@@ -19,7 +19,8 @@
 
 
           <router-link v-else :to="{ name: 'ItemDetails', params: { id: item.Id } }" class="poster-wrapper">
-            <img @error="(e) => handleImageError(e, item.Type)" :src="getImageUrl(item.Id)" :alt="item.Name" class="poster" loading="lazy" />
+            <img @error="(e) => handleImageError(e, item.Type)" :src="getImageUrl(item.Id)" :alt="item.Name"
+              class="poster" loading="lazy" />
           </router-link>
 
 
@@ -87,12 +88,10 @@ async function loadPage() {
       startIndex: startIndex.value,
       limit: limit.value,
     });
-    console.log("pageItems", pageItems)
     items.value = pageItems;
 
     // Heuristique: s'il y a moins d'items que limit, on suppose pas de page suivante
     hasNextPage.value = pageItems.length === limit.value;
-    console.log(hasNextPage)
   } catch (e) {
     error.value = 'Erreur lors du chargement des éléments';
   } finally {

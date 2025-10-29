@@ -26,7 +26,7 @@ import { onMounted, ref } from 'vue';
 import { useJellyfinStore } from './store/jellyfin-store';
 import { useRouter } from 'vue-router';
 
-const jellyfin = useJellyfinStore();
+const store = useJellyfinStore();
 const router = useRouter();
 
 const mediaItems = ref<Array<{ Id: string; Name: string; imageUrl: string }>>([]);
@@ -43,10 +43,10 @@ async function loadMedia() {
   loading.value = true;
   error.value = null;
   try {
-    const libs = await jellyfin.fetchLibraries();
+    const libs = await store.fetchLibraries();
     mediaItems.value = libs.map(lib => ({
       ...lib,
-      imageUrl: jellyfin.getImageUrl(lib.Id, 'Primary', 300, 150) || ''
+      imageUrl: store.getImageUrl(lib.Id, 'Primary', 300, 150) || ''
     }));
   } catch (e) {
     error.value = 'Erreur lors du chargement des médias';
@@ -56,7 +56,7 @@ async function loadMedia() {
 }
 
 async function logout() {
-  await jellyfin.logout();
+  await store.logout();
   router.push({ name: 'login' });
 }
 

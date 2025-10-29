@@ -28,7 +28,6 @@ export const useJellyfinStore = defineStore("jellyfin", {
   actions: {
     initializeApi() {
       if (!this.serverUrl || !this.accessToken) return;
-      console.log("initializeApi", this.serverUrl, this.accessToken);
       const jellyfin = new Jellyfin({
         clientInfo: { name: "Client", version: "1.0.0" },
         deviceInfo: { name: "Desktop", id: `dev-${Date.now()}` },
@@ -58,7 +57,6 @@ export const useJellyfinStore = defineStore("jellyfin", {
     async fetchLibraries() {
       this.initializeApi();
       const libraries = await getLibraryApi(this.api).getMediaFolders();
-      console.log("Libraries =>", libraries);
 
       let Items = libraries.data.Items?.filter(
         (library) => library.CollectionType !== "playlists"
@@ -72,7 +70,6 @@ export const useJellyfinStore = defineStore("jellyfin", {
         limit?: number;
       }
     ) {
-      console.log("fetchItems", libraryId, options);
 
       this.initializeApi();
 
@@ -87,7 +84,6 @@ export const useJellyfinStore = defineStore("jellyfin", {
         startIndex: options?.startIndex ?? 0,
         limit: options?.limit ?? 48,
       });
-      console.log(resp.data.Items);
       this.items = resp.data.Items || [];
       return this.items;
     },
@@ -161,7 +157,6 @@ export const useJellyfinStore = defineStore("jellyfin", {
         limit: opts.limit ?? 20,
         recursive: true,
       });
-      console.log("search", resp.data.Items);
       return resp.data.Items ?? [];
     },
 
@@ -180,7 +175,7 @@ export const useJellyfinStore = defineStore("jellyfin", {
 
     async fetchEpisodes(seasonId: string) {
       this.initializeApi();
-      const resp = await getItemsApithi(this.api).getItems({
+      const resp = await getItemsApi(this.api).getItems({
         userId: this.userId,
         parentId: seasonId,
         includeItemTypes: ["Episode"],

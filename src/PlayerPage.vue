@@ -3,8 +3,14 @@
         <section v-if="error" class="state error">{{ error }}</section>
 
         <div class="video-container" @mousemove="showControls" @mouseleave="hideControls">
+            <!-- Animation de chargement -->
+            <div v-if="isLoading" class="loading-overlay">
+                <div class="spinner"></div>
+            </div>
+
             <video ref="videoEl" class="player" preload="metadata" playsinline :poster="posterUrl"
-                @click="togglePlayPause" @timeupdate="onTimeUpdate" @loadedmetadata="onLoadedMetadata"></video>
+                @click="togglePlayPause" @timeupdate="onTimeUpdate" @loadedmetadata="onLoadedMetadata"
+                @loadstart="onLoadStart" @canplay="onCanPlay" @waiting="onWaiting" @playing="onPlaying"></video>
 
             <!-- Contrôles personnalisés -->
             <div class="player-controls" :class="{ 'show': controlsVisible }">
@@ -160,6 +166,7 @@ const isFullscreen = ref(false);
 const controlsVisible = ref(true);
 const audioMenuOpen = ref(false);
 const subtitleMenuOpen = ref(false);
+const isLoading = ref(true); // AJOUT
 
 const deviceProfile = {
     "StartTimeTicks": 0,
@@ -487,6 +494,23 @@ function formatTime(seconds: number): string {
     return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
+// AJOUT: Événements de chargement
+function onLoadStart() {
+    isLoading.value = true;
+}
+
+function onCanPlay() {
+    isLoading.value = false;
+}
+
+function onWaiting() {
+    isLoading.value = true;
+}
+
+function onPlaying() {
+    isLoading.value = false;
+}
+
 function showControls() {
     controlsVisible.value = true;
     if (controlsTimeout) clearTimeout(controlsTimeout);
@@ -681,6 +705,8 @@ async function initShaka() {
     const video = videoEl.value!;
 
     try {
+        isLoading.value = true; // AJOUT
+
         shaka.polyfill.installAll();
 
         player = new shaka.Player(video);
@@ -707,6 +733,7 @@ async function initShaka() {
             const e = ev.detail;
             console.error('Shaka error:', e);
             error.value = `Erreur Shaka ${e.code}: ${e.data?.[2] || 'Erreur de lecture'}`;
+            isLoading.value = false; // AJOUT
         });
 
         await player.load(hlsUrl.value);
@@ -718,6 +745,7 @@ async function initShaka() {
     } catch (e: any) {
         console.error('Erreur init Shaka:', e);
         error.value = 'Erreur d\'initialisation du lecteur';
+        isLoading.value = false; // AJOUT
     }
 }
 
@@ -725,6 +753,8 @@ async function switchAudio() {
     if (!player || selectedAudioIndex.value === null) return;
 
     console.log('Switching to audio index:', selectedAudioIndex.value);
+
+    isLoading.value = true; // AJOUT
 
     const video = videoEl.value!;
     const wasPlaying = !video.paused;
@@ -783,6 +813,7 @@ async function switchAudio() {
     } catch (e: any) {
         console.error('Erreur switch audio:', e);
         error.value = 'Erreur lors du changement de piste audio';
+        isLoading.value = false; // AJOUT
     }
 }
 
@@ -938,27 +969,6 @@ onBeforeUnmount(() => {
     flex-direction: column;
 }
 
-.player-header {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    z-index: 100;
-    display: grid;
-    grid-template-columns: auto 1fr auto;
-    align-items: center;
-    gap: 12px;
-    padding: 16px;
-    background: linear-gradient(180deg, rgba(0, 0, 0, 0.7) 0%, transparent 100%);
-}
-
-.title {
-    margin: 0;
-    justify-self: center;
-    font-size: 1.4rem;
-    font-weight: 600;
-}
-
 .state.error {
     position: absolute;
     top: 70px;
@@ -982,6 +992,43 @@ onBeforeUnmount(() => {
     width: 100%;
     height: 100%;
     background: #000;
+}
+
+/* AJOUT: Styles loading */
+.loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.9);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+}
+
+.spinner {
+    width: 60px;
+    height: 60px;
+    border: 4px solid rgba(255, 255, 255, 0.1);
+    border-top-color: #00a4dc;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.loading-text {
+    margin-top: 20px;
+    color: #fff;
+    font-size: 1rem;
+    font-weight: 500;
 }
 
 .player-controls {

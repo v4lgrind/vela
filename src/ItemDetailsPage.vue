@@ -460,7 +460,6 @@ const fileSizeHuman = computed(() => {
     color: #181818;
     font-weight: bold;
     border: none;
-    padding: 10px 20px;
     border-radius: 8px;
     font-size: 1.05rem;
 }

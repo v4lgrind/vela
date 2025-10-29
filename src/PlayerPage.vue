@@ -10,7 +10,8 @@
 
             <video ref="videoEl" class="player" preload="metadata" playsinline :poster="posterUrl"
                 @click="togglePlayPause" @timeupdate="onTimeUpdate" @loadedmetadata="onLoadedMetadata"
-                @loadstart="onLoadStart" @canplay="onCanPlay" @waiting="onWaiting" @playing="onPlaying"></video>
+                @dblclick="toggleFullscreen" @loadstart="onLoadStart" @canplay="onCanPlay" @waiting="onWaiting"
+                @playing="onPlaying"></video>
 
             <!-- Contrôles personnalisés -->
             <div class="player-controls" :class="{ 'show': controlsVisible }">
@@ -166,7 +167,9 @@ const isFullscreen = ref(false);
 const controlsVisible = ref(true);
 const audioMenuOpen = ref(false);
 const subtitleMenuOpen = ref(false);
-const isLoading = ref(true); // AJOUT
+const isLoading = ref(true);
+const playSessionId = ref<string>('');
+let progressInterval: NodeJS.Timeout | null = null;
 
 const deviceProfile = {
     "StartTimeTicks": 0,
@@ -494,7 +497,6 @@ function formatTime(seconds: number): string {
     return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-// AJOUT: Événements de chargement
 function onLoadStart() {
     isLoading.value = true;
 }
@@ -509,6 +511,112 @@ function onWaiting() {
 
 function onPlaying() {
     isLoading.value = false;
+}
+
+function generateSessionId(): string {
+    return `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+}
+
+async function reportPlaybackStart() {
+    if (!playSessionId.value) {
+        playSessionId.value = generateSessionId();
+    }
+
+    try {
+        await fetch(`${serverUrl}/Sessions/Playing`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Emby-Token': accessToken
+            },
+            body: JSON.stringify({
+                ItemId: itemId,
+                SessionId: playSessionId.value,
+                MediaSourceId: mediaSource.value?.Id || itemId,
+                PositionTicks: Math.floor((videoEl.value?.currentTime || 0) * 10000000),
+                IsPaused: false,
+                IsMuted: videoEl.value?.muted || false,
+                VolumeLevel: Math.floor((videoEl.value?.volume || 1) * 100),
+                PlayMethod: 'Transcode',
+                PlaySessionId: playSessionId.value,
+                AudioStreamIndex: selectedAudioIndex.value,
+                SubtitleStreamIndex: selectedSubtitleIndex.value !== '-1' ? parseInt(selectedSubtitleIndex.value) : null
+            })
+        });
+        console.log('Playback start reported');
+    } catch (error) {
+        console.error('Error reporting playback start:', error);
+    }
+}
+
+async function reportPlaybackProgress() {
+    try {
+        await fetch(`${serverUrl}/Sessions/Playing/Progress`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Emby-Token': accessToken
+            },
+            body: JSON.stringify({
+                ItemId: itemId,
+                SessionId: playSessionId.value,
+                MediaSourceId: mediaSource.value?.Id || itemId,
+                PositionTicks: Math.floor((videoEl.value?.currentTime || 0) * 10000000),
+                IsPaused: !isPlaying.value,
+                IsMuted: videoEl.value?.muted || false,
+                VolumeLevel: Math.floor((videoEl.value?.volume || 1) * 100),
+                PlayMethod: 'Transcode',
+                PlaySessionId: playSessionId.value,
+                AudioStreamIndex: selectedAudioIndex.value,
+                SubtitleStreamIndex: selectedSubtitleIndex.value !== '-1' ? parseInt(selectedSubtitleIndex.value) : null
+            })
+        });
+        console.log('Playback progress reported:', videoEl.value?.currentTime);
+    } catch (error) {
+        console.error('Error reporting playback progress:', error);
+    }
+}
+
+async function reportPlaybackStopped() {
+    try {
+        await fetch(`${serverUrl}/Sessions/Playing/Stopped`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Emby-Token': accessToken
+            },
+            body: JSON.stringify({
+                ItemId: itemId,
+                SessionId: playSessionId.value,
+                MediaSourceId: mediaSource.value?.Id || itemId,
+                PositionTicks: Math.floor((videoEl.value?.currentTime || 0) * 10000000),
+                PlaySessionId: playSessionId.value
+            })
+        });
+        console.log('Playback stopped reported');
+    } catch (error) {
+        console.error('Error reporting playback stopped:', error);
+    }
+}
+
+function startProgressReporting() {
+    if (progressInterval) {
+        clearInterval(progressInterval);
+    }
+
+    reportPlaybackStart();
+
+    progressInterval = setInterval(() => {
+        reportPlaybackProgress();
+    }, 10000);
+}
+
+function stopProgressReporting() {
+    if (progressInterval) {
+        clearInterval(progressInterval);
+        progressInterval = null;
+    }
+    reportPlaybackStopped();
 }
 
 function showControls() {
@@ -535,9 +643,11 @@ function togglePlayPause() {
     if (video.paused) {
         video.play();
         isPlaying.value = true;
+        reportPlaybackProgress();
     } else {
         video.pause();
         isPlaying.value = false;
+        reportPlaybackProgress();
     }
 }
 
@@ -563,6 +673,8 @@ function seek(e: MouseEvent) {
     const width = progressBar.offsetWidth;
     const video = videoEl.value!;
     video.currentTime = (clickX / width) * duration.value;
+
+    reportPlaybackProgress();
 }
 
 function toggleFullscreen() {
@@ -705,7 +817,7 @@ async function initShaka() {
     const video = videoEl.value!;
 
     try {
-        isLoading.value = true; // AJOUT
+        isLoading.value = true;
 
         shaka.polyfill.installAll();
 
@@ -733,19 +845,32 @@ async function initShaka() {
             const e = ev.detail;
             console.error('Shaka error:', e);
             error.value = `Erreur Shaka ${e.code}: ${e.data?.[2] || 'Erreur de lecture'}`;
-            isLoading.value = false; // AJOUT
+            isLoading.value = false;
         });
 
         await player.load(hlsUrl.value);
 
-        video.addEventListener('play', () => { isPlaying.value = true; });
-        video.addEventListener('pause', () => { isPlaying.value = false; });
+        video.addEventListener('play', () => {
+            isPlaying.value = true;
+            if (!progressInterval) {
+                startProgressReporting();
+            }
+        });
+
+        video.addEventListener('pause', () => {
+            isPlaying.value = false;
+            reportPlaybackProgress();
+        });
+
+        video.addEventListener('ended', () => {
+            stopProgressReporting();
+        });
 
         video.play().catch(() => { });
     } catch (e: any) {
         console.error('Erreur init Shaka:', e);
         error.value = 'Erreur d\'initialisation du lecteur';
-        isLoading.value = false; // AJOUT
+        isLoading.value = false;
     }
 }
 
@@ -754,7 +879,9 @@ async function switchAudio() {
 
     console.log('Switching to audio index:', selectedAudioIndex.value);
 
-    isLoading.value = true; // AJOUT
+    stopProgressReporting();
+
+    isLoading.value = true;
 
     const video = videoEl.value!;
     const wasPlaying = !video.paused;
@@ -813,7 +940,7 @@ async function switchAudio() {
     } catch (e: any) {
         console.error('Erreur switch audio:', e);
         error.value = 'Erreur lors du changement de piste audio';
-        isLoading.value = false; // AJOUT
+        isLoading.value = false;
     }
 }
 
@@ -948,9 +1075,15 @@ onMounted(async () => {
     document.addEventListener('fullscreenchange', () => {
         isFullscreen.value = !!document.fullscreenElement;
     });
+
+    window.addEventListener('beforeunload', () => {
+        stopProgressReporting();
+    });
 });
 
 onBeforeUnmount(() => {
+    stopProgressReporting();
+
     if (player) {
         player.destroy().catch(() => { });
         player = null;
@@ -958,6 +1091,7 @@ onBeforeUnmount(() => {
     if (controlsTimeout) clearTimeout(controlsTimeout);
 });
 </script>
+
 
 <style scoped>
 .player-page {

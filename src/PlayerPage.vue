@@ -443,6 +443,7 @@ function selectSubtitle(index: string) {
 
 function onTimeUpdate() {
     const media = isAudioOnly.value ? audioEl.value! : videoEl.value!;
+    if (media === null) return;
     currentTime.value = media.currentTime;
     if (duration.value > 0) {
         progress.value = (media.currentTime / duration.value) * 100;
@@ -681,6 +682,9 @@ async function initShaka() {
 
         await player.load(hlsUrl.value);
 
+        await preloadAllSubtitles();
+
+
         video.addEventListener('play', () => {
             isPlaying.value = true;
             if (!progressInterval) {
@@ -791,41 +795,42 @@ async function switchSubtitle() {
     }
 
     const subIndex = parseInt(selected);
-    const subtitle = subtitleList.value.find(s => s.index === subIndex);
-
-    if (!subtitle) return;
 
     try {
-        const vttUrl = `${serverUrl}/Videos/${itemId}/${mediaSource.value?.Id || itemId}/Subtitles/${subIndex}/0/Stream.vtt?api_key=${accessToken}`;
-
-        await player.addTextTrackAsync(
-            vttUrl,
-            subtitle.language || 'und',
-            'subtitles',
-            'text/vtt',
-            subtitle.codec,
-            subtitle.label
-        );
-
-        player.setTextTrackVisibility(true);
-
+        // Les pistes sont déjà chargées, il suffit de les sélectionner
         const tracks = player.getTextTracks();
-        if (tracks.length > 0) {
-            player.selectTextTrack(tracks[tracks.length - 1]);
+        const targetTrack = tracks.find(t => t.language === subtitleList.value.find(s => s.index === subIndex)?.language);
+
+        if (targetTrack) {
+            player.selectTextTrack(targetTrack);
+            player.setTextTrackVisibility(true);
+            console.log('Sous-titre activé instantanément');
         }
 
     } catch (e: any) {
-        console.error('Erreur chargement sous-titres:', e);
-        error.value = 'Impossible de charger les sous-titres';
+        console.error('Erreur activation sous-titres:', e);
+        error.value = `Impossible d'activer les sous-titres: ${e.message}`;
     }
 }
 
 function srtToVtt(srt: string) {
-    const vttBody = srt
-        .replace(/\r/g, '')
-        .replace(/^\d+\s*$/gm, '')
-        .replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2');
-    return `WEBVTT\n\n${vttBody}`;
+    // Nettoyer le fichier SRT
+    let vtt = srt
+        .replace(/\r\n/g, '\n')  // Normaliser les sauts de ligne
+        .replace(/\r/g, '\n')
+        .trim();
+
+    // Supprimer les numéros de séquence
+    vtt = vtt.replace(/^\d+\s*$/gm, '');
+
+    // Remplacer les virgules par des points dans les timestamps
+    vtt = vtt.replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2');
+
+    // Supprimer les lignes vides multiples
+    vtt = vtt.replace(/\n{3,}/g, '\n\n');
+
+    // Ajouter l'en-tête WEBVTT
+    return `WEBVTT\n\n${vtt}`;
 }
 
 async function onPickSubtitleFile(e: Event) {
@@ -850,24 +855,33 @@ async function onPickSubtitleFile(e: Event) {
         } else if (isSrt) {
             vttContent = srtToVtt(text);
         } else {
-            error.value = 'Format de sous-titre non supporté';
+            error.value = 'Format de sous-titre non supporté. Utilisez .vtt ou .srt';
             selectedSubtitleIndex.value = '-1';
             return;
         }
 
-        const blob = new Blob([vttContent], { type: 'text/vtt' });
+        // AJOUTER: Valider le format VTT
+        if (!vttContent.trim().startsWith('WEBVTT')) {
+            vttContent = 'WEBVTT\n\n' + vttContent;
+        }
+
+        const blob = new Blob([vttContent], { type: 'text/vtt; charset=utf-8' });
         const blobUrl = URL.createObjectURL(blob);
 
-        const m = name.match(/\.(fr|eng|en|spa|es|de|it|pt|jp|ja|zh|ru)\./i);
+        // Extraire la langue du nom de fichier
+        const m = name.match(/\.(fr|fra|fre|eng|en|spa|es|de|it|pt|jp|ja|zh|ru)\./i);
         const lang = m ? m[1].toLowerCase() : 'und';
 
         if (player) {
+            // Désactiver les anciennes pistes
+            player.setTextTrackVisibility(false);
+
             await player.addTextTrackAsync(
                 blobUrl,
                 lang,
                 'subtitles',
                 'text/vtt',
-                '',
+                null,  // CHANGER: null au lieu de chaîne vide
                 name
             );
 
@@ -877,15 +891,50 @@ async function onPickSubtitleFile(e: Event) {
             if (tracks.length > 0) {
                 player.selectTextTrack(tracks[tracks.length - 1]);
             }
+
+            console.log('Sous-titre local chargé:', name);
         }
 
-    } catch (err) {
-        error.value = 'Échec de chargement du sous-titre local';
+    } catch (err: any) {
+        console.error('Erreur chargement sous-titre local:', err);
+        error.value = `Échec de chargement: ${err.message}`;
         selectedSubtitleIndex.value = '-1';
     } finally {
         if (fileInput.value) fileInput.value.value = '';
     }
 }
+
+async function preloadAllSubtitles() {
+    if (!player || !subtitleList.value.length) return;
+
+    console.log('Préchargement de tous les sous-titres...');
+
+    for (const subtitle of subtitleList.value) {
+        try {
+            const mediaSourceId = mediaSource.value?.Id || itemId;
+            const vttUrl = `${serverUrl}/Videos/${itemId}/${mediaSourceId}/Subtitles/${subtitle.index}/Stream.vtt?api_key=${accessToken}`;
+
+            await player.addTextTrackAsync(
+                vttUrl,
+                subtitle.language || 'und',
+                'subtitles',
+                'text/vtt',
+                null,
+                subtitle.label
+            );
+
+            console.log(`Sous-titre ${subtitle.label} ajouté`);
+        } catch (e) {
+            console.log(`Erreur ajout ${subtitle.label}:`, e);
+        }
+    }
+
+    // Désactiver tous les sous-titres par défaut
+    player.setTextTrackVisibility(false);
+
+    console.log('Tous les sous-titres sont prêts');
+}
+
 
 onMounted(async () => {
     await loadDetails();

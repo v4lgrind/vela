@@ -1,11 +1,5 @@
 <template>
     <div class="details-page">
-        <header class="details-header">
-            <button class="btn ghost" @click="$router.back()">← Retour</button>
-            <h2 class="title">{{ item?.Name || 'Détails' }}</h2>
-            <router-link class="btn home" :to="{ name: 'libraries' }">🏠 Accueil</router-link>
-        </header>
-
         <section v-if="loading" class="state">Chargement...</section>
         <section v-else-if="error" class="state error">{{ error }}</section>
 
@@ -119,7 +113,8 @@
             <div ref="castRail" class="scroller-rail" role="list" aria-label="Distribution">
                 <div v-for="p in cast" :key="p.Id || p.Name" class="scroller-item" role="listitem" :title="p.Name">
                     <div class="avatar">
-                        <img :src="personImageUrl(p)" :alt="p.Name" loading="lazy" />
+                        <img @error="(e) => handleImageError(e, item.Type)" :src="personImageUrl(p)" :alt="p.Name"
+                            loading="lazy" />
                     </div>
                     <div class="cast-meta">
                         <div class="cast-name">{{ p.Name }}</div>

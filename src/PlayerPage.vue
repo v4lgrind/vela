@@ -6,12 +6,29 @@
             <!-- Animation de chargement -->
             <div v-if="isLoading" class="loading-overlay">
                 <div class="spinner"></div>
+                <p class="loading-text">Chargement...</p>
             </div>
 
-            <video ref="videoEl" class="player" preload="metadata" playsinline :poster="posterUrl"
+            <!-- Lecteur vidéo -->
+            <video v-if="!isAudioOnly" ref="videoEl" class="player" preload="metadata" playsinline :poster="posterUrl"
                 @click="togglePlayPause" @timeupdate="onTimeUpdate" @loadedmetadata="onLoadedMetadata"
-                @dblclick="toggleFullscreen" @loadstart="onLoadStart" @canplay="onCanPlay" @waiting="onWaiting"
-                @playing="onPlaying"></video>
+                @loadstart="onLoadStart" @canplay="onCanPlay" @waiting="onWaiting" @playing="onPlaying">
+            </video>
+
+            <!-- Lecteur audio -->
+            <div v-else class="audio-player" @click="togglePlayPause">
+                <audio ref="audioEl" preload="metadata">
+                </audio>
+
+                <!-- Affichage pour l'audio -->
+                <div class="audio-display">
+                    <img v-if="posterUrl" :src="posterUrl" class="audio-cover" alt="Cover">
+                    <div class="audio-info">
+                        <h2 class="audio-title">{{ details?.Name || 'Lecture audio' }}</h2>
+                        <p class="audio-artist">{{ details?.AlbumArtist || details?.Artists?.join(', ') || '' }}</p>
+                    </div>
+                </div>
+            </div>
 
             <!-- Contrôles personnalisés -->
             <div class="player-controls" :class="{ 'show': controlsVisible }">
@@ -58,8 +75,8 @@
                     </div>
 
                     <div class="controls-right">
-                        <!-- Bouton Audio -->
-                        <div class="dropdown" ref="audioDropdown">
+                        <!-- Bouton Audio (seulement pour vidéo) -->
+                        <div v-if="!isAudioOnly && audioList.length > 0" class="dropdown" ref="audioDropdown">
                             <button class="control-btn" @click="toggleAudioMenu">
                                 <svg viewBox="0 0 24 24" fill="currentColor">
                                     <path
@@ -77,8 +94,8 @@
                             </div>
                         </div>
 
-                        <!-- Bouton Sous-titres -->
-                        <div class="dropdown" ref="subtitleDropdown">
+                        <!-- Bouton Sous-titres (seulement pour vidéo) -->
+                        <div v-if="!isAudioOnly && subtitleList.length > 0" class="dropdown" ref="subtitleDropdown">
                             <button class="control-btn" @click="toggleSubtitleMenu">
                                 <svg viewBox="0 0 24 24" fill="currentColor">
                                     <path
@@ -126,11 +143,14 @@
     </div>
 </template>
 
+
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useRoute } from 'vue-router';
 import { useJellyfinStore } from './store/jellyfin-store';
 import shaka from 'shaka-player/dist/shaka-player.compiled.js';
+import { router } from './router';
+import { deviceProfile } from './constants';
 
 const route = useRoute();
 const store = useJellyfinStore();
@@ -140,6 +160,7 @@ const accessToken = store.accessToken || '';
 const serverUrl = store.serverUrl;
 
 const videoEl = ref<HTMLVideoElement | null>(null);
+const audioEl = ref<HTMLAudioElement | null>(null);
 const fileInput = ref<HTMLInputElement | null>(null);
 const audioDropdown = ref<HTMLElement | null>(null);
 const subtitleDropdown = ref<HTMLElement | null>(null);
@@ -168,316 +189,14 @@ const controlsVisible = ref(true);
 const audioMenuOpen = ref(false);
 const subtitleMenuOpen = ref(false);
 const isLoading = ref(true);
+
+// Type de média
+const mediaType = ref<'Video' | 'Audio'>('Video');
+const isAudioOnly = computed(() => mediaType.value === 'Audio');
+
+// Variables pour le suivi de lecture
 const playSessionId = ref<string>('');
 let progressInterval: NodeJS.Timeout | null = null;
-
-const deviceProfile = {
-    "StartTimeTicks": 0,
-    "IsPlayback": true,
-    "AutoOpenLiveStream": true,
-    "AudioStreamIndex": null,
-    "SubtitleStreamIndex": null,
-    "MaxStreamingBitrate": 140000000,
-    "AlwaysBurnInSubtitleWhenTranscoding": false,
-    "EnableAllProbes": true,
-    "DeviceProfile": {
-        "MaxStreamingBitrate": 120000000,
-        "MaxStaticBitrate": 100000000,
-        "MusicStreamingTranscodingBitrate": 384000,
-        "DirectPlayProfiles": [
-            {
-                "Container": "webm",
-                "Type": "Video",
-                "VideoCodec": "vp8,vp9,av1",
-                "AudioCodec": "vorbis,opus"
-            },
-            {
-                "Container": "mp4,m4v",
-                "Type": "Video",
-                "VideoCodec": "h264,hevc,vp9,av1",
-                "AudioCodec": "aac,mp3,mp2,opus,flac,vorbis"
-            },
-            {
-                "Container": "mov",
-                "Type": "Video",
-                "VideoCodec": "h264",
-                "AudioCodec": "aac,mp3,mp2,opus,flac,vorbis"
-            },
-            { "Container": "opus", "Type": "Audio" },
-            { "Container": "webm", "AudioCodec": "opus", "Type": "Audio" },
-            { "Container": "ts", "AudioCodec": "mp3", "Type": "Audio" },
-            { "Container": "mp3", "Type": "Audio" },
-            { "Container": "aac", "Type": "Audio" },
-            { "Container": "m4a", "AudioCodec": "aac", "Type": "Audio" },
-            { "Container": "m4b", "AudioCodec": "aac", "Type": "Audio" },
-            { "Container": "flac", "Type": "Audio" },
-            { "Container": "webma", "Type": "Audio" },
-            { "Container": "webm", "AudioCodec": "webma", "Type": "Audio" },
-            { "Container": "wav", "Type": "Audio" },
-            { "Container": "ogg", "Type": "Audio" },
-            {
-                "Container": "hls",
-                "Type": "Video",
-                "VideoCodec": "av1,hevc,h264,vp9",
-                "AudioCodec": "aac,mp2,opus,flac"
-            },
-            {
-                "Container": "hls",
-                "Type": "Video",
-                "VideoCodec": "h264",
-                "AudioCodec": "aac,mp3,mp2"
-            }
-        ],
-        "TranscodingProfiles": [
-            {
-                "Container": "mp4",
-                "Type": "Audio",
-                "AudioCodec": "aac",
-                "Context": "Streaming",
-                "Protocol": "hls",
-                "MaxAudioChannels": "2",
-                "MinSegments": "1",
-                "BreakOnNonKeyFrames": true,
-                "EnableAudioVbrEncoding": true
-            },
-            {
-                "Container": "aac",
-                "Type": "Audio",
-                "AudioCodec": "aac",
-                "Context": "Streaming",
-                "Protocol": "http",
-                "MaxAudioChannels": "2"
-            },
-            {
-                "Container": "mp3",
-                "Type": "Audio",
-                "AudioCodec": "mp3",
-                "Context": "Streaming",
-                "Protocol": "http",
-                "MaxAudioChannels": "2"
-            },
-            {
-                "Container": "opus",
-                "Type": "Audio",
-                "AudioCodec": "opus",
-                "Context": "Streaming",
-                "Protocol": "http",
-                "MaxAudioChannels": "2"
-            },
-            {
-                "Container": "wav",
-                "Type": "Audio",
-                "AudioCodec": "wav",
-                "Context": "Streaming",
-                "Protocol": "http",
-                "MaxAudioChannels": "2"
-            },
-            {
-                "Container": "opus",
-                "Type": "Audio",
-                "AudioCodec": "opus",
-                "Context": "Static",
-                "Protocol": "http",
-                "MaxAudioChannels": "2"
-            },
-            {
-                "Container": "mp3",
-                "Type": "Audio",
-                "AudioCodec": "mp3",
-                "Context": "Static",
-                "Protocol": "http",
-                "MaxAudioChannels": "2"
-            },
-            {
-                "Container": "aac",
-                "Type": "Audio",
-                "AudioCodec": "aac",
-                "Context": "Static",
-                "Protocol": "http",
-                "MaxAudioChannels": "2"
-            },
-            {
-                "Container": "wav",
-                "Type": "Audio",
-                "AudioCodec": "wav",
-                "Context": "Static",
-                "Protocol": "http",
-                "MaxAudioChannels": "2"
-            },
-            {
-                "Container": "mp4",
-                "Type": "Video",
-                "AudioCodec": "aac,mp2,opus,flac",
-                "VideoCodec": "av1,hevc,h264,vp9",
-                "Context": "Streaming",
-                "Protocol": "hls",
-                "MaxAudioChannels": "2",
-                "MinSegments": "1",
-                "BreakOnNonKeyFrames": true
-            },
-            {
-                "Container": "ts",
-                "Type": "Video",
-                "AudioCodec": "aac,mp3,mp2",
-                "VideoCodec": "h264",
-                "Context": "Streaming",
-                "Protocol": "hls",
-                "MaxAudioChannels": "2",
-                "MinSegments": "1",
-                "BreakOnNonKeyFrames": true,
-                "EnableSubtitlesInManifest": true
-            }
-        ],
-        "ContainerProfiles": [],
-        "CodecProfiles": [
-            {
-                "Type": "VideoAudio",
-                "Codec": "aac",
-                "Conditions": [
-                    {
-                        "Condition": "Equals",
-                        "Property": "IsSecondaryAudio",
-                        "Value": "false",
-                        "IsRequired": false
-                    }
-                ]
-            },
-            {
-                "Type": "VideoAudio",
-                "Conditions": [
-                    {
-                        "Condition": "Equals",
-                        "Property": "IsSecondaryAudio",
-                        "Value": "false",
-                        "IsRequired": false
-                    }
-                ]
-            },
-            {
-                "Type": "Video",
-                "Codec": "h264",
-                "Conditions": [
-                    {
-                        "Condition": "NotEquals",
-                        "Property": "IsAnamorphic",
-                        "Value": "true",
-                        "IsRequired": false
-                    },
-                    {
-                        "Condition": "EqualsAny",
-                        "Property": "VideoProfile",
-                        "Value": "high|main|baseline|constrained baseline|high 10",
-                        "IsRequired": false
-                    },
-                    {
-                        "Condition": "EqualsAny",
-                        "Property": "VideoRangeType",
-                        "Value": "SDR",
-                        "IsRequired": false
-                    },
-                    {
-                        "Condition": "LessThanEqual",
-                        "Property": "VideoLevel",
-                        "Value": "52",
-                        "IsRequired": false
-                    },
-                    {
-                        "Condition": "NotEquals",
-                        "Property": "IsInterlaced",
-                        "Value": "true",
-                        "IsRequired": false
-                    }
-                ]
-            },
-            {
-                "Type": "Video",
-                "Codec": "hevc",
-                "Conditions": [
-                    {
-                        "Condition": "NotEquals",
-                        "Property": "IsAnamorphic",
-                        "Value": "true",
-                        "IsRequired": false
-                    },
-                    {
-                        "Condition": "EqualsAny",
-                        "Property": "VideoProfile",
-                        "Value": "main|main 10",
-                        "IsRequired": false
-                    },
-                    {
-                        "Condition": "EqualsAny",
-                        "Property": "VideoRangeType",
-                        "Value": "SDR|HDR10|HLG",
-                        "IsRequired": false
-                    },
-                    {
-                        "Condition": "LessThanEqual",
-                        "Property": "VideoLevel",
-                        "Value": "183",
-                        "IsRequired": false
-                    },
-                    {
-                        "Condition": "NotEquals",
-                        "Property": "IsInterlaced",
-                        "Value": "true",
-                        "IsRequired": false
-                    }
-                ]
-            },
-            {
-                "Type": "Video",
-                "Codec": "vp9",
-                "Conditions": [
-                    {
-                        "Condition": "EqualsAny",
-                        "Property": "VideoRangeType",
-                        "Value": "SDR|HDR10|HLG",
-                        "IsRequired": false
-                    }
-                ]
-            },
-            {
-                "Type": "Video",
-                "Codec": "av1",
-                "Conditions": [
-                    {
-                        "Condition": "NotEquals",
-                        "Property": "IsAnamorphic",
-                        "Value": "true",
-                        "IsRequired": false
-                    },
-                    {
-                        "Condition": "EqualsAny",
-                        "Property": "VideoProfile",
-                        "Value": "main",
-                        "IsRequired": false
-                    },
-                    {
-                        "Condition": "EqualsAny",
-                        "Property": "VideoRangeType",
-                        "Value": "SDR|HDR10|HLG",
-                        "IsRequired": false
-                    },
-                    {
-                        "Condition": "LessThanEqual",
-                        "Property": "VideoLevel",
-                        "Value": "19",
-                        "IsRequired": false
-                    }
-                ]
-            }
-        ],
-        "SubtitleProfiles": [
-            { "Format": "vtt", "Method": "External" },
-            { "Format": "ass", "Method": "External" },
-            { "Format": "ssa", "Method": "External" }
-        ],
-        "ResponseProfiles": [
-            { "Type": "Video", "Container": "m4v", "MimeType": "video/mp4" }
-        ]
-    }
-};
 
 const posterUrl = computed(
     () => store.getImageUrl(itemId, 'Primary') || ''
@@ -485,6 +204,7 @@ const posterUrl = computed(
 
 const hlsUrl = ref<string>('');
 const baseTranscodingUrl = ref<string>('');
+const audioUrl = ref<string>('');
 
 function formatTime(seconds: number): string {
     if (!seconds || isNaN(seconds)) return '0:00';
@@ -522,6 +242,8 @@ async function reportPlaybackStart() {
         playSessionId.value = generateSessionId();
     }
 
+    const media = isAudioOnly.value ? audioEl.value : videoEl.value;
+
     try {
         await fetch(`${serverUrl}/Sessions/Playing`, {
             method: 'POST',
@@ -533,14 +255,14 @@ async function reportPlaybackStart() {
                 ItemId: itemId,
                 SessionId: playSessionId.value,
                 MediaSourceId: mediaSource.value?.Id || itemId,
-                PositionTicks: Math.floor((videoEl.value?.currentTime || 0) * 10000000),
+                PositionTicks: Math.floor((media?.currentTime || 0) * 10000000),
                 IsPaused: false,
-                IsMuted: videoEl.value?.muted || false,
-                VolumeLevel: Math.floor((videoEl.value?.volume || 1) * 100),
-                PlayMethod: 'Transcode',
+                IsMuted: media?.muted || false,
+                VolumeLevel: Math.floor((media?.volume || 1) * 100),
+                PlayMethod: isAudioOnly.value ? 'DirectStream' : 'Transcode',
                 PlaySessionId: playSessionId.value,
                 AudioStreamIndex: selectedAudioIndex.value,
-                SubtitleStreamIndex: selectedSubtitleIndex.value !== '-1' ? parseInt(selectedSubtitleIndex.value) : null
+                SubtitleStreamIndex: !isAudioOnly.value && selectedSubtitleIndex.value !== '-1' ? parseInt(selectedSubtitleIndex.value) : null
             })
         });
         console.log('Playback start reported');
@@ -550,6 +272,8 @@ async function reportPlaybackStart() {
 }
 
 async function reportPlaybackProgress() {
+    const media = isAudioOnly.value ? audioEl.value : videoEl.value;
+
     try {
         await fetch(`${serverUrl}/Sessions/Playing/Progress`, {
             method: 'POST',
@@ -561,23 +285,25 @@ async function reportPlaybackProgress() {
                 ItemId: itemId,
                 SessionId: playSessionId.value,
                 MediaSourceId: mediaSource.value?.Id || itemId,
-                PositionTicks: Math.floor((videoEl.value?.currentTime || 0) * 10000000),
+                PositionTicks: Math.floor((media?.currentTime || 0) * 10000000),
                 IsPaused: !isPlaying.value,
-                IsMuted: videoEl.value?.muted || false,
-                VolumeLevel: Math.floor((videoEl.value?.volume || 1) * 100),
-                PlayMethod: 'Transcode',
+                IsMuted: media?.muted || false,
+                VolumeLevel: Math.floor((media?.volume || 1) * 100),
+                PlayMethod: isAudioOnly.value ? 'DirectStream' : 'Transcode',
                 PlaySessionId: playSessionId.value,
                 AudioStreamIndex: selectedAudioIndex.value,
-                SubtitleStreamIndex: selectedSubtitleIndex.value !== '-1' ? parseInt(selectedSubtitleIndex.value) : null
+                SubtitleStreamIndex: !isAudioOnly.value && selectedSubtitleIndex.value !== '-1' ? parseInt(selectedSubtitleIndex.value) : null
             })
         });
-        console.log('Playback progress reported:', videoEl.value?.currentTime);
+        console.log('Playback progress reported:', media?.currentTime);
     } catch (error) {
         console.error('Error reporting playback progress:', error);
     }
 }
 
 async function reportPlaybackStopped() {
+    const media = isAudioOnly.value ? audioEl.value : videoEl.value;
+
     try {
         await fetch(`${serverUrl}/Sessions/Playing/Stopped`, {
             method: 'POST',
@@ -589,7 +315,7 @@ async function reportPlaybackStopped() {
                 ItemId: itemId,
                 SessionId: playSessionId.value,
                 MediaSourceId: mediaSource.value?.Id || itemId,
-                PositionTicks: Math.floor((videoEl.value?.currentTime || 0) * 10000000),
+                PositionTicks: Math.floor((media?.currentTime || 0) * 10000000),
                 PlaySessionId: playSessionId.value
             })
         });
@@ -639,40 +365,41 @@ function hideControls() {
 }
 
 function togglePlayPause() {
-    const video = videoEl.value!;
-    if (video.paused) {
-        video.play();
+    const media = isAudioOnly.value ? audioEl.value! : videoEl.value!;
+
+    if (media.paused) {
+        media.play();
         isPlaying.value = true;
         reportPlaybackProgress();
     } else {
-        video.pause();
+        media.pause();
         isPlaying.value = false;
         reportPlaybackProgress();
     }
 }
 
 function toggleMute() {
-    const video = videoEl.value!;
-    video.muted = !video.muted;
-    if (video.muted) {
+    const media = isAudioOnly.value ? audioEl.value! : videoEl.value!;
+    media.muted = !media.muted;
+    if (media.muted) {
         volume.value = 0;
     } else {
-        volume.value = video.volume * 100;
+        volume.value = media.volume * 100;
     }
 }
 
 function setVolume() {
-    const video = videoEl.value!;
-    video.volume = volume.value / 100;
-    video.muted = volume.value === 0;
+    const media = isAudioOnly.value ? audioEl.value! : videoEl.value!;
+    media.volume = volume.value / 100;
+    media.muted = volume.value === 0;
 }
 
 function seek(e: MouseEvent) {
     const progressBar = (e.currentTarget as HTMLElement);
     const clickX = e.offsetX;
     const width = progressBar.offsetWidth;
-    const video = videoEl.value!;
-    video.currentTime = (clickX / width) * duration.value;
+    const media = isAudioOnly.value ? audioEl.value! : videoEl.value!;
+    media.currentTime = (clickX / width) * duration.value;
 
     reportPlaybackProgress();
 }
@@ -715,17 +442,17 @@ function selectSubtitle(index: string) {
 }
 
 function onTimeUpdate() {
-    const video = videoEl.value!;
-    currentTime.value = video.currentTime;
+    const media = isAudioOnly.value ? audioEl.value! : videoEl.value!;
+    currentTime.value = media.currentTime;
     if (duration.value > 0) {
-        progress.value = (video.currentTime / duration.value) * 100;
+        progress.value = (media.currentTime / duration.value) * 100;
     }
 }
 
 function onLoadedMetadata() {
-    const video = videoEl.value!;
-    duration.value = video.duration;
-    volume.value = video.volume * 100;
+    const media = isAudioOnly.value ? audioEl.value! : videoEl.value!;
+    duration.value = media.duration;
+    volume.value = media.volume * 100;
 }
 
 async function loadDetails() {
@@ -738,6 +465,110 @@ async function loadDetails() {
         error.value = 'Impossible de charger les détails média';
     }
 }
+
+async function determineMediaType() {
+    try {
+        const item = await store.fetchItemDetails(itemId);
+
+        if (item.Type === 'Audio' || item.Type === 'MusicAlbum' || item.MediaType === 'Audio') {
+            mediaType.value = 'Audio';
+        } else {
+            mediaType.value = 'Video';
+        }
+
+        console.log('Media type:', mediaType.value);
+    } catch (e) {
+        console.error('Error determining media type:', e);
+        mediaType.value = 'Video';
+    }
+}
+
+async function initAudioPlayer() {
+    const audio = audioEl.value!;
+
+    try {
+        isLoading.value = true;
+
+        const params = new URLSearchParams({
+            userId: store.userId || '',
+            api_key: accessToken,
+            MaxStreamingBitrate: '140000000',
+            Container: 'opus,webm|opus,mp3,aac,m4a|aac,m4b|aac,flac,webma,webm|webma,wav,ogg',
+            TranscodingContainer: 'ts',
+            TranscodingProtocol: 'hls',
+            AudioCodec: 'aac'
+        });
+
+        audioUrl.value = `${serverUrl}/Audio/${itemId}/universal?${params.toString()}`;
+
+        console.log('Audio URL:', audioUrl.value);
+
+        audio.src = audioUrl.value;
+        audio.load();
+
+        // SUPPRIMER les anciens listeners pour éviter les doublons
+        // audio.removeEventListener('play', onPlayHandler);
+        // audio.removeEventListener('pause', onPauseHandler);
+        // audio.removeEventListener('ended', onEndedHandler);
+
+        // Créer des handlers nommés pour pouvoir les supprimer
+        const onPlayHandler = () => {
+            isPlaying.value = true;
+            if (!progressInterval) {
+                startProgressReporting();
+            }
+        };
+
+        const onPauseHandler = () => {
+            isPlaying.value = false;
+            reportPlaybackProgress();
+
+        };
+
+        const onEndedHandler = () => {
+            stopProgressReporting();
+            handleTrackEnded();
+        };
+
+        // Attacher les nouveaux listeners
+        audio.addEventListener('play', onPlayHandler);
+        audio.addEventListener('pause', onPauseHandler);
+        audio.addEventListener('ended', onEndedHandler);
+
+        audio.addEventListener('timeupdate', () => {
+            currentTime.value = audio.currentTime;
+            if (duration.value > 0) {
+                progress.value = (audio.currentTime / duration.value) * 100;
+            }
+        });
+
+        audio.addEventListener('loadedmetadata', () => {
+            duration.value = audio.duration;
+            volume.value = audio.volume * 100;
+            isLoading.value = false;
+        });
+
+        audio.addEventListener('canplay', () => {
+            isLoading.value = false;
+        });
+
+        audio.addEventListener('waiting', () => {
+            isLoading.value = true;
+        });
+
+        audio.addEventListener('playing', () => {
+            isLoading.value = false;
+        });
+
+        audio.play().catch(() => { });
+
+    } catch (e: any) {
+        console.error('Erreur init audio player:', e);
+        error.value = 'Erreur d\'initialisation du lecteur audio';
+        isLoading.value = false;
+    }
+}
+
 
 async function getPlaybackUrl() {
     try {
@@ -1058,9 +889,15 @@ async function onPickSubtitleFile(e: Event) {
 
 onMounted(async () => {
     await loadDetails();
-    await getPlaybackUrl();
-    if (hlsUrl.value) {
-        await initShaka();
+    await determineMediaType();
+
+    if (isAudioOnly.value) {
+        await initAudioPlayer();
+    } else {
+        await getPlaybackUrl();
+        if (hlsUrl.value) {
+            await initShaka();
+        }
     }
 
     document.addEventListener('click', (e) => {
@@ -1088,10 +925,16 @@ onBeforeUnmount(() => {
         player.destroy().catch(() => { });
         player = null;
     }
+
+    if (audioEl.value) {
+        audioEl.value.pause();
+        audioEl.value.src = '';
+    }
+
     if (controlsTimeout) clearTimeout(controlsTimeout);
 });
-</script>
 
+</script>
 
 <style scoped>
 .player-page {
@@ -1128,7 +971,6 @@ onBeforeUnmount(() => {
     background: #000;
 }
 
-/* AJOUT: Styles loading */
 .loading-overlay {
     position: absolute;
     top: 0;
@@ -1163,6 +1005,48 @@ onBeforeUnmount(() => {
     color: #fff;
     font-size: 1rem;
     font-weight: 500;
+}
+
+.audio-player {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+}
+
+.audio-display {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 30px;
+    padding: 40px;
+}
+
+.audio-cover {
+    width: 60vh;
+    height: 60vh;
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    object-fit: cover;
+}
+
+.audio-info {
+    text-align: center;
+}
+
+.audio-title {
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0 0 10px 0;
+    color: #fff;
+}
+
+.audio-artist {
+    font-size: 1.2rem;
+    color: #aaa;
+    margin: 0;
 }
 
 .player-controls {

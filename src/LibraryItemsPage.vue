@@ -10,19 +10,18 @@
       <ul class="items-grid">
         <li v-for="item in items" :key="item.Id" class="item-card">
 
-
           <router-link v-if="item.Type === 'BoxSet'"
-            :to="{ name: 'libraryItem', params: { id: item.Id, name: item.Name } }" class="poster-wrapper">
+            :to="{ name: 'libraryItem', params: { id: item.Id, name: item.Name } }" class="poster-wrapper"
+            :class="{ 'square': isAudioType(item.Type) }">
             <img @error="(e) => handleImageError(e, item.Type)" :src="getImageUrl(item.Id)" :alt="item.Name"
               class="poster" loading="lazy" @click="loadPage()">
           </router-link>
 
-
-          <router-link v-else :to="{ name: 'ItemDetails', params: { id: item.Id } }" class="poster-wrapper">
+          <router-link v-else :to="{ name: 'ItemDetails', params: { id: item.Id } }" class="poster-wrapper"
+            :class="{ 'square': isAudioType(item.Type) }">
             <img @error="(e) => handleImageError(e, item.Type)" :src="getImageUrl(item.Id)" :alt="item.Name"
               class="poster" loading="lazy" />
           </router-link>
-
 
           <div class="meta">
             <div class="name" :title="item.Name">{{ item.Name }}</div>
@@ -53,14 +52,18 @@ const libraryId = route.params.id as string;
 const libraryName = route.params.name as string;
 
 const items = ref<any[]>([]);
-const limit = ref(50);              // nombre d'items par page (ajuste selon ton design)
-const startIndex = ref(0);          // index de départ
-const hasNextPage = ref(false);     // indicateur pour le bouton Suivant
+const limit = ref(50);
+const startIndex = ref(0);
+const hasNextPage = ref(false);
 const loading = ref(true);
 const error = ref<string | null>(null);
 
 const currentPage = computed(() => Math.floor(startIndex.value / limit.value) + 1);
 
+// AJOUT: Fonction pour déterminer si c'est un type audio
+function isAudioType(type: string): boolean {
+  return type === 'Audio' || type === 'MusicAlbum' || type === 'MusicArtist';
+}
 
 function handleImageError(e: Event, itemType: string) {
   const img = e.target as HTMLImageElement;
@@ -68,9 +71,7 @@ function handleImageError(e: Event, itemType: string) {
   img.src = fallbackUrl;
 }
 
-// Utilitaire d'image homogène avec les autres pages
 function getImageUrl(id: string) {
-  // Reprend le style 200x300 utilisé sur les autres pages
   return store.getImageUrl(id, 'Primary') || '';
 }
 
@@ -83,14 +84,12 @@ async function loadPage() {
   loading.value = true;
   error.value = null;
   try {
-    // Adapter fetchItems pour accepter options: { startIndex, limit }
     const pageItems = await store.fetchItems(libraryId, {
       startIndex: startIndex.value,
       limit: limit.value,
     });
     items.value = pageItems;
 
-    // Heuristique: s'il y a moins d'items que limit, on suppose pas de page suivante
     hasNextPage.value = pageItems.length === limit.value;
   } catch (e) {
     error.value = 'Erreur lors du chargement des éléments';
@@ -121,10 +120,8 @@ function scrollTopSmooth() {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-
 onMounted(loadPage);
 
-// Recharger si la bibliothèque change (navigation interne)
 watch(() => route.params.id, async (newId) => {
   if (!newId) return;
   startIndex.value = 0;
@@ -168,7 +165,6 @@ watch(() => route.params.id, async (newId) => {
   transition: transform .15s ease, background .2s ease, color .2s ease, border-color .2s ease;
 }
 
-/* Bouton retour neutre */
 .btn.ghost {
   justify-self: start;
   background: transparent;
@@ -181,7 +177,6 @@ watch(() => route.params.id, async (newId) => {
   transform: translateY(-1px);
 }
 
-/* Bouton déconnexion couleur d'alerte */
 .btn.logout {
   justify-self: end;
   background: #ff4c4c;
@@ -229,7 +224,6 @@ watch(() => route.params.id, async (newId) => {
   box-shadow: 0 10px 22px rgba(0, 0, 0, 0.35);
 }
 
-/* Poster */
 .poster-wrapper {
   width: 130px;
   height: 195px;
@@ -237,6 +231,11 @@ watch(() => route.params.id, async (newId) => {
   overflow: hidden;
   background: #0f0f0f;
   box-shadow: 0 6px 14px rgba(0, 0, 0, 0.45);
+}
+
+.poster-wrapper.square {
+  width: 150px;
+  height: 150px;
 }
 
 .poster {
@@ -286,7 +285,6 @@ watch(() => route.params.id, async (newId) => {
   text-shadow: 0 2px 8px #222;
 }
 
-
 /* Responsive petits écrans */
 @media (max-width: 480px) {
   .items-header {
@@ -300,6 +298,12 @@ watch(() => route.params.id, async (newId) => {
   .poster-wrapper {
     width: 120px;
     height: 180px;
+  }
+
+  /* AJOUT: Poster carré responsive */
+  .poster-wrapper.square {
+    width: 140px;
+    height: 140px;
   }
 }
 

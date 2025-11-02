@@ -11,7 +11,8 @@
 
         <section v-else class="details-card">
             <div class="left">
-                <div class="poster">
+                <!-- MODIFIER: Ajouter classe conditionnelle square -->
+                <div class="poster" :class="{ 'square': isAudioType(item.Type) }">
                     <img @error="(e) => handleImageError(e, item.Type)" :src="posterUrl" :alt="item?.Name"
                         loading="lazy" />
                 </div>
@@ -174,6 +175,10 @@ const audioTracks = ref<any[]>([]);
 const itemId = computed(() => route.params.id as string);
 const accessToken = store.accessToken;
 
+function isAudioType(type: string): boolean {
+    return type === 'Audio' || type === 'MusicAlbum' || type === 'MusicArtist';
+}
+
 function handleImageError(e: Event, itemType: string) {
     const img = e.target as HTMLImageElement;
     let fallbackUrl = store.getPlaceholderImage(itemType)
@@ -295,6 +300,7 @@ function formatTrackDuration(ticks?: number) {
 }
 
 function playTrack(trackId: string) {
+    // Naviguer vers le player
     router.push({ name: 'Player', params: { id: trackId } });
 }
 
@@ -490,6 +496,7 @@ const fileSizeHuman = computed(() => {
     box-shadow: 0 10px 22px rgba(0, 0, 0, 0.35);
 }
 
+/* MODIFIER: Poster rectangulaire par défaut */
 .left .poster {
     width: 300px;
     height: 450px;
@@ -497,6 +504,12 @@ const fileSizeHuman = computed(() => {
     overflow: hidden;
     background: #0f0f0f;
     box-shadow: 0 6px 14px rgba(0, 0, 0, 0.45);
+}
+
+/* AJOUTER: Poster carré pour les albums/audio */
+.left .poster.square {
+    width: 300px;
+    height: 300px;
 }
 
 .left .poster img {
@@ -834,6 +847,12 @@ const fileSizeHuman = computed(() => {
         width: 220px;
         height: 330px;
         margin: 0 auto;
+    }
+
+    /* AJOUTER: Poster carré responsive */
+    .left .poster.square {
+        width: 220px;
+        height: 220px;
     }
 }
 </style>

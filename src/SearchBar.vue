@@ -1,7 +1,7 @@
 <template>
-    <div class="global-search" role="search">
-        <router-link class="home-btn" :to="{ name: 'libraries' }" aria-label="Accueil">🏠 Accueil</router-link>
-
+    <div class="navbar">
+        <button class="btn" @click="$router.back()">← Retour</button>
+        <button class="btn" @click="$router.push('/libraries')" aria-label="Accueil">🏠 Accueil</button>
         <div class="combobox" role="combobox" aria-expanded="true" aria-owns="search-listbox" aria-haspopup="listbox">
             <input ref="inputEl" v-model="query" class="search-input" type="search" :placeholder="placeholder"
                 aria-autocomplete="list" aria-controls="search-listbox" aria-label="Rechercher dans les bibliothèques"
@@ -18,7 +18,9 @@
                 </li>
             </ul>
         </div>
+        <button class="btn logout" @click="onLogout">Déconnexion</button>
     </div>
+
 </template>
 
 <script setup lang="ts">
@@ -36,6 +38,12 @@ const results = ref<any[]>([]);
 const open = ref(false);
 const activeIndex = ref(0);
 let debounceId: number | undefined;
+
+async function onLogout() {
+    await store.logout();
+    router.push({ name: 'login' });
+}
+
 
 function typeLabel(t?: string) {
     if (t === 'Movie') return 'Film';
@@ -113,30 +121,22 @@ watch(query, (val) => {
 </script>
 
 <style scoped>
-.global-search {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    gap: 12px;
-    align-items: center;
-    padding: 10px 12px;
-    background: #1b1b1b;
-    border-bottom: 1px solid #262626;
-    position: sticky;
-    top: 0;
-    z-index: 50;
-}
-
-.home-btn {
-    color: #38f9d7;
+.btn {
     text-decoration: none;
     font-weight: 700;
     background: #131313;
-    border: 1px solid #2a2a2a;
+    /* border: 1px solid #2a2a2a; */
     padding: 8px 12px;
     border-radius: 8px;
+
+
+    border: none;
+    cursor: pointer;
+    color: #fff;
+    transition: background 0.2s, transform 0.15s;
 }
 
-.home-btn:hover {
+.btn:hover {
     text-decoration: underline;
 }
 
@@ -205,5 +205,22 @@ watch(query, (val) => {
     color: #9aa0a6;
     font-size: 0.85rem;
     margin-top: 3px;
+}
+
+.btn.logout {
+    justify-self: end;
+    background: #ff4c4c;
+    color: #fff;
+    border: none;
+}
+
+.navbar {
+    display: grid;
+    grid-template-columns: 1fr 1fr 11fr 1fr;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    background: #1b1b1b;
+    padding: 10px 12px;
 }
 </style>

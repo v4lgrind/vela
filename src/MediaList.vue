@@ -2,7 +2,6 @@
   <div class="media-list">
     <header>
       <h2>Ma Bibliothèque</h2>
-      <button class="btn logout" @click="logout">Déconnexion</button>
     </header>
     <div v-if="loading" class="loading">Chargement...</div>
     <div v-else-if="error" class="error">{{ error }}</div>

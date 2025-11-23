@@ -5,6 +5,7 @@ import {
   getItemsApi,
   getUserLibraryApi,
 } from "@jellyfin/sdk/lib/utils/api";
+import { downloadService } from "../services/downloadService";
 
 interface State {
   serverUrl: string;
@@ -13,6 +14,7 @@ interface State {
   items: any[];
   api: Api;
   accessToken: string | null | undefined;
+  downloadProgress: Record<string, number>;
 }
 
 export const useJellyfinStore = defineStore("jellyfin", {
@@ -23,6 +25,7 @@ export const useJellyfinStore = defineStore("jellyfin", {
     libraries: [],
     items: [],
     api: {} as Api,
+    downloadProgress: {} as Record<string, number>, // Progress par itemId
   }),
   persist: true,
   actions: {
@@ -70,7 +73,6 @@ export const useJellyfinStore = defineStore("jellyfin", {
         limit?: number;
       }
     ) {
-
       this.initializeApi();
 
       const resp = await getItemsApi(this.api).getItems({
@@ -200,6 +202,61 @@ export const useJellyfinStore = defineStore("jellyfin", {
     },
     getPlaceholderImage(itemType?: string): string {
       return generatePlaceholderImage(itemType || "default");
+    },
+
+    async downloadItem(
+      itemId: string,
+      onProgress?: (progress: {
+        percentage: number;
+        loaded: number;
+        total: number;
+      }) => void
+    ) {
+      try {
+        // Récupérer les infos de l'item
+        const item = await this.fetchItemDetails(itemId);
+
+        // Construire le nom de fichier
+        const extension = item.Container || "mkv";
+        const filename = `${item.Name}.${extension}`;
+
+        // Télécharger
+        await downloadService.downloadFile(
+          this.serverUrl,
+          itemId,
+          this.accessToken || "",
+          filename,
+          (progress) => {
+            // Mettre à jour le state
+            this.downloadProgress[itemId] = progress.percentage;
+
+            // Callback externe
+            if (onProgress) {
+              onProgress({
+                percentage: progress.percentage,
+                loaded: progress.loaded,
+                total: progress.total,
+              });
+            }
+          }
+        );
+
+        // Nettoyer après téléchargement
+        delete this.downloadProgress[itemId];
+      } catch (error: any) {
+        console.error("Erreur téléchargement:", error);
+        delete this.downloadProgress[itemId];
+        throw error;
+      }
+    },
+
+    cancelDownload(itemId: string) {
+      downloadService.cancelDownload(itemId);
+      delete this.downloadProgress[itemId];
+    },
+
+    isDownloading(itemId: string): boolean {
+      return downloadService.isDownloading(itemId);
     },
   },
   getters: {

@@ -19,6 +19,17 @@
                     ▶️ Lire ce média
                 </button>
 
+                <button class="btn download" v-if="canDownload(item)" @click="handleDownload" :disabled="isDownloading">
+                    <span v-if="!isDownloading">⬇️ Télécharger</span>
+                    <span v-else>
+                        📥 Téléchargement... {{ downloadProgress }}%
+                    </span>
+                </button>
+
+                <button class="btn cancel" v-if="isDownloading" @click="cancelDownload">
+                    ❌ Annuler
+                </button>
+
                 <div class="meta-line">
                     <span v-if="year" class="chip">{{ year }}</span>
                     <span v-if="duration" class="chip">{{ duration }}</span>
@@ -169,6 +180,10 @@ const audioTracks = ref<any[]>([]);
 
 const itemId = computed(() => route.params.id as string);
 const accessToken = store.accessToken;
+
+const isDownloading = ref(false);
+const downloadProgress = ref(0);
+
 
 function isAudioType(type: string): boolean {
     return type === 'Audio' || type === 'MusicAlbum' || type === 'MusicArtist';
@@ -405,6 +420,41 @@ const fileSizeHuman = computed(() => {
     const size = firstSource.value?.Size as number | undefined;
     return formatBytes(size);
 });
+
+
+function canDownload(it: any): boolean {
+    return it && ['Movie', 'Episode', 'Video', 'Audio', 'MusicAlbum'].includes(it.Type);
+}
+
+// AJOUTER: Gérer le téléchargement
+async function handleDownload() {
+    if (!item.value) return;
+
+    try {
+        isDownloading.value = true;
+        downloadProgress.value = 0;
+
+        await store.downloadItem(itemId.value, (progress) => {
+            downloadProgress.value = progress.percentage;
+        });
+
+        // Succès
+    } catch (error: any) {
+        console.log(`❌ Erreur: ${error.message}`);
+    } finally {
+        isDownloading.value = false;
+        downloadProgress.value = 0;
+    }
+}
+
+// AJOUTER: Annuler le téléchargement
+function cancelDownload() {
+    if (!item.value) return;
+    store.cancelDownload(itemId.value);
+    isDownloading.value = false;
+    downloadProgress.value = 0;
+}
+
 </script>
 
 <style scoped>
@@ -849,5 +899,42 @@ const fileSizeHuman = computed(() => {
         width: 220px;
         height: 220px;
     }
+}
+
+.btn.download {
+    margin-top: 12px;
+    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    color: #fff;
+    font-weight: bold;
+    border: none;
+    border-radius: 8px;
+    font-size: 1.05rem;
+    transition: all 0.3s ease;
+    margin-left: 5px;
+}
+
+.btn.download:hover:not(:disabled) {
+    background: linear-gradient(90deg, #764ba2 0%, #667eea 100%);
+    transform: translateY(-1px) scale(1.02);
+}
+
+.btn.download:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.btn.cancel {
+    margin-top: 8px;
+    background: #ff4c4c;
+    color: #fff;
+    font-weight: 600;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.95rem;
+}
+
+.btn.cancel:hover {
+    background: #ff3333;
+    transform: translateY(-1px);
 }
 </style>

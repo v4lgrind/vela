@@ -1,11 +1,5 @@
 <template>
   <div class="items-page">
-    <header class="items-header">
-      <button class="btn ghost" @click="$router.back()">← Retour</button>
-      <h2 class="items-title">{{ libraryName }}</h2>
-      <button class="btn logout" @click="onLogout">Déconnexion</button>
-    </header>
-
     <section class="items-content">
       <ul class="items-grid">
         <li v-for="item in items" :key="item.Id" class="item-card">

@@ -3,35 +3,34 @@
         <section v-if="error" class="state error">{{ error }}</section>
 
         <div class="video-container" @mousemove="showControls" @mouseleave="hideControls">
-            <!-- Animation de chargement -->
+            <!-- Loader -->
             <div v-if="isLoading" class="loading-overlay">
                 <div class="spinner"></div>
                 <p class="loading-text">Chargement...</p>
             </div>
 
-            <!-- Lecteur vidéo -->
+            <!-- Vidéo -->
             <video v-if="!isAudioOnly" ref="videoEl" class="player" preload="metadata" playsinline :poster="posterUrl"
                 @click="togglePlayPause" @timeupdate="onTimeUpdate" @loadedmetadata="onLoadedMetadata"
-                @loadstart="onLoadStart" @canplay="onCanPlay" @waiting="onWaiting" @playing="onPlaying">
-            </video>
+                @loadstart="onLoadStart" @canplay="onCanPlay" @waiting="onWaiting" @playing="onPlaying"></video>
 
-            <!-- Lecteur audio -->
+            <!-- Audio only -->
             <div v-else class="audio-player" @click="togglePlayPause">
-                <audio ref="audioEl" preload="metadata">
-                </audio>
+                <audio ref="audioEl" preload="metadata"></audio>
 
-                <!-- Affichage pour l'audio -->
                 <div class="audio-display">
-                    <img v-if="posterUrl" :src="posterUrl" class="audio-cover" alt="Cover">
+                    <img v-if="posterUrl" :src="posterUrl" class="audio-cover" alt="Cover" />
                     <div class="audio-info">
                         <h2 class="audio-title">{{ details?.Name || 'Lecture audio' }}</h2>
-                        <p class="audio-artist">{{ details?.AlbumArtist || details?.Artists?.join(', ') || '' }}</p>
+                        <p class="audio-artist">
+                            {{ details?.AlbumArtist || details?.Artists?.join(', ') || '' }}
+                        </p>
                     </div>
                 </div>
             </div>
 
-            <!-- Contrôles personnalisés -->
-            <div class="player-controls" :class="{ 'show': controlsVisible }">
+            <!-- Contrôles -->
+            <div class="player-controls" :class="{ show: controlsVisible }">
                 <!-- Barre de progression -->
                 <div class="progress-container" @click="seek">
                     <div class="progress-bar">
@@ -39,9 +38,10 @@
                     </div>
                 </div>
 
-                <!-- Contrôles du bas -->
+                <!-- Bas -->
                 <div class="controls-bottom">
                     <div class="controls-left">
+                        <!-- Play / Pause -->
                         <button class="control-btn" @click="togglePlayPause">
                             <svg v-if="!isPlaying" viewBox="0 0 24 24" fill="currentColor">
                                 <path d="M8 5v14l11-7z" />
@@ -51,9 +51,10 @@
                             </svg>
                         </button>
 
+                        <!-- Volume -->
                         <div class="volume-container">
                             <button class="control-btn" @click="toggleMute">
-                                <svg v-if="volume > 0.5" viewBox="0 0 24 24" fill="currentColor">
+                                <svg v-if="volume > 50" viewBox="0 0 24 24" fill="currentColor">
                                     <path
                                         d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z" />
                                 </svg>
@@ -65,18 +66,19 @@
                                         d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z" />
                                 </svg>
                             </button>
-                            <input type="range" min="0" max="100" v-model="volume" @input="setVolume"
+                            <input type="range" min="0" max="100" v-model.number="volume" @input="setVolume"
                                 class="volume-slider" />
                         </div>
 
+                        <!-- Temps -->
                         <div class="time-display">
                             {{ formatTime(currentTime) }} / {{ formatTime(duration) }}
                         </div>
                     </div>
 
                     <div class="controls-right">
-                        <!-- Bouton Audio (seulement pour vidéo) -->
-                        <div v-if="!isAudioOnly && audioList.length > 0" class="dropdown" ref="audioDropdown">
+                        <!-- Audio tracks (vidéo seulement) -->
+                        <div v-if="!isAudioOnly && audioList.length" class="dropdown" ref="audioDropdown">
                             <button class="control-btn" @click="toggleAudioMenu">
                                 <svg viewBox="0 0 24 24" fill="currentColor">
                                     <path
@@ -84,9 +86,9 @@
                                 </svg>
                                 <span class="btn-label">Audio</span>
                             </button>
-                            <div class="dropdown-menu" :class="{ 'show': audioMenuOpen }">
+                            <div class="dropdown-menu" :class="{ show: audioMenuOpen }">
                                 <div v-for="opt in audioList" :key="opt.id" class="dropdown-item"
-                                    :class="{ 'active': opt.index === selectedAudioIndex }"
+                                    :class="{ active: opt.index === selectedAudioIndex }"
                                     @click="selectAudio(opt.index)">
                                     <span class="check">✓</span>
                                     {{ opt.label }}
@@ -94,8 +96,8 @@
                             </div>
                         </div>
 
-                        <!-- Bouton Sous-titres (seulement pour vidéo) -->
-                        <div v-if="!isAudioOnly && subtitleList.length > 0" class="dropdown" ref="subtitleDropdown">
+                        <!-- Sous-titres (vidéo seulement) -->
+                        <div v-if="!isAudioOnly && subtitleList.length" class="dropdown" ref="subtitleDropdown">
                             <button class="control-btn" @click="toggleSubtitleMenu">
                                 <svg viewBox="0 0 24 24" fill="currentColor">
                                     <path
@@ -103,14 +105,14 @@
                                 </svg>
                                 <span class="btn-label">Sous-titres</span>
                             </button>
-                            <div class="dropdown-menu" :class="{ 'show': subtitleMenuOpen }">
-                                <div class="dropdown-item" :class="{ 'active': selectedSubtitleIndex === '-1' }"
+                            <div class="dropdown-menu" :class="{ show: subtitleMenuOpen }">
+                                <div class="dropdown-item" :class="{ active: selectedSubtitleIndex === '-1' }"
                                     @click="selectSubtitle('-1')">
                                     <span class="check">✓</span>
                                     Désactivés
                                 </div>
                                 <div v-for="opt in subtitleList" :key="opt.id" class="dropdown-item"
-                                    :class="{ 'active': opt.index === parseInt(selectedSubtitleIndex) }"
+                                    :class="{ active: opt.index === parseInt(selectedSubtitleIndex) }"
                                     @click="selectSubtitle(String(opt.index))">
                                     <span class="check">✓</span>
                                     {{ opt.label }}
@@ -123,7 +125,7 @@
                             </div>
                         </div>
 
-                        <!-- Bouton Fullscreen -->
+                        <!-- Fullscreen -->
                         <button class="control-btn" @click="toggleFullscreen">
                             <svg v-if="!isFullscreen" viewBox="0 0 24 24" fill="currentColor">
                                 <path
@@ -143,13 +145,11 @@
     </div>
 </template>
 
-
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useRoute } from 'vue-router';
 import { useJellyfinStore } from './store/jellyfin-store';
 import shaka from 'shaka-player/dist/shaka-player.compiled.js';
-import { router } from './router';
 import { deviceProfile } from './constants';
 
 const route = useRoute();
@@ -167,7 +167,7 @@ const subtitleDropdown = ref<HTMLElement | null>(null);
 const error = ref<string | null>(null);
 
 let player: shaka.Player | null = null;
-let controlsTimeout: NodeJS.Timeout | null = null;
+let controlsTimeout: ReturnType<typeof setTimeout> | null = null;
 
 const details = ref<any | null>(null);
 const mediaSource = ref<any | null>(null);
@@ -175,10 +175,12 @@ const mediaSource = ref<any | null>(null);
 const audioList = ref<Array<{ id: number; index: number; label: string; language: string }>>([]);
 const selectedAudioIndex = ref<number | null>(null);
 
-const subtitleList = ref<Array<{ id: number; index: number; label: string; language: string; codec: string; isExternal: boolean }>>([]);
+const subtitleList = ref<
+    Array<{ id: number; index: number; label: string; language: string; codec: string; isExternal: boolean }>
+>([]);
 const selectedSubtitleIndex = ref<string>('-1');
 
-// État du player
+// État
 const isPlaying = ref(false);
 const currentTime = ref(0);
 const duration = ref(0);
@@ -190,13 +192,13 @@ const audioMenuOpen = ref(false);
 const subtitleMenuOpen = ref(false);
 const isLoading = ref(true);
 
-// Type de média
+// Type media
 const mediaType = ref<'Video' | 'Audio'>('Video');
 const isAudioOnly = computed(() => mediaType.value === 'Audio');
 
-// Variables pour le suivi de lecture
+// Reporting Jellyfin
 const playSessionId = ref<string>('');
-let progressInterval: NodeJS.Timeout | null = null;
+let progressInterval: ReturnType<typeof setInterval> | null = null;
 
 const posterUrl = computed(
     () => store.getImageUrl(itemId, 'Primary') || ''
@@ -206,6 +208,7 @@ const hlsUrl = ref<string>('');
 const baseTranscodingUrl = ref<string>('');
 const audioUrl = ref<string>('');
 
+// Utils
 function formatTime(seconds: number): string {
     if (!seconds || isNaN(seconds)) return '0:00';
     const h = Math.floor(seconds / 3600);
@@ -220,129 +223,14 @@ function formatTime(seconds: number): string {
 function onLoadStart() {
     isLoading.value = true;
 }
-
 function onCanPlay() {
     isLoading.value = false;
 }
-
 function onWaiting() {
     isLoading.value = true;
 }
-
 function onPlaying() {
     isLoading.value = false;
-}
-
-function generateSessionId(): string {
-    return `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-}
-
-async function reportPlaybackStart() {
-    if (!playSessionId.value) {
-        playSessionId.value = generateSessionId();
-    }
-
-    const media = isAudioOnly.value ? audioEl.value : videoEl.value;
-
-    try {
-        await fetch(`${serverUrl}/Sessions/Playing`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Emby-Token': accessToken
-            },
-            body: JSON.stringify({
-                ItemId: itemId,
-                SessionId: playSessionId.value,
-                MediaSourceId: mediaSource.value?.Id || itemId,
-                PositionTicks: Math.floor((media?.currentTime || 0) * 10000000),
-                IsPaused: false,
-                IsMuted: media?.muted || false,
-                VolumeLevel: Math.floor((media?.volume || 1) * 100),
-                PlayMethod: isAudioOnly.value ? 'DirectStream' : 'Transcode',
-                PlaySessionId: playSessionId.value,
-                AudioStreamIndex: selectedAudioIndex.value,
-                SubtitleStreamIndex: !isAudioOnly.value && selectedSubtitleIndex.value !== '-1' ? parseInt(selectedSubtitleIndex.value) : null
-            })
-        });
-        console.log('Playback start reported');
-    } catch (error) {
-        console.error('Error reporting playback start:', error);
-    }
-}
-
-async function reportPlaybackProgress() {
-    const media = isAudioOnly.value ? audioEl.value : videoEl.value;
-
-    try {
-        await fetch(`${serverUrl}/Sessions/Playing/Progress`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Emby-Token': accessToken
-            },
-            body: JSON.stringify({
-                ItemId: itemId,
-                SessionId: playSessionId.value,
-                MediaSourceId: mediaSource.value?.Id || itemId,
-                PositionTicks: Math.floor((media?.currentTime || 0) * 10000000),
-                IsPaused: !isPlaying.value,
-                IsMuted: media?.muted || false,
-                VolumeLevel: Math.floor((media?.volume || 1) * 100),
-                PlayMethod: isAudioOnly.value ? 'DirectStream' : 'Transcode',
-                PlaySessionId: playSessionId.value,
-                AudioStreamIndex: selectedAudioIndex.value,
-                SubtitleStreamIndex: !isAudioOnly.value && selectedSubtitleIndex.value !== '-1' ? parseInt(selectedSubtitleIndex.value) : null
-            })
-        });
-        console.log('Playback progress reported:', media?.currentTime);
-    } catch (error) {
-        console.error('Error reporting playback progress:', error);
-    }
-}
-
-async function reportPlaybackStopped() {
-    const media = isAudioOnly.value ? audioEl.value : videoEl.value;
-
-    try {
-        await fetch(`${serverUrl}/Sessions/Playing/Stopped`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Emby-Token': accessToken
-            },
-            body: JSON.stringify({
-                ItemId: itemId,
-                SessionId: playSessionId.value,
-                MediaSourceId: mediaSource.value?.Id || itemId,
-                PositionTicks: Math.floor((media?.currentTime || 0) * 10000000),
-                PlaySessionId: playSessionId.value
-            })
-        });
-        console.log('Playback stopped reported');
-    } catch (error) {
-        console.error('Error reporting playback stopped:', error);
-    }
-}
-
-function startProgressReporting() {
-    if (progressInterval) {
-        clearInterval(progressInterval);
-    }
-
-    reportPlaybackStart();
-
-    progressInterval = setInterval(() => {
-        reportPlaybackProgress();
-    }, 10000);
-}
-
-function stopProgressReporting() {
-    if (progressInterval) {
-        clearInterval(progressInterval);
-        progressInterval = null;
-    }
-    reportPlaybackStopped();
 }
 
 function showControls() {
@@ -354,7 +242,6 @@ function showControls() {
         }
     }, 3000);
 }
-
 function hideControls() {
     if (controlsTimeout) clearTimeout(controlsTimeout);
     if (isPlaying.value && !audioMenuOpen.value && !subtitleMenuOpen.value) {
@@ -364,13 +251,130 @@ function hideControls() {
     }
 }
 
+// Session ID
+function generateSessionId(): string {
+    return `session-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+}
+
+// Reporting Jellyfin
+async function reportPlaybackStart() {
+    if (!playSessionId.value) {
+        playSessionId.value = generateSessionId();
+    }
+
+    const media = isAudioOnly.value ? audioEl.value : videoEl.value;
+    try {
+        await fetch(`${serverUrl}/Sessions/Playing`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Emby-Token': accessToken
+            },
+            body: JSON.stringify({
+                ItemId: itemId,
+                SessionId: playSessionId.value,
+                MediaSourceId: mediaSource.value?.Id || itemId,
+                PositionTicks: Math.floor((media?.currentTime || 0) * 10_000_000),
+                IsPaused: false,
+                IsMuted: media?.muted || false,
+                VolumeLevel: Math.floor((media?.volume || 1) * 100),
+                PlayMethod: isAudioOnly.value ? 'DirectStream' : 'Transcode',
+                PlaySessionId: playSessionId.value,
+                AudioStreamIndex: selectedAudioIndex.value,
+                SubtitleStreamIndex:
+                    !isAudioOnly.value && selectedSubtitleIndex.value !== '-1'
+                        ? parseInt(selectedSubtitleIndex.value)
+                        : null
+            })
+        });
+    } catch (e) {
+        console.error('reportPlaybackStart error', e);
+    }
+}
+
+async function reportPlaybackProgress() {
+    const media = isAudioOnly.value ? audioEl.value : videoEl.value;
+    if (!media) return;
+    try {
+        await fetch(`${serverUrl}/Sessions/Playing/Progress`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Emby-Token': accessToken
+            },
+            body: JSON.stringify({
+                ItemId: itemId,
+                SessionId: playSessionId.value,
+                MediaSourceId: mediaSource.value?.Id || itemId,
+                PositionTicks: Math.floor((media?.currentTime || 0) * 10_000_000),
+                IsPaused: !isPlaying.value,
+                IsMuted: media?.muted || false,
+                VolumeLevel: Math.floor((media?.volume || 1) * 100),
+                PlayMethod: isAudioOnly.value ? 'DirectStream' : 'Transcode',
+                PlaySessionId: playSessionId.value,
+                AudioStreamIndex: selectedAudioIndex.value,
+                SubtitleStreamIndex:
+                    !isAudioOnly.value && selectedSubtitleIndex.value !== '-1'
+                        ? parseInt(selectedSubtitleIndex.value)
+                        : null
+            })
+        });
+    } catch (e) {
+        console.error('reportPlaybackProgress error', e);
+    }
+}
+
+async function reportPlaybackStopped() {
+    const media = isAudioOnly.value ? audioEl.value : videoEl.value;
+    if (!media) return;
+    try {
+        await fetch(`${serverUrl}/Sessions/Playing/Stopped`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Emby-Token': accessToken
+            },
+            body: JSON.stringify({
+                ItemId: itemId,
+                SessionId: playSessionId.value,
+                MediaSourceId: mediaSource.value?.Id || itemId,
+                PositionTicks: Math.floor((media?.currentTime || 0) * 10_000_000),
+                PlaySessionId: playSessionId.value
+            })
+        });
+    } catch (e) {
+        console.error('reportPlaybackStopped error', e);
+    }
+}
+
+function startProgressReporting() {
+    if (progressInterval) clearInterval(progressInterval);
+    reportPlaybackStart();
+    progressInterval = setInterval(() => {
+        reportPlaybackProgress();
+    }, 10000);
+}
+
+function stopProgressReporting() {
+    if (progressInterval) {
+        clearInterval(progressInterval);
+        progressInterval = null;
+    }
+    const media = isAudioOnly.value ? audioEl.value : videoEl.value;
+    if (media) {
+        reportPlaybackStopped();
+    }
+}
+
+// Interactions
 function togglePlayPause() {
     const media = isAudioOnly.value ? audioEl.value! : videoEl.value!;
-
+    if (!media) return;
     if (media.paused) {
-        media.play();
-        isPlaying.value = true;
-        reportPlaybackProgress();
+        media.play().then(() => {
+            isPlaying.value = true;
+            reportPlaybackProgress();
+        });
     } else {
         media.pause();
         isPlaying.value = false;
@@ -380,27 +384,25 @@ function togglePlayPause() {
 
 function toggleMute() {
     const media = isAudioOnly.value ? audioEl.value! : videoEl.value!;
+    if (!media) return;
     media.muted = !media.muted;
-    if (media.muted) {
-        volume.value = 0;
-    } else {
-        volume.value = media.volume * 100;
-    }
+    volume.value = media.muted ? 0 : media.volume * 100;
 }
 
 function setVolume() {
     const media = isAudioOnly.value ? audioEl.value! : videoEl.value!;
+    if (!media) return;
     media.volume = volume.value / 100;
     media.muted = volume.value === 0;
 }
 
 function seek(e: MouseEvent) {
-    const progressBar = (e.currentTarget as HTMLElement);
+    const progressBar = e.currentTarget as HTMLElement;
     const clickX = e.offsetX;
     const width = progressBar.offsetWidth;
     const media = isAudioOnly.value ? audioEl.value! : videoEl.value!;
+    if (!media) return;
     media.currentTime = (clickX / width) * duration.value;
-
     reportPlaybackProgress();
 }
 
@@ -422,7 +424,6 @@ function toggleAudioMenu() {
     subtitleMenuOpen.value = false;
     showControls();
 }
-
 function toggleSubtitleMenu() {
     subtitleMenuOpen.value = !subtitleMenuOpen.value;
     audioMenuOpen.value = false;
@@ -434,7 +435,6 @@ function selectAudio(index: number) {
     audioMenuOpen.value = false;
     switchAudio();
 }
-
 function selectSubtitle(index: string) {
     selectedSubtitleIndex.value = index;
     subtitleMenuOpen.value = false;
@@ -443,19 +443,19 @@ function selectSubtitle(index: string) {
 
 function onTimeUpdate() {
     const media = isAudioOnly.value ? audioEl.value! : videoEl.value!;
-    if (media === null) return;
+    if (!media) return;
     currentTime.value = media.currentTime;
     if (duration.value > 0) {
         progress.value = (media.currentTime / duration.value) * 100;
     }
 }
-
 function onLoadedMetadata() {
     const media = isAudioOnly.value ? audioEl.value! : videoEl.value!;
     duration.value = media.duration;
     volume.value = media.volume * 100;
 }
 
+// Chargement info item
 async function loadDetails() {
     try {
         details.value =
@@ -470,106 +470,15 @@ async function loadDetails() {
 async function determineMediaType() {
     try {
         const item = await store.fetchItemDetails(itemId);
-
         if (item.Type === 'Audio' || item.Type === 'MusicAlbum' || item.MediaType === 'Audio') {
             mediaType.value = 'Audio';
         } else {
             mediaType.value = 'Video';
         }
-
-        console.log('Media type:', mediaType.value);
     } catch (e) {
-        console.error('Error determining media type:', e);
         mediaType.value = 'Video';
     }
 }
-
-async function initAudioPlayer() {
-    const audio = audioEl.value!;
-
-    try {
-        isLoading.value = true;
-
-        const params = new URLSearchParams({
-            userId: store.userId || '',
-            api_key: accessToken,
-            MaxStreamingBitrate: '140000000',
-            Container: 'opus,webm|opus,mp3,aac,m4a|aac,m4b|aac,flac,webma,webm|webma,wav,ogg',
-            TranscodingContainer: 'ts',
-            TranscodingProtocol: 'hls',
-            AudioCodec: 'aac'
-        });
-
-        audioUrl.value = `${serverUrl}/Audio/${itemId}/universal?${params.toString()}`;
-
-        console.log('Audio URL:', audioUrl.value);
-
-        audio.src = audioUrl.value;
-        audio.load();
-
-        // SUPPRIMER les anciens listeners pour éviter les doublons
-        // audio.removeEventListener('play', onPlayHandler);
-        // audio.removeEventListener('pause', onPauseHandler);
-        // audio.removeEventListener('ended', onEndedHandler);
-
-        // Créer des handlers nommés pour pouvoir les supprimer
-        const onPlayHandler = () => {
-            isPlaying.value = true;
-            if (!progressInterval) {
-                startProgressReporting();
-            }
-        };
-
-        const onPauseHandler = () => {
-            isPlaying.value = false;
-            reportPlaybackProgress();
-
-        };
-
-        const onEndedHandler = () => {
-            stopProgressReporting();
-            handleTrackEnded();
-        };
-
-        // Attacher les nouveaux listeners
-        audio.addEventListener('play', onPlayHandler);
-        audio.addEventListener('pause', onPauseHandler);
-        audio.addEventListener('ended', onEndedHandler);
-
-        audio.addEventListener('timeupdate', () => {
-            currentTime.value = audio.currentTime;
-            if (duration.value > 0) {
-                progress.value = (audio.currentTime / duration.value) * 100;
-            }
-        });
-
-        audio.addEventListener('loadedmetadata', () => {
-            duration.value = audio.duration;
-            volume.value = audio.volume * 100;
-            isLoading.value = false;
-        });
-
-        audio.addEventListener('canplay', () => {
-            isLoading.value = false;
-        });
-
-        audio.addEventListener('waiting', () => {
-            isLoading.value = true;
-        });
-
-        audio.addEventListener('playing', () => {
-            isLoading.value = false;
-        });
-
-        audio.play().catch(() => { });
-
-    } catch (e: any) {
-        console.error('Erreur init audio player:', e);
-        error.value = 'Erreur d\'initialisation du lecteur audio';
-        isLoading.value = false;
-    }
-}
-
 
 async function getPlaybackUrl() {
     try {
@@ -579,25 +488,19 @@ async function getPlaybackUrl() {
             `${serverUrl}/Items/${itemId}/PlaybackInfo?userId=${store.userId}&api_key=${accessToken}`,
             {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(profile)
             }
         );
 
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
         const data = await response.json();
         mediaSource.value = data.MediaSources?.[0];
+        if (!mediaSource.value) throw new Error('Aucune source média disponible');
 
-        if (!mediaSource.value) {
-            throw new Error('Aucune source média disponible');
-        }
-
-        const audioStreams = (mediaSource.value.MediaStreams || []).filter((s: any) => s.Type === 'Audio');
+        const streams = mediaSource.value.MediaStreams || [];
+        const audioStreams = streams.filter((s: any) => s.Type === 'Audio');
         audioList.value = audioStreams.map((s: any) => ({
             id: s.Index,
             index: s.Index,
@@ -606,20 +509,22 @@ async function getPlaybackUrl() {
                 } ${s.Codec ? `- ${s.Codec.toUpperCase()}` : ''}`.trim()
         }));
 
-        const subtitleStreams = (mediaSource.value.MediaStreams || []).filter((s: any) => s.Type === 'Subtitle');
+        const subtitleStreams = streams.filter((s: any) => s.Type === 'Subtitle');
         subtitleList.value = subtitleStreams.map((s: any) => ({
             id: s.Index,
             index: s.Index,
             language: s.Language || 'und',
             codec: s.Codec,
             isExternal: s.IsExternal || false,
-            label: `${(s.Language || 'und').toUpperCase()} ${s.Title ? `- ${s.Title}` : ''} ${s.IsForced ? '(Forced)' : ''}`.trim()
+            label: `${(s.Language || 'und').toUpperCase()} ${s.Title ? `- ${s.Title}` : ''
+                } ${s.IsForced ? '(Forced)' : ''}`.trim()
         }));
 
-        const frenchStream = audioStreams.find((s: any) =>
-            s.Language === 'fra' || s.Language === 'fre' || s.Language === 'fr'
+        const frenchStream = audioStreams.find(
+            (s: any) => s.Language === 'fra' || s.Language === 'fre' || s.Language === 'fr'
         );
-        const defaultStream = frenchStream || audioStreams.find((s: any) => s.IsDefault) || audioStreams[0];
+        const defaultStream =
+            frenchStream || audioStreams.find((s: any) => s.IsDefault) || audioStreams[0];
         selectedAudioIndex.value = defaultStream?.Index ?? 0;
 
         if (mediaSource.value.TranscodingUrl) {
@@ -627,10 +532,9 @@ async function getPlaybackUrl() {
         }
 
         buildHlsUrl();
-
     } catch (e: any) {
         console.error('Erreur PlaybackInfo:', e);
-        error.value = 'Impossible d\'obtenir l\'URL de lecture';
+        error.value = "Impossible d'obtenir l'URL de lecture";
     }
 }
 
@@ -640,21 +544,19 @@ function buildHlsUrl() {
         url.searchParams.set('AudioStreamIndex', String(selectedAudioIndex.value));
         hlsUrl.value = url.toString();
     } else {
-        hlsUrl.value = `${serverUrl}/Videos/${itemId}/master.m3u8?mediaSourceId=${mediaSource.value?.Id || itemId}&AudioStreamIndex=${selectedAudioIndex.value}&api_key=${accessToken}`;
+        hlsUrl.value = `${serverUrl}/Videos/${itemId}/master.m3u8?mediaSourceId=${mediaSource.value?.Id || itemId
+            }&AudioStreamIndex=${selectedAudioIndex.value}&api_key=${accessToken}`;
     }
-    console.log('HLS URL:', hlsUrl.value);
 }
 
+// Shaka vidéo
 async function initShaka() {
     const video = videoEl.value!;
-
     try {
         isLoading.value = true;
-
         shaka.polyfill.installAll();
 
         player = new shaka.Player(video);
-
         player.configure({
             preferredAudioLanguage: 'fra',
             preferredTextLanguage: 'fra',
@@ -682,56 +584,99 @@ async function initShaka() {
 
         await player.load(hlsUrl.value);
 
-        await preloadAllSubtitles();
-
-
         video.addEventListener('play', () => {
             isPlaying.value = true;
-            if (!progressInterval) {
-                startProgressReporting();
-            }
+            if (!progressInterval) startProgressReporting();
         });
-
         video.addEventListener('pause', () => {
             isPlaying.value = false;
             reportPlaybackProgress();
         });
-
         video.addEventListener('ended', () => {
             stopProgressReporting();
         });
 
-        video.play().catch(() => { });
+        await video.play().catch(() => { });
     } catch (e: any) {
         console.error('Erreur init Shaka:', e);
-        error.value = 'Erreur d\'initialisation du lecteur';
+        error.value = "Erreur d'initialisation du lecteur";
         isLoading.value = false;
     }
 }
 
+// Audio only (HTML5)
+async function initAudioPlayer() {
+    const audio = audioEl.value!;
+    try {
+        isLoading.value = true;
+
+        const params = new URLSearchParams({
+            userId: store.userId || '',
+            api_key: accessToken,
+            MaxStreamingBitrate: '140000000',
+            Container: 'opus,webm|opus,mp3,aac,m4a|aac,m4b|aac,flac,webma,webm|webma,wav,ogg',
+            TranscodingContainer: 'ts',
+            TranscodingProtocol: 'hls',
+            AudioCodec: 'aac'
+        });
+
+        audioUrl.value = `${serverUrl}/Audio/${itemId}/universal?${params.toString()}`;
+
+        audio.src = audioUrl.value;
+        audio.load();
+
+        audio.addEventListener('play', () => {
+            isPlaying.value = true;
+            if (!progressInterval) startProgressReporting();
+        });
+        audio.addEventListener('pause', () => {
+            isPlaying.value = false;
+            reportPlaybackProgress();
+        });
+        audio.addEventListener('ended', () => {
+            stopProgressReporting();
+        });
+        audio.addEventListener('timeupdate', () => {
+            currentTime.value = audio.currentTime;
+            if (duration.value > 0) {
+                progress.value = (audio.currentTime / duration.value) * 100;
+            }
+        });
+        audio.addEventListener('loadedmetadata', () => {
+            duration.value = audio.duration;
+            volume.value = audio.volume * 100;
+            isLoading.value = false;
+        });
+        audio.addEventListener('canplay', () => {
+            isLoading.value = false;
+        });
+        audio.addEventListener('waiting', () => {
+            isLoading.value = true;
+        });
+        audio.addEventListener('playing', () => {
+            isLoading.value = false;
+        });
+
+        await audio.play().catch(() => { });
+    } catch (e: any) {
+        console.error('Erreur init audio player:', e);
+        error.value = "Erreur d'initialisation du lecteur audio";
+        isLoading.value = false;
+    }
+}
+
+// Changement de piste audio (vidéo)
 async function switchAudio() {
     if (!player || selectedAudioIndex.value === null) return;
 
-    console.log('Switching to audio index:', selectedAudioIndex.value);
-
-    stopProgressReporting();
-
     isLoading.value = true;
-
     const video = videoEl.value!;
     const wasPlaying = !video.paused;
     const savedTime = video.currentTime;
 
     try {
         video.pause();
-        video.removeAttribute('src');
-        video.load();
-
-        if (player) {
-            await player.unload();
-            await player.destroy();
-            player = null;
-        }
+        await player.unload();
 
         await new Promise(resolve => setTimeout(resolve, 100));
 
@@ -745,9 +690,7 @@ async function switchAudio() {
             `${serverUrl}/Items/${itemId}/PlaybackInfo?userId=${store.userId}&api_key=${accessToken}`,
             {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(profile)
             }
         );
@@ -765,13 +708,11 @@ async function switchAudio() {
             buildHlsUrl();
         }
 
-        await initShaka();
-
+        await player.load(hlsUrl.value);
         video.currentTime = savedTime;
-        if (wasPlaying) {
-            await video.play().catch(() => { });
-        }
-
+        if (wasPlaying) await video.play().catch(() => { });
+        isLoading.value = false;
+        switchSubtitle();
     } catch (e: any) {
         console.error('Erreur switch audio:', e);
         error.value = 'Erreur lors du changement de piste audio';
@@ -779,6 +720,15 @@ async function switchAudio() {
     }
 }
 
+// Nettoyage VTT: suppression des lignes Region:
+function cleanVttRegions(vtt: string): string {
+    return vtt
+        .split('\n')
+        .filter(line => !line.trim().startsWith('Region:'))
+        .join('\n');
+}
+
+// Sous-titres distants via Jellyfin
 async function switchSubtitle() {
     if (!player) return;
 
@@ -795,44 +745,65 @@ async function switchSubtitle() {
     }
 
     const subIndex = parseInt(selected);
+    const subtitle = subtitleList.value.find(s => s.index === subIndex);
+    if (!subtitle) return;
 
     try {
-        // Les pistes sont déjà chargées, il suffit de les sélectionner
+        const mediaSourceId = mediaSource.value?.Id || itemId;
+        const vttUrl = `${serverUrl}/Videos/${itemId}/${mediaSourceId}/Subtitles/${subIndex}/Stream.vtt?api_key=${accessToken}`;
+
+        // On récupère et nettoie le VTT côté client
+        const resp = await fetch(vttUrl);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const raw = await resp.text();
+        const cleaned = cleanVttRegions(raw);
+
+        const blob = new Blob([cleaned], { type: 'text/vtt; charset=utf-8' });
+        const blobUrl = URL.createObjectURL(blob);
+
+        player.setTextTrackVisibility(false);
+
+        await player.addTextTrackAsync(
+            blobUrl,
+            subtitle.language || 'und',
+            'subtitles',
+            'text/vtt',
+            null,
+            subtitle.label
+        );
+
+        player.setTextTrackVisibility(true);
+
         const tracks = player.getTextTracks();
-        const targetTrack = tracks.find(t => t.language === subtitleList.value.find(s => s.index === subIndex)?.language);
-
-        if (targetTrack) {
-            player.selectTextTrack(targetTrack);
-            player.setTextTrackVisibility(true);
-            console.log('Sous-titre activé instantanément');
+        if (tracks.length > 0) {
+            player.selectTextTrack(tracks[tracks.length - 1]);
         }
-
     } catch (e: any) {
-        console.error('Erreur activation sous-titres:', e);
-        error.value = `Impossible d'activer les sous-titres: ${e.message}`;
+        console.error('Erreur chargement sous-titres:', e);
+        error.value = `Impossible de charger les sous-titres: ${e.message}`;
     }
 }
 
+// Conversion SRT → VTT robuste
 function srtToVtt(srt: string) {
-    // Nettoyer le fichier SRT
     let vtt = srt
-        .replace(/\r\n/g, '\n')  // Normaliser les sauts de ligne
+        .replace(/\r\n/g, '\n')
         .replace(/\r/g, '\n')
         .trim();
 
-    // Supprimer les numéros de séquence
+    // Remove sequence numbers
     vtt = vtt.replace(/^\d+\s*$/gm, '');
-
-    // Remplacer les virgules par des points dans les timestamps
+    // Replace commas by dots in timestamps
     vtt = vtt.replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2');
-
-    // Supprimer les lignes vides multiples
+    // Remove multiple empty lines
     vtt = vtt.replace(/\n{3,}/g, '\n\n');
 
-    // Ajouter l'en-tête WEBVTT
-    return `WEBVTT\n\n${vtt}`;
+    vtt = `WEBVTT\n\n${vtt}`;
+    // Nettoyage éventuel des Region:
+    return cleanVttRegions(vtt);
 }
 
+// Sous-titre local
 async function onPickSubtitleFile(e: Event) {
     const input = e.target as HTMLInputElement;
     const file = input.files?.[0];
@@ -851,29 +822,25 @@ async function onPickSubtitleFile(e: Event) {
 
         let vttContent: string;
         if (isVtt) {
-            vttContent = text;
+            vttContent = text.trim().startsWith('WEBVTT') ? text : `WEBVTT\n\n${text}`;
         } else if (isSrt) {
             vttContent = srtToVtt(text);
         } else {
-            error.value = 'Format de sous-titre non supporté. Utilisez .vtt ou .srt';
+            error.value = 'Format de sous-titre non supporté';
             selectedSubtitleIndex.value = '-1';
             return;
         }
 
-        // AJOUTER: Valider le format VTT
-        if (!vttContent.trim().startsWith('WEBVTT')) {
-            vttContent = 'WEBVTT\n\n' + vttContent;
-        }
+        // Nettoyage Region:
+        vttContent = cleanVttRegions(vttContent);
 
         const blob = new Blob([vttContent], { type: 'text/vtt; charset=utf-8' });
         const blobUrl = URL.createObjectURL(blob);
 
-        // Extraire la langue du nom de fichier
         const m = name.match(/\.(fr|fra|fre|eng|en|spa|es|de|it|pt|jp|ja|zh|ru)\./i);
         const lang = m ? m[1].toLowerCase() : 'und';
 
         if (player) {
-            // Désactiver les anciennes pistes
             player.setTextTrackVisibility(false);
 
             await player.addTextTrackAsync(
@@ -881,7 +848,7 @@ async function onPickSubtitleFile(e: Event) {
                 lang,
                 'subtitles',
                 'text/vtt',
-                null,  // CHANGER: null au lieu de chaîne vide
+                null,
                 name
             );
 
@@ -891,51 +858,16 @@ async function onPickSubtitleFile(e: Event) {
             if (tracks.length > 0) {
                 player.selectTextTrack(tracks[tracks.length - 1]);
             }
-
-            console.log('Sous-titre local chargé:', name);
         }
-
     } catch (err: any) {
-        console.error('Erreur chargement sous-titre local:', err);
-        error.value = `Échec de chargement: ${err.message}`;
+        error.value = `Échec de chargement du sous-titre local: ${err.message}`;
         selectedSubtitleIndex.value = '-1';
     } finally {
         if (fileInput.value) fileInput.value.value = '';
     }
 }
 
-async function preloadAllSubtitles() {
-    if (!player || !subtitleList.value.length) return;
-
-    console.log('Préchargement de tous les sous-titres...');
-
-    for (const subtitle of subtitleList.value) {
-        try {
-            const mediaSourceId = mediaSource.value?.Id || itemId;
-            const vttUrl = `${serverUrl}/Videos/${itemId}/${mediaSourceId}/Subtitles/${subtitle.index}/Stream.vtt?api_key=${accessToken}`;
-
-            await player.addTextTrackAsync(
-                vttUrl,
-                subtitle.language || 'und',
-                'subtitles',
-                'text/vtt',
-                null,
-                subtitle.label
-            );
-
-            console.log(`Sous-titre ${subtitle.label} ajouté`);
-        } catch (e) {
-            console.log(`Erreur ajout ${subtitle.label}:`, e);
-        }
-    }
-
-    // Désactiver tous les sous-titres par défaut
-    player.setTextTrackVisibility(false);
-
-    console.log('Tous les sous-titres sont prêts');
-}
-
-
+// Lifecycle
 onMounted(async () => {
     await loadDetails();
     await determineMediaType();
@@ -949,7 +881,7 @@ onMounted(async () => {
         }
     }
 
-    document.addEventListener('click', (e) => {
+    document.addEventListener('click', e => {
         if (audioDropdown.value && !audioDropdown.value.contains(e.target as Node)) {
             audioMenuOpen.value = false;
         }
@@ -968,19 +900,35 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
-    stopProgressReporting();
+    // 1. Arrêter l'intervalle EN PREMIER
+    if (progressInterval) {
+        clearInterval(progressInterval);
+        progressInterval = null;
+    }
 
+    // 2. Reporter l'arrêt AVANT de détruire les éléments
+    const media = isAudioOnly.value ? audioEl.value : videoEl.value;
+    if (media) {
+        reportPlaybackStopped();
+    }
+
+    // 3. Détruire le player Shaka
     if (player) {
         player.destroy().catch(() => { });
         player = null;
     }
 
+    // 4. Nettoyer l'audio
     if (audioEl.value) {
         audioEl.value.pause();
         audioEl.value.src = '';
     }
 
-    if (controlsTimeout) clearTimeout(controlsTimeout);
+    // 5. Nettoyer le timeout des contrôles
+    if (controlsTimeout) {
+        clearTimeout(controlsTimeout);
+        controlsTimeout = null;
+    }
 });
 
 </script>
@@ -1020,12 +968,10 @@ onBeforeUnmount(() => {
     background: #000;
 }
 
+/* Loader */
 .loading-overlay {
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    inset: 0;
     background: rgba(0, 0, 0, 0.9);
     display: flex;
     flex-direction: column;
@@ -1056,13 +1002,15 @@ onBeforeUnmount(() => {
     font-weight: 500;
 }
 
+/* Audio UI */
 .audio-player {
     width: 100%;
     height: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    background: radial-gradient(circle at top, #1a1a2e 0%, #000 70%);
+    cursor: pointer;
 }
 
 .audio-display {
@@ -1074,8 +1022,8 @@ onBeforeUnmount(() => {
 }
 
 .audio-cover {
-    width: 60vh;
-    height: 60vh;
+    width: 300px;
+    height: 300px;
     border-radius: 12px;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
     object-fit: cover;
@@ -1098,12 +1046,15 @@ onBeforeUnmount(() => {
     margin: 0;
 }
 
+/* Controls */
 .player-controls {
     position: absolute;
+    inset-inline: 0;
     bottom: 0;
-    left: 0;
-    right: 0;
-    background: linear-gradient(0deg, rgba(0, 0, 0, 0.9) 0%, rgba(0, 0, 0, 0.7) 70%, transparent 100%);
+    background: linear-gradient(0deg,
+            rgba(0, 0, 0, 0.9) 0%,
+            rgba(0, 0, 0, 0.7) 70%,
+            transparent 100%);
     padding: 20px 16px 16px;
     opacity: 0;
     transition: opacity 0.3s ease;
@@ -1193,7 +1144,6 @@ onBeforeUnmount(() => {
 .volume-slider {
     width: 80px;
     height: 4px;
-    -webkit-appearance: none;
     appearance: none;
     background: rgba(255, 255, 255, 0.3);
     border-radius: 2px;
@@ -1202,7 +1152,6 @@ onBeforeUnmount(() => {
 }
 
 .volume-slider::-webkit-slider-thumb {
-    -webkit-appearance: none;
     appearance: none;
     width: 12px;
     height: 12px;
@@ -1227,6 +1176,7 @@ onBeforeUnmount(() => {
     min-width: 110px;
 }
 
+/* Dropdowns */
 .dropdown {
     position: relative;
 }
@@ -1287,28 +1237,6 @@ onBeforeUnmount(() => {
     height: 1px;
     background: rgba(255, 255, 255, 0.1);
     margin: 4px 0;
-}
-
-.btn {
-    height: 40px;
-    padding: 0 16px;
-    border-radius: 8px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: transform .15s ease, background .2s ease;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    color: #fff;
-    background: rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(10px);
-}
-
-.btn:hover {
-    background: rgba(255, 255, 255, 0.1);
-    transform: translateY(-1px);
-}
-
-.btn.ghost {
-    background: transparent;
 }
 
 .hidden-input {

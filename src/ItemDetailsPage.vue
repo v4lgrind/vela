@@ -7,8 +7,7 @@
             <div class="left">
                 <!-- MODIFIER: Ajouter classe conditionnelle square -->
                 <div class="poster" :class="{ 'square': isAudioType(item.Type) }">
-                    <img @error="(e) => handleImageError(e, item.Type)" :src="posterUrl" :alt="item?.Name"
-                        loading="lazy" />
+                    <LazyImg :src="posterUrl" :alt="item?.Name" :item-type="item?.Type" />
                 </div>
             </div>
 
@@ -71,7 +70,7 @@
             <h3>Saisons</h3>
             <div class="grid">
                 <div v-for="season in seasons" :key="season.Id" class="card" @click="goToItem(season.Id)">
-                    <img :src="getImageUrl(season.Id, 'Primary', 300, 450)" :alt="season.Name" loading="lazy"
+                    <LazyImg :src="getImageUrl(season.Id, 'Primary', 300, 450)" :alt="season.Name" item-type="Season"
                         class="card-poster" />
                     <div class="card-title">{{ season.Name }}</div>
                 </div>
@@ -83,7 +82,7 @@
             <h3>Épisodes</h3>
             <div class="episodes-list">
                 <div v-for="ep in episodes" :key="ep.Id" class="episode-card" @click="goToItem(ep.Id)">
-                    <img :src="getImageUrl(ep.Id, 'Primary', 200, 112)" :alt="ep.Name" loading="lazy"
+                    <LazyImg :src="getImageUrl(ep.Id, 'Primary', 200, 112)" :alt="ep.Name" item-type="Episode"
                         class="episode-thumb" />
                     <div class="episode-info">
                         <div class="episode-title">{{ ep.IndexNumber }}. {{ ep.Name }}</div>
@@ -124,8 +123,7 @@
             <div ref="castRail" class="scroller-rail" role="list" aria-label="Distribution">
                 <div v-for="p in cast" :key="p.Id || p.Name" class="scroller-item" role="listitem" :title="p.Name">
                     <div class="avatar">
-                        <img @error="(e) => handleImageError(e, item.Type)" :src="personImageUrl(p)" :alt="p.Name"
-                            loading="lazy" />
+                        <LazyImg :src="personImageUrl(p)" :alt="p.Name" item-type="person" />
                     </div>
                     <div class="cast-meta">
                         <div class="cast-name">{{ p.Name }}</div>
@@ -166,6 +164,7 @@
 import { onMounted, ref, computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useJellyfinStore } from './store/jellyfin-store';
+import LazyImg from './components/LazyImg.vue';
 
 const store = useJellyfinStore();
 const route = useRoute();
@@ -187,12 +186,6 @@ const downloadProgress = ref(0);
 
 function isAudioType(type: string): boolean {
     return type === 'Audio' || type === 'MusicAlbum' || type === 'MusicArtist';
-}
-
-function handleImageError(e: Event, itemType: string) {
-    const img = e.target as HTMLImageElement;
-    let fallbackUrl = store.getPlaceholderImage(itemType)
-    img.src = fallbackUrl;
 }
 
 async function load() {

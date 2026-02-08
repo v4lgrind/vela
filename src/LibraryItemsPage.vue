@@ -7,14 +7,14 @@
           <router-link v-if="item.Type === 'BoxSet'"
             :to="{ name: 'libraryItem', params: { id: item.Id, name: item.Name } }" class="poster-wrapper"
             :class="{ 'square': isAudioType(item.Type) }">
-            <img @error="(e) => handleImageError(e, item.Type)" :src="getImageUrl(item.Id)" :alt="item.Name"
-              class="poster" loading="lazy" @click="loadPage()">
+            <LazyImg :src="getImageUrl(item.Id, item.Type)" :alt="item.Name" :item-type="item.Type"
+              class="poster" @click="loadPage()" />
           </router-link>
 
           <router-link v-else :to="{ name: 'ItemDetails', params: { id: item.Id } }" class="poster-wrapper"
             :class="{ 'square': isAudioType(item.Type) }">
-            <img @error="(e) => handleImageError(e, item.Type)" :src="getImageUrl(item.Id)" :alt="item.Name"
-              class="poster" loading="lazy" />
+            <LazyImg :src="getImageUrl(item.Id, item.Type)" :alt="item.Name" :item-type="item.Type"
+              class="poster" />
           </router-link>
 
           <div class="meta">
@@ -38,6 +38,7 @@
 import { onMounted, ref, computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useJellyfinStore } from './store/jellyfin-store';
+import LazyImg from './components/LazyImg.vue';
 
 const store = useJellyfinStore();
 const route = useRoute();
@@ -59,14 +60,9 @@ function isAudioType(type: string): boolean {
   return type === 'Audio' || type === 'MusicAlbum' || type === 'MusicArtist';
 }
 
-function handleImageError(e: Event, itemType: string) {
-  const img = e.target as HTMLImageElement;
-  let fallbackUrl = store.getPlaceholderImage(itemType)
-  img.src = fallbackUrl;
-}
-
-function getImageUrl(id: string) {
-  return store.getImageUrl(id, 'Primary') || '';
+function getImageUrl(id: string, itemType?: string) {
+  const isAudio = itemType && isAudioType(itemType);
+  return store.getImageUrl(id, 'Primary', isAudio ? 150 : 130, isAudio ? 150 : 195) || '';
 }
 
 async function onLogout() {

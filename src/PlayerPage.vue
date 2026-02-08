@@ -527,6 +527,11 @@ async function getPlaybackUrl() {
             frenchStream || audioStreams.find((s: any) => s.IsDefault) || audioStreams[0];
         selectedAudioIndex.value = defaultStream?.Index ?? 0;
 
+        // Use server's PlaySessionId for proper session tracking
+        if (data.PlaySessionId) {
+            playSessionId.value = data.PlaySessionId;
+        }
+
         if (mediaSource.value.TranscodingUrl) {
             baseTranscodingUrl.value = mediaSource.value.TranscodingUrl;
         }
@@ -540,9 +545,16 @@ async function getPlaybackUrl() {
 
 function buildHlsUrl() {
     if (baseTranscodingUrl.value) {
-        const url = new URL(`${serverUrl}${baseTranscodingUrl.value}`);
-        url.searchParams.set('AudioStreamIndex', String(selectedAudioIndex.value));
-        hlsUrl.value = url.toString();
+        // Clean leading ?& and use the server's transcoding URL directly
+        let transcodingPath = baseTranscodingUrl.value;
+        // Replace ?& with ? to avoid malformed query string
+        transcodingPath = transcodingPath.replace('?&', '?');
+        // Update AudioStreamIndex in the URL
+        transcodingPath = transcodingPath.replace(
+            /AudioStreamIndex=\d+/,
+            `AudioStreamIndex=${selectedAudioIndex.value}`
+        );
+        hlsUrl.value = `${serverUrl}${transcodingPath}`;
     } else {
         hlsUrl.value = `${serverUrl}/Videos/${itemId}/master.m3u8?mediaSourceId=${mediaSource.value?.Id || itemId
             }&AudioStreamIndex=${selectedAudioIndex.value}&api_key=${accessToken}`;
@@ -935,12 +947,14 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .player-page {
-    height: 92%;
+    position: fixed;
+    inset: 0;
     background: #000;
     color: #e0e0e0;
     padding: 0;
     display: flex;
     flex-direction: column;
+    z-index: 100;
 }
 
 .state.error {
@@ -957,8 +971,9 @@ onBeforeUnmount(() => {
 
 .video-container {
     position: relative;
-    width: 100vw;
-    height: 93vh;
+    width: 100%;
+    flex: 1;
+    overflow: hidden;
     background: #000;
 }
 

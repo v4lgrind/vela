@@ -21,7 +21,7 @@ export const deviceProfile = {
       {
         Container: "mp4,m4v",
         Type: "Video",
-        VideoCodec: "h264,hevc,vp9,av1",
+        VideoCodec: "h264,vp9,av1",
         AudioCodec: "aac,mp3,mp2,opus,flac,vorbis",
       },
       {
@@ -45,7 +45,7 @@ export const deviceProfile = {
       {
         Container: "hls",
         Type: "Video",
-        VideoCodec: "av1,hevc,h264,vp9",
+        VideoCodec: "av1,h264,vp9",
         AudioCodec: "aac,mp3,opus",
       },
       {
@@ -200,7 +200,7 @@ export const deviceProfile = {
             Condition: "EqualsAny",
             Property: "VideoRangeType",
             Value: "SDR",
-            IsRequired: false,
+            IsRequired: true,
           },
           {
             Condition: "LessThanEqual",
@@ -235,8 +235,8 @@ export const deviceProfile = {
           {
             Condition: "EqualsAny",
             Property: "VideoRangeType",
-            Value: "SDR|HDR10|HLG",
-            IsRequired: false,
+            Value: "SDR",
+            IsRequired: true,
           },
           {
             Condition: "LessThanEqual",
@@ -259,8 +259,8 @@ export const deviceProfile = {
           {
             Condition: "EqualsAny",
             Property: "VideoRangeType",
-            Value: "SDR|HDR10|HLG",
-            IsRequired: false,
+            Value: "SDR",
+            IsRequired: true,
           },
         ],
       },
@@ -283,8 +283,8 @@ export const deviceProfile = {
           {
             Condition: "EqualsAny",
             Property: "VideoRangeType",
-            Value: "SDR|HDR10|HLG",
-            IsRequired: false,
+            Value: "SDR",
+            IsRequired: true,
           },
           {
             Condition: "LessThanEqual",

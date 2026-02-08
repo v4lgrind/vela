@@ -9,7 +9,7 @@
       <li v-for="item in mediaItems" :key="item.Id" class="media-item">
         <router-link class="media-title" :to="{ name: 'libraryItem', params: { id: item.Id, name: item.Name } }">
           <div>
-            <img @error="(e) => handleImageError(e, item.Type)" :src="item.imageUrl" alt="poster" class="poster" />
+            <LazyImg :src="item.imageUrl" alt="poster" :item-type="item.Type" class="poster" />
             <div class="meta">
               {{ item.Name }}
             </div>
@@ -24,19 +24,14 @@
 import { onMounted, ref } from 'vue';
 import { useJellyfinStore } from './store/jellyfin-store';
 import { useRouter } from 'vue-router';
+import LazyImg from './components/LazyImg.vue';
 
 const store = useJellyfinStore();
 const router = useRouter();
 
-const mediaItems = ref<Array<{ Id: string; Name: string; imageUrl: string }>>([]);
+const mediaItems = ref<Array<{ Id: string; Name: string; imageUrl: string; Type?: string }>>([]);
 const loading = ref(true);
 const error = ref<string | null>(null);
-
-function handleImageError(e: Event, itemType: string) {
-  const img = e.target as HTMLImageElement;
-  let fallbackUrl = store.getPlaceholderImage(itemType)
-  img.src = fallbackUrl;
-}
 
 async function loadMedia() {
   loading.value = true;

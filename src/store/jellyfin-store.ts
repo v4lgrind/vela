@@ -96,11 +96,11 @@ export const useJellyfinStore = defineStore("jellyfin", {
       height?: number
     ) {
       let url = this.serverUrl + `/Items/${itemId}/Images/${imageType}`;
-      if (width || height) {
-        const params = new URLSearchParams();
-        if (height) params.set("height", height.toString());
-        url += `?${params.toString()}`;
-      }
+      const params = new URLSearchParams();
+      if (width) params.set("maxWidth", width.toString());
+      if (height) params.set("maxHeight", height.toString());
+      params.set("quality", "80");
+      url += `?${params.toString()}`;
       return url;
     },
     logout() {

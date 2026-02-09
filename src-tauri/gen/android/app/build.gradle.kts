@@ -16,6 +16,7 @@ val tauriProperties = Properties().apply {
 android {
     compileSdk = 36
     namespace = "com.jellyfin_v4lgrind_client.app"
+    setProperty("archivesBaseName", "mediaserver-client")
     defaultConfig {
         manifestPlaceholders["usesCleartextTraffic"] = "false"
         applicationId = "com.jellyfin_v4lgrind_client.app"

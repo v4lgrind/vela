@@ -52,4 +52,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: debug-apk
-          path: src-tauri/gen/android/app/build/outputs/apk/universal/debug/*.apk
+          path: src-tauri/gen/android/app/build/outputs/apk/universal/debug/mediaserver-client-universal-debug.apk

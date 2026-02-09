@@ -71,13 +71,15 @@ async function onSubmit() {
 <style scoped>
 /* Style simplifié, adapte comme dans l'exemple login précédent */
 .login-root {
-  min-height: 100vh;
+  height: 100vh;
   display: grid;
   place-items: center;
   background: #121212;
   color: white;
   padding-top: env(safe-area-inset-top, 0px);
   padding-bottom: env(safe-area-inset-bottom, 0px);
+  box-sizing: border-box;
+  overflow: hidden;
 }
 .login-card {
   width: min(92vw, 420px);

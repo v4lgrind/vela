@@ -5,13 +5,22 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import SearchBar from './SearchBar.vue';
 import { useJellyfinStore } from './store/jellyfin-store';
 
 const route = useRoute();
+const router = useRouter();
 const store = useJellyfinStore();
 const isAuthenticated = computed(() => store.isAuthenticated);
+
+// Android back button bridge — called from MainActivity.kt via evaluateJavascript
+(window as any).__goBack = () => {
+  const name = router.currentRoute.value.name;
+  if (name === 'login' || name === 'libraries') return false;
+  router.back();
+  return true;
+};
 </script>
 
 <style>

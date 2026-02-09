@@ -27,6 +27,7 @@
 import { ref, watch, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useJellyfinStore } from './store/jellyfin-store';
+import { typeLabel } from './utils/helpers';
 
 const placeholder = 'Rechercher films, séries, acteurs…';
 const router = useRouter();
@@ -42,15 +43,6 @@ let debounceId: number | undefined;
 async function onLogout() {
     await store.logout();
     router.push({ name: 'login' });
-}
-
-
-function typeLabel(t?: string) {
-    if (t === 'Movie') return 'Film';
-    if (t === 'Series') return 'Série';
-    if (t === 'Episode') return 'Épisode';
-    if (t === 'Person') return 'Personne';
-    return t || '';
 }
 
 function thumb(item: any) {
@@ -69,7 +61,6 @@ async function searchAll(term: string) {
         limit: 24,
         includeItemTypes: ['Movie', 'Series', 'Episode', 'Audio', 'AudioAlbum']
     });
-    console.log("results", results.value)
     activeIndex.value = 0;
 }
 
@@ -92,13 +83,8 @@ function selectActive() {
 
 function goToResult(r: any) {
     open.value = false;
-    // Routage médias uniquement
     if (['Movie', 'Series', 'Episode', 'Video', 'Audio', 'AudioAlbum'].includes(r.Type)) {
-        // Vers page détail si vidéo; pour Audio/Album adapter selon vos routes
-        const target = ['Audio', 'AudioAlbum'].includes(r.Type)
-            ? { name: 'ItemDetails', params: { id: r.Id } } // ou une page Audio dédiée
-            : { name: 'ItemDetails', params: { id: r.Id } };
-        router.push(target);
+        router.push({ name: 'ItemDetails', params: { id: r.Id } });
     }
 }
 

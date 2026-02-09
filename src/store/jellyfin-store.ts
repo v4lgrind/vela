@@ -109,7 +109,6 @@ export const useJellyfinStore = defineStore("jellyfin", {
       this.libraries = [];
       this.items = [];
     },
-    items: [] as any[],
     currentItem: null as any | null,
     async fetchItemDetails(itemId: string) {
       this.initializeApi();

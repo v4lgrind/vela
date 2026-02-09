@@ -23,11 +23,11 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { useJellyfinStore } from './store/jellyfin-store';
-import { useRouter } from 'vue-router';
 import LazyImg from './components/LazyImg.vue';
+import { useImageError } from './composables/useImageError';
 
 const store = useJellyfinStore();
-const router = useRouter();
+const { handleImageError } = useImageError();
 
 const mediaItems = ref<Array<{ Id: string; Name: string; imageUrl: string; Type?: string }>>([]);
 const loading = ref(true);
@@ -47,11 +47,6 @@ async function loadMedia() {
   } finally {
     loading.value = false;
   }
-}
-
-async function logout() {
-  await store.logout();
-  router.push({ name: 'login' });
 }
 
 onMounted(() => {

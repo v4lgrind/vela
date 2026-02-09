@@ -36,13 +36,15 @@
 
 <script setup lang="ts">
 import { onMounted, ref, computed, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { useRoute } from 'vue-router';
 import { useJellyfinStore } from './store/jellyfin-store';
 import LazyImg from './components/LazyImg.vue';
+import { isAudioType } from './utils/helpers';
+import { useImageError } from './composables/useImageError';
 
 const store = useJellyfinStore();
 const route = useRoute();
-const router = useRouter();
+const { handleImageError } = useImageError();
 const libraryId = route.params.id as string;
 const libraryName = route.params.name as string;
 
@@ -55,19 +57,9 @@ const error = ref<string | null>(null);
 
 const currentPage = computed(() => Math.floor(startIndex.value / limit.value) + 1);
 
-// AJOUT: Fonction pour déterminer si c'est un type audio
-function isAudioType(type: string): boolean {
-  return type === 'Audio' || type === 'MusicAlbum' || type === 'MusicArtist';
-}
-
 function getImageUrl(id: string, itemType?: string) {
   const isAudio = itemType && isAudioType(itemType);
   return store.getImageUrl(id, 'Primary', isAudio ? 150 : 130, isAudio ? 150 : 195) || '';
-}
-
-async function onLogout() {
-  await store.logout();
-  router.push({ name: 'login' });
 }
 
 async function loadPage() {

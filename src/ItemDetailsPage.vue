@@ -165,10 +165,13 @@ import { onMounted, ref, computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useJellyfinStore } from './store/jellyfin-store';
 import LazyImg from './components/LazyImg.vue';
+import { isAudioType, typeLabel as getTypeLabel, formatTicksDuration, formatTicksHuman, formatBytes } from './utils/helpers';
+import { useImageError } from './composables/useImageError';
 
 const store = useJellyfinStore();
 const route = useRoute();
 const router = useRouter();
+const { handleImageError } = useImageError();
 
 const loading = ref(true);
 const error = ref<string | null>(null);
@@ -182,11 +185,6 @@ const accessToken = store.accessToken;
 
 const isDownloading = ref(false);
 const downloadProgress = ref(0);
-
-
-function isAudioType(type: string): boolean {
-    return type === 'Audio' || type === 'MusicAlbum' || type === 'MusicArtist';
-}
 
 async function load() {
     loading.value = true;
@@ -232,27 +230,11 @@ const posterUrl = computed(() => {
 // Métadonnées simples
 const year = computed(() => item.value?.ProductionYear || null);
 
-const duration = computed(() => {
-    const ticks = item.value?.RunTimeTicks;
-    if (!ticks) return null;
-    const totalSec = Math.floor(ticks / 10_000_000);
-    const h = Math.floor(totalSec / 3600);
-    const m = Math.floor((totalSec % 3600) / 60);
-    return h ? `${h}h ${m}m` : `${m}m`;
-});
+const duration = computed(() => formatTicksHuman(item.value?.RunTimeTicks));
 
 const genres = computed<string[]>(() => item.value?.Genres || []);
 
-const typeLabel = computed(() => {
-    const t = item.value?.Type;
-    if (t === 'Movie') return 'Film';
-    if (t === 'Series') return 'Série';
-    if (t === 'Season') return 'Saison';
-    if (t === 'Episode') return 'Épisode';
-    if (t === 'MusicAlbum') return 'Album';
-    if (t === 'Audio') return 'Audio';
-    return t || '';
-});
+const typeLabel = computed(() => getTypeLabel(item.value?.Type));
 
 // People
 type Person = { Id?: string; Name: string; Role?: string; Type?: string };
@@ -294,13 +276,7 @@ function getImageUrl(id: string, type: string, w: number, h: number) {
 }
 
 // Pistes audio
-function formatTrackDuration(ticks?: number) {
-    if (!ticks) return '';
-    const totalSec = Math.floor(ticks / 10_000_000);
-    const m = Math.floor(totalSec / 60);
-    const s = totalSec % 60;
-    return `${m}:${s.toString().padStart(2, '0')}`;
-}
+const formatTrackDuration = formatTicksDuration;
 
 function playTrack(trackId: string) {
     // Naviguer vers le player
@@ -395,19 +371,6 @@ const sourceDetails = computed(() => {
 
     return entries;
 });
-
-function formatBytes(bytes?: number | null) {
-    if (!bytes || bytes <= 0) return null;
-    const units = ['octets', 'Ko', 'Mo', 'Go', 'To'];
-    let i = 0;
-    let val = bytes;
-    while (val >= 1024 && i < units.length - 1) {
-        val /= 1024;
-        i++;
-    }
-    const fixed = val >= 100 ? val.toFixed(0) : val >= 10 ? val.toFixed(1) : val.toFixed(2);
-    return `${fixed} ${units[i]}`;
-}
 
 const fileSizeHuman = computed(() => {
     const size = firstSource.value?.Size as number | undefined;

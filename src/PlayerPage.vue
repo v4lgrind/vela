@@ -151,6 +151,7 @@ import { useRoute } from 'vue-router';
 import { useJellyfinStore } from './store/jellyfin-store';
 import shaka from 'shaka-player/dist/shaka-player.compiled.js';
 import { deviceProfile } from './constants';
+import { formatTime } from './utils/helpers';
 
 const route = useRoute();
 const store = useJellyfinStore();
@@ -196,6 +197,10 @@ const isLoading = ref(true);
 const mediaType = ref<'Video' | 'Audio'>('Video');
 const isAudioOnly = computed(() => mediaType.value === 'Audio');
 
+function getMediaElement(): HTMLMediaElement | null {
+    return isAudioOnly.value ? audioEl.value : videoEl.value;
+}
+
 // Reporting Jellyfin
 const playSessionId = ref<string>('');
 let progressInterval: ReturnType<typeof setInterval> | null = null;
@@ -207,18 +212,6 @@ const posterUrl = computed(
 const hlsUrl = ref<string>('');
 const baseTranscodingUrl = ref<string>('');
 const audioUrl = ref<string>('');
-
-// Utils
-function formatTime(seconds: number): string {
-    if (!seconds || isNaN(seconds)) return '0:00';
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = Math.floor(seconds % 60);
-    if (h > 0) {
-        return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-    }
-    return `${m}:${s.toString().padStart(2, '0')}`;
-}
 
 function onLoadStart() {
     isLoading.value = true;
@@ -257,35 +250,47 @@ function generateSessionId(): string {
 }
 
 // Reporting Jellyfin
+const reportingHeaders = {
+    'Content-Type': 'application/json',
+    'X-Emby-Token': accessToken
+};
+
+function buildReportingPayload(overrides: Record<string, any> = {}) {
+    const media = getMediaElement();
+    return {
+        ItemId: itemId,
+        SessionId: playSessionId.value,
+        MediaSourceId: mediaSource.value?.Id || itemId,
+        PositionTicks: Math.floor((media?.currentTime || 0) * 10_000_000),
+        PlayMethod: isAudioOnly.value ? 'DirectStream' : 'Transcode',
+        PlaySessionId: playSessionId.value,
+        ...overrides
+    };
+}
+
+function buildFullReportingPayload(overrides: Record<string, any> = {}) {
+    const media = getMediaElement();
+    return buildReportingPayload({
+        IsMuted: media?.muted || false,
+        VolumeLevel: Math.floor((media?.volume || 1) * 100),
+        AudioStreamIndex: selectedAudioIndex.value,
+        SubtitleStreamIndex:
+            !isAudioOnly.value && selectedSubtitleIndex.value !== '-1'
+                ? parseInt(selectedSubtitleIndex.value)
+                : null,
+        ...overrides
+    });
+}
+
 async function reportPlaybackStart() {
     if (!playSessionId.value) {
         playSessionId.value = generateSessionId();
     }
-
-    const media = isAudioOnly.value ? audioEl.value : videoEl.value;
     try {
         await fetch(`${serverUrl}/Sessions/Playing`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Emby-Token': accessToken
-            },
-            body: JSON.stringify({
-                ItemId: itemId,
-                SessionId: playSessionId.value,
-                MediaSourceId: mediaSource.value?.Id || itemId,
-                PositionTicks: Math.floor((media?.currentTime || 0) * 10_000_000),
-                IsPaused: false,
-                IsMuted: media?.muted || false,
-                VolumeLevel: Math.floor((media?.volume || 1) * 100),
-                PlayMethod: isAudioOnly.value ? 'DirectStream' : 'Transcode',
-                PlaySessionId: playSessionId.value,
-                AudioStreamIndex: selectedAudioIndex.value,
-                SubtitleStreamIndex:
-                    !isAudioOnly.value && selectedSubtitleIndex.value !== '-1'
-                        ? parseInt(selectedSubtitleIndex.value)
-                        : null
-            })
+            headers: reportingHeaders,
+            body: JSON.stringify(buildFullReportingPayload({ IsPaused: false }))
         });
     } catch (e) {
         console.error('reportPlaybackStart error', e);
@@ -293,31 +298,13 @@ async function reportPlaybackStart() {
 }
 
 async function reportPlaybackProgress() {
-    const media = isAudioOnly.value ? audioEl.value : videoEl.value;
+    const media = getMediaElement();
     if (!media) return;
     try {
         await fetch(`${serverUrl}/Sessions/Playing/Progress`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Emby-Token': accessToken
-            },
-            body: JSON.stringify({
-                ItemId: itemId,
-                SessionId: playSessionId.value,
-                MediaSourceId: mediaSource.value?.Id || itemId,
-                PositionTicks: Math.floor((media?.currentTime || 0) * 10_000_000),
-                IsPaused: !isPlaying.value,
-                IsMuted: media?.muted || false,
-                VolumeLevel: Math.floor((media?.volume || 1) * 100),
-                PlayMethod: isAudioOnly.value ? 'DirectStream' : 'Transcode',
-                PlaySessionId: playSessionId.value,
-                AudioStreamIndex: selectedAudioIndex.value,
-                SubtitleStreamIndex:
-                    !isAudioOnly.value && selectedSubtitleIndex.value !== '-1'
-                        ? parseInt(selectedSubtitleIndex.value)
-                        : null
-            })
+            headers: reportingHeaders,
+            body: JSON.stringify(buildFullReportingPayload({ IsPaused: !isPlaying.value }))
         });
     } catch (e) {
         console.error('reportPlaybackProgress error', e);
@@ -325,22 +312,13 @@ async function reportPlaybackProgress() {
 }
 
 async function reportPlaybackStopped() {
-    const media = isAudioOnly.value ? audioEl.value : videoEl.value;
+    const media = getMediaElement();
     if (!media) return;
     try {
         await fetch(`${serverUrl}/Sessions/Playing/Stopped`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Emby-Token': accessToken
-            },
-            body: JSON.stringify({
-                ItemId: itemId,
-                SessionId: playSessionId.value,
-                MediaSourceId: mediaSource.value?.Id || itemId,
-                PositionTicks: Math.floor((media?.currentTime || 0) * 10_000_000),
-                PlaySessionId: playSessionId.value
-            })
+            headers: reportingHeaders,
+            body: JSON.stringify(buildReportingPayload())
         });
     } catch (e) {
         console.error('reportPlaybackStopped error', e);
@@ -360,15 +338,14 @@ function stopProgressReporting() {
         clearInterval(progressInterval);
         progressInterval = null;
     }
-    const media = isAudioOnly.value ? audioEl.value : videoEl.value;
-    if (media) {
+    if (getMediaElement()) {
         reportPlaybackStopped();
     }
 }
 
 // Interactions
 function togglePlayPause() {
-    const media = isAudioOnly.value ? audioEl.value! : videoEl.value!;
+    const media = getMediaElement();
     if (!media) return;
     if (media.paused) {
         media.play().then(() => {
@@ -383,14 +360,14 @@ function togglePlayPause() {
 }
 
 function toggleMute() {
-    const media = isAudioOnly.value ? audioEl.value! : videoEl.value!;
+    const media = getMediaElement();
     if (!media) return;
     media.muted = !media.muted;
     volume.value = media.muted ? 0 : media.volume * 100;
 }
 
 function setVolume() {
-    const media = isAudioOnly.value ? audioEl.value! : videoEl.value!;
+    const media = getMediaElement();
     if (!media) return;
     media.volume = volume.value / 100;
     media.muted = volume.value === 0;
@@ -400,7 +377,7 @@ function seek(e: MouseEvent) {
     const progressBar = e.currentTarget as HTMLElement;
     const clickX = e.offsetX;
     const width = progressBar.offsetWidth;
-    const media = isAudioOnly.value ? audioEl.value! : videoEl.value!;
+    const media = getMediaElement();
     if (!media) return;
     media.currentTime = (clickX / width) * duration.value;
     reportPlaybackProgress();
@@ -442,7 +419,7 @@ function selectSubtitle(index: string) {
 }
 
 function onTimeUpdate() {
-    const media = isAudioOnly.value ? audioEl.value! : videoEl.value!;
+    const media = getMediaElement();
     if (!media) return;
     currentTime.value = media.currentTime;
     if (duration.value > 0) {
@@ -450,7 +427,7 @@ function onTimeUpdate() {
     }
 }
 function onLoadedMetadata() {
-    const media = isAudioOnly.value ? audioEl.value! : videoEl.value!;
+    const media = getMediaElement()!;
     duration.value = media.duration;
     volume.value = media.volume * 100;
 }
@@ -482,20 +459,7 @@ async function determineMediaType() {
 
 async function getPlaybackUrl() {
     try {
-        const profile = { ...deviceProfile, MediaSourceId: itemId };
-
-        const response = await fetch(
-            `${serverUrl}/Items/${itemId}/PlaybackInfo?userId=${store.userId}&api_key=${accessToken}`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(profile)
-            }
-        );
-
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-        const data = await response.json();
+        const data = await fetchPlaybackInfo();
         mediaSource.value = data.MediaSources?.[0];
         if (!mediaSource.value) throw new Error('Aucune source média disponible');
 
@@ -561,6 +525,60 @@ function buildHlsUrl() {
     }
 }
 
+function attachMediaListeners(media: HTMLMediaElement) {
+    media.addEventListener('play', () => {
+        isPlaying.value = true;
+        if (!progressInterval) startProgressReporting();
+    });
+    media.addEventListener('pause', () => {
+        isPlaying.value = false;
+        reportPlaybackProgress();
+    });
+    media.addEventListener('ended', () => {
+        stopProgressReporting();
+    });
+}
+
+async function addSubtitleTrack(shakaPlayer: shaka.Player, blobUrl: string, lang: string, label: string) {
+    shakaPlayer.setTextTrackVisibility(false);
+
+    await shakaPlayer.addTextTrackAsync(
+        blobUrl,
+        lang,
+        'subtitles',
+        'text/vtt',
+        null,
+        label
+    );
+
+    shakaPlayer.setTextTrackVisibility(true);
+
+    const tracks = shakaPlayer.getTextTracks();
+    if (tracks.length > 0) {
+        shakaPlayer.selectTextTrack(tracks[tracks.length - 1]);
+    }
+}
+
+async function fetchPlaybackInfo(audioStreamIndex?: number) {
+    const profile = {
+        ...deviceProfile,
+        MediaSourceId: itemId,
+        ...(audioStreamIndex !== undefined ? { AudioStreamIndex: audioStreamIndex } : {})
+    };
+
+    const response = await fetch(
+        `${serverUrl}/Items/${itemId}/PlaybackInfo?userId=${store.userId}&api_key=${accessToken}`,
+        {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(profile)
+        }
+    );
+
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return await response.json();
+}
+
 // Shaka vidéo
 async function initShaka() {
     const video = videoEl.value!;
@@ -596,17 +614,7 @@ async function initShaka() {
 
         await player.load(hlsUrl.value);
 
-        video.addEventListener('play', () => {
-            isPlaying.value = true;
-            if (!progressInterval) startProgressReporting();
-        });
-        video.addEventListener('pause', () => {
-            isPlaying.value = false;
-            reportPlaybackProgress();
-        });
-        video.addEventListener('ended', () => {
-            stopProgressReporting();
-        });
+        attachMediaListeners(video);
 
         await video.play().catch(() => { });
     } catch (e: any) {
@@ -637,17 +645,7 @@ async function initAudioPlayer() {
         audio.src = audioUrl.value;
         audio.load();
 
-        audio.addEventListener('play', () => {
-            isPlaying.value = true;
-            if (!progressInterval) startProgressReporting();
-        });
-        audio.addEventListener('pause', () => {
-            isPlaying.value = false;
-            reportPlaybackProgress();
-        });
-        audio.addEventListener('ended', () => {
-            stopProgressReporting();
-        });
+        attachMediaListeners(audio);
         audio.addEventListener('timeupdate', () => {
             currentTime.value = audio.currentTime;
             if (duration.value > 0) {
@@ -692,23 +690,8 @@ async function switchAudio() {
 
         await new Promise(resolve => setTimeout(resolve, 100));
 
-        const profile = {
-            ...deviceProfile,
-            MediaSourceId: itemId,
-            AudioStreamIndex: selectedAudioIndex.value
-        };
-
-        const response = await fetch(
-            `${serverUrl}/Items/${itemId}/PlaybackInfo?userId=${store.userId}&api_key=${accessToken}`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(profile)
-            }
-        );
-
-        if (response.ok) {
-            const data = await response.json();
+        try {
+            const data = await fetchPlaybackInfo(selectedAudioIndex.value!);
             const newMediaSource = data.MediaSources?.[0];
 
             if (newMediaSource?.TranscodingUrl) {
@@ -716,7 +699,7 @@ async function switchAudio() {
             } else {
                 buildHlsUrl();
             }
-        } else {
+        } catch {
             buildHlsUrl();
         }
 
@@ -773,23 +756,7 @@ async function switchSubtitle() {
         const blob = new Blob([cleaned], { type: 'text/vtt; charset=utf-8' });
         const blobUrl = URL.createObjectURL(blob);
 
-        player.setTextTrackVisibility(false);
-
-        await player.addTextTrackAsync(
-            blobUrl,
-            subtitle.language || 'und',
-            'subtitles',
-            'text/vtt',
-            null,
-            subtitle.label
-        );
-
-        player.setTextTrackVisibility(true);
-
-        const tracks = player.getTextTracks();
-        if (tracks.length > 0) {
-            player.selectTextTrack(tracks[tracks.length - 1]);
-        }
+        await addSubtitleTrack(player, blobUrl, subtitle.language || 'und', subtitle.label);
     } catch (e: any) {
         console.error('Erreur chargement sous-titres:', e);
         error.value = `Impossible de charger les sous-titres: ${e.message}`;
@@ -853,23 +820,7 @@ async function onPickSubtitleFile(e: Event) {
         const lang = m ? m[1].toLowerCase() : 'und';
 
         if (player) {
-            player.setTextTrackVisibility(false);
-
-            await player.addTextTrackAsync(
-                blobUrl,
-                lang,
-                'subtitles',
-                'text/vtt',
-                null,
-                name
-            );
-
-            player.setTextTrackVisibility(true);
-
-            const tracks = player.getTextTracks();
-            if (tracks.length > 0) {
-                player.selectTextTrack(tracks[tracks.length - 1]);
-            }
+            await addSubtitleTrack(player, blobUrl, lang, name);
         }
     } catch (err: any) {
         error.value = `Échec de chargement du sous-titre local: ${err.message}`;
@@ -919,8 +870,7 @@ onBeforeUnmount(() => {
     }
 
     // 2. Reporter l'arrêt AVANT de détruire les éléments
-    const media = isAudioOnly.value ? audioEl.value : videoEl.value;
-    if (media) {
+    if (getMediaElement()) {
         reportPlaybackStopped();
     }
 

@@ -31,6 +31,12 @@
 
             <!-- Contrôles -->
             <div class="player-controls" :class="{ show: controlsVisible }">
+                <!-- Back button -->
+                <button class="back-btn" @click="goBack">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+                    Retour
+                </button>
+
                 <!-- Barre de progression -->
                 <div class="progress-container" @click="seek">
                     <div class="progress-bar">
@@ -147,13 +153,14 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { useJellyfinStore } from './store/jellyfin-store';
 import shaka from 'shaka-player/dist/shaka-player.compiled.js';
 import { deviceProfile } from './constants';
 import { formatTime } from './utils/helpers';
 
 const route = useRoute();
+const router = useRouter();
 const store = useJellyfinStore();
 
 const itemId = route.params.id as string;
@@ -242,6 +249,22 @@ function hideControls() {
             controlsVisible.value = false;
         }, 1000);
     }
+}
+
+function goBack() {
+    router.back();
+}
+
+async function lockLandscape() {
+    try {
+        await (screen.orientation as any).lock('landscape');
+    } catch { /* silently fail on desktop */ }
+}
+
+function unlockOrientation() {
+    try {
+        (screen.orientation as any).unlock();
+    } catch { /* silently fail on desktop */ }
 }
 
 // Session ID
@@ -835,6 +858,10 @@ onMounted(async () => {
     await loadDetails();
     await determineMediaType();
 
+    if (!isAudioOnly.value) {
+        await lockLandscape();
+    }
+
     if (isAudioOnly.value) {
         await initAudioPlayer();
     } else {
@@ -863,6 +890,8 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
+    unlockOrientation();
+
     // 1. Arrêter l'intervalle EN PREMIER
     if (progressInterval) {
         clearInterval(progressInterval);
@@ -902,6 +931,8 @@ onBeforeUnmount(() => {
     background: #000;
     color: #e0e0e0;
     padding: 0;
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
     display: flex;
     flex-direction: column;
     z-index: 100;
@@ -1014,13 +1045,17 @@ onBeforeUnmount(() => {
 /* Controls */
 .player-controls {
     position: absolute;
-    inset-inline: 0;
-    bottom: 0;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
     background: linear-gradient(0deg,
             rgba(0, 0, 0, 0.9) 0%,
-            rgba(0, 0, 0, 0.7) 70%,
-            transparent 100%);
-    padding: 20px 16px 16px;
+            rgba(0, 0, 0, 0.4) 30%,
+            transparent 50%,
+            rgba(0, 0, 0, 0.4) 85%,
+            rgba(0, 0, 0, 0.7) 100%);
+    padding: 20px 16px calc(16px + env(safe-area-inset-bottom, 0px));
     opacity: 0;
     transition: opacity 0.3s ease;
     pointer-events: none;
@@ -1029,6 +1064,34 @@ onBeforeUnmount(() => {
 .player-controls.show {
     opacity: 1;
     pointer-events: all;
+}
+
+.back-btn {
+    position: absolute;
+    top: env(safe-area-inset-top, 12px);
+    left: 12px;
+    background: rgba(0, 0, 0, 0.5);
+    border: none;
+    color: #fff;
+    cursor: pointer;
+    padding: 8px 14px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.95rem;
+    font-weight: 500;
+    transition: background 0.2s ease;
+    z-index: 10;
+}
+
+.back-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.back-btn svg {
+    width: 20px;
+    height: 20px;
 }
 
 .progress-container {

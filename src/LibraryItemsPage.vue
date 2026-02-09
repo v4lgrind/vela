@@ -182,8 +182,15 @@ watch(() => route.params.id, async (newId) => {
   padding: 0;
   margin: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 18px;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 12px;
+}
+
+@media (min-width: 480px) {
+  .items-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 16px;
+  }
 }
 
 /* Carte d'item */
@@ -207,8 +214,8 @@ watch(() => route.params.id, async (newId) => {
 }
 
 .poster-wrapper {
-  width: 130px;
-  height: 195px;
+  width: 100%;
+  aspect-ratio: 2 / 3;
   border-radius: 10px;
   overflow: hidden;
   background: #0f0f0f;
@@ -216,8 +223,7 @@ watch(() => route.params.id, async (newId) => {
 }
 
 .poster-wrapper.square {
-  width: 150px;
-  height: 150px;
+  aspect-ratio: 1 / 1;
 }
 
 .poster {
@@ -267,27 +273,6 @@ watch(() => route.params.id, async (newId) => {
   text-shadow: 0 2px 8px #222;
 }
 
-/* Responsive petits écrans */
-@media (max-width: 480px) {
-  .items-header {
-    grid-template-columns: auto 1fr auto;
-  }
-
-  .items-title {
-    font-size: 1.4rem;
-  }
-
-  .poster-wrapper {
-    width: 120px;
-    height: 180px;
-  }
-
-  /* AJOUT: Poster carré responsive */
-  .poster-wrapper.square {
-    width: 140px;
-    height: 140px;
-  }
-}
 
 .pagination {
   margin-top: 18px;

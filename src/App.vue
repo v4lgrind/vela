@@ -1,14 +1,17 @@
 <template>
-  <SearchBar />
+  <SearchBar v-if="isAuthenticated" />
   <router-view :key="route.fullPath" />
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import { useRoute } from 'vue-router';
 import SearchBar from './SearchBar.vue';
-const route = useRoute()
-// Pas de logique spécifique dans App.vue
-// Tout est géré via Vue Router
+import { useJellyfinStore } from './store/jellyfin-store';
+
+const route = useRoute();
+const store = useJellyfinStore();
+const isAuthenticated = computed(() => store.isAuthenticated);
 </script>
 
 <style>
@@ -19,5 +22,6 @@ body,
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   background-color: #000000;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 </style>

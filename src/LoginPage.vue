@@ -76,6 +76,8 @@ async function onSubmit() {
   place-items: center;
   background: #121212;
   color: white;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 .login-card {
   width: min(92vw, 420px);

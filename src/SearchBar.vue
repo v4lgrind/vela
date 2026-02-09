@@ -202,11 +202,11 @@ watch(query, (val) => {
 
 .navbar {
     display: grid;
-    grid-template-columns: 1fr 1fr 11fr 1fr;
+    grid-template-columns: auto auto 1fr auto;
     align-items: center;
     gap: 12px;
     margin-bottom: 20px;
     background: #1b1b1b;
-    padding: 10px 12px;
+    padding: calc(10px + env(safe-area-inset-top, 0px)) 12px 10px;
 }
 </style>

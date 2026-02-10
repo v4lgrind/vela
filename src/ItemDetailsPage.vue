@@ -18,6 +18,10 @@
                     ▶️ Lire ce média
                 </button>
 
+                <button class="btn play" v-if="item.Type === 'MusicAlbum' && audioTracks.length" @click="playAlbum">
+                    ▶️ Lire l'album
+                </button>
+
                 <button class="btn download" v-if="canDownload(item)" @click="handleDownload" :disabled="isDownloading">
                     <span v-if="!isDownloading">⬇️ Télécharger</span>
                     <span v-else>
@@ -96,7 +100,9 @@
         <section v-if="item?.Type === 'MusicAlbum' && audioTracks.length" class="children-section">
             <h3>Pistes</h3>
             <div class="tracks-list">
-                <div v-for="track in audioTracks" :key="track.Id" class="track-card" @click="playTrack(track.Id)">
+                <div v-for="(track, i) in audioTracks" :key="track.Id" class="track-card"
+                    :class="{ playing: audioPlayerStore.currentTrack?.id === track.Id }"
+                    @click="playTrack(track.Id, i)">
                     <div class="track-number">{{ track.IndexNumber || '•' }}</div>
                     <div class="track-info">
                         <div class="track-title">{{ track.Name }}</div>
@@ -164,11 +170,13 @@
 import { onMounted, ref, computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useJellyfinStore } from './store/jellyfin-store';
+import { useAudioPlayerStore, type AudioTrack } from './store/audio-player-store';
 import LazyImg from './components/LazyImg.vue';
 import { isAudioType, typeLabel as getTypeLabel, formatTicksDuration, formatTicksHuman, formatBytes } from './utils/helpers';
 import { useImageError } from './composables/useImageError';
 
 const store = useJellyfinStore();
+const audioPlayerStore = useAudioPlayerStore();
 const route = useRoute();
 const router = useRouter();
 const { handleImageError } = useImageError();
@@ -263,6 +271,12 @@ function isPlayable(it: any) {
 }
 function playMedia() {
     if (!item.value || !accessToken) return;
+    // Audio items go through the audio player store
+    if (item.value.Type === 'Audio' || item.value.MediaType === 'Audio') {
+        const track = itemToAudioTrack(item.value);
+        audioPlayerStore.playTrack(track);
+        return;
+    }
     router.push({ name: 'Player', params: { id: item.value.Id } });
 }
 
@@ -278,9 +292,26 @@ function getImageUrl(id: string, type: string, w: number, h: number) {
 // Pistes audio
 const formatTrackDuration = formatTicksDuration;
 
-function playTrack(trackId: string) {
-    // Naviguer vers le player
-    router.push({ name: 'Player', params: { id: trackId } });
+function itemToAudioTrack(raw: any): AudioTrack {
+    return {
+        id: raw.Id,
+        name: raw.Name || '',
+        artist: raw.AlbumArtist || raw.Artists?.join(', ') || '',
+        albumId: raw.AlbumId || raw.ParentId || raw.Id,
+        albumName: raw.Album || item.value?.Name || '',
+        duration: raw.RunTimeTicks ? raw.RunTimeTicks / 10_000_000 : 0,
+        indexNumber: raw.IndexNumber || 0,
+    };
+}
+
+function playTrack(_trackId: string, index: number) {
+    const tracks = audioTracks.value.map(itemToAudioTrack);
+    audioPlayerStore.playAlbum(tracks, index);
+}
+
+function playAlbum() {
+    const tracks = audioTracks.value.map(itemToAudioTrack);
+    audioPlayerStore.playAlbum(tracks, 0);
 }
 
 // Cast rail scrolling
@@ -678,6 +709,15 @@ function cancelDownload() {
     transform: translateX(4px);
     border-color: #38f9d7;
     background: #242424;
+}
+
+.track-card.playing {
+    border-color: #00a4dc;
+    background: rgba(0, 164, 220, 0.1);
+}
+
+.track-card.playing .track-title {
+    color: #00a4dc;
 }
 
 .track-number {

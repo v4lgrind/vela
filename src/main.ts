@@ -12,3 +12,6 @@ const app = createApp(App);
 app.use(router);
 app.use(pinia);
 app.mount("#app");
+
+import { audioPlayerService } from './services/audioPlayerService';
+audioPlayerService.init();

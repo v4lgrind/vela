@@ -5,6 +5,7 @@ import LibraryItemsPage from "../LibraryItemsPage.vue";
 import ItemDetailsPage from "../ItemDetailsPage.vue";
 import PlayerPage from "../PlayerPage.vue";
 import { useJellyfinStore } from "../store/jellyfin-store";
+import { useAudioPlayerStore } from "../store/audio-player-store";
 
 const routes = [
   {
@@ -68,6 +69,32 @@ router.beforeEach(async (to, from, next) => {
   // Si on est connecté et qu'on accède à la page login
   else if (to.name === "login" && isAuthenticated) {
     next({ name: "libraries" });
+  }
+  // Redirect audio items away from the video player route
+  else if (to.name === "Player" && to.params.id) {
+    try {
+      const item = store.currentItem?.Id === to.params.id
+        ? store.currentItem
+        : await store.fetchItemDetails(to.params.id as string);
+      if (item && (item.Type === "Audio" || item.MediaType === "Audio")) {
+        const audioStore = useAudioPlayerStore();
+        audioStore.playTrack({
+          id: item.Id,
+          name: item.Name || "",
+          artist: item.AlbumArtist || item.Artists?.join(", ") || "",
+          albumId: item.AlbumId || item.ParentId || item.Id,
+          albumName: item.Album || "",
+          duration: item.RunTimeTicks ? item.RunTimeTicks / 10_000_000 : 0,
+          indexNumber: item.IndexNumber || 0,
+        });
+        // Stay on current page or go back
+        next(false);
+        return;
+      }
+    } catch {
+      // If fetch fails, let the player page handle it
+    }
+    next();
   }
   // Sinon, laisser passer
   else {

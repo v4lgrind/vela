@@ -10,24 +10,9 @@
             </div>
 
             <!-- Vidéo -->
-            <video v-if="!isAudioOnly" ref="videoEl" class="player" preload="metadata" playsinline :poster="posterUrl"
+            <video ref="videoEl" class="player" preload="metadata" playsinline :poster="posterUrl"
                 @click="togglePlayPause" @timeupdate="onTimeUpdate" @loadedmetadata="onLoadedMetadata"
                 @loadstart="onLoadStart" @canplay="onCanPlay" @waiting="onWaiting" @playing="onPlaying"></video>
-
-            <!-- Audio only -->
-            <div v-else class="audio-player" @click="togglePlayPause">
-                <audio ref="audioEl" preload="metadata"></audio>
-
-                <div class="audio-display">
-                    <img v-if="posterUrl" :src="posterUrl" class="audio-cover" alt="Cover" />
-                    <div class="audio-info">
-                        <h2 class="audio-title">{{ details?.Name || 'Lecture audio' }}</h2>
-                        <p class="audio-artist">
-                            {{ details?.AlbumArtist || details?.Artists?.join(', ') || '' }}
-                        </p>
-                    </div>
-                </div>
-            </div>
 
             <!-- Contrôles -->
             <div class="player-controls" :class="{ show: controlsVisible }">
@@ -83,8 +68,8 @@
                     </div>
 
                     <div class="controls-right">
-                        <!-- Audio tracks (vidéo seulement) -->
-                        <div v-if="!isAudioOnly && audioList.length" class="dropdown" ref="audioDropdown">
+                        <!-- Audio tracks -->
+                        <div v-if="audioList.length" class="dropdown" ref="audioDropdown">
                             <button class="control-btn" @click="toggleAudioMenu">
                                 <svg viewBox="0 0 24 24" fill="currentColor">
                                     <path
@@ -102,8 +87,8 @@
                             </div>
                         </div>
 
-                        <!-- Sous-titres (vidéo seulement) -->
-                        <div v-if="!isAudioOnly && subtitleList.length" class="dropdown" ref="subtitleDropdown">
+                        <!-- Sous-titres -->
+                        <div v-if="subtitleList.length" class="dropdown" ref="subtitleDropdown">
                             <button class="control-btn" @click="toggleSubtitleMenu">
                                 <svg viewBox="0 0 24 24" fill="currentColor">
                                     <path
@@ -158,6 +143,7 @@ import { useJellyfinStore } from './store/jellyfin-store';
 import shaka from 'shaka-player/dist/shaka-player.compiled.js';
 import { deviceProfile } from './constants';
 import { formatTime } from './utils/helpers';
+import { lockLandscape, unlockOrientation } from './utils/orientation';
 
 const route = useRoute();
 const router = useRouter();
@@ -168,7 +154,6 @@ const accessToken = store.accessToken || '';
 const serverUrl = store.serverUrl;
 
 const videoEl = ref<HTMLVideoElement | null>(null);
-const audioEl = ref<HTMLAudioElement | null>(null);
 const fileInput = ref<HTMLInputElement | null>(null);
 const audioDropdown = ref<HTMLElement | null>(null);
 const subtitleDropdown = ref<HTMLElement | null>(null);
@@ -200,12 +185,8 @@ const audioMenuOpen = ref(false);
 const subtitleMenuOpen = ref(false);
 const isLoading = ref(true);
 
-// Type media
-const mediaType = ref<'Video' | 'Audio'>('Video');
-const isAudioOnly = computed(() => mediaType.value === 'Audio');
-
 function getMediaElement(): HTMLMediaElement | null {
-    return isAudioOnly.value ? audioEl.value : videoEl.value;
+    return videoEl.value;
 }
 
 // Reporting Jellyfin
@@ -218,7 +199,6 @@ const posterUrl = computed(
 
 const hlsUrl = ref<string>('');
 const baseTranscodingUrl = ref<string>('');
-const audioUrl = ref<string>('');
 
 function onLoadStart() {
     isLoading.value = true;
@@ -255,18 +235,6 @@ function goBack() {
     router.back();
 }
 
-async function lockLandscape() {
-    try {
-        await (screen.orientation as any).lock('landscape');
-    } catch { /* silently fail on desktop */ }
-}
-
-function unlockOrientation() {
-    try {
-        (screen.orientation as any).unlock();
-    } catch { /* silently fail on desktop */ }
-}
-
 // Session ID
 function generateSessionId(): string {
     return `session-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
@@ -285,7 +253,7 @@ function buildReportingPayload(overrides: Record<string, any> = {}) {
         SessionId: playSessionId.value,
         MediaSourceId: mediaSource.value?.Id || itemId,
         PositionTicks: Math.floor((media?.currentTime || 0) * 10_000_000),
-        PlayMethod: isAudioOnly.value ? 'DirectStream' : 'Transcode',
+        PlayMethod: 'Transcode',
         PlaySessionId: playSessionId.value,
         ...overrides
     };
@@ -298,7 +266,7 @@ function buildFullReportingPayload(overrides: Record<string, any> = {}) {
         VolumeLevel: Math.floor((media?.volume || 1) * 100),
         AudioStreamIndex: selectedAudioIndex.value,
         SubtitleStreamIndex:
-            !isAudioOnly.value && selectedSubtitleIndex.value !== '-1'
+            selectedSubtitleIndex.value !== '-1'
                 ? parseInt(selectedSubtitleIndex.value)
                 : null,
         ...overrides
@@ -464,19 +432,6 @@ async function loadDetails() {
                 : await store.fetchItemDetails(itemId);
     } catch (e: any) {
         error.value = 'Impossible de charger les détails média';
-    }
-}
-
-async function determineMediaType() {
-    try {
-        const item = await store.fetchItemDetails(itemId);
-        if (item.Type === 'Audio' || item.Type === 'MusicAlbum' || item.MediaType === 'Audio') {
-            mediaType.value = 'Audio';
-        } else {
-            mediaType.value = 'Video';
-        }
-    } catch (e) {
-        mediaType.value = 'Video';
     }
 }
 
@@ -647,57 +602,6 @@ async function initShaka() {
     }
 }
 
-// Audio only (HTML5)
-async function initAudioPlayer() {
-    const audio = audioEl.value!;
-    try {
-        isLoading.value = true;
-
-        const params = new URLSearchParams({
-            userId: store.userId || '',
-            api_key: accessToken,
-            MaxStreamingBitrate: '140000000',
-            Container: 'opus,webm|opus,mp3,aac,m4a|aac,m4b|aac,flac,webma,webm|webma,wav,ogg',
-            TranscodingContainer: 'ts',
-            TranscodingProtocol: 'hls',
-            AudioCodec: 'aac'
-        });
-
-        audioUrl.value = `${serverUrl}/Audio/${itemId}/universal?${params.toString()}`;
-
-        audio.src = audioUrl.value;
-        audio.load();
-
-        attachMediaListeners(audio);
-        audio.addEventListener('timeupdate', () => {
-            currentTime.value = audio.currentTime;
-            if (duration.value > 0) {
-                progress.value = (audio.currentTime / duration.value) * 100;
-            }
-        });
-        audio.addEventListener('loadedmetadata', () => {
-            duration.value = audio.duration;
-            volume.value = audio.volume * 100;
-            isLoading.value = false;
-        });
-        audio.addEventListener('canplay', () => {
-            isLoading.value = false;
-        });
-        audio.addEventListener('waiting', () => {
-            isLoading.value = true;
-        });
-        audio.addEventListener('playing', () => {
-            isLoading.value = false;
-        });
-
-        await audio.play().catch(() => { });
-    } catch (e: any) {
-        console.error('Erreur init audio player:', e);
-        error.value = "Erreur d'initialisation du lecteur audio";
-        isLoading.value = false;
-    }
-}
-
 // Changement de piste audio (vidéo)
 async function switchAudio() {
     if (!player || selectedAudioIndex.value === null) return;
@@ -856,19 +760,11 @@ async function onPickSubtitleFile(e: Event) {
 // Lifecycle
 onMounted(async () => {
     await loadDetails();
-    await determineMediaType();
+    await lockLandscape();
 
-    if (!isAudioOnly.value) {
-        await lockLandscape();
-    }
-
-    if (isAudioOnly.value) {
-        await initAudioPlayer();
-    } else {
-        await getPlaybackUrl();
-        if (hlsUrl.value) {
-            await initShaka();
-        }
+    await getPlaybackUrl();
+    if (hlsUrl.value) {
+        await initShaka();
     }
 
     document.addEventListener('click', e => {
@@ -909,13 +805,7 @@ onBeforeUnmount(() => {
         player = null;
     }
 
-    // 4. Nettoyer l'audio
-    if (audioEl.value) {
-        audioEl.value.pause();
-        audioEl.value.src = '';
-    }
-
-    // 5. Nettoyer le timeout des contrôles
+    // 4. Nettoyer le timeout des contrôles
     if (controlsTimeout) {
         clearTimeout(controlsTimeout);
         controlsTimeout = null;
@@ -996,50 +886,6 @@ onBeforeUnmount(() => {
     color: #fff;
     font-size: 1rem;
     font-weight: 500;
-}
-
-/* Audio UI */
-.audio-player {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: radial-gradient(circle at top, #1a1a2e 0%, #000 70%);
-    cursor: pointer;
-}
-
-.audio-display {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 30px;
-    padding: 40px;
-}
-
-.audio-cover {
-    width: 300px;
-    height: 300px;
-    border-radius: 12px;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-    object-fit: cover;
-}
-
-.audio-info {
-    text-align: center;
-}
-
-.audio-title {
-    font-size: 2rem;
-    font-weight: 700;
-    margin: 0 0 10px 0;
-    color: #fff;
-}
-
-.audio-artist {
-    font-size: 1.2rem;
-    color: #aaa;
-    margin: 0;
 }
 
 /* Controls */

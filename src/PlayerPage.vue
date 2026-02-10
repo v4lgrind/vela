@@ -82,7 +82,7 @@
                                 <div v-for="opt in audioList" :key="opt.id" class="dropdown-item"
                                     :class="{ active: opt.index === selectedAudioIndex }"
                                     @click="selectAudio(opt.index)">
-                                    <span class="check">✓</span>
+                                    <span class="check">&#10003;</span>
                                     {{ opt.label }}
                                 </div>
                             </div>
@@ -100,19 +100,38 @@
                             <div class="dropdown-menu" :class="{ show: subtitleMenuOpen }">
                                 <div class="dropdown-item" :class="{ active: selectedSubtitleIndex === '-1' }"
                                     @click="selectSubtitle('-1')">
-                                    <span class="check">✓</span>
-                                    Désactivés
+                                    <span class="check">&#10003;</span>
+                                    Desactives
                                 </div>
                                 <div v-for="opt in subtitleList" :key="opt.id" class="dropdown-item"
                                     :class="{ active: opt.index === parseInt(selectedSubtitleIndex) }"
                                     @click="selectSubtitle(String(opt.index))">
-                                    <span class="check">✓</span>
+                                    <span class="check">&#10003;</span>
                                     {{ opt.label }}
                                 </div>
                                 <div class="dropdown-divider"></div>
                                 <div class="dropdown-item" @click="selectSubtitle('local')">
                                     <span class="check"></span>
-                                    📁 Charger un fichier local…
+                                    Charger un fichier local...
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Quality -->
+                        <div class="dropdown" ref="qualityDropdown">
+                            <button class="control-btn quality-btn" @click="toggleQualityMenu">
+                                <svg viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.488.488 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 00-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+                                </svg>
+                                <span class="btn-label">{{ qualityLabel }}</span>
+                                <span class="play-method-badge">{{ playMethodLabel }}</span>
+                            </button>
+                            <div class="dropdown-menu" :class="{ show: qualityMenuOpen }">
+                                <div v-for="preset in qualityPresets" :key="preset.key" class="dropdown-item"
+                                    :class="{ active: preset.key === selectedQuality }"
+                                    @click="selectQuality(preset.key)">
+                                    <span class="check">&#10003;</span>
+                                    {{ preset.label }}
                                 </div>
                             </div>
                         </div>
@@ -160,10 +179,12 @@ const videoEl = ref<HTMLVideoElement | null>(null);
 const fileInput = ref<HTMLInputElement | null>(null);
 const audioDropdown = ref<HTMLElement | null>(null);
 const subtitleDropdown = ref<HTMLElement | null>(null);
+const qualityDropdown = ref<HTMLElement | null>(null);
 const error = ref<string | null>(null);
 
 let player: shaka.Player | null = null;
 let controlsTimeout: ReturnType<typeof setTimeout> | null = null;
+let mediaListenersAttached = false;
 
 const details = ref<any | null>(null);
 const mediaSource = ref<any | null>(null);
@@ -176,7 +197,7 @@ const subtitleList = ref<
 >([]);
 const selectedSubtitleIndex = ref<string>('-1');
 
-// État
+// State
 const isPlaying = ref(false);
 const currentTime = ref(0);
 const duration = ref(0);
@@ -187,6 +208,29 @@ const controlsVisible = ref(true);
 const audioMenuOpen = ref(false);
 const subtitleMenuOpen = ref(false);
 const isLoading = ref(true);
+
+// Playback method & quality
+const playMethod = ref<'DirectPlay' | 'DirectStream' | 'Transcode'>('Transcode');
+const selectedQuality = ref<string>('auto');
+const qualityMenuOpen = ref(false);
+
+const qualityPresets = [
+    { key: 'auto', label: 'Auto (Original)', bitrate: 1000000000 },
+    { key: '1080p', label: '1080p', bitrate: 20000000 },
+    { key: '720p', label: '720p', bitrate: 8000000 },
+    { key: '480p', label: '480p', bitrate: 4000000 },
+];
+
+const playMethodLabel = computed(() => {
+    if (playMethod.value === 'DirectPlay') return 'Direct Play';
+    if (playMethod.value === 'DirectStream') return 'Direct Stream';
+    const preset = qualityPresets.find(p => p.key === selectedQuality.value);
+    return preset && preset.key !== 'auto' ? `Transcode ${preset.label}` : 'Transcode';
+});
+
+const qualityLabel = computed(() => {
+    return qualityPresets.find(p => p.key === selectedQuality.value)?.label || 'Auto';
+});
 
 function getMediaElement(): HTMLMediaElement | null {
     return videoEl.value;
@@ -220,14 +264,14 @@ function showControls() {
     controlsVisible.value = true;
     if (controlsTimeout) clearTimeout(controlsTimeout);
     controlsTimeout = setTimeout(() => {
-        if (isPlaying.value && !audioMenuOpen.value && !subtitleMenuOpen.value) {
+        if (isPlaying.value && !audioMenuOpen.value && !subtitleMenuOpen.value && !qualityMenuOpen.value) {
             controlsVisible.value = false;
         }
     }, 3000);
 }
 function hideControls() {
     if (controlsTimeout) clearTimeout(controlsTimeout);
-    if (isPlaying.value && !audioMenuOpen.value && !subtitleMenuOpen.value) {
+    if (isPlaying.value && !audioMenuOpen.value && !subtitleMenuOpen.value && !qualityMenuOpen.value) {
         controlsTimeout = setTimeout(() => {
             controlsVisible.value = false;
         }, 1000);
@@ -256,7 +300,7 @@ function buildReportingPayload(overrides: Record<string, any> = {}) {
         SessionId: playSessionId.value,
         MediaSourceId: mediaSource.value?.Id || itemId,
         PositionTicks: Math.floor((media?.currentTime || 0) * 10_000_000),
-        PlayMethod: 'Transcode',
+        PlayMethod: playMethod.value,
         PlaySessionId: playSessionId.value,
         ...overrides
     };
@@ -422,11 +466,19 @@ function toggleFullscreen() {
 function toggleAudioMenu() {
     audioMenuOpen.value = !audioMenuOpen.value;
     subtitleMenuOpen.value = false;
+    qualityMenuOpen.value = false;
     showControls();
 }
 function toggleSubtitleMenu() {
     subtitleMenuOpen.value = !subtitleMenuOpen.value;
     audioMenuOpen.value = false;
+    qualityMenuOpen.value = false;
+    showControls();
+}
+function toggleQualityMenu() {
+    qualityMenuOpen.value = !qualityMenuOpen.value;
+    audioMenuOpen.value = false;
+    subtitleMenuOpen.value = false;
     showControls();
 }
 
@@ -439,6 +491,11 @@ function selectSubtitle(index: string) {
     selectedSubtitleIndex.value = index;
     subtitleMenuOpen.value = false;
     switchSubtitle();
+}
+function selectQuality(key: string) {
+    if (key === selectedQuality.value) return;
+    qualityMenuOpen.value = false;
+    switchQuality(key);
 }
 
 function onTimeUpdate() {
@@ -463,15 +520,35 @@ async function loadDetails() {
                 ? store.currentItem
                 : await store.fetchItemDetails(itemId);
     } catch (e: any) {
-        error.value = 'Impossible de charger les détails média';
+        error.value = 'Impossible de charger les details media';
+    }
+}
+
+// Determine playback method from media source
+function determinePlaybackMethod(ms: any) {
+    if (ms.SupportsDirectPlay && selectedQuality.value === 'auto') {
+        playMethod.value = 'DirectPlay';
+        const msId = ms.Id || itemId;
+        hlsUrl.value = `${serverUrl}/Videos/${itemId}/stream?static=true&mediaSourceId=${msId}&api_key=${accessToken}`;
+    } else if (ms.SupportsDirectStream && selectedQuality.value === 'auto') {
+        playMethod.value = 'DirectStream';
+        if (ms.TranscodingUrl) baseTranscodingUrl.value = ms.TranscodingUrl;
+        buildHlsUrl();
+    } else {
+        playMethod.value = 'Transcode';
+        if (ms.TranscodingUrl) baseTranscodingUrl.value = ms.TranscodingUrl;
+        buildHlsUrl();
     }
 }
 
 async function getPlaybackUrl() {
     try {
-        const data = await fetchPlaybackInfo();
+        const maxBitrate = selectedQuality.value !== 'auto'
+            ? qualityPresets.find(p => p.key === selectedQuality.value)?.bitrate
+            : undefined;
+        const data = await fetchPlaybackInfo(undefined, maxBitrate);
         mediaSource.value = data.MediaSources?.[0];
-        if (!mediaSource.value) throw new Error('Aucune source média disponible');
+        if (!mediaSource.value) throw new Error('Aucune source media disponible');
 
         const streams = mediaSource.value.MediaStreams || [];
         const audioStreams = streams.filter((s: any) => s.Type === 'Audio');
@@ -506,11 +583,11 @@ async function getPlaybackUrl() {
             playSessionId.value = data.PlaySessionId;
         }
 
-        if (mediaSource.value.TranscodingUrl) {
-            baseTranscodingUrl.value = mediaSource.value.TranscodingUrl;
-        }
+        // Reset base transcoding URL
+        baseTranscodingUrl.value = '';
 
-        buildHlsUrl();
+        // Determine playback method
+        determinePlaybackMethod(mediaSource.value);
     } catch (e: any) {
         console.error('Erreur PlaybackInfo:', e);
         error.value = "Impossible d'obtenir l'URL de lecture";
@@ -536,6 +613,9 @@ function buildHlsUrl() {
 }
 
 function attachMediaListeners(media: HTMLMediaElement) {
+    if (mediaListenersAttached) return;
+    mediaListenersAttached = true;
+
     media.addEventListener('play', () => {
         isPlaying.value = true;
         if (!progressInterval) startProgressReporting();
@@ -563,7 +643,7 @@ async function addSubtitleTrack(shakaPlayer: shaka.Player, blobUrl: string, lang
         lang,
         'subtitles',
         'text/vtt',
-        null,
+        undefined,
         label
     );
 
@@ -575,12 +655,41 @@ async function addSubtitleTrack(shakaPlayer: shaka.Player, blobUrl: string, lang
     }
 }
 
-async function fetchPlaybackInfo(audioStreamIndex?: number) {
-    const profile = {
+function addNativeSubtitleTrack(video: HTMLVideoElement, blobUrl: string, lang: string, label: string) {
+    // Remove any previously added dynamic tracks
+    const existing = video.querySelectorAll('track.dynamic-sub');
+    existing.forEach(t => t.remove());
+
+    const track = document.createElement('track');
+    track.kind = 'subtitles';
+    track.label = label;
+    track.srclang = lang;
+    track.src = blobUrl;
+    track.default = true;
+    track.classList.add('dynamic-sub');
+    video.appendChild(track);
+
+    // Enable the new track, hide others
+    for (let i = 0; i < video.textTracks.length; i++) {
+        video.textTracks[i].mode = i === video.textTracks.length - 1 ? 'showing' : 'hidden';
+    }
+}
+
+async function fetchPlaybackInfo(audioStreamIndex?: number, maxBitrate?: number) {
+    const profile: any = {
         ...deviceProfile,
         MediaSourceId: itemId,
-        ...(audioStreamIndex !== undefined ? { AudioStreamIndex: audioStreamIndex } : {})
+        ...(audioStreamIndex !== undefined ? { AudioStreamIndex: audioStreamIndex } : {}),
     };
+
+    if (maxBitrate) {
+        profile.MaxStreamingBitrate = maxBitrate;
+        profile.DeviceProfile = {
+            ...deviceProfile.DeviceProfile,
+            MaxStreamingBitrate: maxBitrate,
+            MaxStaticBitrate: maxBitrate,
+        };
+    }
 
     const response = await fetch(
         `${serverUrl}/Items/${itemId}/PlaybackInfo?userId=${store.userId}&api_key=${accessToken}`,
@@ -595,48 +704,79 @@ async function fetchPlaybackInfo(audioStreamIndex?: number) {
     return await response.json();
 }
 
-// Shaka vidéo
-async function initShaka() {
+// Player init (handles both DirectPlay and Shaka/HLS)
+async function initPlayer(seekTo?: number, resumePlaying?: boolean) {
     const video = videoEl.value!;
+    isLoading.value = true;
+
     try {
-        isLoading.value = true;
-        shaka.polyfill.installAll();
+        if (playMethod.value === 'DirectPlay') {
+            // Native playback - no Shaka needed
+            video.src = hlsUrl.value;
 
-        player = new shaka.Player(video);
-        player.configure({
-            preferredAudioLanguage: 'fra',
-            preferredTextLanguage: 'fra',
-            abr: {
-                enabled: true,
-                defaultBandwidthEstimate: 5_000_000
-            },
-            streaming: {
-                bufferingGoal: 20,
-                rebufferingGoal: 2,
-                bufferBehind: 20,
-                retryParameters: {
-                    maxAttempts: 5,
-                    baseDelay: 1000
-                }
+            if (seekTo !== undefined) {
+                await new Promise<void>(resolve => {
+                    const onSeekable = () => {
+                        video.currentTime = seekTo;
+                        video.removeEventListener('loadedmetadata', onSeekable);
+                        resolve();
+                    };
+                    video.addEventListener('loadedmetadata', onSeekable);
+                });
             }
-        });
 
-        player.addEventListener('error', (ev: any) => {
-            const e = ev.detail;
-            console.error('Shaka error:', e);
-            error.value = `Erreur Shaka ${e.code}: ${e.data?.[2] || 'Erreur de lecture'}`;
-            isLoading.value = false;
-        });
+            attachMediaListeners(video);
+            setupMediaSession();
 
-        await player.load(hlsUrl.value);
+            if (resumePlaying !== false) {
+                await video.play().catch(() => {});
+            }
+        } else {
+            // HLS playback via Shaka (DirectStream or Transcode)
+            shaka.polyfill.installAll();
 
-        attachMediaListeners(video);
-        setupMediaSession();
+            player = new shaka.Player(video);
+            player.configure({
+                preferredAudioLanguage: 'fra',
+                preferredTextLanguage: 'fra',
+                abr: {
+                    enabled: true,
+                    defaultBandwidthEstimate: 5_000_000
+                },
+                streaming: {
+                    bufferingGoal: 20,
+                    rebufferingGoal: 2,
+                    bufferBehind: 20,
+                    retryParameters: {
+                        maxAttempts: 5,
+                        baseDelay: 1000
+                    }
+                }
+            });
 
-        await video.play().catch(() => { });
+            player.addEventListener('error', (ev: any) => {
+                const e = ev.detail;
+                console.error('Shaka error:', e);
+                error.value = `Erreur Shaka ${e.code}: ${e.data?.[2] || 'Erreur de lecture'}`;
+                isLoading.value = false;
+            });
 
-        // Auto-fullscreen on mobile
-        if (isMobile()) {
+            await player.load(hlsUrl.value);
+
+            if (seekTo !== undefined) {
+                video.currentTime = seekTo;
+            }
+
+            attachMediaListeners(video);
+            setupMediaSession();
+
+            if (resumePlaying !== false) {
+                await video.play().catch(() => {});
+            }
+        }
+
+        // Auto-fullscreen on mobile (only on initial load, not on reload)
+        if (seekTo === undefined && isMobile()) {
             const container = videoEl.value?.parentElement;
             if (container) {
                 requestFS(container).then(() => {
@@ -645,15 +785,29 @@ async function initShaka() {
             }
         }
     } catch (e: any) {
-        console.error('Erreur init Shaka:', e);
+        console.error('Erreur init player:', e);
         error.value = "Erreur d'initialisation du lecteur";
         isLoading.value = false;
     }
 }
 
-// Changement de piste audio (vidéo)
+// Teardown current player (Shaka or native)
+async function teardownPlayer() {
+    const video = videoEl.value;
+    if (player) {
+        await player.unload().catch(() => {});
+        await player.destroy().catch(() => {});
+        player = null;
+    }
+    if (video) {
+        video.removeAttribute('src');
+        video.load();
+    }
+}
+
+// Changement de piste audio
 async function switchAudio() {
-    if (!player || selectedAudioIndex.value === null) return;
+    if (selectedAudioIndex.value === null) return;
 
     isLoading.value = true;
     const video = videoEl.value!;
@@ -662,26 +816,28 @@ async function switchAudio() {
 
     try {
         video.pause();
-        await player.unload();
+        await teardownPlayer();
 
         await new Promise(resolve => setTimeout(resolve, 100));
 
-        try {
-            const data = await fetchPlaybackInfo(selectedAudioIndex.value!);
-            const newMediaSource = data.MediaSources?.[0];
+        // Re-fetch with new audio stream
+        const maxBitrate = selectedQuality.value !== 'auto'
+            ? qualityPresets.find(p => p.key === selectedQuality.value)?.bitrate
+            : undefined;
 
-            if (newMediaSource?.TranscodingUrl) {
-                hlsUrl.value = `${serverUrl}${newMediaSource.TranscodingUrl}`;
-            } else {
-                buildHlsUrl();
+        try {
+            const data = await fetchPlaybackInfo(selectedAudioIndex.value!, maxBitrate);
+            const ms = data.MediaSources?.[0];
+            if (ms) {
+                mediaSource.value = ms;
+                baseTranscodingUrl.value = '';
+                determinePlaybackMethod(ms);
             }
         } catch {
             buildHlsUrl();
         }
 
-        await player.load(hlsUrl.value);
-        video.currentTime = savedTime;
-        if (wasPlaying) await video.play().catch(() => { });
+        await initPlayer(savedTime, wasPlaying);
         isLoading.value = false;
         switchSubtitle();
     } catch (e: any) {
@@ -689,6 +845,50 @@ async function switchAudio() {
         error.value = 'Erreur lors du changement de piste audio';
         isLoading.value = false;
     }
+}
+
+// Quality switching
+async function switchQuality(key: string) {
+    selectedQuality.value = key;
+
+    const video = videoEl.value!;
+    const wasPlaying = !video.paused;
+    const savedTime = video.currentTime;
+
+    isLoading.value = true;
+    video.pause();
+
+    await teardownPlayer();
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // Re-fetch playback info with new bitrate
+    const maxBitrate = key !== 'auto'
+        ? qualityPresets.find(p => p.key === key)?.bitrate
+        : undefined;
+
+    try {
+        const data = await fetchPlaybackInfo(selectedAudioIndex.value ?? undefined, maxBitrate);
+        const ms = data.MediaSources?.[0];
+        if (ms) {
+            mediaSource.value = ms;
+            baseTranscodingUrl.value = '';
+            if (data.PlaySessionId) {
+                playSessionId.value = data.PlaySessionId;
+            }
+            determinePlaybackMethod(ms);
+        }
+    } catch (e: any) {
+        console.error('Erreur switch quality:', e);
+        error.value = 'Erreur lors du changement de qualite';
+        isLoading.value = false;
+        return;
+    }
+
+    if (hlsUrl.value) {
+        await initPlayer(savedTime, wasPlaying);
+    }
+
+    switchSubtitle();
 }
 
 // Nettoyage VTT: suppression des lignes Region:
@@ -701,8 +901,6 @@ function cleanVttRegions(vtt: string): string {
 
 // Sous-titres distants via Jellyfin
 async function switchSubtitle() {
-    if (!player) return;
-
     const selected = selectedSubtitleIndex.value;
 
     if (selected === 'local') {
@@ -711,7 +909,17 @@ async function switchSubtitle() {
     }
 
     if (selected === '-1') {
-        player.setTextTrackVisibility(false);
+        if (player) {
+            player.setTextTrackVisibility(false);
+        } else {
+            // Native: hide all text tracks
+            const video = videoEl.value;
+            if (video) {
+                for (let i = 0; i < video.textTracks.length; i++) {
+                    video.textTracks[i].mode = 'hidden';
+                }
+            }
+        }
         return;
     }
 
@@ -723,7 +931,7 @@ async function switchSubtitle() {
         const mediaSourceId = mediaSource.value?.Id || itemId;
         const vttUrl = `${serverUrl}/Videos/${itemId}/${mediaSourceId}/Subtitles/${subIndex}/Stream.vtt?api_key=${accessToken}`;
 
-        // On récupère et nettoie le VTT côté client
+        // On recupere et nettoie le VTT cote client
         const resp = await fetch(vttUrl);
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const raw = await resp.text();
@@ -732,14 +940,21 @@ async function switchSubtitle() {
         const blob = new Blob([cleaned], { type: 'text/vtt; charset=utf-8' });
         const blobUrl = URL.createObjectURL(blob);
 
-        await addSubtitleTrack(player, blobUrl, subtitle.language || 'und', subtitle.label);
+        if (player) {
+            await addSubtitleTrack(player, blobUrl, subtitle.language || 'und', subtitle.label);
+        } else {
+            const video = videoEl.value;
+            if (video) {
+                addNativeSubtitleTrack(video, blobUrl, subtitle.language || 'und', subtitle.label);
+            }
+        }
     } catch (e: any) {
         console.error('Erreur chargement sous-titres:', e);
         error.value = `Impossible de charger les sous-titres: ${e.message}`;
     }
 }
 
-// Conversion SRT → VTT robuste
+// Conversion SRT -> VTT robuste
 function srtToVtt(srt: string) {
     let vtt = srt
         .replace(/\r\n/g, '\n')
@@ -754,7 +969,7 @@ function srtToVtt(srt: string) {
     vtt = vtt.replace(/\n{3,}/g, '\n\n');
 
     vtt = `WEBVTT\n\n${vtt}`;
-    // Nettoyage éventuel des Region:
+    // Nettoyage eventuel des Region:
     return cleanVttRegions(vtt);
 }
 
@@ -781,7 +996,7 @@ async function onPickSubtitleFile(e: Event) {
         } else if (isSrt) {
             vttContent = srtToVtt(text);
         } else {
-            error.value = 'Format de sous-titre non supporté';
+            error.value = 'Format de sous-titre non supporte';
             selectedSubtitleIndex.value = '-1';
             return;
         }
@@ -797,9 +1012,14 @@ async function onPickSubtitleFile(e: Event) {
 
         if (player) {
             await addSubtitleTrack(player, blobUrl, lang, name);
+        } else {
+            const video = videoEl.value;
+            if (video) {
+                addNativeSubtitleTrack(video, blobUrl, lang, name);
+            }
         }
     } catch (err: any) {
-        error.value = `Échec de chargement du sous-titre local: ${err.message}`;
+        error.value = `Echec de chargement du sous-titre local: ${err.message}`;
         selectedSubtitleIndex.value = '-1';
     } finally {
         if (fileInput.value) fileInput.value.value = '';
@@ -867,7 +1087,7 @@ onMounted(async () => {
 
     await getPlaybackUrl();
     if (hlsUrl.value) {
-        await initShaka();
+        await initPlayer();
     }
 
     document.addEventListener('click', e => {
@@ -876,6 +1096,9 @@ onMounted(async () => {
         }
         if (subtitleDropdown.value && !subtitleDropdown.value.contains(e.target as Node)) {
             subtitleMenuOpen.value = false;
+        }
+        if (qualityDropdown.value && !qualityDropdown.value.contains(e.target as Node)) {
+            qualityMenuOpen.value = false;
         }
     });
 
@@ -895,24 +1118,24 @@ onBeforeUnmount(() => {
     unlockOrientation();
     clearMediaSession();
 
-    // 1. Arrêter l'intervalle EN PREMIER
+    // 1. Stop interval first
     if (progressInterval) {
         clearInterval(progressInterval);
         progressInterval = null;
     }
 
-    // 2. Reporter l'arrêt AVANT de détruire les éléments
+    // 2. Report stop before destroying elements
     if (getMediaElement()) {
         reportPlaybackStopped();
     }
 
-    // 3. Détruire le player Shaka
+    // 3. Destroy Shaka player if present
     if (player) {
         player.destroy().catch(() => { });
         player = null;
     }
 
-    // 4. Nettoyer le timeout des contrôles
+    // 4. Clean controls timeout
     if (controlsTimeout) {
         clearTimeout(controlsTimeout);
         controlsTimeout = null;
@@ -1243,5 +1466,23 @@ onBeforeUnmount(() => {
 
 .dropdown-menu::-webkit-scrollbar-thumb:hover {
     background: rgba(255, 255, 255, 0.3);
+}
+
+/* Quality button & play method badge */
+.quality-btn {
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.play-method-badge {
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    background: rgba(0, 164, 220, 0.3);
+    color: #7dd3fc;
+    padding: 2px 6px;
+    border-radius: 4px;
+    white-space: nowrap;
 }
 </style>

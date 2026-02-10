@@ -4,12 +4,12 @@ export const deviceProfile = {
   AutoOpenLiveStream: true,
   AudioStreamIndex: null,
   SubtitleStreamIndex: null,
-  MaxStreamingBitrate: 140000000,
+  MaxStreamingBitrate: 1000000000,
   AlwaysBurnInSubtitleWhenTranscoding: false,
   EnableAllProbes: true,
   DeviceProfile: {
-    MaxStreamingBitrate: 120000000,
-    MaxStaticBitrate: 100000000,
+    MaxStreamingBitrate: 1000000000,
+    MaxStaticBitrate: 1000000000,
     MusicStreamingTranscodingBitrate: 384000,
     DirectPlayProfiles: [
       {
@@ -21,14 +21,20 @@ export const deviceProfile = {
       {
         Container: "mp4,m4v",
         Type: "Video",
-        VideoCodec: "h264,vp9,av1",
-        AudioCodec: "aac,mp3,mp2,opus,flac,vorbis",
+        VideoCodec: "h264,hevc,vp9,av1",
+        AudioCodec: "aac,mp3,mp2,opus,flac,vorbis,ac3,eac3",
+      },
+      {
+        Container: "mkv,webm",
+        Type: "Video",
+        VideoCodec: "h264,hevc,vp9,av1",
+        AudioCodec: "aac,mp3,mp2,opus,flac,vorbis,ac3,eac3",
       },
       {
         Container: "mov",
         Type: "Video",
-        VideoCodec: "h264",
-        AudioCodec: "aac,mp3,mp2,opus,flac,vorbis",
+        VideoCodec: "h264,hevc",
+        AudioCodec: "aac,mp3,mp2,opus,flac,vorbis,ac3,eac3",
       },
       { Container: "opus", Type: "Audio" },
       { Container: "webm", AudioCodec: "opus", Type: "Audio" },
@@ -45,7 +51,7 @@ export const deviceProfile = {
       {
         Container: "hls",
         Type: "Video",
-        VideoCodec: "av1,h264,vp9",
+        VideoCodec: "av1,h264,hevc,vp9",
         AudioCodec: "aac,mp3,opus",
       },
       {
@@ -235,8 +241,8 @@ export const deviceProfile = {
           {
             Condition: "EqualsAny",
             Property: "VideoRangeType",
-            Value: "SDR",
-            IsRequired: true,
+            Value: "SDR|HDR10|HLG|DOVIWithHDR10",
+            IsRequired: false,
           },
           {
             Condition: "LessThanEqual",

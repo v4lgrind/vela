@@ -27,20 +27,13 @@ class AudioPlayerService {
 
     this.setupAudioEvents();
     this.setupStoreWatchers();
-
-    // Global callbacks for Android notification buttons
-    (window as any).__audioService = {
-      play: () => this.audioStore.togglePlayPause(),
-      pause: () => this.audioStore.togglePlayPause(),
-      next: () => this.audioStore.next(),
-      previous: () => this.audioStore.previous(),
-    };
   }
 
   private setupAudioEvents() {
     this.audio.addEventListener('timeupdate', () => {
       if (this.audioStore) {
         this.audioStore.currentTime = this.audio.currentTime;
+        this.updatePositionState();
       }
     });
 
@@ -272,27 +265,74 @@ class AudioPlayerService {
     }
   }
 
-  // --- Native Android Bridge ---
+  // --- Media Session API (lock screen / notification controls) ---
 
   private startNativeService() {
+    if (!('mediaSession' in navigator)) return;
     const track = this.audioStore.currentTrack;
     if (!track) return;
-    const artUrl = this.jellyfinStore.getImageUrl(track.albumId || track.id, 'Primary', 96, 96);
-    (window as any).AndroidAudioService?.startService(track.name, track.artist, artUrl);
+
+    const artUrl = this.jellyfinStore.getImageUrl(track.albumId || track.id, 'Primary', 512, 512);
+
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: track.name,
+      artist: track.artist,
+      album: track.albumName || '',
+      artwork: artUrl ? [
+        { src: artUrl, sizes: '512x512', type: 'image/jpeg' },
+      ] : [],
+    });
+
+    navigator.mediaSession.setActionHandler('play', () => {
+      this.audioStore.isPlaying = true;
+    });
+    navigator.mediaSession.setActionHandler('pause', () => {
+      this.audioStore.isPlaying = false;
+    });
+    navigator.mediaSession.setActionHandler('nexttrack', () => {
+      this.audioStore.next();
+    });
+    navigator.mediaSession.setActionHandler('previoustrack', () => {
+      this.audioStore.previous();
+    });
+    navigator.mediaSession.setActionHandler('seekto', (details) => {
+      if (details.seekTime != null) {
+        this.audio.currentTime = details.seekTime;
+        this.audioStore.currentTime = details.seekTime;
+      }
+    });
+    navigator.mediaSession.setActionHandler('seekbackward', (details) => {
+      this.audio.currentTime = Math.max(0, this.audio.currentTime - (details.seekOffset || 10));
+    });
+    navigator.mediaSession.setActionHandler('seekforward', (details) => {
+      this.audio.currentTime = Math.min(this.audio.duration || 0, this.audio.currentTime + (details.seekOffset || 10));
+    });
   }
 
   private updateNativeNotification() {
-    const track = this.audioStore.currentTrack;
-    if (!track) return;
-    (window as any).AndroidAudioService?.updateNotification(
-      track.name,
-      track.artist,
-      this.audioStore.isPlaying
-    );
+    if (!('mediaSession' in navigator)) return;
+    navigator.mediaSession.playbackState = this.audioStore.isPlaying ? 'playing' : 'paused';
+    this.updatePositionState();
+  }
+
+  private updatePositionState() {
+    if (!('mediaSession' in navigator)) return;
+    if (!this.audio.duration || isNaN(this.audio.duration)) return;
+    try {
+      navigator.mediaSession.setPositionState({
+        duration: this.audio.duration,
+        playbackRate: this.audio.playbackRate,
+        position: Math.min(this.audio.currentTime, this.audio.duration),
+      });
+    } catch {
+      // ignore - position state may fail if duration is not ready
+    }
   }
 
   private stopNativeService() {
-    (window as any).AndroidAudioService?.stopService();
+    if (!('mediaSession' in navigator)) return;
+    navigator.mediaSession.metadata = null;
+    navigator.mediaSession.playbackState = 'none';
   }
 }
 

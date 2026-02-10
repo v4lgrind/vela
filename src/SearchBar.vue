@@ -1,6 +1,5 @@
 <template>
     <div class="navbar">
-        <button class="btn" @click="$router.back()">← Retour</button>
         <button class="btn" @click="$router.push('/libraries')" aria-label="Accueil">🏠 Accueil</button>
         <div class="combobox" role="combobox" aria-expanded="true" aria-owns="search-listbox" aria-haspopup="listbox">
             <input ref="inputEl" v-model="query" class="search-input" type="search" :placeholder="placeholder"

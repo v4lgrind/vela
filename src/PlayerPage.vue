@@ -2,7 +2,8 @@
     <div class="player-page">
         <section v-if="error" class="state error">{{ error }}</section>
 
-        <div class="video-container" @mousemove="showControls" @mouseleave="hideControls">
+        <div class="video-container" @mousemove="showControls" @mouseleave="hideControls"
+            @touchstart="showControls">
             <!-- Loader -->
             <div v-if="isLoading" class="loading-overlay">
                 <div class="spinner"></div>
@@ -144,10 +145,12 @@ import shaka from 'shaka-player/dist/shaka-player.compiled.js';
 import { deviceProfile } from './constants';
 import { formatTime } from './utils/helpers';
 import { lockLandscape, unlockOrientation } from './utils/orientation';
+import { useAudioPlayerStore } from './store/audio-player-store';
 
 const route = useRoute();
 const router = useRouter();
 const store = useJellyfinStore();
+const audioPlayerStore = useAudioPlayerStore();
 
 const itemId = route.params.id as string;
 const accessToken = store.accessToken || '';
@@ -374,15 +377,44 @@ function seek(e: MouseEvent) {
     reportPlaybackProgress();
 }
 
+function isMobile(): boolean {
+    return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+        (navigator.maxTouchPoints > 0 && window.innerWidth < 1024);
+}
+
+function requestFS(el: HTMLElement) {
+    if (el.requestFullscreen) return el.requestFullscreen();
+    if ((el as any).webkitRequestFullscreen) return (el as any).webkitRequestFullscreen();
+    if ((el as any).webkitEnterFullscreen) return (el as any).webkitEnterFullscreen();
+    return Promise.reject();
+}
+
+function exitFS() {
+    if (document.exitFullscreen) return document.exitFullscreen();
+    if ((document as any).webkitExitFullscreen) return (document as any).webkitExitFullscreen();
+    return Promise.reject();
+}
+
+function getFullscreenElement(): Element | null {
+    return document.fullscreenElement || (document as any).webkitFullscreenElement || null;
+}
+
 function toggleFullscreen() {
     const container = videoEl.value?.parentElement;
     if (!container) return;
 
-    if (!document.fullscreenElement) {
-        container.requestFullscreen();
-        isFullscreen.value = true;
+    if (!getFullscreenElement()) {
+        requestFS(container).then(() => {
+            isFullscreen.value = true;
+        }).catch(() => {
+            // iOS Safari: try fullscreen on the video element itself
+            if (videoEl.value && (videoEl.value as any).webkitEnterFullscreen) {
+                (videoEl.value as any).webkitEnterFullscreen();
+                isFullscreen.value = true;
+            }
+        });
     } else {
-        document.exitFullscreen();
+        exitFS().catch(() => {});
         isFullscreen.value = false;
     }
 }
@@ -507,13 +539,19 @@ function attachMediaListeners(media: HTMLMediaElement) {
     media.addEventListener('play', () => {
         isPlaying.value = true;
         if (!progressInterval) startProgressReporting();
+        if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
     });
     media.addEventListener('pause', () => {
         isPlaying.value = false;
         reportPlaybackProgress();
+        if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
     });
     media.addEventListener('ended', () => {
         stopProgressReporting();
+        clearMediaSession();
+    });
+    media.addEventListener('timeupdate', () => {
+        updateMediaSessionPosition();
     });
 }
 
@@ -593,8 +631,19 @@ async function initShaka() {
         await player.load(hlsUrl.value);
 
         attachMediaListeners(video);
+        setupMediaSession();
 
         await video.play().catch(() => { });
+
+        // Auto-fullscreen on mobile
+        if (isMobile()) {
+            const container = videoEl.value?.parentElement;
+            if (container) {
+                requestFS(container).then(() => {
+                    isFullscreen.value = true;
+                }).catch(() => {});
+            }
+        }
     } catch (e: any) {
         console.error('Erreur init Shaka:', e);
         error.value = "Erreur d'initialisation du lecteur";
@@ -757,8 +806,62 @@ async function onPickSubtitleFile(e: Event) {
     }
 }
 
+// Media Session API (lock screen / notification controls)
+function setupMediaSession() {
+    if (!('mediaSession' in navigator)) return;
+
+    const artUrl = store.getImageUrl(itemId, 'Primary', 512, 512);
+    navigator.mediaSession.metadata = new MediaMetadata({
+        title: details.value?.Name || 'Video',
+        artist: details.value?.SeriesName || details.value?.AlbumArtist || '',
+        album: details.value?.Album || details.value?.SeasonName || '',
+        artwork: artUrl ? [{ src: artUrl, sizes: '512x512', type: 'image/jpeg' }] : [],
+    });
+
+    const video = videoEl.value;
+    navigator.mediaSession.setActionHandler('play', () => {
+        video?.play();
+    });
+    navigator.mediaSession.setActionHandler('pause', () => {
+        video?.pause();
+    });
+    navigator.mediaSession.setActionHandler('seekto', (d) => {
+        if (video && d.seekTime != null) video.currentTime = d.seekTime;
+    });
+    navigator.mediaSession.setActionHandler('seekbackward', (d) => {
+        if (video) video.currentTime = Math.max(0, video.currentTime - (d.seekOffset || 10));
+    });
+    navigator.mediaSession.setActionHandler('seekforward', (d) => {
+        if (video) video.currentTime = Math.min(video.duration || 0, video.currentTime + (d.seekOffset || 10));
+    });
+}
+
+function updateMediaSessionPosition() {
+    if (!('mediaSession' in navigator)) return;
+    const video = videoEl.value;
+    if (!video || !video.duration || isNaN(video.duration)) return;
+    try {
+        navigator.mediaSession.setPositionState({
+            duration: video.duration,
+            playbackRate: video.playbackRate,
+            position: Math.min(video.currentTime, video.duration),
+        });
+    } catch { /* ignore */ }
+}
+
+function clearMediaSession() {
+    if (!('mediaSession' in navigator)) return;
+    navigator.mediaSession.metadata = null;
+    navigator.mediaSession.playbackState = 'none';
+}
+
 // Lifecycle
 onMounted(async () => {
+    // Stop any background audio playback before starting video
+    if (audioPlayerStore.isPlaying) {
+        audioPlayerStore.stop();
+    }
+
     await loadDetails();
     await lockLandscape();
 
@@ -777,7 +880,10 @@ onMounted(async () => {
     });
 
     document.addEventListener('fullscreenchange', () => {
-        isFullscreen.value = !!document.fullscreenElement;
+        isFullscreen.value = !!getFullscreenElement();
+    });
+    document.addEventListener('webkitfullscreenchange', () => {
+        isFullscreen.value = !!getFullscreenElement();
     });
 
     window.addEventListener('beforeunload', () => {
@@ -787,6 +893,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
     unlockOrientation();
+    clearMediaSession();
 
     // 1. Arrêter l'intervalle EN PREMIER
     if (progressInterval) {
@@ -826,6 +933,8 @@ onBeforeUnmount(() => {
     display: flex;
     flex-direction: column;
     z-index: 100;
+    height: 100vh;
+    height: 100dvh; /* mobile: accounts for browser chrome */
 }
 
 .state.error {
@@ -843,6 +952,7 @@ onBeforeUnmount(() => {
 .video-container {
     position: relative;
     width: 100%;
+    height: 100%;
     flex: 1;
     overflow: hidden;
     background: #000;

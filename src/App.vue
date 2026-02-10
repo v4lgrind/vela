@@ -6,7 +6,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { invoke } from '@tauri-apps/api/core';
 import SearchBar from './SearchBar.vue';
 import { useJellyfinStore } from './store/jellyfin-store';
 
@@ -15,14 +14,14 @@ const router = useRouter();
 const store = useJellyfinStore();
 const isAuthenticated = computed(() => store.isAuthenticated);
 
-// Android back button handler — called from Rust via eval on CloseRequested
-(window as any).__handleBack = async () => {
+// Android back button handler — called from Kotlin via evaluateJavascript
+(window as any).__handleBack = () => {
   const name = router.currentRoute.value.name;
   if (name === 'login' || name === 'libraries') {
-    try { await invoke('exit_app'); } catch {}
-  } else {
-    router.back();
+    return 'exit';
   }
+  router.back();
+  return 'back';
 };
 </script>
 

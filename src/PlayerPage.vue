@@ -12,7 +12,7 @@
 
             <!-- Vidéo -->
             <video ref="videoEl" class="player" preload="metadata" playsinline :poster="posterUrl"
-                @click="togglePlayPause" @timeupdate="onTimeUpdate" @loadedmetadata="onLoadedMetadata"
+                @click="handleVideoTap" @timeupdate="onTimeUpdate" @loadedmetadata="onLoadedMetadata"
                 @loadstart="onLoadStart" @canplay="onCanPlay" @waiting="onWaiting" @playing="onPlaying"></video>
 
             <!-- Contrôles -->
@@ -382,6 +382,18 @@ function stopProgressReporting() {
 }
 
 // Interactions
+function handleVideoTap() {
+    // Toggle controls visibility instead of play/pause
+    if (controlsVisible.value) {
+        // Controls are visible, hide them
+        controlsVisible.value = false;
+        if (controlsTimeout) clearTimeout(controlsTimeout);
+    } else {
+        // Controls are hidden, show them
+        showControls();
+    }
+}
+
 function togglePlayPause() {
     const media = getMediaElement();
     if (!media) return;

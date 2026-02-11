@@ -1,5 +1,5 @@
 import { offlineDatabase, type DownloadedMedia } from './offlineDatabase';
-import { writeBinaryFile, BaseDirectory, exists, remove } from '@tauri-apps/plugin-fs';
+import { writeFile, BaseDirectory, exists, remove } from '@tauri-apps/plugin-fs';
 import { convertFileSrc } from '@tauri-apps/api/core';
 
 interface DownloadProgress {
@@ -186,7 +186,7 @@ class DownloadService {
 
       // Sauvegarder via Tauri
       const filePath = `downloads/${filename}`;
-      await writeBinaryFile(filePath, buffer, { baseDir: BaseDirectory.AppData });
+      await writeFile(filePath, buffer, { baseDir: BaseDirectory.AppData });
 
       console.log("💾 Fichier sauvegardé:", filePath);
 

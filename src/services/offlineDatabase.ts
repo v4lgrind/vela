@@ -55,6 +55,10 @@ class OfflineDatabase {
    * Initialize the database
    */
   public async init(): Promise<void> {
+    if (typeof indexedDB === 'undefined') {
+      console.warn('[OfflineDB] IndexedDB not available on this platform');
+      return;
+    }
     return new Promise((resolve, reject) => {
       const request = indexedDB.open(this.DB_NAME, this.DB_VERSION);
 
@@ -155,6 +159,7 @@ class OfflineDatabase {
    * Get all downloaded media items
    */
   public async getAllDownloads(): Promise<DownloadedMedia[]> {
+    if (!this.db) return [];
     return new Promise((resolve, reject) => {
       const db = this.ensureDB();
       const transaction = db.transaction(['downloads'], 'readonly');

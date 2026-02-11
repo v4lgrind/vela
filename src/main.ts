@@ -14,4 +14,8 @@ app.use(pinia);
 app.mount("#app");
 
 import { audioPlayerService } from './services/audioPlayerService';
-audioPlayerService.init();
+try {
+  audioPlayerService.init();
+} catch (error) {
+  console.error('[Main] Failed to initialize audio player service:', error);
+}

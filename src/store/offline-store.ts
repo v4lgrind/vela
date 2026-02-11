@@ -19,7 +19,9 @@ export const useOfflineStore = defineStore('offline', {
     initialized: false,
   }),
 
-  persist: true,
+  persist: {
+    pick: ['lastSyncTime'],
+  },
 
   getters: {
     /**
@@ -125,21 +127,39 @@ export const useOfflineStore = defineStore('offline', {
     async init() {
       try {
         // Initialize the database
-        await offlineDatabase.init();
-        console.log('[OfflineStore] Database initialized');
+        try {
+          await offlineDatabase.init();
+          console.log('[OfflineStore] Database initialized');
+        } catch (dbError) {
+          console.error('[OfflineStore] IndexedDB init failed (continuing without offline):', dbError);
+          this.initialized = true;
+          return;
+        }
 
         // Load downloads from IndexedDB
-        await this.loadDownloads();
+        try {
+          await this.loadDownloads();
+        } catch (loadError) {
+          console.error('[OfflineStore] Failed to load downloads:', loadError);
+        }
 
         // Initialize offline detection with server URL
-        const jellyfinStore = useJellyfinStore();
-        if (jellyfinStore.serverUrl) {
-          offlineDetection.init(jellyfinStore.serverUrl);
-          console.log('[OfflineStore] Offline detection initialized');
+        try {
+          const jellyfinStore = useJellyfinStore();
+          if (jellyfinStore.serverUrl) {
+            offlineDetection.init(jellyfinStore.serverUrl);
+            console.log('[OfflineStore] Offline detection initialized');
+          }
+        } catch (detectionError) {
+          console.error('[OfflineStore] Offline detection init failed:', detectionError);
         }
 
         // Setup auto-sync when coming back online
-        this.setupAutoSync();
+        try {
+          this.setupAutoSync();
+        } catch (syncError) {
+          console.error('[OfflineStore] Auto-sync setup failed:', syncError);
+        }
 
         // Mark as initialized
         this.initialized = true;

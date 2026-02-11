@@ -9,16 +9,21 @@ import { ref, type Ref } from 'vue';
 class OfflineDetectionService {
   private static instance: OfflineDetectionService;
 
-  public isOnline: Ref<boolean> = ref(navigator.onLine);
+  public isOnline: Ref<boolean> = ref(typeof navigator !== 'undefined' ? navigator.onLine : true);
   public serverReachable: Ref<boolean> = ref(false);
 
   private serverUrl: string = '';
   private pingInterval: number | null = null;
   private readonly PING_INTERVAL_MS = 30000; // 30 seconds
   private readonly PING_TIMEOUT_MS = 5000; // 5 seconds
+  private eventListenersSetup = false;
 
   private constructor() {
-    this.setupEventListeners();
+    try {
+      this.setupEventListeners();
+    } catch (error) {
+      console.error('[OfflineDetection] Failed to setup event listeners:', error);
+    }
   }
 
   public static getInstance(): OfflineDetectionService {
@@ -54,8 +59,10 @@ class OfflineDetectionService {
    * Setup browser online/offline event listeners
    */
   private setupEventListeners(): void {
+    if (typeof window === 'undefined' || this.eventListenersSetup) return;
     window.addEventListener('online', this.handleOnline);
     window.addEventListener('offline', this.handleOffline);
+    this.eventListenersSetup = true;
   }
 
   /**

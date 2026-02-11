@@ -58,7 +58,7 @@ export const router = createRouter({
   routes,
 });
 
-router.beforeEach(async (to, from, next) => {
+router.beforeEach(async (to, _from, next) => {
   const store = useJellyfinStore();
 
   // Initialiser l'API si on a un token persisté

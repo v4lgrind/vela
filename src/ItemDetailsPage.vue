@@ -180,14 +180,12 @@ import { useAudioPlayerStore, type AudioTrack } from './store/audio-player-store
 import { downloadService } from './services/downloadService';
 import LazyImg from './components/LazyImg.vue';
 import { isAudioType, typeLabel as getTypeLabel, formatTicksDuration, formatTicksHuman, formatBytes } from './utils/helpers';
-import { useImageError } from './composables/useImageError';
 
 const store = useJellyfinStore();
 const offlineStore = useOfflineStore();
 const audioPlayerStore = useAudioPlayerStore();
 const route = useRoute();
 const router = useRouter();
-const { handleImageError } = useImageError();
 
 const loading = ref(true);
 const error = ref<string | null>(null);

@@ -353,7 +353,7 @@ class OfflineDatabase {
       const store = transaction.objectStore('watchProgress');
       const index = store.index('synced');
 
-      const request = index.getAll(false);
+      const request = index.getAll(IDBKeyRange.only(false));
 
       request.onsuccess = () => {
         resolve(request.result || []);
@@ -411,8 +411,8 @@ class OfflineDatabase {
       const downloadsStore = transaction.objectStore('downloads');
       const progressStore = transaction.objectStore('watchProgress');
 
-      const clearDownloads = downloadsStore.clear();
-      const clearProgress = progressStore.clear();
+      downloadsStore.clear();
+      progressStore.clear();
 
       transaction.oncomplete = () => {
         console.log('[OfflineDB] Cleared all data');

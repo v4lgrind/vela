@@ -33,7 +33,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref } from 'vue'
 import { useJellyfinStore } from './store/jellyfin-store'
 import { useRouter } from 'vue-router'
 
@@ -47,13 +47,6 @@ const showPassword = ref(false)
 
 const loading = ref(false)
 const error = ref<string | null>(null)
-
-watch(
-  () => jellyfin.error,
-  (val) => {
-    error.value = val
-  }
-)
 
 async function onSubmit() {
   error.value = null

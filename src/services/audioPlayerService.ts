@@ -16,7 +16,6 @@ class AudioPlayerService {
   // Track the index we've loaded so we don't re-load the same track
   private loadedIndex = -1;
   private loadedTrackId = '';
-  private isOfflinePlayback = false;
   private offlineProgressInterval: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
@@ -169,7 +168,6 @@ class AudioPlayerService {
       if (localUrl) {
         this.audio.src = localUrl;
         this.audio.load();
-        this.isOfflinePlayback = true;
 
         try {
           await this.audio.play();
@@ -186,7 +184,6 @@ class AudioPlayerService {
     }
 
     // Online playback
-    this.isOfflinePlayback = false;
     const url = this.buildAudioUrl(trackId);
     this.audio.src = url;
     this.audio.load();
@@ -234,7 +231,6 @@ class AudioPlayerService {
     this.audio.src = '';
     this.loadedIndex = -1;
     this.loadedTrackId = '';
-    this.isOfflinePlayback = false;
     this.stopNativeService();
   }
 

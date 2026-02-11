@@ -2,7 +2,17 @@
   "permissions": {
     "allow": [
       "Bash(npx vite:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(gh run list:*)",
+      "Bash(gh run view:*)",
+      "Bash(gh api:*)",
+      "Bash(find:*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:v2.tauri.app)",
+      "WebSearch",
+      "Bash(python3:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat: change video tap behavior to toggle controls visibility\n\n- First tap: shows controls if hidden\n- Second tap: hides controls if visible\n- Play/pause now only via control buttons \\(better touch UX\\)\n- Prevents accidental play/pause when trying to show controls\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
     ]
   }
 }

@@ -24,10 +24,8 @@
 import { onMounted, ref } from 'vue';
 import { useJellyfinStore } from './store/jellyfin-store';
 import LazyImg from './components/LazyImg.vue';
-import { useImageError } from './composables/useImageError';
 
 const store = useJellyfinStore();
-const { handleImageError } = useImageError();
 
 const mediaItems = ref<Array<{ Id: string; Name: string; imageUrl: string; Type?: string }>>([]);
 const loading = ref(true);
@@ -39,8 +37,10 @@ async function loadMedia() {
   try {
     const libs = await store.fetchLibraries();
     mediaItems.value = libs.map(lib => ({
-      ...lib,
-      imageUrl: store.getImageUrl(lib.Id, 'Primary', 300, 150) || ''
+      Id: lib.Id!,
+      Name: lib.Name!,
+      Type: lib.Type,
+      imageUrl: store.getImageUrl(lib.Id!, 'Primary', 300, 150) || ''
     }));
   } catch (e) {
     error.value = 'Erreur lors du chargement des médias';

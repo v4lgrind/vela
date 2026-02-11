@@ -40,13 +40,10 @@ import { useRoute } from 'vue-router';
 import { useJellyfinStore } from './store/jellyfin-store';
 import LazyImg from './components/LazyImg.vue';
 import { isAudioType } from './utils/helpers';
-import { useImageError } from './composables/useImageError';
 
 const store = useJellyfinStore();
 const route = useRoute();
-const { handleImageError } = useImageError();
 const libraryId = route.params.id as string;
-const libraryName = route.params.name as string;
 
 const items = ref<any[]>([]);
 const limit = ref(50);

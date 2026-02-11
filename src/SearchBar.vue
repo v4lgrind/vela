@@ -20,7 +20,7 @@
                     <div v-if="groupedResults.movies.length" class="result-group">
                         <div class="group-header">Films ({{ groupedResults.movies.length }})</div>
                         <div class="group-items">
-                            <div v-for="(r, idx) in groupedResults.movies" :key="r.Id" class="result" role="option"
+                            <div v-for="r in groupedResults.movies" :key="r.Id" class="result" role="option"
                                 :class="{ active: flatIndex(r) === activeIndex }"
                                 @mouseenter="activeIndex = flatIndex(r)" @click="goToResult(r)">
                                 <img :src="thumb(r)" alt="" class="thumb" loading="lazy" />
@@ -39,7 +39,7 @@
                     <div v-if="groupedResults.series.length" class="result-group">
                         <div class="group-header">Séries TV ({{ groupedResults.series.length }})</div>
                         <div class="group-items">
-                            <div v-for="(r, idx) in groupedResults.series" :key="r.Id" class="result" role="option"
+                            <div v-for="r in groupedResults.series" :key="r.Id" class="result" role="option"
                                 :class="{ active: flatIndex(r) === activeIndex }"
                                 @mouseenter="activeIndex = flatIndex(r)" @click="goToResult(r)">
                                 <img :src="thumb(r)" alt="" class="thumb" loading="lazy" />
@@ -58,7 +58,7 @@
                     <div v-if="groupedResults.albums.length" class="result-group">
                         <div class="group-header">Albums ({{ groupedResults.albums.length }})</div>
                         <div class="group-items">
-                            <div v-for="(r, idx) in groupedResults.albums" :key="r.Id" class="result" role="option"
+                            <div v-for="r in groupedResults.albums" :key="r.Id" class="result" role="option"
                                 :class="{ active: flatIndex(r) === activeIndex }"
                                 @mouseenter="activeIndex = flatIndex(r)" @click="goToResult(r)">
                                 <img :src="thumb(r)" alt="" class="thumb square" loading="lazy" />

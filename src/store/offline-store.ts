@@ -19,9 +19,7 @@ export const useOfflineStore = defineStore('offline', {
     initialized: false,
   }),
 
-  persist: {
-    paths: ['lastSyncTime'], // Only persist last sync time, downloads come from IndexedDB
-  },
+  persist: true,
 
   getters: {
     /**
@@ -102,11 +100,13 @@ export const useOfflineStore = defineStore('offline', {
 
       // Convert Maps to arrays and sort
       const result = Array.from(seriesMap.values()).map((series) => ({
-        ...series,
+        seriesId: series.seriesId,
+        seriesName: series.seriesName,
         seasons: Array.from(series.seasons.values())
-          .sort((a, b) => (a.seasonNumber || 0) - (b.seasonNumber || 0))
-          .map((season) => ({
-            ...season,
+          .sort((a: any, b: any) => (a.seasonNumber || 0) - (b.seasonNumber || 0))
+          .map((season: any) => ({
+            seasonId: season.seasonId,
+            seasonNumber: season.seasonNumber,
             episodes: season.episodes.sort(
               (a: DownloadedMedia, b: DownloadedMedia) =>
                 (a.episodeNumber || 0) - (b.episodeNumber || 0)
@@ -114,7 +114,7 @@ export const useOfflineStore = defineStore('offline', {
           })),
       }));
 
-      return result.sort((a, b) => a.seriesName.localeCompare(b.seriesName));
+      return result.sort((a: any, b: any) => a.seriesName.localeCompare(b.seriesName));
     },
   },
 

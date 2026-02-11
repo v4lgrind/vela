@@ -117,21 +117,6 @@ export const useJellyfinStore = defineStore("jellyfin", {
       const resp = await getUserLibraryApi(this.api).getItem({
         itemId,
         userId: this.userId,
-        // Many endpoints in Jellyfin support "fields" to include extra data
-        // La doc du client généré répertorie les noms; on inclut les classiques
-        fields: [
-          "Overview",
-          "Genres",
-          "People",
-          "CommunityRating",
-          "ProductionYear",
-          "RunTimeTicks",
-          "Studios",
-          "Taglines",
-          "PremiereDate",
-          "MediaStreams",
-          "MediaSources",
-        ] as any,
       });
       this.currentItem = resp.data;
       return this.currentItem;
@@ -148,11 +133,11 @@ export const useJellyfinStore = defineStore("jellyfin", {
       const resp = await getItemsApi(this.api).getItems({
         userId: this.userId,
         searchTerm: opts.searchTerm,
-        includeItemTypes: opts.includeItemTypes ?? [
+        includeItemTypes: (opts.includeItemTypes ?? [
           "Movie",
           "Series",
           "Episode",
-        ],
+        ]) as any,
         sortBy: ["SortName"],
         sortOrder: ["Ascending"],
         limit: opts.limit ?? 20,
@@ -166,10 +151,9 @@ export const useJellyfinStore = defineStore("jellyfin", {
       const resp = await getItemsApi(this.api).getItems({
         userId: this.userId,
         parentId: seriesId,
-        includeItemTypes: ["Season"],
+        includeItemTypes: ["Season"] as any,
         sortBy: ["SortName"],
         sortOrder: ["Ascending"],
-        fields: ["Overview", "PrimaryImageAspectRatio"] as any,
       });
       return resp.data.Items ?? [];
     },
@@ -179,10 +163,9 @@ export const useJellyfinStore = defineStore("jellyfin", {
       const resp = await getItemsApi(this.api).getItems({
         userId: this.userId,
         parentId: seasonId,
-        includeItemTypes: ["Episode"],
+        includeItemTypes: ["Episode"] as any,
         sortBy: ["SortName"],
         sortOrder: ["Ascending"],
-        fields: ["Overview", "RunTimeTicks", "MediaStreams"] as any,
       });
       return resp.data.Items ?? [];
     },
@@ -192,10 +175,9 @@ export const useJellyfinStore = defineStore("jellyfin", {
       const resp = await getItemsApi(this.api).getItems({
         userId: this.userId,
         parentId: albumId,
-        includeItemTypes: ["Audio"],
+        includeItemTypes: ["Audio"] as any,
         sortBy: ["ParentIndexNumber", "IndexNumber", "SortName"],
         sortOrder: ["Ascending"],
-        fields: ["MediaStreams", "RunTimeTicks", "Path"] as any,
       });
       return resp.data.Items ?? [];
     },

@@ -240,6 +240,7 @@ watch(query, (val) => {
 .combobox {
     position: relative;
     width: 100%;
+    min-width: 0; /* Allow grid to work properly */
 }
 
 .search-input {
@@ -448,6 +449,14 @@ watch(query, (val) => {
     margin-bottom: 20px;
     background: #1b1b1b;
     padding: calc(10px + env(safe-area-inset-top, 0px)) 12px 10px;
+}
+
+/* Desktop: more space for search bar */
+@media (min-width: 768px) {
+    .navbar {
+        gap: 20px;
+        padding: calc(10px + env(safe-area-inset-top, 0px)) 20px 10px;
+    }
 }
 
 /* Scrollbar styling */

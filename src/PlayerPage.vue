@@ -160,6 +160,9 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useJellyfinStore } from './store/jellyfin-store';
+import { useOfflineStore } from './store/offline-store';
+import { downloadService } from './services/downloadService';
+import { offlineDatabase } from './services/offlineDatabase';
 import shaka from 'shaka-player/dist/shaka-player.compiled.js';
 import { deviceProfile } from './constants';
 import { formatTime } from './utils/helpers';
@@ -170,6 +173,7 @@ const route = useRoute();
 const router = useRouter();
 const store = useJellyfinStore();
 const audioPlayerStore = useAudioPlayerStore();
+const offlineStore = useOfflineStore();
 
 const itemId = route.params.id as string;
 const accessToken = store.accessToken || '';
@@ -188,6 +192,8 @@ let mediaListenersAttached = false;
 
 const details = ref<any | null>(null);
 const mediaSource = ref<any | null>(null);
+const isOfflinePlayback = ref(false);
+let offlineProgressInterval: ReturnType<typeof setInterval> | null = null;
 
 const audioList = ref<Array<{ id: number; index: number; label: string; language: string }>>([]);
 const selectedAudioIndex = ref<number | null>(null);
@@ -1087,6 +1093,73 @@ function clearMediaSession() {
     navigator.mediaSession.playbackState = 'none';
 }
 
+// Offline playback support
+async function playOffline() {
+    try {
+        const localFileUrl = await downloadService.getLocalFile(itemId);
+        if (!localFileUrl) {
+            throw new Error('Fichier local introuvable');
+        }
+
+        console.log('[Player] Lecture hors ligne:', localFileUrl);
+
+        const video = videoEl.value;
+        if (!video) throw new Error('Video element not found');
+
+        // Use direct file playback
+        video.src = localFileUrl;
+
+        // Setup media listeners
+        attachMediaListeners(video);
+
+        // Load saved progress
+        const savedProgress = await offlineDatabase.getWatchProgress(itemId);
+        if (savedProgress && savedProgress.position > 0) {
+            video.currentTime = savedProgress.position;
+        }
+
+        // Start tracking offline progress
+        startOfflineProgressTracking();
+
+        // Setup media session
+        setupMediaSession();
+
+        isOfflinePlayback.value = true;
+        console.log('[Player] Lecture hors ligne initialisée');
+    } catch (e: any) {
+        console.error('[Player] Erreur lecture hors ligne:', e);
+        error.value = 'Impossible de lire le fichier hors ligne';
+    }
+}
+
+function startOfflineProgressTracking() {
+    if (offlineProgressInterval) return;
+
+    offlineProgressInterval = setInterval(async () => {
+        const video = videoEl.value;
+        if (!video || !video.duration || isNaN(video.duration)) return;
+
+        const progress = {
+            itemId,
+            position: video.currentTime,
+            duration: video.duration,
+            percentage: (video.currentTime / video.duration) * 100,
+            completed: (video.currentTime / video.duration) > 0.9,
+            lastWatched: Date.now(),
+            synced: false,
+        };
+
+        await offlineDatabase.saveWatchProgress(progress);
+    }, 10000); // Save every 10 seconds
+}
+
+function stopOfflineProgressTracking() {
+    if (offlineProgressInterval) {
+        clearInterval(offlineProgressInterval);
+        offlineProgressInterval = null;
+    }
+}
+
 // Lifecycle
 onMounted(async () => {
     // Stop any background audio playback before starting video
@@ -1097,9 +1170,21 @@ onMounted(async () => {
     await loadDetails();
     await lockLandscape();
 
-    await getPlaybackUrl();
-    if (hlsUrl.value) {
-        await initPlayer();
+    // Check if item is downloaded and play offline if available
+    const isDownloaded = offlineStore.isItemDownloaded(itemId);
+
+    if (isDownloaded) {
+        console.log('[Player] Item téléchargé, lecture hors ligne');
+        await playOffline();
+    } else if (offlineStore.isFullyOnline) {
+        console.log('[Player] Lecture en ligne');
+        await getPlaybackUrl();
+        if (hlsUrl.value) {
+            await initPlayer();
+        }
+    } else {
+        error.value = 'Fichier non disponible hors ligne. Connectez-vous à Internet pour regarder ce contenu.';
+        return;
     }
 
     document.addEventListener('click', e => {
@@ -1130,14 +1215,15 @@ onBeforeUnmount(() => {
     unlockOrientation();
     clearMediaSession();
 
-    // 1. Stop interval first
+    // 1. Stop intervals first
     if (progressInterval) {
         clearInterval(progressInterval);
         progressInterval = null;
     }
+    stopOfflineProgressTracking();
 
-    // 2. Report stop before destroying elements
-    if (getMediaElement()) {
+    // 2. Report stop before destroying elements (skip if offline)
+    if (getMediaElement() && !isOfflinePlayback.value) {
         reportPlaybackStopped();
     }
 

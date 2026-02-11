@@ -1,17 +1,23 @@
 import { watch } from 'vue';
 import { useAudioPlayerStore } from '../store/audio-player-store';
 import { useJellyfinStore } from '../store/jellyfin-store';
+import { useOfflineStore } from '../store/offline-store';
+import { downloadService } from './downloadService';
+import { offlineDatabase } from './offlineDatabase';
 
 class AudioPlayerService {
   private audio: HTMLAudioElement;
   private audioStore!: ReturnType<typeof useAudioPlayerStore>;
   private jellyfinStore!: ReturnType<typeof useJellyfinStore>;
+  private offlineStore!: ReturnType<typeof useOfflineStore>;
   private progressInterval: ReturnType<typeof setInterval> | null = null;
   private playSessionId = '';
   private initialized = false;
   // Track the index we've loaded so we don't re-load the same track
   private loadedIndex = -1;
   private loadedTrackId = '';
+  private isOfflinePlayback = false;
+  private offlineProgressInterval: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
     this.audio = document.createElement('audio');
@@ -24,6 +30,7 @@ class AudioPlayerService {
 
     this.audioStore = useAudioPlayerStore();
     this.jellyfinStore = useJellyfinStore();
+    this.offlineStore = useOfflineStore();
 
     this.setupAudioEvents();
     this.setupStoreWatchers();
@@ -146,11 +153,40 @@ class AudioPlayerService {
   private async loadTrack(trackId: string) {
     // Stop previous reporting
     this.stopProgressReporting();
+    this.stopOfflineProgressTracking();
 
     // Stop current playback
     this.audio.pause();
 
-    // Build and load URL
+    // Check if track is downloaded
+    const isDownloaded = this.offlineStore.isItemDownloaded(trackId);
+
+    if (isDownloaded) {
+      // Offline playback
+      console.log('[AudioPlayer] Lecture hors ligne:', trackId);
+      const localUrl = await downloadService.getLocalFile(trackId);
+
+      if (localUrl) {
+        this.audio.src = localUrl;
+        this.audio.load();
+        this.isOfflinePlayback = true;
+
+        try {
+          await this.audio.play();
+          this.startOfflineProgressTracking(trackId);
+          this.startNativeService();
+        } catch {
+          // autoplay may be blocked
+        }
+
+        return;
+      } else {
+        console.error('[AudioPlayer] Fichier local introuvable');
+      }
+    }
+
+    // Online playback
+    this.isOfflinePlayback = false;
     const url = this.buildAudioUrl(trackId);
     this.audio.src = url;
     this.audio.load();
@@ -164,12 +200,41 @@ class AudioPlayerService {
     }
   }
 
+  private startOfflineProgressTracking(trackId: string) {
+    if (this.offlineProgressInterval) return;
+
+    this.offlineProgressInterval = setInterval(async () => {
+      if (!this.audio.duration || isNaN(this.audio.duration)) return;
+
+      const progress = {
+        itemId: trackId,
+        position: this.audio.currentTime,
+        duration: this.audio.duration,
+        percentage: (this.audio.currentTime / this.audio.duration) * 100,
+        completed: (this.audio.currentTime / this.audio.duration) > 0.9,
+        lastWatched: Date.now(),
+        synced: false,
+      };
+
+      await offlineDatabase.saveWatchProgress(progress);
+    }, 10000); // Save every 10 seconds
+  }
+
+  private stopOfflineProgressTracking() {
+    if (this.offlineProgressInterval) {
+      clearInterval(this.offlineProgressInterval);
+      this.offlineProgressInterval = null;
+    }
+  }
+
   private stopPlayback() {
     this.stopProgressReporting();
+    this.stopOfflineProgressTracking();
     this.audio.pause();
     this.audio.src = '';
     this.loadedIndex = -1;
     this.loadedTrackId = '';
+    this.isOfflinePlayback = false;
     this.stopNativeService();
   }
 

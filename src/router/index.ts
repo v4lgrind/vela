@@ -4,6 +4,7 @@ import MediaList from "../MediaList.vue";
 import LibraryItemsPage from "../LibraryItemsPage.vue";
 import ItemDetailsPage from "../ItemDetailsPage.vue";
 import PlayerPage from "../PlayerPage.vue";
+import OfflineLibraryPage from "../OfflineLibraryPage.vue";
 import { useJellyfinStore } from "../store/jellyfin-store";
 import { useAudioPlayerStore } from "../store/audio-player-store";
 
@@ -23,6 +24,12 @@ const routes = [
     name: "libraries",
     meta: { requiresAuth: true },
     component: MediaList,
+  },
+  {
+    path: "/offline",
+    name: "offline",
+    meta: { requiresAuth: true },
+    component: OfflineLibraryPage,
   },
   {
     path: "/libraryItem/:name/:id",

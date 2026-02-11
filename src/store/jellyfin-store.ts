@@ -219,7 +219,7 @@ export const useJellyfinStore = defineStore("jellyfin", {
         const extension = item.Container || "mkv";
         const filename = `${item.Name}.${extension}`;
 
-        // Télécharger
+        // Télécharger (ancienne méthode - browser download)
         await downloadService.downloadFile(
           this.serverUrl,
           itemId,
@@ -244,6 +244,51 @@ export const useJellyfinStore = defineStore("jellyfin", {
         delete this.downloadProgress[itemId];
       } catch (error: any) {
         console.error("Erreur téléchargement:", error);
+        delete this.downloadProgress[itemId];
+        throw error;
+      }
+    },
+
+    async downloadItemForOffline(
+      itemId: string,
+      onProgress?: (progress: {
+        percentage: number;
+        loaded: number;
+        total: number;
+      }) => void
+    ) {
+      try {
+        // Récupérer les infos de l'item
+        const item = await this.fetchItemDetails(itemId);
+
+        // Télécharger pour usage hors ligne
+        await downloadService.downloadForOffline(
+          this.serverUrl,
+          itemId,
+          this.accessToken || "",
+          item,
+          (progress) => {
+            // Mettre à jour le state
+            this.downloadProgress[itemId] = progress.percentage;
+
+            // Callback externe
+            if (onProgress) {
+              onProgress({
+                percentage: progress.percentage,
+                loaded: progress.loaded,
+                total: progress.total,
+              });
+            }
+          }
+        );
+
+        // Nettoyer après téléchargement
+        delete this.downloadProgress[itemId];
+
+        // Mettre à jour le store offline (il se rafraîchira automatiquement)
+        console.log("✅ Item téléchargé pour usage hors ligne:", itemId);
+      } catch (error: any) {
+        console.error("Erreur téléchargement offline:", error);
         delete this.downloadProgress[itemId];
         throw error;
       }

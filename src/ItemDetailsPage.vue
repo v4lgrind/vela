@@ -22,11 +22,16 @@
                     ▶️ Lire l'album
                 </button>
 
-                <button class="btn download" v-if="canDownload(item)" @click="handleDownload" :disabled="isDownloading">
-                    <span v-if="!isDownloading">⬇️ Télécharger</span>
-                    <span v-else>
-                        📥 Téléchargement... {{ downloadProgress }}%
-                    </span>
+                <button class="btn downloaded" v-if="isItemDownloaded && !isDownloading" @click="deleteDownload">
+                    ✓ Téléchargé - Supprimer
+                </button>
+
+                <button class="btn download" v-else-if="canDownload(item) && !isItemDownloaded && !isDownloading" @click="handleDownload">
+                    ⬇️ Télécharger pour hors ligne
+                </button>
+
+                <button class="btn downloading" v-else-if="isDownloading" disabled>
+                    📥 Téléchargement... {{ downloadProgress }}%
                 </button>
 
                 <button class="btn cancel" v-if="isDownloading" @click="cancelDownload">
@@ -170,12 +175,15 @@
 import { onMounted, ref, computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useJellyfinStore } from './store/jellyfin-store';
+import { useOfflineStore } from './store/offline-store';
 import { useAudioPlayerStore, type AudioTrack } from './store/audio-player-store';
+import { downloadService } from './services/downloadService';
 import LazyImg from './components/LazyImg.vue';
 import { isAudioType, typeLabel as getTypeLabel, formatTicksDuration, formatTicksHuman, formatBytes } from './utils/helpers';
 import { useImageError } from './composables/useImageError';
 
 const store = useJellyfinStore();
+const offlineStore = useOfflineStore();
 const audioPlayerStore = useAudioPlayerStore();
 const route = useRoute();
 const router = useRouter();
@@ -413,6 +421,10 @@ function canDownload(it: any): boolean {
     return it && ['Movie', 'Episode', 'Video', 'Audio', 'MusicAlbum'].includes(it.Type);
 }
 
+const isItemDownloaded = computed(() => {
+    return offlineStore.isItemDownloaded(itemId.value);
+});
+
 // AJOUTER: Gérer le téléchargement
 async function handleDownload() {
     if (!item.value) return;
@@ -421,16 +433,38 @@ async function handleDownload() {
         isDownloading.value = true;
         downloadProgress.value = 0;
 
-        await store.downloadItem(itemId.value, (progress) => {
+        // Use downloadItemForOffline instead of downloadItem
+        await store.downloadItemForOffline(itemId.value, (progress) => {
             downloadProgress.value = progress.percentage;
         });
 
-        // Succès
+        // Refresh offline store to show downloaded badge
+        await offlineStore.loadDownloads();
+
+        console.log('✅ Téléchargement pour usage hors ligne terminé');
     } catch (error: any) {
         console.log(`❌ Erreur: ${error.message}`);
+        alert('Erreur lors du téléchargement');
     } finally {
         isDownloading.value = false;
         downloadProgress.value = 0;
+    }
+}
+
+async function deleteDownload() {
+    if (!item.value) return;
+
+    if (!confirm(`Supprimer "${item.value.Name}" du stockage hors ligne ?`)) {
+        return;
+    }
+
+    try {
+        await downloadService.deleteOfflineFile(itemId.value);
+        await offlineStore.removeDownload(itemId.value);
+        console.log('✅ Téléchargement supprimé');
+    } catch (error: any) {
+        console.error('❌ Erreur suppression:', error);
+        alert('Erreur lors de la suppression');
     }
 }
 
@@ -917,6 +951,37 @@ function cancelDownload() {
 .btn.download:disabled {
     opacity: 0.7;
     cursor: not-allowed;
+}
+
+.btn.downloaded {
+    margin-top: 12px;
+    background: #38f9d7;
+    color: #121212;
+    font-weight: bold;
+    border: none;
+    border-radius: 8px;
+    font-size: 1.05rem;
+    transition: all 0.3s ease;
+    margin-left: 5px;
+}
+
+.btn.downloaded:hover {
+    background: #ff4c4c;
+    color: #fff;
+    transform: translateY(-1px) scale(1.02);
+}
+
+.btn.downloading {
+    margin-top: 12px;
+    background: #1a5f7a;
+    color: #fff;
+    font-weight: bold;
+    border: none;
+    border-radius: 8px;
+    font-size: 1.05rem;
+    margin-left: 5px;
+    opacity: 0.9;
+    cursor: wait;
 }
 
 .btn.cancel {

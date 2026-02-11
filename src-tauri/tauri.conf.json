@@ -21,6 +21,15 @@
       "csp": null
     }
   },
+  "plugins": {
+    "fs": {
+      "scope": [
+        "$APPDATA/*",
+        "$APPCACHE/*",
+        "$APPDATA/downloads/*"
+      ]
+    }
+  },
   "bundle": {
     "active": true,
     "targets": "all",

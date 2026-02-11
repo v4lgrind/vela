@@ -1,6 +1,10 @@
 <template>
     <div class="navbar">
         <button class="btn" @click="$router.push('/libraries')" aria-label="Accueil">🏠 Accueil</button>
+        <button class="btn offline" @click="$router.push('/offline')" aria-label="Téléchargements" v-if="offlineStore.downloadCount > 0">
+            📥 Hors ligne
+            <span class="badge">{{ offlineStore.downloadCount }}</span>
+        </button>
         <div class="combobox" role="combobox" aria-expanded="true" aria-owns="search-listbox" aria-haspopup="listbox">
             <input ref="inputEl" v-model="query" class="search-input" type="search" :placeholder="placeholder"
                 aria-autocomplete="list" aria-controls="search-listbox" aria-label="Rechercher dans les bibliothèques"
@@ -82,10 +86,12 @@
 import { ref, computed, watch, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useJellyfinStore } from './store/jellyfin-store';
+import { useOfflineStore } from './store/offline-store';
 
 const placeholder = 'Rechercher films, séries, albums…';
 const router = useRouter();
 const store = useJellyfinStore();
+const offlineStore = useOfflineStore();
 
 const inputEl = ref<HTMLInputElement | null>(null);
 const query = ref('');
@@ -410,9 +416,33 @@ watch(query, (val) => {
     background: #ff3333;
 }
 
+.btn.offline {
+    background: #1a5f7a;
+    color: #fff;
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.btn.offline:hover {
+    background: #246b86;
+}
+
+.badge {
+    background: #38f9d7;
+    color: #121212;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 10px;
+    min-width: 20px;
+    text-align: center;
+}
+
 .navbar {
     display: grid;
-    grid-template-columns: auto 1fr auto;
+    grid-template-columns: auto auto 1fr auto;
     align-items: center;
     gap: 12px;
     margin-bottom: 20px;

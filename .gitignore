@@ -22,3 +22,14 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Capacitor
+android/app/build/
+android/.gradle/
+android/local.properties
+electron/dist/
+electron/node_modules/
+
+# Keep for version control
+!android/app/src/
+!android/app/build.gradle

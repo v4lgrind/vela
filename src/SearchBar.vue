@@ -239,7 +239,8 @@ watch(query, (val) => {
 
 .combobox {
     position: relative;
-    width: 100%;
+    flex: 1; /* Take all remaining space */
+    min-width: 0; /* Allow flex to work properly */
 }
 
 .search-input {
@@ -270,6 +271,16 @@ watch(query, (val) => {
     overflow: hidden;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
     z-index: 1000;
+}
+
+/* Mobile: full-width results panel */
+@media (max-width: 767px) {
+    .results-container {
+        left: -12px;
+        right: -12px;
+        border-radius: 0;
+        max-height: calc(100vh - 120px);
+    }
 }
 
 .searching {
@@ -321,6 +332,14 @@ watch(query, (val) => {
     z-index: 1;
 }
 
+/* Mobile: adjust header padding */
+@media (max-width: 767px) {
+    .group-header {
+        font-size: 0.8rem;
+        padding: 6px 8px 4px;
+    }
+}
+
 .group-items {
     display: flex;
     flex-direction: column;
@@ -336,6 +355,15 @@ watch(query, (val) => {
     border-radius: 8px;
     cursor: pointer;
     transition: background 0.2s, transform 0.15s;
+}
+
+/* Mobile: smaller thumbnails for more text space */
+@media (max-width: 767px) {
+    .result {
+        grid-template-columns: 60px 1fr;
+        gap: 10px;
+        padding: 8px;
+    }
 }
 
 .result.active,
@@ -358,6 +386,19 @@ watch(query, (val) => {
     height: 100px;
 }
 
+/* Mobile: smaller thumbnails */
+@media (max-width: 767px) {
+    .thumb {
+        width: 60px;
+        height: 90px;
+    }
+
+    .thumb.square {
+        width: 60px;
+        height: 60px;
+    }
+}
+
 .meta {
     display: flex;
     flex-direction: column;
@@ -375,6 +416,17 @@ watch(query, (val) => {
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
+}
+
+/* Mobile: adjust font sizes */
+@media (max-width: 767px) {
+    .meta .name {
+        font-size: 0.9rem;
+    }
+
+    .meta .info {
+        font-size: 0.75rem;
+    }
 }
 
 .meta .info {
@@ -406,7 +458,6 @@ watch(query, (val) => {
 }
 
 .btn.logout {
-    justify-self: end;
     background: #ff4c4c;
     color: #fff;
     border: none;
@@ -441,13 +492,20 @@ watch(query, (val) => {
 }
 
 .navbar {
-    display: grid;
-    grid-template-columns: auto auto 1fr auto;
+    display: flex;
     align-items: center;
     gap: 12px;
     margin-bottom: 20px;
     background: #1b1b1b;
     padding: calc(10px + env(safe-area-inset-top, 0px)) 12px 10px;
+}
+
+/* Desktop: more space for search bar */
+@media (min-width: 768px) {
+    .navbar {
+        gap: 20px;
+        padding: calc(10px + env(safe-area-inset-top, 0px)) 20px 10px;
+    }
 }
 
 /* Scrollbar styling */

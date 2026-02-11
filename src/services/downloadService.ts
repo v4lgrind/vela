@@ -1,6 +1,6 @@
 import { offlineDatabase, type DownloadedMedia } from './offlineDatabase';
-import { writeFile, BaseDirectory, exists, remove } from '@tauri-apps/plugin-fs';
-import { convertFileSrc } from '@tauri-apps/api/core';
+import { Filesystem, Directory } from '@capacitor/filesystem';
+import { Capacitor } from '@capacitor/core';
 
 interface DownloadProgress {
   itemId: string;
@@ -14,6 +14,19 @@ class DownloadService {
   private downloads: Map<string, AbortController> = new Map();
   private progressCallbacks: Map<string, (progress: DownloadProgress) => void> =
     new Map();
+
+  /**
+   * Convert Uint8Array to base64 for Capacitor filesystem
+   */
+  private arrayBufferToBase64(buffer: Uint8Array): string {
+    const CHUNK_SIZE = 0x8000; // 32KB chunks for large files
+    let binary = '';
+    for (let i = 0; i < buffer.length; i += CHUNK_SIZE) {
+      const chunk = buffer.subarray(i, Math.min(i + CHUNK_SIZE, buffer.length));
+      binary += String.fromCharCode.apply(null, Array.from(chunk));
+    }
+    return btoa(binary);
+  }
 
   /**
    * Télécharge un fichier depuis Jellyfin (ancienne méthode - browser download)
@@ -184,9 +197,14 @@ class DownloadService {
         offset += chunk.length;
       }
 
-      // Sauvegarder via Tauri
+      // Sauvegarder via Capacitor
       const filePath = `downloads/${filename}`;
-      await writeFile(filePath, buffer, { baseDir: BaseDirectory.AppData });
+      const base64Data = this.arrayBufferToBase64(buffer);
+      await Filesystem.writeFile({
+        path: filePath,
+        data: base64Data,
+        directory: Directory.Data
+      });
 
       console.log("💾 Fichier sauvegardé:", filePath);
 
@@ -244,8 +262,12 @@ class DownloadService {
         return null;
       }
 
-      // Convertir le chemin Tauri en URL utilisable
-      const fileUrl = convertFileSrc(download.filePath, 'appdata');
+      // Convertir le chemin Capacitor en URL utilisable
+      const fileInfo = await Filesystem.getUri({
+        path: download.filePath,
+        directory: Directory.Data
+      });
+      const fileUrl = Capacitor.convertFileSrc(fileInfo.uri);
       return fileUrl;
     } catch (error) {
       console.error("❌ Erreur récupération fichier local:", error);
@@ -265,9 +287,18 @@ class DownloadService {
       }
 
       // Supprimer le fichier physique
-      const fileExists = await exists(download.filePath, { baseDir: BaseDirectory.AppData });
+      let fileExists = false;
+      try {
+        await Filesystem.stat({ path: download.filePath, directory: Directory.Data });
+        fileExists = true;
+      } catch {
+        fileExists = false;
+      }
       if (fileExists) {
-        await remove(download.filePath, { baseDir: BaseDirectory.AppData });
+        await Filesystem.deleteFile({
+          path: download.filePath,
+          directory: Directory.Data
+        });
         console.log("🗑️ Fichier supprimé:", download.filePath);
       }
 

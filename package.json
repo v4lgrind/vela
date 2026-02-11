@@ -6,14 +6,19 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
+    "build:skip-types": "vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "cap:sync": "npx cap sync",
+    "cap:android": "npx cap open android",
+    "android:build": "npm run build:skip-types && npx cap sync android && cd android && ./gradlew assembleDebug",
+    "android:release": "npm run build:skip-types && npx cap sync android && cd android && ./gradlew assembleRelease"
   },
   "dependencies": {
+    "@capacitor/android": "^8.0.2",
+    "@capacitor/cli": "^8.0.2",
+    "@capacitor/core": "^8.0.2",
+    "@capacitor/filesystem": "^8.1.0",
     "@jellyfin/sdk": "^0.11.0",
-    "@tauri-apps/api": "^2.10.1",
-    "@tauri-apps/plugin-fs": "^2",
-    "@tauri-apps/plugin-opener": "^2",
     "pinia": "^3.0.3",
     "pinia-plugin-persistedstate": "^4.5.0",
     "shaka-player": "^4.16.7",
@@ -21,7 +26,6 @@
     "vue-router": "^4.5.1"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2.10.0",
     "@vitejs/plugin-vue": "^5.2.1",
     "typescript": "~5.6.2",
     "vite": "^6.0.3",

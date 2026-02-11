@@ -3,6 +3,7 @@ name: Build Android APK
 on:
   push:
     branches: [main]
+  pull_request:
   workflow_dispatch:
 
 jobs:
@@ -23,33 +24,33 @@ jobs:
         with:
           api-level: 36
 
-      - name: Install Android NDK
-        run: sdkmanager "ndk;26.1.10909125"
-
-      - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android,i686-linux-android
-
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
-      - name: Install frontend dependencies
+      - name: Setup Gradle cache
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
+
+      - name: Install dependencies
         run: npm ci
 
-      - name: Build frontend
-        run: npx vite build
+      - name: Build web app
+        run: npm run build:skip-types
+
+      - name: Sync Capacitor
+        run: npx cap sync android
 
       - name: Build Android APK (debug)
-        env:
-          NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/26.1.10909125
-        run: npx tauri android build --debug --config '{"build":{"beforeBuildCommand":""}}'
+        working-directory: android
+        run: ./gradlew assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: debug-apk
-          path: src-tauri/gen/android/app/build/outputs/apk/universal/debug/mediaserver-client-universal-debug.apk
+          name: mediaserver-client-debug-${{ github.sha }}
+          path: android/app/build/outputs/apk/debug/mediaserver-client-debug.apk
+          retention-days: 30

@@ -8,6 +8,7 @@ interface State {
   downloads: DownloadedMedia[];
   syncInProgress: boolean;
   lastSyncTime: number;
+  initialized: boolean;
 }
 
 export const useOfflineStore = defineStore('offline', {
@@ -15,6 +16,7 @@ export const useOfflineStore = defineStore('offline', {
     downloads: [],
     syncInProgress: false,
     lastSyncTime: 0,
+    initialized: false,
   }),
 
   persist: {
@@ -35,7 +37,7 @@ export const useOfflineStore = defineStore('offline', {
     /**
      * Get fully online status (browser online AND server reachable)
      */
-    isFullyOnline: () => offlineDetection.isFullyOnline,
+    isFullyOnline: (state) => state.initialized ? offlineDetection.isFullyOnline : true,
 
     /**
      * Get downloads count
@@ -138,8 +140,13 @@ export const useOfflineStore = defineStore('offline', {
 
         // Setup auto-sync when coming back online
         this.setupAutoSync();
+
+        // Mark as initialized
+        this.initialized = true;
       } catch (error) {
         console.error('[OfflineStore] Failed to initialize:', error);
+        // Mark as initialized even on error to prevent UI crashes
+        this.initialized = true;
       }
     },
 

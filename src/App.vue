@@ -1,5 +1,5 @@
 <template>
-  <div v-if="isAuthenticated && !offlineStore.isFullyOnline" class="offline-banner">
+  <div v-if="isAuthenticated && offlineStore.initialized && !offlineStore.isFullyOnline" class="offline-banner">
     📡 Mode hors ligne - Contenu téléchargé uniquement
     <button v-if="offlineStore.syncInProgress" class="sync-status">
       <span class="spinner-tiny"></span>
@@ -30,9 +30,14 @@ const offlineStore = useOfflineStore();
 const isAuthenticated = computed(() => store.isAuthenticated);
 
 // Initialize offline store on app mount
-onMounted(() => {
+onMounted(async () => {
   if (isAuthenticated.value) {
-    offlineStore.init();
+    try {
+      await offlineStore.init();
+    } catch (error) {
+      console.error('[App] Failed to initialize offline store:', error);
+      // Continue without offline features if initialization fails
+    }
   }
 });
 

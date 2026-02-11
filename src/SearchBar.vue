@@ -1,7 +1,7 @@
 <template>
     <div class="navbar">
         <button class="btn" @click="$router.push('/libraries')" aria-label="Accueil">🏠 Accueil</button>
-        <button class="btn offline" @click="$router.push('/offline')" aria-label="Téléchargements" v-if="offlineStore.downloadCount > 0">
+        <button class="btn offline" @click="$router.push('/offline')" aria-label="Téléchargements" v-if="offlineStore.initialized && offlineStore.downloadCount > 0">
             📥 Hors ligne
             <span class="badge">{{ offlineStore.downloadCount }}</span>
         </button>

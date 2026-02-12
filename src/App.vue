@@ -1,5 +1,10 @@
 <template>
-  <div v-if="isAuthenticated && offlineStore.initialized && !offlineStore.isFullyOnline" class="offline-banner">
+  <div
+    v-if="
+      isAuthenticated && offlineStore.initialized && !offlineStore.isFullyOnline
+    "
+    class="offline-banner"
+  >
     📡 Mode hors ligne - Contenu téléchargé uniquement
     <button v-if="offlineStore.syncInProgress" class="sync-status">
       <span class="spinner-tiny"></span>
@@ -8,19 +13,27 @@
   </div>
   <SearchBar v-if="isAuthenticated" />
   <router-view :key="route.fullPath" :style="routerViewStyle" />
-  <MiniAudioPlayer v-if="isAuthenticated && audioStore.isMiniPlayerVisible && !audioStore.isExpanded" />
+  <MiniAudioPlayer
+    v-if="
+      isAuthenticated &&
+      audioStore.isMiniPlayerVisible &&
+      !audioStore.isExpanded
+    "
+  />
   <ExpandedAudioPlayer v-if="isAuthenticated && audioStore.isExpanded" />
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
-import SearchBar from './SearchBar.vue';
-import MiniAudioPlayer from './components/MiniAudioPlayer.vue';
-import ExpandedAudioPlayer from './components/ExpandedAudioPlayer.vue';
-import { useJellyfinStore } from './store/jellyfin-store';
-import { useAudioPlayerStore } from './store/audio-player-store';
-import { useOfflineStore } from './store/offline-store';
+import { computed, onMounted } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import SearchBar from "./SearchBar.vue";
+import MiniAudioPlayer from "./components/MiniAudioPlayer.vue";
+import ExpandedAudioPlayer from "./components/ExpandedAudioPlayer.vue";
+import { useJellyfinStore } from "./store/jellyfin-store";
+import { useAudioPlayerStore } from "./store/audio-player-store";
+import { useOfflineStore } from "./store/offline-store";
+import { App as CapacitorApp } from "@capacitor/app";
+import { Capacitor } from "@capacitor/core";
 
 const route = useRoute();
 const router = useRouter();
@@ -31,11 +44,29 @@ const isAuthenticated = computed(() => store.isAuthenticated);
 
 // Initialize offline store on app mount
 onMounted(async () => {
+  if (Capacitor.isNativePlatform()) {
+    await CapacitorApp.addListener("backButton", ({ canGoBack }) => {
+      // If we're on the home page, exit the app
+      if (route.path === "/" || !canGoBack) {
+        CapacitorApp.exitApp();
+      } else {
+        // If on workout execution page, confirm before going back
+        if (route.path.includes("workout/")) {
+          if (window.confirm("Are you sure you want to quit this workout?")) {
+            router.back();
+          }
+        } else {
+          router.back();
+        }
+      }
+    });
+  }
+
   if (isAuthenticated.value) {
     try {
       await offlineStore.init();
     } catch (error) {
-      console.error('[App] Failed to initialize offline store:', error);
+      console.error("[App] Failed to initialize offline store:", error);
       // Continue without offline features if initialization fails
     }
   }
@@ -43,25 +74,10 @@ onMounted(async () => {
 
 const routerViewStyle = computed(() => {
   if (audioStore.isMiniPlayerVisible && !audioStore.isExpanded) {
-    return { paddingBottom: '72px' };
+    return { paddingBottom: "72px" };
   }
   return {};
 });
-
-// Android back button handler — called from Kotlin via evaluateJavascript
-(window as any).__handleBack = () => {
-  // If expanded audio player is open, collapse it
-  if (audioStore.isExpanded) {
-    audioStore.isExpanded = false;
-    return 'back';
-  }
-  const name = router.currentRoute.value.name;
-  if (name === 'login' || name === 'libraries') {
-    return 'exit';
-  }
-  router.back();
-  return 'back';
-};
 </script>
 
 <style>
@@ -70,7 +86,8 @@ body,
 #app {
   height: 100%;
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   color: #e0e0e0;
   background-color: #000000;
   padding-bottom: env(safe-area-inset-bottom, 0px);
@@ -118,6 +135,8 @@ body,
 }
 
 @keyframes spin-tiny {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>

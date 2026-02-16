@@ -78,9 +78,9 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import { useAudioPlayerStore } from '../store/audio-player-store';
-import { useJellyfinStore } from '../store/jellyfin-store';
-import { formatTime } from '../utils/helpers';
+import { useAudioPlayerStore } from '@/store/audio-player-store';
+import { useJellyfinStore } from '@/store/jellyfin-store';
+import { formatTime } from '@/utils/helpers';
 
 const audioStore = useAudioPlayerStore();
 const jellyfinStore = useJellyfinStore();

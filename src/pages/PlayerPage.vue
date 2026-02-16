@@ -159,15 +159,15 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { useJellyfinStore } from './store/jellyfin-store';
-import { useOfflineStore } from './store/offline-store';
-import { downloadService } from './services/downloadService';
-import { offlineDatabase } from './services/offlineDatabase';
+import { useJellyfinStore } from '@/store/jellyfin-store';
+import { useOfflineStore } from '@/store/offline-store';
+import { downloadService } from '@/services/downloadService';
+import { offlineDatabase } from '@/services/offlineDatabase';
 import shaka from 'shaka-player/dist/shaka-player.compiled.js';
-import { deviceProfile } from './constants';
-import { formatTime } from './utils/helpers';
-import { lockLandscape, unlockOrientation } from './utils/orientation';
-import { useAudioPlayerStore } from './store/audio-player-store';
+import { deviceProfile } from '@/constants';
+import { formatTime } from '@/utils/helpers';
+import { lockLandscape, unlockOrientation } from '@/utils/orientation';
+import { useAudioPlayerStore } from '@/store/audio-player-store';
 
 const route = useRoute();
 const router = useRouter();

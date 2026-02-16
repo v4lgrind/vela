@@ -34,7 +34,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useJellyfinStore } from './store/jellyfin-store'
+import { useJellyfinStore } from '@/store/jellyfin-store'
 import { useRouter } from 'vue-router'
 
 const jellyfin = useJellyfinStore()

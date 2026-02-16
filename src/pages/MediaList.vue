@@ -22,8 +22,8 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { useJellyfinStore } from './store/jellyfin-store';
-import LazyImg from './components/LazyImg.vue';
+import { useJellyfinStore } from '@/store/jellyfin-store';
+import LazyImg from '@/components/LazyImg.vue';
 
 const store = useJellyfinStore();
 

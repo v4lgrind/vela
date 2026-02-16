@@ -26,12 +26,12 @@
 <script setup lang="ts">
 import { computed, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import SearchBar from "./SearchBar.vue";
-import MiniAudioPlayer from "./components/MiniAudioPlayer.vue";
-import ExpandedAudioPlayer from "./components/ExpandedAudioPlayer.vue";
-import { useJellyfinStore } from "./store/jellyfin-store";
-import { useAudioPlayerStore } from "./store/audio-player-store";
-import { useOfflineStore } from "./store/offline-store";
+import SearchBar from "@/components/SearchBar.vue";
+import MiniAudioPlayer from "@/components/MiniAudioPlayer.vue";
+import ExpandedAudioPlayer from "@/components/ExpandedAudioPlayer.vue";
+import { useJellyfinStore } from "@/store/jellyfin-store";
+import { useAudioPlayerStore } from "@/store/audio-player-store";
+import { useOfflineStore } from "@/store/offline-store";
 import { App as CapacitorApp } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
 

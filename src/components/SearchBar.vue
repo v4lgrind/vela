@@ -85,8 +85,8 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { useJellyfinStore } from './store/jellyfin-store';
-import { useOfflineStore } from './store/offline-store';
+import { useJellyfinStore } from '@/store/jellyfin-store';
+import { useOfflineStore } from '@/store/offline-store';
 
 const placeholder = 'Rechercher films, séries, albums…';
 const router = useRouter();

@@ -37,9 +37,9 @@
 <script setup lang="ts">
 import { onMounted, ref, computed, watch } from 'vue';
 import { useRoute } from 'vue-router';
-import { useJellyfinStore } from './store/jellyfin-store';
-import LazyImg from './components/LazyImg.vue';
-import { isAudioType } from './utils/helpers';
+import { useJellyfinStore } from '@/store/jellyfin-store';
+import LazyImg from '@/components/LazyImg.vue';
+import { isAudioType } from '@/utils/helpers';
 
 const store = useJellyfinStore();
 const route = useRoute();

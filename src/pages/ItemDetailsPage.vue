@@ -174,12 +174,12 @@
 <script setup lang="ts">
 import { onMounted, ref, computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { useJellyfinStore } from './store/jellyfin-store';
-import { useOfflineStore } from './store/offline-store';
-import { useAudioPlayerStore, type AudioTrack } from './store/audio-player-store';
-import { downloadService } from './services/downloadService';
-import LazyImg from './components/LazyImg.vue';
-import { isAudioType, typeLabel as getTypeLabel, formatTicksDuration, formatTicksHuman, formatBytes } from './utils/helpers';
+import { useJellyfinStore } from '@/store/jellyfin-store';
+import { useOfflineStore } from '@/store/offline-store';
+import { useAudioPlayerStore, type AudioTrack } from '@/store/audio-player-store';
+import { downloadService } from '@/services/downloadService';
+import LazyImg from '@/components/LazyImg.vue';
+import { isAudioType, typeLabel as getTypeLabel, formatTicksDuration, formatTicksHuman, formatBytes } from '@/utils/helpers';
 
 const store = useJellyfinStore();
 const offlineStore = useOfflineStore();

@@ -5,7 +5,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue';
-import { useJellyfinStore } from '../store/jellyfin-store';
+import { useJellyfinStore } from '@/store/jellyfin-store';
 
 const props = defineProps<{
   src: string;

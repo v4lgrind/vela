@@ -97,11 +97,11 @@
 
 <script setup lang="ts">
 import { onMounted } from 'vue';
-import { useOfflineStore } from './store/offline-store';
-import { useJellyfinStore } from './store/jellyfin-store';
-import { downloadService } from './services/downloadService';
-import LazyImg from './components/LazyImg.vue';
-import { isAudioType } from './utils/helpers';
+import { useOfflineStore } from '@/store/offline-store';
+import { useJellyfinStore } from '@/store/jellyfin-store';
+import { downloadService } from '@/services/downloadService';
+import LazyImg from '@/components/LazyImg.vue';
+import { isAudioType } from '@/utils/helpers';
 
 const offlineStore = useOfflineStore();
 const jellyfinStore = useJellyfinStore();

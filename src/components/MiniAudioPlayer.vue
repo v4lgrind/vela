@@ -28,8 +28,8 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { useAudioPlayerStore } from '../store/audio-player-store';
-import { useJellyfinStore } from '../store/jellyfin-store';
+import { useAudioPlayerStore } from '@/store/audio-player-store';
+import { useJellyfinStore } from '@/store/jellyfin-store';
 
 const audioStore = useAudioPlayerStore();
 const jellyfinStore = useJellyfinStore();

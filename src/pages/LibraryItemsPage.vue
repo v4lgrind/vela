@@ -1,34 +1,41 @@
 <template>
-  <div class="items-page">
-    <section class="items-content">
-      <ul class="items-grid">
-        <li v-for="item in items" :key="item.Id" class="item-card">
+  <div class="min-h-dvh bg-surface text-text-primary p-5 flex flex-col">
+    <section class="flex-1">
+      <ul class="list-none p-0 m-0 grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-3 sm:grid-cols-[repeat(auto-fill,minmax(150px,1fr))] sm:gap-4">
+        <li v-for="item in items" :key="item.Id">
+          <Card class="bg-surface-raised border-border-default hover:-translate-y-1 hover:bg-surface-hover hover:border-border-hover hover:shadow-xl transition-all duration-200 flex flex-col items-center p-2.5 pb-3 overflow-hidden">
+            <router-link v-if="item.Type === 'BoxSet'"
+              :to="{ name: 'libraryItem', params: { id: item.Id, name: item.Name } }"
+              class="w-full rounded-[10px] overflow-hidden bg-black/60 shadow-lg"
+              :class="isAudioType(item.Type) ? 'aspect-square' : 'aspect-[2/3]'">
+              <LazyImg :src="getImageUrl(item.Id, item.Type)" :alt="item.Name" :item-type="item.Type"
+                class="w-full h-full object-cover block" @click="loadPage()" />
+            </router-link>
 
-          <router-link v-if="item.Type === 'BoxSet'"
-            :to="{ name: 'libraryItem', params: { id: item.Id, name: item.Name } }" class="poster-wrapper"
-            :class="{ 'square': isAudioType(item.Type) }">
-            <LazyImg :src="getImageUrl(item.Id, item.Type)" :alt="item.Name" :item-type="item.Type"
-              class="poster" @click="loadPage()" />
-          </router-link>
+            <router-link v-else :to="{ name: 'ItemDetails', params: { id: item.Id } }"
+              class="w-full rounded-[10px] overflow-hidden bg-black/60 shadow-lg"
+              :class="isAudioType(item.Type) ? 'aspect-square' : 'aspect-[2/3]'">
+              <LazyImg :src="getImageUrl(item.Id, item.Type)" :alt="item.Name" :item-type="item.Type"
+                class="w-full h-full object-cover block" />
+            </router-link>
 
-          <router-link v-else :to="{ name: 'ItemDetails', params: { id: item.Id } }" class="poster-wrapper"
-            :class="{ 'square': isAudioType(item.Type) }">
-            <LazyImg :src="getImageUrl(item.Id, item.Type)" :alt="item.Name" :item-type="item.Type"
-              class="poster" />
-          </router-link>
-
-          <div class="meta">
-            <div class="name" :title="item.Name">{{ item.Name }}</div>
-            <div class="type">{{ item.Type }}</div>
-          </div>
+            <div class="w-full text-center mt-2.5">
+              <div class="text-[0.95rem] font-semibold text-text-heading truncate" :title="item.Name">{{ item.Name }}</div>
+              <Badge variant="secondary" class="mt-1 text-xs">{{ item.Type }}</Badge>
+            </div>
+          </Card>
         </li>
       </ul>
 
       <!-- Pagination -->
-      <div class="pagination">
-        <button class="btn ghost" :disabled="startIndex === 0" @click="prevPage">← Précédent</button>
-        <span class="page-indicator">Page {{ currentPage }}</span>
-        <button class="btn ghost" :disabled="!hasNextPage" @click="nextPage">Suivant →</button>
+      <div class="flex items-center justify-center gap-3 mt-5">
+        <Button variant="outline" :disabled="startIndex === 0" @click="prevPage">
+          <ArrowLeft class="size-4 mr-1" /> Previous
+        </Button>
+        <span class="text-text-primary font-semibold">Page {{ currentPage }}</span>
+        <Button variant="outline" :disabled="!hasNextPage" @click="nextPage">
+          Next <ArrowRight class="size-4 ml-1" />
+        </Button>
       </div>
     </section>
   </div>
@@ -40,6 +47,10 @@ import { useRoute } from 'vue-router';
 import { useJellyfinStore } from '@/store/jellyfin-store';
 import LazyImg from '@/components/LazyImg.vue';
 import { isAudioType } from '@/utils/helpers';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { ArrowLeft, ArrowRight } from 'lucide-vue-next';
 
 const store = useJellyfinStore();
 const route = useRoute();
@@ -68,10 +79,9 @@ async function loadPage() {
       limit: limit.value,
     });
     items.value = pageItems;
-
     hasNextPage.value = pageItems.length === limit.value;
   } catch (e) {
-    error.value = 'Erreur lors du chargement des éléments';
+    error.value = 'Failed to load items';
   } finally {
     loading.value = false;
   }
@@ -107,180 +117,3 @@ watch(() => route.params.id, async (newId) => {
   await loadPage();
 });
 </script>
-
-<style scoped>
-/* Conteneur général */
-.items-page {
-  min-height: 100vh;
-  background: #121212;
-  color: #e0e0e0;
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-}
-
-/* En-tête */
-.items-header {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 20px;
-}
-
-.items-title {
-  justify-self: center;
-  font-size: 1.8rem;
-  font-weight: 600;
-  margin: 0;
-}
-
-.btn {
-  height: 36px;
-  padding: 0 14px;
-  border-radius: 8px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: transform .15s ease, background .2s ease, color .2s ease, border-color .2s ease;
-}
-
-.btn.ghost {
-  justify-self: start;
-  background: transparent;
-  border: 1px solid #2a2a2a;
-  color: #e0e0e0;
-}
-
-.btn.ghost:hover {
-  background: #1f1f1f;
-  transform: translateY(-1px);
-}
-
-.btn.logout {
-  justify-self: end;
-  background: #ff4c4c;
-  color: #fff;
-  border: none;
-}
-
-.btn.logout:hover {
-  background: #e03b3b;
-  transform: translateY(-1px);
-}
-
-/* Corps */
-.items-content {
-  flex: 1;
-}
-
-/* Grille des items */
-.items-grid {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: 12px;
-}
-
-@media (min-width: 480px) {
-  .items-grid {
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    gap: 16px;
-  }
-}
-
-/* Carte d'item */
-.item-card {
-  background: #1e1e1e;
-  border-radius: 12px;
-  overflow: hidden;
-  border: 1px solid #232323;
-  transition: transform .2s ease, box-shadow .2s ease, background .2s ease, border-color .2s ease;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 10px 10px 12px;
-}
-
-.item-card:hover {
-  transform: translateY(-4px);
-  background: #242424;
-  border-color: #2c2c2c;
-  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.35);
-}
-
-.poster-wrapper {
-  width: 100%;
-  aspect-ratio: 2 / 3;
-  border-radius: 10px;
-  overflow: hidden;
-  background: #0f0f0f;
-  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.45);
-}
-
-.poster-wrapper.square {
-  aspect-ratio: 1 / 1;
-}
-
-.poster {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-/* Métadonnées */
-.meta {
-  width: 100%;
-  text-align: center;
-  margin-top: 10px;
-}
-
-.name {
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: #f0f0f0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.type {
-  margin-top: 4px;
-  font-size: 0.8rem;
-  color: #9aa0a6;
-}
-
-.media-title {
-  margin-top: 8px;
-  color: #38f9d7;
-  text-align: center;
-  font-size: 1rem;
-  font-weight: 600;
-  text-decoration: none;
-  line-height: 1.3;
-  text-shadow: 0 1px 5px #111, 0 0px 2px #2f2f2f;
-  transition: color 0.2s, text-shadow 0.2s;
-}
-
-.media-title:hover {
-  color: #43e97b;
-  text-decoration: underline;
-  text-shadow: 0 2px 8px #222;
-}
-
-
-.pagination {
-  margin-top: 18px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-}
-
-.page-indicator {
-  color: #dcdcdc;
-  font-weight: 600;
-}
-</style>

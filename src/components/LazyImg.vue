@@ -1,11 +1,15 @@
 <template>
-  <img ref="imgRef" :src="loaded ? src : placeholder" :alt="alt" :class="[$attrs.class, { 'lazy-loaded': loaded }]"
+  <img ref="imgRef" :src="loaded ? src : placeholder" :alt="alt"
+    :class="cn('opacity-0 transition-opacity duration-300', loaded && 'opacity-100', $attrs.class as string)"
     @error="onError" />
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue';
 import { useJellyfinStore } from '@/store/jellyfin-store';
+import { cn } from '@/lib/utils';
+
+defineOptions({ inheritAttrs: false });
 
 const props = defineProps<{
   src: string;
@@ -60,14 +64,3 @@ onBeforeUnmount(() => {
   observer = null;
 });
 </script>
-
-<style scoped>
-img {
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-img.lazy-loaded {
-  opacity: 1;
-}
-</style>

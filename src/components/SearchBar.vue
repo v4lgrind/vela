@@ -1,85 +1,104 @@
 <template>
-    <div class="navbar">
-        <button class="btn" @click="$router.push('/libraries')" aria-label="Accueil">🏠 Accueil</button>
-        <button class="btn offline" @click="$router.push('/offline')" aria-label="Téléchargements" v-if="offlineStore.initialized && offlineStore.downloadCount > 0">
-            📥 Hors ligne
-            <span class="badge">{{ offlineStore.downloadCount }}</span>
-        </button>
-        <div class="combobox" role="combobox" aria-expanded="true" aria-owns="search-listbox" aria-haspopup="listbox">
-            <input ref="inputEl" v-model="query" class="search-input" type="search" :placeholder="placeholder"
-                aria-autocomplete="list" aria-controls="search-listbox" aria-label="Rechercher dans les bibliothèques"
-                @input="onInput" @keydown.down.prevent="moveActive(1)" @keydown.up.prevent="moveActive(-1)"
-                @keydown.enter.prevent="selectActive" @keydown.esc="close" />
-            <div v-if="open && (hasResults || isSearching)" class="results-container">
-                <div v-if="isSearching" class="searching">
-                    <div class="spinner-small"></div>
-                    <span>Recherche en cours...</span>
-                </div>
-                <div v-else-if="hasResults" id="search-listbox" class="results" role="listbox">
-                    <!-- Movies -->
-                    <div v-if="groupedResults.movies.length" class="result-group">
-                        <div class="group-header">Films ({{ groupedResults.movies.length }})</div>
-                        <div class="group-items">
-                            <div v-for="r in groupedResults.movies" :key="r.Id" class="result" role="option"
-                                :class="{ active: flatIndex(r) === activeIndex }"
-                                @mouseenter="activeIndex = flatIndex(r)" @click="goToResult(r)">
-                                <img :src="thumb(r)" alt="" class="thumb" loading="lazy" />
-                                <div class="meta">
-                                    <div class="name">{{ r.Name }}</div>
-                                    <div class="info">
-                                        <span v-if="r.ProductionYear" class="year">{{ r.ProductionYear }}</span>
-                                        <span v-if="r.CommunityRating" class="rating">⭐ {{ r.CommunityRating.toFixed(1) }}</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+  <nav class="flex items-center gap-3 md:gap-5 bg-surface-raised px-3 md:px-5 pb-2.5" style="padding-top: calc(10px + env(safe-area-inset-top, 0px))">
+    <Button variant="ghost" class="font-bold shrink-0" @click="$router.push('/libraries')" aria-label="Home">
+      <Home class="size-4 mr-1" /> Home
+    </Button>
+    <Button v-if="offlineStore.initialized && offlineStore.downloadCount > 0" variant="ghost" class="bg-accent-purple/20 text-white shrink-0" @click="$router.push('/offline')" aria-label="Downloads">
+      <Download class="size-4 mr-1" /> Offline
+      <Badge class="ml-1.5 bg-accent-purple text-white text-xs">{{ offlineStore.downloadCount }}</Badge>
+    </Button>
 
-                    <!-- TV Shows -->
-                    <div v-if="groupedResults.series.length" class="result-group">
-                        <div class="group-header">Séries TV ({{ groupedResults.series.length }})</div>
-                        <div class="group-items">
-                            <div v-for="r in groupedResults.series" :key="r.Id" class="result" role="option"
-                                :class="{ active: flatIndex(r) === activeIndex }"
-                                @mouseenter="activeIndex = flatIndex(r)" @click="goToResult(r)">
-                                <img :src="thumb(r)" alt="" class="thumb" loading="lazy" />
-                                <div class="meta">
-                                    <div class="name">{{ r.Name }}</div>
-                                    <div class="info">
-                                        <span v-if="r.ProductionYear" class="year">{{ r.ProductionYear }}</span>
-                                        <span v-if="r.CommunityRating" class="rating">⭐ {{ r.CommunityRating.toFixed(1) }}</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+    <div class="relative flex-1 min-w-0" role="combobox" aria-expanded="true" aria-owns="search-listbox" aria-haspopup="listbox">
+      <Input ref="inputEl" v-model="query" type="search" :placeholder="placeholder"
+        aria-autocomplete="list" aria-controls="search-listbox" aria-label="Search libraries"
+        class="w-full focus:border-accent-purple focus:ring-accent-purple/15"
+        @input="onInput" @keydown.down.prevent="moveActive(1)" @keydown.up.prevent="moveActive(-1)"
+        @keydown.enter.prevent="selectActive" @keydown.esc="close" />
 
-                    <!-- Music Albums -->
-                    <div v-if="groupedResults.albums.length" class="result-group">
-                        <div class="group-header">Albums ({{ groupedResults.albums.length }})</div>
-                        <div class="group-items">
-                            <div v-for="r in groupedResults.albums" :key="r.Id" class="result" role="option"
-                                :class="{ active: flatIndex(r) === activeIndex }"
-                                @mouseenter="activeIndex = flatIndex(r)" @click="goToResult(r)">
-                                <img :src="thumb(r)" alt="" class="thumb square" loading="lazy" />
-                                <div class="meta">
-                                    <div class="name">{{ r.Name }}</div>
-                                    <div class="info">
-                                        <span v-if="r.AlbumArtist" class="artist">{{ r.AlbumArtist }}</span>
-                                        <span v-if="r.ProductionYear" class="year">{{ r.ProductionYear }}</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div v-else class="no-results">
-                    Aucun résultat pour "{{ query }}"
-                </div>
-            </div>
+      <div v-if="open && (hasResults || isSearching)" class="absolute left-0 right-0 mt-2 bg-surface-raised border border-border-input rounded-xl max-h-[70vh] overflow-hidden shadow-[0_10px_30px_rgba(0,0,0,0.5)] z-[1000] max-md:-mx-3 max-md:rounded-none max-md:max-h-[calc(100vh-120px)]">
+        <!-- Searching -->
+        <div v-if="isSearching" class="flex items-center justify-center gap-2.5 py-8 text-text-muted">
+          <Loader2 class="size-5 animate-spin" />
+          <span>Searching...</span>
         </div>
-        <button class="btn logout" @click="onLogout">Déconnexion</button>
+
+        <!-- Results -->
+        <div v-else-if="hasResults" id="search-listbox" class="max-h-[70vh] overflow-y-auto p-2 scrollbar-hide" role="listbox">
+          <!-- Movies -->
+          <div v-if="groupedResults.movies.length" class="mb-4 last:mb-0">
+            <div class="font-bold text-sm text-text-muted uppercase tracking-wide px-3 py-2 sticky top-0 bg-surface-raised z-[1]">Movies ({{ groupedResults.movies.length }})</div>
+            <div class="flex flex-col gap-1">
+              <div v-for="r in groupedResults.movies" :key="r.Id"
+                class="grid grid-cols-[100px_1fr] max-md:grid-cols-[60px_1fr] gap-3 max-md:gap-2.5 items-center px-2.5 py-2.5 max-md:px-2 max-md:py-2 rounded-lg cursor-pointer transition-all duration-200"
+                :class="flatIndex(r) === activeIndex ? 'bg-surface-hover translate-x-0.5' : ''"
+                role="option"
+                @mouseenter="activeIndex = flatIndex(r)" @click="goToResult(r)">
+                <img :src="thumb(r)" alt="" class="w-[100px] h-[150px] max-md:w-[60px] max-md:h-[90px] rounded-md object-cover bg-black/60 shadow-md" loading="lazy" />
+                <div class="flex flex-col gap-1.5 min-w-0">
+                  <div class="text-text-heading font-semibold text-base max-md:text-sm line-clamp-2">{{ r.Name }}</div>
+                  <div class="flex flex-wrap gap-2 items-center text-sm max-md:text-xs">
+                    <span v-if="r.ProductionYear" class="text-text-muted">{{ r.ProductionYear }}</span>
+                    <span v-if="r.CommunityRating" class="text-rating font-semibold">{{ r.CommunityRating.toFixed(1) }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TV Shows -->
+          <div v-if="groupedResults.series.length" class="mb-4 last:mb-0">
+            <div class="font-bold text-sm text-text-muted uppercase tracking-wide px-3 py-2 sticky top-0 bg-surface-raised z-[1]">TV Shows ({{ groupedResults.series.length }})</div>
+            <div class="flex flex-col gap-1">
+              <div v-for="r in groupedResults.series" :key="r.Id"
+                class="grid grid-cols-[100px_1fr] max-md:grid-cols-[60px_1fr] gap-3 max-md:gap-2.5 items-center px-2.5 py-2.5 max-md:px-2 max-md:py-2 rounded-lg cursor-pointer transition-all duration-200"
+                :class="flatIndex(r) === activeIndex ? 'bg-surface-hover translate-x-0.5' : ''"
+                role="option"
+                @mouseenter="activeIndex = flatIndex(r)" @click="goToResult(r)">
+                <img :src="thumb(r)" alt="" class="w-[100px] h-[150px] max-md:w-[60px] max-md:h-[90px] rounded-md object-cover bg-black/60 shadow-md" loading="lazy" />
+                <div class="flex flex-col gap-1.5 min-w-0">
+                  <div class="text-text-heading font-semibold text-base max-md:text-sm line-clamp-2">{{ r.Name }}</div>
+                  <div class="flex flex-wrap gap-2 items-center text-sm max-md:text-xs">
+                    <span v-if="r.ProductionYear" class="text-text-muted">{{ r.ProductionYear }}</span>
+                    <span v-if="r.CommunityRating" class="text-rating font-semibold">{{ r.CommunityRating.toFixed(1) }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Albums -->
+          <div v-if="groupedResults.albums.length" class="mb-4 last:mb-0">
+            <div class="font-bold text-sm text-text-muted uppercase tracking-wide px-3 py-2 sticky top-0 bg-surface-raised z-[1]">Albums ({{ groupedResults.albums.length }})</div>
+            <div class="flex flex-col gap-1">
+              <div v-for="r in groupedResults.albums" :key="r.Id"
+                class="grid grid-cols-[100px_1fr] max-md:grid-cols-[60px_1fr] gap-3 max-md:gap-2.5 items-center px-2.5 py-2.5 max-md:px-2 max-md:py-2 rounded-lg cursor-pointer transition-all duration-200"
+                :class="flatIndex(r) === activeIndex ? 'bg-surface-hover translate-x-0.5' : ''"
+                role="option"
+                @mouseenter="activeIndex = flatIndex(r)" @click="goToResult(r)">
+                <img :src="thumb(r)" alt="" class="w-[100px] h-[100px] max-md:w-[60px] max-md:h-[60px] rounded-md object-cover bg-black/60 shadow-md" loading="lazy" />
+                <div class="flex flex-col gap-1.5 min-w-0">
+                  <div class="text-text-heading font-semibold text-base max-md:text-sm line-clamp-2">{{ r.Name }}</div>
+                  <div class="flex flex-wrap gap-2 items-center text-sm max-md:text-xs">
+                    <span v-if="r.AlbumArtist" class="text-accent-purple-light">{{ r.AlbumArtist }}</span>
+                    <span v-if="r.ProductionYear" class="text-text-muted">{{ r.ProductionYear }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- No results -->
+        <div v-else class="py-10 text-center text-text-muted">
+          No results for "{{ query }}"
+        </div>
+      </div>
     </div>
+
+    <Button variant="destructive" class="shrink-0" @click="onLogout">
+      <LogOut class="size-4 mr-1" /> Logout
+    </Button>
+  </nav>
 </template>
 
 <script setup lang="ts">
@@ -87,8 +106,12 @@ import { ref, computed, watch, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useJellyfinStore } from '@/store/jellyfin-store';
 import { useOfflineStore } from '@/store/offline-store';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Home, Download, LogOut, Loader2 } from 'lucide-vue-next';
 
-const placeholder = 'Rechercher films, séries, albums…';
+const placeholder = 'Search movies, shows, albums...';
 const router = useRouter();
 const store = useJellyfinStore();
 const offlineStore = useOfflineStore();
@@ -107,14 +130,12 @@ async function onLogout() {
 }
 
 function thumb(item: any) {
-    // Larger thumbnails for better visibility
     if (item.Type === 'MusicAlbum') {
         return store.getImageUrl(item.Id, 'Primary', 120, 120) || '';
     }
     return store.getImageUrl(item.Id, 'Primary', 100, 150) || '';
 }
 
-// Group results by type
 const groupedResults = computed(() => {
     return {
         movies: results.value.filter(r => r.Type === 'Movie'),
@@ -125,7 +146,6 @@ const groupedResults = computed(() => {
 
 const hasResults = computed(() => results.value.length > 0);
 
-// Flatten results for keyboard navigation
 const flatResults = computed(() => {
     return [
         ...groupedResults.value.movies,
@@ -148,7 +168,6 @@ async function searchAll(term: string) {
     isSearching.value = true;
 
     try {
-        // Search only: Movies, TV Shows, Music Albums (no episodes)
         results.value = await store.searchItems({
             searchTerm: term,
             limit: 50,
@@ -174,7 +193,6 @@ function moveActive(delta: number) {
     if (!flat.length) return;
     activeIndex.value = (activeIndex.value + delta + flat.length) % flat.length;
 
-    // Scroll active item into view
     setTimeout(() => {
         const activeEl = document.querySelector('.result.active');
         activeEl?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
@@ -198,11 +216,9 @@ function close() {
 }
 
 onMounted(() => {
-    // Focus search with "/" keyboard shortcut
     window.addEventListener('keydown', (e) => {
         if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey) {
             const target = e.target as HTMLElement;
-            // Don't trigger if already in an input
             if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
             e.preventDefault();
             inputEl.value?.focus();
@@ -218,312 +234,3 @@ watch(query, (val) => {
     }
 });
 </script>
-
-<style scoped>
-.btn {
-    text-decoration: none;
-    font-weight: 700;
-    background: #131313;
-    padding: 8px 12px;
-    border-radius: 8px;
-    border: none;
-    cursor: pointer;
-    color: #fff;
-    transition: background 0.2s, transform 0.15s;
-}
-
-.btn:hover {
-    background: #1f1f1f;
-    transform: translateY(-1px);
-}
-
-.combobox {
-    position: relative;
-    flex: 1; /* Take all remaining space */
-    min-width: 0; /* Allow flex to work properly */
-}
-
-.search-input {
-    width: 100%;
-    background: #121212;
-    color: #e0e0e0;
-    border: 1px solid #2a2a2a;
-    border-radius: 8px;
-    padding: 10px 12px;
-    outline: none;
-    font-size: 0.95rem;
-}
-
-.search-input:focus {
-    border-color: #38f9d7;
-    box-shadow: 0 0 0 3px rgba(56, 249, 215, 0.15);
-}
-
-.results-container {
-    position: absolute;
-    left: 0;
-    right: 0;
-    margin-top: 8px;
-    background: #1e1e1e;
-    border: 1px solid #2a2a2a;
-    border-radius: 12px;
-    max-height: 70vh;
-    overflow: hidden;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-    z-index: 1000;
-}
-
-/* Mobile: full-width results panel */
-@media (max-width: 767px) {
-    .results-container {
-        left: -12px;
-        right: -12px;
-        border-radius: 0;
-        max-height: calc(100vh - 120px);
-    }
-}
-
-.searching {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    padding: 30px;
-    color: #9aa0a6;
-}
-
-.spinner-small {
-    width: 20px;
-    height: 20px;
-    border: 2px solid rgba(255, 255, 255, 0.1);
-    border-top-color: #00a4dc;
-    border-radius: 50%;
-    animation: spin 0.6s linear infinite;
-}
-
-@keyframes spin {
-    to { transform: rotate(360deg); }
-}
-
-.results {
-    max-height: 70vh;
-    overflow-y: auto;
-    padding: 8px;
-}
-
-.result-group {
-    margin-bottom: 16px;
-}
-
-.result-group:last-child {
-    margin-bottom: 0;
-}
-
-.group-header {
-    font-weight: 700;
-    font-size: 0.9rem;
-    color: #9aa0a6;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    padding: 8px 12px 6px;
-    position: sticky;
-    top: 0;
-    background: #1e1e1e;
-    z-index: 1;
-}
-
-/* Mobile: adjust header padding */
-@media (max-width: 767px) {
-    .group-header {
-        font-size: 0.8rem;
-        padding: 6px 8px 4px;
-    }
-}
-
-.group-items {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-
-.result {
-    display: grid;
-    grid-template-columns: 100px 1fr;
-    gap: 12px;
-    align-items: center;
-    padding: 10px;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: background 0.2s, transform 0.15s;
-}
-
-/* Mobile: smaller thumbnails for more text space */
-@media (max-width: 767px) {
-    .result {
-        grid-template-columns: 60px 1fr;
-        gap: 10px;
-        padding: 8px;
-    }
-}
-
-.result.active,
-.result:hover {
-    background: #242424;
-    transform: translateX(2px);
-}
-
-.thumb {
-    width: 100px;
-    height: 150px;
-    border-radius: 6px;
-    object-fit: cover;
-    background: #0f0f0f;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-}
-
-.thumb.square {
-    width: 100px;
-    height: 100px;
-}
-
-/* Mobile: smaller thumbnails */
-@media (max-width: 767px) {
-    .thumb {
-        width: 60px;
-        height: 90px;
-    }
-
-    .thumb.square {
-        width: 60px;
-        height: 60px;
-    }
-}
-
-.meta {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    min-width: 0;
-}
-
-.meta .name {
-    color: #f0f0f0;
-    font-weight: 600;
-    font-size: 1rem;
-    line-height: 1.3;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-}
-
-/* Mobile: adjust font sizes */
-@media (max-width: 767px) {
-    .meta .name {
-        font-size: 0.9rem;
-    }
-
-    .meta .info {
-        font-size: 0.75rem;
-    }
-}
-
-.meta .info {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    align-items: center;
-    font-size: 0.85rem;
-}
-
-.meta .year {
-    color: #9aa0a6;
-}
-
-.meta .rating {
-    color: #fbbf24;
-    font-weight: 600;
-}
-
-.meta .artist {
-    color: #38f9d7;
-}
-
-.no-results {
-    padding: 40px 20px;
-    text-align: center;
-    color: #9aa0a6;
-    font-size: 0.95rem;
-}
-
-.btn.logout {
-    background: #ff4c4c;
-    color: #fff;
-    border: none;
-}
-
-.btn.logout:hover {
-    background: #ff3333;
-}
-
-.btn.offline {
-    background: #1a5f7a;
-    color: #fff;
-    position: relative;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.btn.offline:hover {
-    background: #246b86;
-}
-
-.badge {
-    background: #38f9d7;
-    color: #121212;
-    font-size: 0.75rem;
-    font-weight: 700;
-    padding: 2px 6px;
-    border-radius: 10px;
-    min-width: 20px;
-    text-align: center;
-}
-
-.navbar {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 20px;
-    background: #1b1b1b;
-    padding: calc(10px + env(safe-area-inset-top, 0px)) 12px 10px;
-}
-
-/* Desktop: more space for search bar */
-@media (min-width: 768px) {
-    .navbar {
-        gap: 20px;
-        padding: calc(10px + env(safe-area-inset-top, 0px)) 20px 10px;
-    }
-}
-
-/* Scrollbar styling */
-.results::-webkit-scrollbar {
-    width: 8px;
-}
-
-.results::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 4px;
-}
-
-.results::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 4px;
-}
-
-.results::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.3);
-}
-</style>

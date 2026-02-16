@@ -1,170 +1,165 @@
 <template>
-    <div class="details-page">
-        <section v-if="loading" class="state">Chargement...</section>
-        <section v-else-if="error" class="state error">{{ error }}</section>
+    <div class="min-h-dvh bg-surface text-text-primary p-5 flex flex-col">
+        <section v-if="loading" class="text-center py-10 text-lg text-text-muted">Loading...</section>
+        <section v-else-if="error" class="text-center py-10 text-lg text-error">{{ error }}</section>
 
-        <section v-else class="details-card">
-            <div class="left">
-                <!-- MODIFIER: Ajouter classe conditionnelle square -->
-                <div class="poster" :class="{ 'square': isAudioType(item.Type) }">
-                    <LazyImg :src="posterUrl" :alt="item?.Name" :item-type="item?.Type" />
+        <Card v-else class="bg-surface-raised border-border-default rounded-[14px] p-4.5 shadow-xl grid grid-cols-[300px_1fr] max-md:grid-cols-1 gap-6">
+            <div>
+                <div class="rounded-xl overflow-hidden bg-black/60 shadow-lg mx-auto"
+                    :class="isAudioType(item.Type) ? 'w-[300px] h-[300px] max-md:w-[220px] max-md:h-[220px]' : 'w-[300px] h-[450px] max-md:w-[220px] max-md:h-[330px]'">
+                    <LazyImg :src="posterUrl" :alt="item?.Name" :item-type="item?.Type" class="w-full h-full object-cover" />
                 </div>
             </div>
 
-            <div class="right">
-                <h3 class="name">{{ item?.Name }}</h3>
+            <div>
+                <h3 class="text-2xl font-bold text-text-heading m-0 mb-2">{{ item?.Name }}</h3>
 
-                <button class="btn play" v-if="isPlayable(item)" @click="playMedia">
-                    ▶️ Lire ce média
-                </button>
+                <Button v-if="isPlayable(item)" class="mt-3 bg-gradient-to-r from-accent-green to-accent-teal text-surface-raised font-bold" @click="playMedia">
+                    <Play class="size-4 mr-1 fill-current stroke-none" /> Play
+                </Button>
 
-                <button class="btn play" v-if="item.Type === 'MusicAlbum' && audioTracks.length" @click="playAlbum">
-                    ▶️ Lire l'album
-                </button>
+                <Button v-if="item.Type === 'MusicAlbum' && audioTracks.length" class="mt-3 bg-gradient-to-r from-accent-green to-accent-teal text-surface-raised font-bold" @click="playAlbum">
+                    <Play class="size-4 mr-1 fill-current stroke-none" /> Play album
+                </Button>
 
-                <button class="btn downloaded" v-if="isItemDownloaded && !isDownloading" @click="deleteDownload">
-                    ✓ Téléchargé - Supprimer
-                </button>
+                <Button v-if="isItemDownloaded && !isDownloading" class="mt-3 ml-1 bg-accent-purple text-white hover:bg-error-dark" @click="deleteDownload">
+                    <Check class="size-4 mr-1" /> Downloaded - Remove
+                </Button>
 
-                <button class="btn download" v-else-if="canDownload(item) && !isItemDownloaded && !isDownloading" @click="handleDownload">
-                    ⬇️ Télécharger pour hors ligne
-                </button>
+                <Button v-else-if="canDownload(item) && !isItemDownloaded && !isDownloading" class="mt-3 ml-1 bg-gradient-to-r from-[#667eea] to-[#764ba2] text-white font-bold" @click="handleDownload">
+                    <DownloadIcon class="size-4 mr-1" /> Download for offline
+                </Button>
 
-                <button class="btn downloading" v-else-if="isDownloading" disabled>
-                    📥 Téléchargement... {{ downloadProgress }}%
-                </button>
+                <Button v-if="isDownloading" class="mt-3 ml-1 bg-[#1a5f7a] text-white font-bold cursor-wait" disabled>
+                    Downloading... {{ downloadProgress }}%
+                </Button>
 
-                <button class="btn cancel" v-if="isDownloading" @click="cancelDownload">
-                    ❌ Annuler
-                </button>
+                <Button v-if="isDownloading" variant="destructive" class="mt-2" @click="cancelDownload">
+                    <X class="size-4 mr-1" /> Cancel
+                </Button>
 
-                <div class="meta-line">
-                    <span v-if="year" class="chip">{{ year }}</span>
-                    <span v-if="duration" class="chip">{{ duration }}</span>
-                    <span v-if="item?.CommunityRating" class="chip">Note: {{ item.CommunityRating }}</span>
-                    <span v-if="typeLabel" class="chip">{{ typeLabel }}</span>
-                    <span v-if="videoCodec" class="chip">Codec: {{ videoCodec }}</span>
-                    <span v-if="videoResolution" class="chip">Résolution: {{ videoResolution }}</span>
+                <div class="flex flex-wrap gap-2 mb-3 mt-3">
+                    <Badge v-if="year" variant="secondary">{{ year }}</Badge>
+                    <Badge v-if="duration" variant="secondary">{{ duration }}</Badge>
+                    <Badge v-if="item?.CommunityRating" variant="secondary">Rating: {{ item.CommunityRating }}</Badge>
+                    <Badge v-if="typeLabel" variant="secondary">{{ typeLabel }}</Badge>
+                    <Badge v-if="videoCodec" variant="secondary">Codec: {{ videoCodec }}</Badge>
+                    <Badge v-if="videoResolution" variant="secondary">{{ videoResolution }}</Badge>
                 </div>
 
-                <p v-if="item?.Overview" class="overview">
+                <p v-if="item?.Overview" class="my-2.5 leading-relaxed text-text-primary/85">
                     {{ item.Overview }}
                 </p>
 
-                <div v-if="genres?.length" class="section">
-                    <h4>Genres</h4>
-                    <div class="chips">
-                        <span v-for="g in genres" :key="g" class="chip">{{ g }}</span>
+                <div v-if="genres?.length" class="mt-3.5">
+                    <h4 class="text-base font-semibold text-text-bright m-0 mb-2">Genres</h4>
+                    <div class="flex flex-wrap gap-2">
+                        <Badge v-for="g in genres" :key="g" variant="secondary">{{ g }}</Badge>
                     </div>
                 </div>
 
-                <div v-if="directorNames?.length" class="section">
-                    <h4>Réalisateur</h4>
-                    <div class="chips">
-                        <span v-for="d in directorNames" :key="d" class="chip">{{ d }}</span>
+                <div v-if="directorNames?.length" class="mt-3.5">
+                    <h4 class="text-base font-semibold text-text-bright m-0 mb-2">Director</h4>
+                    <div class="flex flex-wrap gap-2">
+                        <Badge v-for="d in directorNames" :key="d" variant="secondary">{{ d }}</Badge>
                     </div>
                 </div>
 
-                <div v-if="studioNames?.length" class="section">
-                    <h4>Studios</h4>
-                    <div class="chips">
-                        <span v-for="s in studioNames" :key="s" class="chip">{{ s }}</span>
+                <div v-if="studioNames?.length" class="mt-3.5">
+                    <h4 class="text-base font-semibold text-text-bright m-0 mb-2">Studios</h4>
+                    <div class="flex flex-wrap gap-2">
+                        <Badge v-for="s in studioNames" :key="s" variant="secondary">{{ s }}</Badge>
                     </div>
                 </div>
             </div>
-        </section>
+        </Card>
 
-        <!-- Si Série : afficher les Saisons -->
-        <section v-if="item?.Type === 'Series' && seasons.length" class="children-section">
-            <h3>Saisons</h3>
-            <div class="grid">
-                <div v-for="season in seasons" :key="season.Id" class="card" @click="goToItem(season.Id)">
+        <!-- Seasons -->
+        <section v-if="item?.Type === 'Series' && seasons.length" class="mt-6">
+            <h3 class="text-xl font-semibold mb-3">Seasons</h3>
+            <div class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-4">
+                <Card v-for="season in seasons" :key="season.Id" class="bg-surface-raised border-border-default cursor-pointer overflow-hidden hover:-translate-y-1 hover:border-accent-purple transition-all duration-200" @click="goToItem(season.Id)">
                     <LazyImg :src="getImageUrl(season.Id, 'Primary', 300, 450)" :alt="season.Name" item-type="Season"
-                        class="card-poster" />
-                    <div class="card-title">{{ season.Name }}</div>
-                </div>
+                        class="w-full aspect-[2/3] object-cover" />
+                    <div class="p-2 text-center font-semibold">{{ season.Name }}</div>
+                </Card>
             </div>
         </section>
 
-        <!-- Si Saison : afficher les Épisodes -->
-        <section v-if="item?.Type === 'Season' && episodes.length" class="children-section">
-            <h3>Épisodes</h3>
-            <div class="episodes-list">
-                <div v-for="ep in episodes" :key="ep.Id" class="episode-card" @click="goToItem(ep.Id)">
+        <!-- Episodes -->
+        <section v-if="item?.Type === 'Season' && episodes.length" class="mt-6">
+            <h3 class="text-xl font-semibold mb-3">Episodes</h3>
+            <div class="flex flex-col gap-3">
+                <Card v-for="ep in episodes" :key="ep.Id" class="bg-surface-raised border-border-default flex gap-3 p-3 cursor-pointer hover:translate-x-1 hover:border-accent-purple transition-all duration-200" @click="goToItem(ep.Id)">
                     <LazyImg :src="getImageUrl(ep.Id, 'Primary', 200, 112)" :alt="ep.Name" item-type="Episode"
-                        class="episode-thumb" />
-                    <div class="episode-info">
-                        <div class="episode-title">{{ ep.IndexNumber }}. {{ ep.Name }}</div>
-                        <div class="episode-overview">{{ ep.Overview }}</div>
+                        class="w-[200px] h-[112px] object-cover rounded-lg shrink-0" />
+                    <div class="flex-1">
+                        <div class="font-semibold mb-1.5">{{ ep.IndexNumber }}. {{ ep.Name }}</div>
+                        <div class="text-text-muted text-sm leading-snug">{{ ep.Overview }}</div>
                     </div>
-                </div>
+                </Card>
             </div>
         </section>
 
-        <!-- Si Album : afficher les pistes audio -->
-        <section v-if="item?.Type === 'MusicAlbum' && audioTracks.length" class="children-section">
-            <h3>Pistes</h3>
-            <div class="tracks-list">
-                <div v-for="(track, i) in audioTracks" :key="track.Id" class="track-card"
-                    :class="{ playing: audioPlayerStore.currentTrack?.id === track.Id }"
+        <!-- Audio Tracks -->
+        <section v-if="item?.Type === 'MusicAlbum' && audioTracks.length" class="mt-6">
+            <h3 class="text-xl font-semibold mb-3">Tracks</h3>
+            <div class="flex flex-col gap-1">
+                <div v-for="(track, i) in audioTracks" :key="track.Id"
+                    class="grid grid-cols-[40px_1fr_60px] gap-3 items-center bg-surface-raised border border-border-default rounded-lg px-3.5 py-2.5 cursor-pointer transition-all duration-150 hover:translate-x-1 hover:border-accent-purple hover:bg-surface-hover"
+                    :class="audioPlayerStore.currentTrack?.id === track.Id && 'border-accent-purple! bg-accent-purple/10'"
                     @click="playTrack(track.Id, i)">
-                    <div class="track-number">{{ track.IndexNumber || '•' }}</div>
-                    <div class="track-info">
-                        <div class="track-title">{{ track.Name }}</div>
-                        <div class="track-artist" v-if="track.Artists?.length">
-                            {{ track.Artists.join(', ') }}
-                        </div>
+                    <div class="text-center text-text-muted font-semibold text-sm">{{ track.IndexNumber || '·' }}</div>
+                    <div class="min-w-0">
+                        <div class="font-semibold text-text-heading truncate" :class="audioPlayerStore.currentTrack?.id === track.Id && 'text-accent-purple-light'">{{ track.Name }}</div>
+                        <div v-if="track.Artists?.length" class="text-text-muted text-sm mt-0.5 truncate">{{ track.Artists.join(', ') }}</div>
                     </div>
-                    <div class="track-duration">{{ formatTrackDuration(track.RunTimeTicks) }}</div>
+                    <div class="text-right text-text-muted text-sm tabular-nums">{{ formatTrackDuration(track.RunTimeTicks) }}</div>
                 </div>
             </div>
         </section>
 
-        <!-- Distribution en liste horizontale déroulante -->
-        <section v-if="cast?.length" class="cast-scroller">
-            <div class="scroller-header">
-                <h3>Distribution</h3>
-                <div class="controls">
-                    <button class="btn ghost" @click="scrollCast('left')" aria-label="Défiler vers la gauche">←</button>
-                    <button class="btn ghost" @click="scrollCast('right')"
-                        aria-label="Défiler vers la droite">→</button>
+        <!-- Cast -->
+        <section v-if="cast?.length" class="mt-6">
+            <div class="flex items-center justify-between gap-3 mb-3">
+                <h3 class="text-xl font-semibold m-0">Cast</h3>
+                <div class="flex gap-2">
+                    <Button variant="outline" size="icon" class="size-8" @click="scrollCast('left')"><ArrowLeft class="size-4" /></Button>
+                    <Button variant="outline" size="icon" class="size-8" @click="scrollCast('right')"><ArrowRight class="size-4" /></Button>
                 </div>
             </div>
-
-            <div ref="castRail" class="scroller-rail" role="list" aria-label="Distribution">
-                <div v-for="p in cast" :key="p.Id || p.Name" class="scroller-item" role="listitem" :title="p.Name">
-                    <div class="avatar">
-                        <LazyImg :src="personImageUrl(p)" :alt="p.Name" item-type="person" />
+            <div ref="castRail" class="grid grid-flow-col auto-cols-[minmax(140px,160px)] gap-3 overflow-x-auto overflow-y-hidden overscroll-x-contain snap-x snap-proximity scroll-smooth pb-1.5 scrollbar-hide" role="list">
+                <Card v-for="p in cast" :key="p.Id || p.Name" class="bg-surface-raised border-border-default p-2.5 text-center snap-center hover:-translate-y-1 hover:bg-surface-hover hover:border-border-hover transition-all duration-200" role="listitem" :title="p.Name">
+                    <div class="size-[110px] mx-auto mb-2.5 rounded-full overflow-hidden bg-black/60 shadow-lg grid place-items-center">
+                        <LazyImg :src="personImageUrl(p)" :alt="p.Name" item-type="person" class="w-full h-full object-cover" />
                     </div>
-                    <div class="cast-meta">
-                        <div class="cast-name">{{ p.Name }}</div>
-                        <div class="cast-role" v-if="p.Role">{{ p.Role }}</div>
-                    </div>
-                </div>
+                    <div class="font-semibold text-text-heading truncate">{{ p.Name }}</div>
+                    <div v-if="p.Role" class="text-text-muted text-sm mt-1">{{ p.Role }}</div>
+                </Card>
             </div>
         </section>
 
-        <!-- Section technique: détails complets du flux vidéo -->
-        <section v-if="videoDetails.length" class="tech-section">
-            <h3>Métadonnées vidéo</h3>
-            <dl class="kv">
+        <!-- Video Metadata -->
+        <section v-if="videoDetails.length" class="mt-6">
+            <h3 class="text-lg font-semibold mb-2.5">Video Metadata</h3>
+            <dl class="grid grid-cols-[180px_1fr] gap-x-3.5 gap-y-1.5 items-center">
                 <template v-for="row in videoDetails" :key="`v-${row.label}`">
-                    <dt>{{ row.label }}</dt>
-                    <dd>{{ row.value }}</dd>
+                    <dt class="text-text-muted font-semibold">{{ row.label }}</dt>
+                    <dd class="m-0 text-text-primary break-all">{{ row.value }}</dd>
                 </template>
             </dl>
         </section>
 
-        <section v-if="sourceDetails.length || fileSizeHuman" class="tech-section">
-            <h3>Source média</h3>
-            <dl class="kv">
+        <section v-if="sourceDetails.length || fileSizeHuman" class="mt-6">
+            <h3 class="text-lg font-semibold mb-2.5">Media Source</h3>
+            <dl class="grid grid-cols-[180px_1fr] gap-x-3.5 gap-y-1.5 items-center">
                 <template v-for="row in sourceDetails" :key="`s-${row.label}`">
-                    <dt>{{ row.label }}</dt>
-                    <dd>{{ row.value }}</dd>
+                    <dt class="text-text-muted font-semibold">{{ row.label }}</dt>
+                    <dd class="m-0 text-text-primary break-all">{{ row.value }}</dd>
                 </template>
                 <template v-if="fileSizeHuman">
-                    <dt>Taille du fichier</dt>
-                    <dd>{{ fileSizeHuman }}</dd>
+                    <dt class="text-text-muted font-semibold">File size</dt>
+                    <dd class="m-0 text-text-primary break-all">{{ fileSizeHuman }}</dd>
                 </template>
             </dl>
         </section>
@@ -180,6 +175,10 @@ import { useAudioPlayerStore, type AudioTrack } from '@/store/audio-player-store
 import { downloadService } from '@/services/downloadService';
 import LazyImg from '@/components/LazyImg.vue';
 import { isAudioType, typeLabel as getTypeLabel, formatTicksDuration, formatTicksHuman, formatBytes } from '@/utils/helpers';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Play, Check, Download as DownloadIcon, X, ArrowLeft, ArrowRight } from 'lucide-vue-next';
 
 const store = useJellyfinStore();
 const offlineStore = useOfflineStore();
@@ -211,22 +210,17 @@ async function load() {
         const data = await store.fetchItemDetails(itemId.value);
         item.value = data;
 
-        // Si Série, charger les saisons
         if (data?.Type === 'Series') {
             seasons.value = await store.fetchSeasons(itemId.value);
         }
-
-        // Si Saison, charger les épisodes
         if (data?.Type === 'Season') {
             episodes.value = await store.fetchEpisodes(itemId.value);
         }
-
-        // Si Album de musique, charger les pistes audio
         if (data?.Type === 'MusicAlbum') {
             audioTracks.value = await store.fetchAudioTracks(itemId.value);
         }
     } catch (e) {
-        error.value = 'Impossible de charger les détails';
+        error.value = 'Failed to load details';
     } finally {
         loading.value = false;
     }
@@ -235,49 +229,33 @@ async function load() {
 onMounted(load);
 watch(() => route.params.id, load);
 
-// Image principale
 const posterUrl = computed(() => {
     if (!item.value?.Id) return '';
     return store.getImageUrl(item.value.Id, 'Primary', 300, 450) || '';
 });
 
-// Métadonnées simples
 const year = computed(() => item.value?.ProductionYear || null);
-
 const duration = computed(() => formatTicksHuman(item.value?.RunTimeTicks));
-
 const genres = computed<string[]>(() => item.value?.Genres || []);
-
 const typeLabel = computed(() => getTypeLabel(item.value?.Type));
 
-// People
 type Person = { Id?: string; Name: string; Role?: string; Type?: string };
 const people = computed<Person[]>(() => item.value?.People || []);
-
-const directorNames = computed(() =>
-    people.value.filter(p => p.Type === 'Director').map(p => p.Name)
-);
-
-const cast = computed<Person[]>(() =>
-    people.value.filter(p => p.Type === 'Actor')
-);
-
-const studioNames = computed(() =>
-    (item.value?.Studios || []).map((s: any) => s.Name).filter(Boolean)
-);
+const directorNames = computed(() => people.value.filter(p => p.Type === 'Director').map(p => p.Name));
+const cast = computed<Person[]>(() => people.value.filter(p => p.Type === 'Actor'));
+const studioNames = computed(() => (item.value?.Studios || []).map((s: any) => s.Name).filter(Boolean));
 
 function personImageUrl(p: Person) {
     if (!p?.Id) return '';
     return store.getImageUrl(p.Id, 'Primary', 140) || '';
 }
 
-// Play
 function isPlayable(it: any) {
     return it && ['Movie', 'Episode', 'Video', 'Audio'].includes(it.Type);
 }
+
 function playMedia() {
     if (!item.value || !accessToken) return;
-    // Audio items go through the audio player store
     if (item.value.Type === 'Audio' || item.value.MediaType === 'Audio') {
         const track = itemToAudioTrack(item.value);
         audioPlayerStore.playTrack(track);
@@ -286,7 +264,6 @@ function playMedia() {
     router.push({ name: 'Player', params: { id: item.value.Id } });
 }
 
-// Navigation
 function goToItem(id: string) {
     router.push({ name: 'ItemDetails', params: { id } });
 }
@@ -295,7 +272,6 @@ function getImageUrl(id: string, type: string, w: number, h: number) {
     return store.getImageUrl(id, type, w, h) || '';
 }
 
-// Pistes audio
 const formatTrackDuration = formatTicksDuration;
 
 function itemToAudioTrack(raw: any): AudioTrack {
@@ -320,7 +296,6 @@ function playAlbum() {
     audioPlayerStore.playAlbum(tracks, 0);
 }
 
-// Cast rail scrolling
 const castRail = ref<HTMLDivElement | null>(null);
 function scrollCast(dir: 'left' | 'right') {
     const el = castRail.value;
@@ -330,7 +305,6 @@ function scrollCast(dir: 'left' | 'right') {
     el.scrollBy({ left: delta, behavior: 'smooth' });
 }
 
-// MediaStreams / MediaSources (vidéo)
 const mediaStreams = computed<any[]>(() => item.value?.MediaStreams ?? []);
 const videoStreams = computed(() => mediaStreams.value.filter(s => s.Type === 'Video'));
 const primaryVideo = computed(() => videoStreams.value[0] || null);
@@ -342,51 +316,45 @@ const videoCodec = computed(() => {
 const videoResolution = computed(() => {
     const w = primaryVideo.value?.Width;
     const h = primaryVideo.value?.Height;
-    return w && h ? `${w}×${h}` : null;
+    return w && h ? `${w}x${h}` : null;
 });
 
-// Liste détaillée de toutes les infos du flux vidéo
 const videoDetails = computed(() => {
     const v = primaryVideo.value;
     if (!v) return [];
-
     const entries: Array<{ label: string; value: string }> = [];
     const push = (label: string, val: any) => {
         if (val === null || val === undefined || val === '') return;
         entries.push({ label, value: String(val) });
     };
-
     push('Codec', v.Codec?.toUpperCase());
-    push('Profil', v.Profile);
-    push('Niveau', v.Level);
-    if (v.Width && v.Height) push('Résolution', `${v.Width}×${v.Height}`);
-    push('Ratio', v.AspectRatio);
-    push('Frame rate (moy.)', v.AverageFrameRate);
-    push('Frame rate (réel)', v.RealFrameRate);
-    push('Bitrate (vidéo)', v.BitRate);
-    push('Profondeur bits', v.BitDepth);
-    push('Ref frames', v.RefFrames);
-    push('Entrelacé', v.IsInterlaced);
+    push('Profile', v.Profile);
+    push('Level', v.Level);
+    if (v.Width && v.Height) push('Resolution', `${v.Width}x${v.Height}`);
+    push('Aspect Ratio', v.AspectRatio);
+    push('Avg Frame Rate', v.AverageFrameRate);
+    push('Real Frame Rate', v.RealFrameRate);
+    push('Bitrate (video)', v.BitRate);
+    push('Bit Depth', v.BitDepth);
+    push('Ref Frames', v.RefFrames);
+    push('Interlaced', v.IsInterlaced);
     push('IsAVC', v.IsAVC);
-    push('Pixel format', v.PixelFormat);
-    push('Espace couleur', v.ColorSpace);
-    push('Transfert', v.ColorTransfer);
-    push('Primaires', v.ColorPrimaries);
-    push('Plage vidéo', v.VideoRange);
-    push('Type HDR', v.VideoRangeType);
-    if (v.DvProfile != null) push('DoVi Profil', v.DvProfile);
-    if (v.DvLevel != null) push('DoVi Niveau', v.DvLevel);
+    push('Pixel Format', v.PixelFormat);
+    push('Color Space', v.ColorSpace);
+    push('Color Transfer', v.ColorTransfer);
+    push('Color Primaries', v.ColorPrimaries);
+    push('Video Range', v.VideoRange);
+    push('HDR Type', v.VideoRangeType);
+    if (v.DvProfile != null) push('DoVi Profile', v.DvProfile);
+    if (v.DvLevel != null) push('DoVi Level', v.DvLevel);
     if (v.DvVersionMajor != null) {
-        const dvVer = `${v.DvVersionMajor}.${v.DvVersionMinor ?? 0}`;
-        push('DoVi Version', dvVer);
+        push('DoVi Version', `${v.DvVersionMajor}.${v.DvVersionMinor ?? 0}`);
     }
-    push('Time base', v.TimeBase);
+    push('Time Base', v.TimeBase);
     push('Index', v.Index);
-
     return entries;
 });
 
-// Source
 const mediaSources = computed<any[]>(() => item.value?.MediaSources ?? []);
 const firstSource = computed(() => mediaSources.value[0] || null);
 
@@ -398,14 +366,12 @@ const sourceDetails = computed(() => {
         if (val === null || val === undefined || val === '') return;
         entries.push({ label, value: String(val) });
     };
-
     push('Container', s.Container);
-    push('Bitrate total', s.Bitrate);
-    push('Chemin', s.Path);
-    push('DirectPlay possible', s.SupportsDirectPlay);
-    push('Remux possible', s.SupportsDirectStream);
-    push('Transcode possible', s.SupportsTranscoding);
-
+    push('Total Bitrate', s.Bitrate);
+    push('Path', s.Path);
+    push('Direct Play', s.SupportsDirectPlay);
+    push('Remux', s.SupportsDirectStream);
+    push('Transcode', s.SupportsTranscoding);
     return entries;
 });
 
@@ -413,7 +379,6 @@ const fileSizeHuman = computed(() => {
     const size = firstSource.value?.Size as number | undefined;
     return formatBytes(size);
 });
-
 
 function canDownload(it: any): boolean {
     return it && ['Movie', 'Episode', 'Video', 'Audio', 'MusicAlbum'].includes(it.Type);
@@ -423,26 +388,17 @@ const isItemDownloaded = computed(() => {
     return offlineStore.isItemDownloaded(itemId.value);
 });
 
-// AJOUTER: Gérer le téléchargement
 async function handleDownload() {
     if (!item.value) return;
-
     try {
         isDownloading.value = true;
         downloadProgress.value = 0;
-
-        // Use downloadItemForOffline instead of downloadItem
         await store.downloadItemForOffline(itemId.value, (progress) => {
             downloadProgress.value = progress.percentage;
         });
-
-        // Refresh offline store to show downloaded badge
         await offlineStore.loadDownloads();
-
-        console.log('✅ Téléchargement pour usage hors ligne terminé');
     } catch (error: any) {
-        console.log(`❌ Erreur: ${error.message}`);
-        alert('Erreur lors du téléchargement');
+        alert('Download failed');
     } finally {
         isDownloading.value = false;
         downloadProgress.value = 0;
@@ -451,549 +407,19 @@ async function handleDownload() {
 
 async function deleteDownload() {
     if (!item.value) return;
-
-    if (!confirm(`Supprimer "${item.value.Name}" du stockage hors ligne ?`)) {
-        return;
-    }
-
+    if (!confirm(`Delete "${item.value.Name}" from offline storage?`)) return;
     try {
         await downloadService.deleteOfflineFile(itemId.value);
         await offlineStore.removeDownload(itemId.value);
-        console.log('✅ Téléchargement supprimé');
     } catch (error: any) {
-        console.error('❌ Erreur suppression:', error);
-        alert('Erreur lors de la suppression');
+        alert('Failed to delete');
     }
 }
 
-// AJOUTER: Annuler le téléchargement
 function cancelDownload() {
     if (!item.value) return;
     store.cancelDownload(itemId.value);
     isDownloading.value = false;
     downloadProgress.value = 0;
 }
-
 </script>
-
-<style scoped>
-.details-page {
-    min-height: 100vh;
-    background: #121212;
-    color: #e0e0e0;
-    padding: 20px;
-    display: flex;
-    flex-direction: column;
-}
-
-.details-header {
-    display: grid;
-    grid-template-columns: auto 1fr auto;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 20px;
-}
-
-.title {
-    margin: 0;
-    justify-self: center;
-    font-size: 1.8rem;
-    font-weight: 600;
-}
-
-.btn {
-    height: 36px;
-    padding: 0 14px;
-    border-radius: 8px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: transform .15s ease, background .2s ease, color .2s ease, border-color .2s ease;
-    border: 1px solid #2a2a2a;
-    color: #e0e0e0;
-    background: transparent;
-}
-
-.btn:hover {
-    background: #1f1f1f;
-    transform: translateY(-1px);
-}
-
-.btn.home {
-    text-decoration: none;
-    background: #131313;
-    border: 1px solid #2a2a2a;
-}
-
-.btn.play {
-    margin-top: 12px;
-    background: linear-gradient(90deg, #43e97b 0%, #38f9d7 100%);
-    color: #181818;
-    font-weight: bold;
-    border: none;
-    border-radius: 8px;
-    font-size: 1.05rem;
-}
-
-.btn.play:hover {
-    background: linear-gradient(90deg, #38f9d7 20%, #43e97b 100%);
-    transform: translateY(-1px) scale(1.02);
-}
-
-.state {
-    text-align: center;
-    padding: 40px 0;
-    font-size: 1.1rem;
-}
-
-.state.error {
-    color: #ff6b6b;
-}
-
-.details-card {
-    display: grid;
-    grid-template-columns: 300px 1fr;
-    gap: 24px;
-    background: #1e1e1e;
-    border: 1px solid #232323;
-    border-radius: 14px;
-    padding: 18px;
-    box-shadow: 0 10px 22px rgba(0, 0, 0, 0.35);
-}
-
-/* MODIFIER: Poster rectangulaire par défaut */
-.left .poster {
-    width: 300px;
-    height: 450px;
-    border-radius: 12px;
-    overflow: hidden;
-    background: #0f0f0f;
-    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.45);
-}
-
-/* AJOUTER: Poster carré pour les albums/audio */
-.left .poster.square {
-    width: 300px;
-    height: 300px;
-}
-
-.left .poster img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-.right .name {
-    font-size: 1.6rem;
-    font-weight: 700;
-    margin: 0 0 8px 0;
-    color: #f0f0f0;
-}
-
-.meta-line {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-bottom: 12px;
-}
-
-.chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-}
-
-.chip {
-    display: inline-flex;
-    align-items: center;
-    padding: 6px 10px;
-    border-radius: 999px;
-    background: #242424;
-    border: 1px solid #2a2a2a;
-    color: #dcdcdc;
-    font-size: 0.85rem;
-}
-
-.overview {
-    margin: 10px 0 16px 0;
-    line-height: 1.6;
-    color: #d7d7d7;
-}
-
-.section {
-    margin-top: 14px;
-}
-
-.section h4 {
-    margin: 0 0 8px 0;
-    font-size: 1.05rem;
-    color: #f3f3f3;
-}
-
-/* Saisons/Épisodes/Albums */
-.children-section {
-    margin-top: 24px;
-}
-
-.children-section h3 {
-    margin: 0 0 12px 0;
-    font-size: 1.3rem;
-    font-weight: 600;
-}
-
-.grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    gap: 16px;
-}
-
-.card {
-    cursor: pointer;
-    border-radius: 12px;
-    overflow: hidden;
-    background: #1e1e1e;
-    border: 1px solid #232323;
-    transition: transform 0.2s, border-color 0.2s;
-}
-
-.card:hover {
-    transform: translateY(-4px);
-    border-color: #38f9d7;
-}
-
-.card-poster {
-    width: 100%;
-    height: auto;
-    aspect-ratio: 2/3;
-    object-fit: cover;
-}
-
-.card-title {
-    padding: 8px;
-    text-align: center;
-    font-weight: 600;
-}
-
-.episodes-list {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
-.episode-card {
-    display: flex;
-    gap: 12px;
-    background: #1e1e1e;
-    border: 1px solid #232323;
-    border-radius: 12px;
-    padding: 12px;
-    cursor: pointer;
-    transition: transform 0.2s, border-color 0.2s;
-}
-
-.episode-card:hover {
-    transform: translateX(4px);
-    border-color: #38f9d7;
-}
-
-.episode-thumb {
-    width: 200px;
-    height: 112px;
-    object-fit: cover;
-    border-radius: 8px;
-}
-
-.episode-info {
-    flex: 1;
-}
-
-.episode-title {
-    font-weight: 600;
-    margin-bottom: 6px;
-}
-
-.episode-overview {
-    color: #9aa0a6;
-    font-size: 0.9rem;
-    line-height: 1.4;
-}
-
-/* Pistes audio */
-.tracks-list {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-
-.track-card {
-    display: grid;
-    grid-template-columns: 40px 1fr 60px;
-    gap: 12px;
-    align-items: center;
-    background: #1e1e1e;
-    border: 1px solid #232323;
-    border-radius: 8px;
-    padding: 10px 14px;
-    cursor: pointer;
-    transition: transform 0.15s, border-color 0.2s, background 0.2s;
-}
-
-.track-card:hover {
-    transform: translateX(4px);
-    border-color: #38f9d7;
-    background: #242424;
-}
-
-.track-card.playing {
-    border-color: #00a4dc;
-    background: rgba(0, 164, 220, 0.1);
-}
-
-.track-card.playing .track-title {
-    color: #00a4dc;
-}
-
-.track-number {
-    text-align: center;
-    color: #9aa0a6;
-    font-weight: 600;
-    font-size: 0.95rem;
-}
-
-.track-info {
-    flex: 1;
-    min-width: 0;
-}
-
-.track-title {
-    font-weight: 600;
-    color: #f0f0f0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.track-artist {
-    color: #9aa0a6;
-    font-size: 0.85rem;
-    margin-top: 2px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.track-duration {
-    text-align: right;
-    color: #9aa0a6;
-    font-size: 0.9rem;
-    font-variant-numeric: tabular-nums;
-}
-
-/* Cast horizontal scroller */
-.cast-scroller {
-    margin-top: 22px;
-}
-
-.scroller-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 12px;
-}
-
-.scroller-header h3 {
-    margin: 0;
-    font-size: 1.3rem;
-    font-weight: 600;
-}
-
-.controls {
-    display: flex;
-    gap: 8px;
-}
-
-.scroller-rail {
-    display: grid;
-    grid-auto-flow: column;
-    grid-auto-columns: minmax(140px, 160px);
-    gap: 12px;
-    overflow-x: auto;
-    overflow-y: hidden;
-    overscroll-behavior-x: contain;
-    scroll-snap-type: x proximity;
-    scroll-behavior: smooth;
-    padding-bottom: 6px;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-}
-
-.scroller-rail::-webkit-scrollbar {
-    display: none;
-}
-
-.scroller-item {
-    background: #1e1e1e;
-    border: 1px solid #232323;
-    border-radius: 12px;
-    padding: 10px;
-    text-align: center;
-    scroll-snap-align: center;
-    transition: transform .2s ease, background .2s ease, border-color .2s ease;
-}
-
-.scroller-item:hover {
-    transform: translateY(-3px);
-    background: #242424;
-    border-color: #2c2c2c;
-}
-
-.avatar {
-    width: 110px;
-    aspect-ratio: 1 / 1;
-    margin: 0 auto 10px auto;
-    border-radius: 50%;
-    overflow: hidden;
-    background: #0f0f0f;
-    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.35);
-    display: grid;
-    place-items: center;
-}
-
-.avatar img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    object-position: center;
-    display: block;
-}
-
-.cast-meta .cast-name {
-    font-weight: 600;
-    color: #f0f0f0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.cast-meta .cast-role {
-    margin-top: 4px;
-    color: #9aa0a6;
-    font-size: 0.85rem;
-}
-
-/* Tech sections */
-.tech-section {
-    margin-top: 22px;
-}
-
-.tech-section h3 {
-    margin: 0 0 10px 0;
-    font-size: 1.2rem;
-    font-weight: 600;
-}
-
-.kv {
-    display: grid;
-    grid-template-columns: 180px 1fr;
-    gap: 6px 14px;
-    align-items: center;
-}
-
-.kv dt {
-    color: #9aa0a6;
-    font-weight: 600;
-}
-
-.kv dd {
-    margin: 0;
-    color: #e0e0e0;
-    overflow-wrap: anywhere;
-}
-
-/* Responsive */
-@media (max-width: 880px) {
-    .details-card {
-        grid-template-columns: 1fr;
-    }
-
-    .left .poster {
-        width: 220px;
-        height: 330px;
-        margin: 0 auto;
-    }
-
-    /* AJOUTER: Poster carré responsive */
-    .left .poster.square {
-        width: 220px;
-        height: 220px;
-    }
-}
-
-.btn.download {
-    margin-top: 12px;
-    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-    color: #fff;
-    font-weight: bold;
-    border: none;
-    border-radius: 8px;
-    font-size: 1.05rem;
-    transition: all 0.3s ease;
-    margin-left: 5px;
-}
-
-.btn.download:hover:not(:disabled) {
-    background: linear-gradient(90deg, #764ba2 0%, #667eea 100%);
-    transform: translateY(-1px) scale(1.02);
-}
-
-.btn.download:disabled {
-    opacity: 0.7;
-    cursor: not-allowed;
-}
-
-.btn.downloaded {
-    margin-top: 12px;
-    background: #38f9d7;
-    color: #121212;
-    font-weight: bold;
-    border: none;
-    border-radius: 8px;
-    font-size: 1.05rem;
-    transition: all 0.3s ease;
-    margin-left: 5px;
-}
-
-.btn.downloaded:hover {
-    background: #ff4c4c;
-    color: #fff;
-    transform: translateY(-1px) scale(1.02);
-}
-
-.btn.downloading {
-    margin-top: 12px;
-    background: #1a5f7a;
-    color: #fff;
-    font-weight: bold;
-    border: none;
-    border-radius: 8px;
-    font-size: 1.05rem;
-    margin-left: 5px;
-    opacity: 0.9;
-    cursor: wait;
-}
-
-.btn.cancel {
-    margin-top: 8px;
-    background: #ff4c4c;
-    color: #fff;
-    font-weight: 600;
-    border: none;
-    border-radius: 8px;
-    font-size: 0.95rem;
-}
-
-.btn.cancel:hover {
-    background: #ff3333;
-    transform: translateY(-1px);
-}
-</style>

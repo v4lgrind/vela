@@ -56,7 +56,7 @@
         <Volume2 v-if="audioStore.volume > 50" class="size-5 text-text-muted shrink-0" />
         <Volume1 v-else-if="audioStore.volume > 0" class="size-5 text-text-muted shrink-0" />
         <VolumeX v-else class="size-5 text-text-muted shrink-0" />
-        <Slider :model-value="[audioStore.volume]" :max="100" :step="1" class="flex-1" @update:model-value="(v: number[]) => audioStore.setVolume(v[0])" />
+        <Slider :model-value="[audioStore.volume]" :max="100" :step="1" class="flex-1" @update:model-value="(v?: number[]) => v && audioStore.setVolume(v[0])" />
       </div>
     </div>
 

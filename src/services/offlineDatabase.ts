@@ -398,7 +398,6 @@ class OfflineDatabase {
       const request = index.getAll();
 
       request.onsuccess = () => {
-        console.log(request.result)
         resolve(request.result || []);
       };
 

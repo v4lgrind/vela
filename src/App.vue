@@ -44,13 +44,7 @@ onMounted(async () => {
       if (route.path === "/" || !canGoBack) {
         CapacitorApp.exitApp();
       } else {
-        if (route.path.includes("workout/")) {
-          if (window.confirm("Are you sure you want to quit this workout?")) {
-            router.back();
-          }
-        } else {
-          router.back();
-        }
+        router.back();
       }
     });
   }

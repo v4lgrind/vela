@@ -30,7 +30,6 @@
     "lucide-vue-next": "^0.564.0",
     "pinia": "^3.0.3",
     "pinia-plugin-persistedstate": "^4.5.0",
-    "radix-vue": "^1.9.17",
     "reka-ui": "^2.8.0",
     "shaka-player": "^4.16.7",
     "tailwind-merge": "^3.4.1",

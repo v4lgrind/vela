@@ -71,6 +71,7 @@ async function onSubmit() {
 
     router.push({ name: 'libraries' })
   } catch (e) {
+    error.value = e instanceof Error ? e.message : 'Login failed. Please check your credentials.'
     loading.value = false
   }
 }

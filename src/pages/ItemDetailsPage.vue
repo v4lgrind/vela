@@ -3,16 +3,16 @@
         <section v-if="loading" class="text-center py-10 text-lg text-text-muted">Loading...</section>
         <section v-else-if="error" class="text-center py-10 text-lg text-error">{{ error }}</section>
 
-        <Card v-else class="bg-surface-raised border-border-default rounded-[14px] p-4.5 shadow-xl grid grid-cols-[300px_1fr] max-md:grid-cols-1 gap-6">
+        <Card v-else class="bg-surface-raised border-border-default rounded-xl p-4 shadow-lg grid grid-cols-[200px_1fr] max-md:grid-cols-1 gap-4">
             <div>
-                <div class="rounded-xl overflow-hidden bg-black/60 shadow-lg mx-auto"
-                    :class="isAudioType(item.Type) ? 'w-[300px] h-[300px] max-md:w-[220px] max-md:h-[220px]' : 'w-[300px] h-[450px] max-md:w-[220px] max-md:h-[330px]'">
+                <div class="rounded-lg overflow-hidden bg-black/60 shadow-md mx-auto"
+                    :class="isAudioType(item.Type) ? 'w-[200px] h-[200px] max-md:w-[160px] max-md:h-[160px]' : 'w-[200px] h-[300px] max-md:w-[160px] max-md:h-[240px]'">
                     <LazyImg :src="posterUrl" :alt="item?.Name" :item-type="item?.Type" class="w-full h-full object-cover" />
                 </div>
             </div>
 
             <div>
-                <h3 class="text-2xl font-bold text-text-heading m-0 mb-2">{{ item?.Name }}</h3>
+                <h3 class="text-xl font-bold text-text-heading m-0 mb-2">{{ item?.Name }}</h3>
 
                 <Button v-if="isPlayable(item)" class="mt-3 bg-gradient-to-r from-accent-green to-accent-teal text-surface-raised font-bold" @click="playMedia">
                     <Play class="size-4 mr-1 fill-current stroke-none" /> Play
@@ -38,7 +38,7 @@
                     <X class="size-4 mr-1" /> Cancel
                 </Button>
 
-                <div class="flex flex-wrap gap-2 mb-3 mt-3">
+                <div class="flex flex-wrap gap-2 mb-2 mt-2">
                     <Badge v-if="year" variant="secondary">{{ year }}</Badge>
                     <Badge v-if="duration" variant="secondary">{{ duration }}</Badge>
                     <Badge v-if="item?.CommunityRating" variant="secondary">Rating: {{ item.CommunityRating }}</Badge>
@@ -47,26 +47,26 @@
                     <Badge v-if="videoResolution" variant="secondary">{{ videoResolution }}</Badge>
                 </div>
 
-                <p v-if="item?.Overview" class="my-2.5 leading-relaxed text-text-primary/85">
+                <p v-if="item?.Overview" class="my-2 leading-relaxed text-sm text-text-primary/85">
                     {{ item.Overview }}
                 </p>
 
-                <div v-if="genres?.length" class="mt-3.5">
-                    <h4 class="text-base font-semibold text-text-bright m-0 mb-2">Genres</h4>
+                <div v-if="genres?.length" class="mt-3">
+                    <h4 class="text-sm font-semibold text-text-bright m-0 mb-1.5">Genres</h4>
                     <div class="flex flex-wrap gap-2">
                         <Badge v-for="g in genres" :key="g" variant="secondary">{{ g }}</Badge>
                     </div>
                 </div>
 
-                <div v-if="directorNames?.length" class="mt-3.5">
-                    <h4 class="text-base font-semibold text-text-bright m-0 mb-2">Director</h4>
+                <div v-if="directorNames?.length" class="mt-3">
+                    <h4 class="text-sm font-semibold text-text-bright m-0 mb-1.5">Director</h4>
                     <div class="flex flex-wrap gap-2">
                         <Badge v-for="d in directorNames" :key="d" variant="secondary">{{ d }}</Badge>
                     </div>
                 </div>
 
-                <div v-if="studioNames?.length" class="mt-3.5">
-                    <h4 class="text-base font-semibold text-text-bright m-0 mb-2">Studios</h4>
+                <div v-if="studioNames?.length" class="mt-3">
+                    <h4 class="text-sm font-semibold text-text-bright m-0 mb-1.5">Studios</h4>
                     <div class="flex flex-wrap gap-2">
                         <Badge v-for="s in studioNames" :key="s" variant="secondary">{{ s }}</Badge>
                     </div>
@@ -90,12 +90,28 @@
         <section v-if="item?.Type === 'Season' && episodes.length" class="mt-6">
             <h3 class="text-xl font-semibold mb-3">Episodes</h3>
             <div class="flex flex-col gap-3">
-                <Card v-for="ep in episodes" :key="ep.Id" class="bg-surface-raised border-border-default flex gap-3 p-3 cursor-pointer hover:translate-x-1 hover:border-accent-purple transition-all duration-200" @click="goToItem(ep.Id)">
-                    <LazyImg :src="getImageUrl(ep.Id, 'Primary', 200, 112)" :alt="ep.Name" item-type="Episode"
-                        class="w-[200px] h-[112px] object-cover rounded-lg shrink-0" />
-                    <div class="flex-1">
-                        <div class="font-semibold mb-1.5">{{ ep.IndexNumber }}. {{ ep.Name }}</div>
-                        <div class="text-text-muted text-sm leading-snug">{{ ep.Overview }}</div>
+                <Card v-for="ep in episodes" :key="ep.Id" class="bg-surface-raised border-border-default flex gap-4 p-4 cursor-pointer hover:translate-x-1 hover:border-accent-purple transition-all duration-200" @click="goToItem(ep.Id)">
+                    <LazyImg :src="getImageUrl(ep.Id, 'Primary', 240, 135)" :alt="ep.Name" item-type="Episode"
+                        class="w-[240px] h-[135px] object-cover rounded-lg shrink-0" />
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-start justify-between gap-3 mb-2">
+                            <h4 class="font-bold text-lg text-text-heading m-0">{{ ep.IndexNumber }}. {{ ep.Name }}</h4>
+                            <Badge v-if="ep.RunTimeTicks" variant="secondary" class="shrink-0">{{ formatTicksDuration(ep.RunTimeTicks) }}</Badge>
+                        </div>
+                        <p v-if="ep.Overview" class="text-text-primary text-sm leading-relaxed mb-0">
+                            {{ ep.Overview }}
+                        </p>
+                        <p v-else class="text-text-muted text-sm italic mb-0">
+                            No synopsis available
+                        </p>
+                        <div v-if="ep.CommunityRating || ep.PremiereDate" class="flex gap-2 mt-2">
+                            <Badge v-if="ep.CommunityRating" variant="secondary" class="text-xs">
+                                ⭐ {{ ep.CommunityRating.toFixed(1) }}
+                            </Badge>
+                            <Badge v-if="ep.PremiereDate" variant="secondary" class="text-xs">
+                                {{ new Date(ep.PremiereDate).getFullYear() }}
+                            </Badge>
+                        </div>
                     </div>
                 </Card>
             </div>

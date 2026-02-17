@@ -4,6 +4,8 @@ import {
   getLibraryApi,
   getItemsApi,
   getUserLibraryApi,
+  getPlaystateApi,
+  getTvShowsApi,
 } from "@jellyfin/sdk/lib/utils/api";
 import { downloadService } from "../services/downloadService";
 
@@ -71,23 +73,52 @@ export const useJellyfinStore = defineStore("jellyfin", {
       options?: {
         startIndex?: number;
         limit?: number;
+        sortBy?: string[];
+        sortOrder?: string[];
+        filters?: string[];
+        genres?: string[];
       }
     ) {
       this.initializeApi();
 
+      const apiParams: any = {
+        userId: this.userId,
+        parentId: libraryId,
+        recursive: true,
+        includeItemTypes: ["Movie", "Series", "MusicAlbum", "BoxSet"] as any,
+        sortBy: (options?.sortBy ?? ["SortName"]) as any,
+        sortOrder: (options?.sortOrder ?? ["Ascending"]) as any,
+        startIndex: options?.startIndex ?? 0,
+        limit: options?.limit ?? 48,
+        filters: options?.filters as any,
+        genres: options?.genres as any,
+      };
+
+      const resp = await getItemsApi(this.api).getItems(apiParams);
+      this.items = resp.data.Items || [];
+      return this.items;
+    },
+
+    async fetchGenres(libraryId: string) {
+      this.initializeApi();
       const resp = await getItemsApi(this.api).getItems({
         userId: this.userId,
         parentId: libraryId,
         recursive: true,
-        includeItemTypes: ["Movie", "Series", "MusicAlbum", "BoxSet"],
-        // Optionnel: tri et pagination
-        sortBy: ["SortName"],
-        sortOrder: ["Ascending"],
-        startIndex: options?.startIndex ?? 0,
-        limit: options?.limit ?? 48,
+        includeItemTypes: ["Movie", "Series", "MusicAlbum", "BoxSet"] as any,
+        fields: ["Genres"] as any,
+        limit: 1000,
       });
-      this.items = resp.data.Items || [];
-      return this.items;
+
+      // Extract unique genres from all items
+      const genresSet = new Set<string>();
+      resp.data.Items?.forEach((item: any) => {
+        if (item.Genres) {
+          item.Genres.forEach((genre: string) => genresSet.add(genre));
+        }
+      });
+
+      return Array.from(genresSet).sort();
     },
     getImageUrl(
       itemId: string,
@@ -146,6 +177,19 @@ export const useJellyfinStore = defineStore("jellyfin", {
       return resp.data.Items ?? [];
     },
 
+    async fetchResumeItems(limit = 12) {
+      this.initializeApi();
+      const resp = await getItemsApi(this.api).getResumeItems({
+        userId: this.userId!,
+        limit,
+        fields: ["Overview", "UserData", "SeriesInfo", "ParentId"] as any,
+        includeItemTypes: ["Movie", "Episode"] as any,
+        enableImageTypes: ["Backdrop", "Primary", "Thumb"] as any,
+        imageTypeLimit: 1,
+      });
+      return resp.data.Items ?? [];
+    },
+
     async fetchSeasons(seriesId: string) {
       this.initializeApi();
       const resp = await getItemsApi(this.api).getItems({
@@ -166,9 +210,62 @@ export const useJellyfinStore = defineStore("jellyfin", {
         includeItemTypes: ["Episode"] as any,
         sortBy: ["SortName"],
         sortOrder: ["Ascending"],
-        fields: ["Overview", "PrimaryImageAspectRatio", "CommunityRating", "PremiereDate"] as any,
+        fields: ["Overview", "PrimaryImageAspectRatio", "CommunityRating", "PremiereDate", "UserData"] as any,
       });
       return resp.data.Items ?? [];
+    },
+
+    async markPlayed(itemId: string) {
+      this.initializeApi();
+      await getPlaystateApi(this.api).markPlayedItem({
+        itemId,
+        userId: this.userId!,
+      });
+    },
+
+    async markUnplayed(itemId: string) {
+      this.initializeApi();
+      await getPlaystateApi(this.api).markUnplayedItem({
+        itemId,
+        userId: this.userId!,
+      });
+    },
+
+    async fetchNextUp(seriesId: string) {
+      this.initializeApi();
+      const resp = await getTvShowsApi(this.api).getNextUp({
+        userId: this.userId,
+        seriesId,
+        limit: 1,
+      });
+      return resp.data.Items?.[0] ?? null;
+    },
+
+    async fetchFirstUnwatchedEpisode(seasonId: string) {
+      this.initializeApi();
+      const resp = await getItemsApi(this.api).getItems({
+        userId: this.userId,
+        parentId: seasonId,
+        includeItemTypes: ["Episode"] as any,
+        sortBy: ["IndexNumber"],
+        sortOrder: ["Ascending"],
+        filters: ["IsUnplayed"] as any,
+        limit: 1,
+      });
+      return resp.data.Items?.[0] ?? null;
+    },
+
+    async fetchFirstEpisode(seasonId: string) {
+      this.initializeApi();
+      const resp = await getItemsApi(this.api).getItems({
+        userId: this.userId,
+        parentId: seasonId,
+        includeItemTypes: ["Episode"] as any,
+        sortBy: ["IndexNumber"],
+        sortOrder: ["Ascending"],
+        limit: 1,
+      });
+      return resp.data.Items?.[0] ?? null;
     },
 
     async fetchAudioTracks(albumId: string) {
@@ -305,7 +402,7 @@ function generatePlaceholderImage(type: string = "default"): string {
 
     audio: `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 140 140'%3E%3Crect fill='%231e1e1e' width='140' height='140'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-size='40' fill='%2343e97b' font-family='Arial'%3E🎵%3C/text%3E%3Ctext x='50%25' y='75%25' dominant-baseline='middle' text-anchor='middle' font-size='12' fill='%239aa0a6' font-family='Arial'%3ENo Image%3C/text%3E%3C/svg%3E`,
 
-    person: `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 140 140'%3E%3Crect fill='%231e1e1e' width='140' height='140'/%3E%3Ccircle cx='70' cy='40' r='20' fill='%9aa0a6'/%3E%3Cpath d='M 50 65 Q 50 55 70 55 Q 90 55 90 65 L 90 110 Q 90 120 70 120 Q 50 120 50 110 Z' fill='%9aa0a6'/%3E%3C/svg%3E`,
+    person: `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 140 210'%3E%3Crect fill='%231e1e1e' width='140' height='210'/%3E%3Ccircle cx='70' cy='65' r='28' fill='%239aa0a6'/%3E%3Cellipse cx='70' cy='145' rx='40' ry='35' fill='%239aa0a6'/%3E%3C/svg%3E`,
 
     default: `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 450'%3E%3Crect fill='%231e1e1e' width='300' height='450'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-size='48' fill='%239aa0a6' font-family='Arial'%3E❓%3C/text%3E%3Ctext x='50%25' y='70%25' dominant-baseline='middle' text-anchor='middle' font-size='18' fill='%239aa0a6' font-family='Arial'%3ENo Image%3C/text%3E%3C/svg%3E`,
   };

@@ -14,34 +14,38 @@
             <div>
                 <h3 class="text-xl font-bold text-text-heading m-0 mb-2">{{ item?.Name }}</h3>
 
-                <Button v-if="isPlayable(item)" class="mt-3 bg-gradient-to-r from-accent-green to-accent-teal text-surface-raised font-bold" @click="playMedia">
+                <div class="flex flex-wrap gap-2 mt-3">
+                <Button v-if="isPlayable(item)" class="bg-gradient-to-r from-accent-green to-accent-teal text-surface-raised font-bold min-h-[44px]" @click="playMedia">
                     <Play class="size-4 mr-1 fill-current stroke-none" /> Play
                 </Button>
 
-                <Button v-if="item.Type === 'MusicAlbum' && audioTracks.length" class="mt-3 bg-gradient-to-r from-accent-green to-accent-teal text-surface-raised font-bold" @click="playAlbum">
+                <Button v-if="item.Type === 'MusicAlbum' && audioTracks.length" class="bg-gradient-to-r from-accent-green to-accent-teal text-surface-raised font-bold min-h-[44px]" @click="playAlbum">
                     <Play class="size-4 mr-1 fill-current stroke-none" /> Play album
                 </Button>
 
-                <Button v-if="isItemDownloaded && !isDownloading" class="mt-3 ml-1 bg-accent-purple text-white hover:bg-error-dark" @click="deleteDownload">
+                <Button v-if="isItemDownloaded && !isDownloading" class="bg-accent-purple text-white hover:bg-error-dark min-h-[44px]" @click="deleteDownload">
                     <Check class="size-4 mr-1" /> Downloaded - Remove
                 </Button>
 
-                <Button v-else-if="canDownload(item) && !isItemDownloaded && !isDownloading" class="mt-3 ml-1 bg-gradient-to-r from-[#667eea] to-[#764ba2] text-white font-bold" @click="handleDownload">
-                    <DownloadIcon class="size-4 mr-1" /> Download for offline
+                <Button v-else-if="canDownload(item) && !isItemDownloaded && !isDownloading" class="bg-gradient-to-r from-[#667eea] to-[#764ba2] text-white font-bold min-h-[44px]" @click="handleDownload">
+                    <DownloadIcon class="size-4 mr-1" /> Download
                 </Button>
 
-                <Button v-if="isDownloading" class="mt-3 ml-1 bg-[#1a5f7a] text-white font-bold cursor-wait" disabled>
+                <Button v-if="isDownloading" class="bg-[#1a5f7a] text-white font-bold cursor-wait min-h-[44px]" disabled>
                     Downloading... {{ downloadProgress }}%
                 </Button>
 
-                <Button v-if="isDownloading" variant="destructive" class="mt-2" @click="cancelDownload">
+                <Button v-if="isDownloading" variant="destructive" class="min-h-[44px]" @click="cancelDownload">
                     <X class="size-4 mr-1" /> Cancel
                 </Button>
+                </div>
 
                 <div class="flex flex-wrap gap-2 mb-2 mt-2">
                     <Badge v-if="year" variant="secondary">{{ year }}</Badge>
+                    <Badge v-if="item?.Type === 'Season' && episodes.length" variant="secondary">{{ episodes.length }} Episodes</Badge>
                     <Badge v-if="duration" variant="secondary">{{ duration }}</Badge>
-                    <Badge v-if="item?.CommunityRating" variant="secondary">Rating: {{ item.CommunityRating }}</Badge>
+                    <Badge v-if="item?.CommunityRating" variant="secondary">⭐ {{ item.CommunityRating.toFixed(1) }}</Badge>
+                    <Badge v-if="item?.Type === 'Season' && item?.PremiereDate" variant="secondary">Aired: {{ new Date(item.PremiereDate).getFullYear() }}</Badge>
                     <Badge v-if="typeLabel" variant="secondary">{{ typeLabel }}</Badge>
                     <Badge v-if="videoCodec" variant="secondary">Codec: {{ videoCodec }}</Badge>
                     <Badge v-if="videoResolution" variant="secondary">{{ videoResolution }}</Badge>
@@ -79,8 +83,25 @@
             <h3 class="text-xl font-semibold mb-3">Seasons</h3>
             <div class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-4">
                 <Card v-for="season in seasons" :key="season.Id" class="bg-surface-raised border-border-default cursor-pointer overflow-hidden hover:-translate-y-1 hover:border-accent-purple transition-all duration-200" @click="goToItem(season.Id)">
-                    <LazyImg :src="getImageUrl(season.Id, 'Primary', 300, 450)" :alt="season.Name" item-type="Season"
-                        class="w-full aspect-[2/3] object-cover" />
+                    <div class="relative group w-full aspect-[2/3] overflow-hidden">
+                        <LazyImg :src="getImageUrl(season.Id, 'Primary', 300, 450)" :alt="season.Name" item-type="Season"
+                            class="w-full h-full object-cover" />
+                        <!-- watched badge -->
+                        <div v-if="season.UserData?.UnplayedItemCount === 0 && season.UserData?.PlayCount > 0"
+                            class="absolute top-1.5 right-1.5 bg-accent-purple rounded-full p-0.5 shadow pointer-events-none">
+                            <Check class="size-3 text-white" />
+                        </div>
+                        <!-- overlay: always visible on mobile, hover-only on desktop -->
+                        <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent flex items-end justify-center gap-2 pb-2 transition-opacity duration-200 sm:opacity-0 sm:group-hover:opacity-100 pointer-events-none">
+                            <button @click.stop="playNextInSeason(season)"
+                                :disabled="playingSeasonId === season.Id"
+                                class="bg-white/90 hover:bg-white text-black rounded-full p-2 shadow-lg transition-all hover:scale-110 disabled:opacity-60 pointer-events-auto"
+                                title="Play next episode">
+                                <Loader2 v-if="playingSeasonId === season.Id" class="size-4 animate-spin" />
+                                <Play v-else class="size-4 fill-black stroke-none" />
+                            </button>
+                        </div>
+                    </div>
                     <div class="p-2 text-center font-semibold">{{ season.Name }}</div>
                 </Card>
             </div>
@@ -90,21 +111,46 @@
         <section v-if="item?.Type === 'Season' && episodes.length" class="mt-6">
             <h3 class="text-xl font-semibold mb-3">Episodes</h3>
             <div class="flex flex-col gap-3">
-                <Card v-for="ep in episodes" :key="ep.Id" class="bg-surface-raised border-border-default flex gap-4 p-4 cursor-pointer hover:translate-x-1 hover:border-accent-purple transition-all duration-200" @click="goToItem(ep.Id)">
-                    <LazyImg :src="getImageUrl(ep.Id, 'Primary', 240, 135)" :alt="ep.Name" item-type="Episode"
-                        class="w-[240px] h-[135px] object-cover rounded-lg shrink-0" />
-                    <div class="flex-1 min-w-0">
-                        <div class="flex items-start justify-between gap-3 mb-2">
-                            <h4 class="font-bold text-lg text-text-heading m-0">{{ ep.IndexNumber }}. {{ ep.Name }}</h4>
-                            <Badge v-if="ep.RunTimeTicks" variant="secondary" class="shrink-0">{{ formatTicksDuration(ep.RunTimeTicks) }}</Badge>
+                <Card v-for="ep in episodes" :key="ep.Id"
+                    class="bg-surface-raised border-border-default flex gap-3 p-3 sm:gap-4 sm:p-4 cursor-pointer hover:translate-x-1 transition-all duration-200"
+                    :class="ep.UserData?.Played ? 'opacity-60 hover:opacity-100 border-border-default' : 'hover:border-accent-purple'"
+                    @click="goToItem(ep.Id)">
+                    <!-- Thumbnail with play overlay -->
+                    <div class="relative group w-[100px] h-[56px] sm:w-[180px] sm:h-[101px] md:w-[240px] md:h-[135px] rounded-lg overflow-hidden shrink-0">
+                        <LazyImg :src="getImageUrl(ep.Id, 'Primary', 240, 135)" :alt="ep.Name" item-type="Episode"
+                            class="w-full h-full object-cover" />
+                        <!-- Always visible on mobile, hover-only on desktop -->
+                        <div class="absolute inset-0 bg-black/50 flex items-center justify-center sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+                            <button @click.stop="playEpisode(ep)"
+                                class="bg-white/90 hover:bg-white text-black rounded-full p-2 sm:p-2.5 shadow-lg transition-all active:scale-95 pointer-events-auto"
+                                title="Play episode">
+                                <Play class="size-4 sm:size-5 fill-black stroke-none" />
+                            </button>
                         </div>
-                        <p v-if="ep.Overview" class="text-text-primary text-sm leading-relaxed mb-0">
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-start justify-between gap-2 mb-1.5">
+                            <h4 class="font-bold text-sm sm:text-lg text-text-heading m-0 leading-snug">{{ ep.IndexNumber }}. {{ ep.Name }}</h4>
+                            <div class="flex items-center gap-1.5 shrink-0">
+                                <Badge v-if="ep.RunTimeTicks" variant="secondary" class="text-xs hidden sm:inline-flex">{{ formatTicksDuration(ep.RunTimeTicks) }}</Badge>
+                                <!-- Watched toggle -->
+                                <button @click.stop="toggleWatchedEpisode(ep)"
+                                    :disabled="watchingEpId === ep.Id"
+                                    class="rounded-full p-2 transition-all active:scale-95 disabled:opacity-50"
+                                    :class="ep.UserData?.Played ? 'bg-accent-purple text-white' : 'bg-surface-hover text-text-muted hover:text-white hover:bg-accent-purple'"
+                                    :title="ep.UserData?.Played ? 'Mark as unwatched' : 'Mark as watched'">
+                                    <Check class="size-4" />
+                                </button>
+                            </div>
+                        </div>
+                        <p v-if="ep.Overview" class="text-text-primary text-xs sm:text-sm leading-relaxed mb-0 line-clamp-2 sm:line-clamp-none">
                             {{ ep.Overview }}
                         </p>
-                        <p v-else class="text-text-muted text-sm italic mb-0">
+                        <p v-else class="text-text-muted text-xs sm:text-sm italic mb-0">
                             No synopsis available
                         </p>
-                        <div v-if="ep.CommunityRating || ep.PremiereDate" class="flex gap-2 mt-2">
+                        <div v-if="ep.CommunityRating || ep.PremiereDate || ep.RunTimeTicks" class="flex gap-2 mt-1.5">
+                            <Badge v-if="ep.RunTimeTicks" variant="secondary" class="text-xs sm:hidden">{{ formatTicksDuration(ep.RunTimeTicks) }}</Badge>
                             <Badge v-if="ep.CommunityRating" variant="secondary" class="text-xs">
                                 ⭐ {{ ep.CommunityRating.toFixed(1) }}
                             </Badge>
@@ -146,8 +192,8 @@
             </div>
             <div ref="castRail" class="grid grid-flow-col auto-cols-[minmax(140px,160px)] gap-3 overflow-x-auto overflow-y-hidden overscroll-x-contain snap-x snap-proximity scroll-smooth pb-1.5 scrollbar-hide" role="list">
                 <Card v-for="p in cast" :key="p.Id || p.Name" class="bg-surface-raised border-border-default p-2.5 text-center snap-center hover:-translate-y-1 hover:bg-surface-hover hover:border-border-hover transition-all duration-200" role="listitem" :title="p.Name">
-                    <div class="size-[110px] mx-auto mb-2.5 rounded-full overflow-hidden bg-black/60 shadow-lg grid place-items-center">
-                        <LazyImg :src="personImageUrl(p)" :alt="p.Name" item-type="person" class="w-full h-full object-cover" />
+                    <div class="w-full aspect-[2/3] rounded-lg overflow-hidden bg-black/60 shadow-lg mb-2.5">
+                        <LazyImg :src="personImageUrl(p)" :alt="p.Name" item-type="person" class="w-full h-full object-cover object-top" />
                     </div>
                     <div class="font-semibold text-text-heading truncate">{{ p.Name }}</div>
                     <div v-if="p.Role" class="text-text-muted text-sm mt-1">{{ p.Role }}</div>
@@ -194,7 +240,7 @@ import { isAudioType, typeLabel as getTypeLabel, formatTicksDuration, formatTick
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Play, Check, Download as DownloadIcon, X, ArrowLeft, ArrowRight } from 'lucide-vue-next';
+import { Play, Check, Download as DownloadIcon, X, ArrowLeft, ArrowRight, Loader2 } from 'lucide-vue-next';
 
 const store = useJellyfinStore();
 const offlineStore = useOfflineStore();
@@ -214,6 +260,8 @@ const accessToken = store.accessToken;
 
 const isDownloading = ref(false);
 const downloadProgress = ref(0);
+const playingSeasonId = ref<string | null>(null);
+const watchingEpId = ref<string | null>(null);
 
 async function load() {
     loading.value = true;
@@ -255,15 +303,15 @@ const duration = computed(() => formatTicksHuman(item.value?.RunTimeTicks));
 const genres = computed<string[]>(() => item.value?.Genres || []);
 const typeLabel = computed(() => getTypeLabel(item.value?.Type));
 
-type Person = { Id?: string; Name: string; Role?: string; Type?: string };
+type Person = { Id?: string; Name: string; Role?: string; Type?: string; PrimaryImageTag?: string };
 const people = computed<Person[]>(() => item.value?.People || []);
 const directorNames = computed(() => people.value.filter(p => p.Type === 'Director').map(p => p.Name));
 const cast = computed<Person[]>(() => people.value.filter(p => p.Type === 'Actor'));
 const studioNames = computed(() => (item.value?.Studios || []).map((s: any) => s.Name).filter(Boolean));
 
 function personImageUrl(p: Person) {
-    if (!p?.Id) return '';
-    return store.getImageUrl(p.Id, 'Primary', 140) || '';
+    if (!p?.Id || !p.PrimaryImageTag) return '';
+    return store.getImageUrl(p.Id, 'Primary', 220) || '';
 }
 
 function isPlayable(it: any) {
@@ -282,6 +330,43 @@ function playMedia() {
 
 function goToItem(id: string) {
     router.push({ name: 'ItemDetails', params: { id } });
+}
+
+async function playNextInSeason(season: any) {
+    if (playingSeasonId.value) return;
+    playingSeasonId.value = season.Id;
+    try {
+        const hasUnwatched = season.UserData?.UnplayedItemCount == null || season.UserData.UnplayedItemCount > 0;
+        const ep = hasUnwatched
+            ? await store.fetchFirstUnwatchedEpisode(season.Id)
+            : await store.fetchFirstEpisode(season.Id);
+        if (ep) {
+            router.push({ name: 'Player', params: { id: ep.Id } });
+        }
+    } finally {
+        playingSeasonId.value = null;
+    }
+}
+
+function playEpisode(ep: any) {
+    router.push({ name: 'Player', params: { id: ep.Id } });
+}
+
+async function toggleWatchedEpisode(ep: any) {
+    if (watchingEpId.value) return;
+    watchingEpId.value = ep.Id;
+    try {
+        if (ep.UserData?.Played) {
+            await store.markUnplayed(ep.Id);
+            if (ep.UserData) ep.UserData.Played = false;
+        } else {
+            await store.markPlayed(ep.Id);
+            if (!ep.UserData) ep.UserData = {};
+            ep.UserData.Played = true;
+        }
+    } finally {
+        watchingEpId.value = null;
+    }
 }
 
 function getImageUrl(id: string, type: string, w: number, h: number) {

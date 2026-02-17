@@ -1,11 +1,11 @@
 <template>
-  <nav class="flex items-center gap-3 md:gap-5 bg-surface-raised px-3 md:px-5 pb-2.5" style="padding-top: calc(10px + env(safe-area-inset-top, 0px))">
-    <Button variant="ghost" class="font-bold shrink-0" @click="$router.push('/libraries')" aria-label="Home">
-      <Home class="size-4 mr-1" /> Home
+  <nav class="flex items-center gap-2 md:gap-4 bg-surface-raised px-3 md:px-5 pb-2.5" style="padding-top: calc(10px + env(safe-area-inset-top, 0px))">
+    <Button variant="ghost" class="font-bold shrink-0 px-2 sm:px-3" @click="$router.push('/libraries')" aria-label="Home">
+      <Home class="size-5 sm:size-4 sm:mr-1" /><span class="hidden sm:inline">Home</span>
     </Button>
-    <Button v-if="offlineStore.initialized && offlineStore.downloadCount > 0" variant="ghost" class="bg-accent-purple/20 text-white shrink-0" @click="$router.push('/offline')" aria-label="Downloads">
-      <Download class="size-4 mr-1" /> Offline
-      <Badge class="ml-1.5 bg-accent-purple text-white text-xs">{{ offlineStore.downloadCount }}</Badge>
+    <Button v-if="offlineStore.initialized && offlineStore.downloadCount > 0" variant="ghost" class="bg-accent-purple/20 text-white shrink-0 px-2 sm:px-3" @click="$router.push('/offline')" aria-label="Downloads">
+      <Download class="size-5 sm:size-4 sm:mr-1" /><span class="hidden sm:inline">Offline</span>
+      <Badge class="ml-1 bg-accent-purple text-white text-xs">{{ offlineStore.downloadCount }}</Badge>
     </Button>
 
     <div class="relative flex-1 min-w-0" role="combobox" aria-expanded="true" aria-owns="search-listbox" aria-haspopup="listbox">
@@ -33,7 +33,7 @@
                 :class="flatIndex(r) === activeIndex ? 'bg-surface-hover translate-x-0.5' : ''"
                 role="option"
                 @mouseenter="activeIndex = flatIndex(r)" @click="goToResult(r)">
-                <img :src="thumb(r)" alt="" class="w-[100px] h-[150px] max-md:w-[60px] max-md:h-[90px] rounded-md object-cover bg-black/60 shadow-md" loading="lazy" />
+                <img :src="thumb(r)" alt="" class="w-[100px] h-[150px] max-md:w-[60px] max-md:h-[90px] rounded-md object-cover bg-black/60 shadow-md" loading="lazy" @error="onThumbError($event, r.Type)" />
                 <div class="flex flex-col gap-1.5 min-w-0">
                   <div class="text-text-heading font-semibold text-base max-md:text-sm line-clamp-2">{{ r.Name }}</div>
                   <div class="flex flex-wrap gap-2 items-center text-sm max-md:text-xs">
@@ -54,7 +54,7 @@
                 :class="flatIndex(r) === activeIndex ? 'bg-surface-hover translate-x-0.5' : ''"
                 role="option"
                 @mouseenter="activeIndex = flatIndex(r)" @click="goToResult(r)">
-                <img :src="thumb(r)" alt="" class="w-[100px] h-[150px] max-md:w-[60px] max-md:h-[90px] rounded-md object-cover bg-black/60 shadow-md" loading="lazy" />
+                <img :src="thumb(r)" alt="" class="w-[100px] h-[150px] max-md:w-[60px] max-md:h-[90px] rounded-md object-cover bg-black/60 shadow-md" loading="lazy" @error="onThumbError($event, r.Type)" />
                 <div class="flex flex-col gap-1.5 min-w-0">
                   <div class="text-text-heading font-semibold text-base max-md:text-sm line-clamp-2">{{ r.Name }}</div>
                   <div class="flex flex-wrap gap-2 items-center text-sm max-md:text-xs">
@@ -75,7 +75,7 @@
                 :class="flatIndex(r) === activeIndex ? 'bg-surface-hover translate-x-0.5' : ''"
                 role="option"
                 @mouseenter="activeIndex = flatIndex(r)" @click="goToResult(r)">
-                <img :src="thumb(r)" alt="" class="w-[100px] h-[100px] max-md:w-[60px] max-md:h-[60px] rounded-md object-cover bg-black/60 shadow-md" loading="lazy" />
+                <img :src="thumb(r)" alt="" class="w-[100px] h-[100px] max-md:w-[60px] max-md:h-[60px] rounded-md object-cover bg-black/60 shadow-md" loading="lazy" @error="onThumbError($event, r.Type)" />
                 <div class="flex flex-col gap-1.5 min-w-0">
                   <div class="text-text-heading font-semibold text-base max-md:text-sm line-clamp-2">{{ r.Name }}</div>
                   <div class="flex flex-wrap gap-2 items-center text-sm max-md:text-xs">
@@ -95,8 +95,8 @@
       </div>
     </div>
 
-    <Button variant="destructive" class="shrink-0" @click="onLogout">
-      <LogOut class="size-4 mr-1" /> Logout
+    <Button variant="destructive" class="shrink-0 px-2 sm:px-3" @click="onLogout">
+      <LogOut class="size-5 sm:size-4 sm:mr-1" /><span class="hidden sm:inline">Logout</span>
     </Button>
   </nav>
 </template>
@@ -134,6 +134,10 @@ function thumb(item: any) {
         return store.getImageUrl(item.Id, 'Primary', 120, 120) || '';
     }
     return store.getImageUrl(item.Id, 'Primary', 100, 150) || '';
+}
+
+function onThumbError(e: Event, itemType: string) {
+    (e.target as HTMLImageElement).src = store.getPlaceholderImage(itemType.toLowerCase());
 }
 
 const groupedResults = computed(() => {

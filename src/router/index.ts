@@ -1,12 +1,12 @@
 import { createRouter, createWebHashHistory } from "vue-router";
-import LoginPage from "../LoginPage.vue";
-import MediaList from "../MediaList.vue";
-import LibraryItemsPage from "../LibraryItemsPage.vue";
-import ItemDetailsPage from "../ItemDetailsPage.vue";
-import PlayerPage from "../PlayerPage.vue";
-import OfflineLibraryPage from "../OfflineLibraryPage.vue";
-import { useJellyfinStore } from "../store/jellyfin-store";
-import { useAudioPlayerStore } from "../store/audio-player-store";
+import LoginPage from "@/pages/LoginPage.vue";
+import MediaList from "@/pages/MediaList.vue";
+import LibraryItemsPage from "@/pages/LibraryItemsPage.vue";
+import ItemDetailsPage from "@/pages/ItemDetailsPage.vue";
+import PlayerPage from "@/pages/PlayerPage.vue";
+import OfflineLibraryPage from "@/pages/OfflineLibraryPage.vue";
+import { useJellyfinStore } from "@/store/jellyfin-store";
+import { useAudioPlayerStore } from "@/store/audio-player-store";
 
 const routes = [
   {

@@ -1,173 +1,169 @@
 <template>
-    <div class="player-page">
-        <section v-if="error" class="state error">{{ error }}</section>
+  <div class="fixed inset-0 bg-black text-gray-300 flex flex-col z-[100] h-dvh"
+    style="padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px)">
 
-        <div class="video-container" @mousemove="showControls" @mouseleave="hideControls"
-            @touchstart="showControls">
-            <!-- Loader -->
-            <div v-if="isLoading" class="loading-overlay">
-                <div class="spinner"></div>
-                <p class="loading-text">Chargement...</p>
-            </div>
+    <!-- Error -->
+    <section v-if="error" class="absolute top-[70px] left-1/2 -translate-x-1/2 z-[200] text-error bg-black/90 px-6 py-3 rounded-lg">
+      {{ error }}
+    </section>
 
-            <!-- Vidéo -->
-            <video ref="videoEl" class="player" preload="metadata" playsinline :poster="posterUrl"
-                @click="handleVideoTap" @timeupdate="onTimeUpdate" @loadedmetadata="onLoadedMetadata"
-                @loadstart="onLoadStart" @canplay="onCanPlay" @waiting="onWaiting" @playing="onPlaying"></video>
+    <div class="relative w-full flex-1 overflow-hidden bg-black"
+      @mousemove="showControls" @mouseleave="hideControls" @touchstart="showControls">
 
-            <!-- Contrôles -->
-            <div class="player-controls" :class="{ show: controlsVisible }">
-                <!-- Back button -->
-                <button class="back-btn" @click="goBack">
-                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
-                    Retour
-                </button>
+      <!-- Loader -->
+      <div v-if="isLoading" class="absolute inset-0 bg-black/90 flex flex-col items-center justify-center z-50">
+        <Loader2 class="size-15 animate-spin text-accent-purple" />
+        <p class="mt-5 text-white text-base font-medium">Loading...</p>
+      </div>
 
-                <!-- Barre de progression -->
-                <div class="progress-container" @click="seek">
-                    <div class="progress-bar">
-                        <div class="progress-filled" :style="{ width: progress + '%' }"></div>
-                    </div>
-                </div>
+      <!-- Video -->
+      <video ref="videoEl" class="w-full h-full bg-black object-contain" preload="metadata" playsinline :poster="posterUrl"
+        @click="handleVideoTap" @timeupdate="onTimeUpdate" @loadedmetadata="onLoadedMetadata"
+        @loadstart="onLoadStart" @canplay="onCanPlay" @waiting="onWaiting" @playing="onPlaying"></video>
 
-                <!-- Bas -->
-                <div class="controls-bottom">
-                    <div class="controls-left">
-                        <!-- Play / Pause -->
-                        <button class="control-btn" @click="togglePlayPause">
-                            <svg v-if="!isPlaying" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M8 5v14l11-7z" />
-                            </svg>
-                            <svg v-else viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
-                            </svg>
-                        </button>
+      <!-- Controls -->
+      <div class="absolute inset-0 flex flex-col justify-end player-gradient px-4 pt-5 transition-opacity duration-300"
+        :class="controlsVisible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'"
+        style="padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px))">
 
-                        <!-- Volume -->
-                        <div class="volume-container">
-                            <button class="control-btn" @click="toggleMute">
-                                <svg v-if="volume > 50" viewBox="0 0 24 24" fill="currentColor">
-                                    <path
-                                        d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z" />
-                                </svg>
-                                <svg v-else-if="volume > 0" viewBox="0 0 24 24" fill="currentColor">
-                                    <path d="M7 9v6h4l5 5V4l-5 5H7z" />
-                                </svg>
-                                <svg v-else viewBox="0 0 24 24" fill="currentColor">
-                                    <path
-                                        d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z" />
-                                </svg>
-                            </button>
-                            <input type="range" min="0" max="100" v-model.number="volume" @input="setVolume"
-                                class="volume-slider" />
-                        </div>
+        <!-- Back button -->
+        <button class="absolute left-3 bg-black/50 text-white border-none cursor-pointer px-3.5 py-2 rounded-lg flex items-center gap-1.5 text-[0.95rem] font-medium transition-colors hover:bg-white/15 z-10"
+          style="top: env(safe-area-inset-top, 12px)"
+          @click="goBack">
+          <ArrowLeft class="size-5" />
+          Back
+        </button>
 
-                        <!-- Temps -->
-                        <div class="time-display">
-                            {{ formatTime(currentTime) }} / {{ formatTime(duration) }}
-                        </div>
-                    </div>
-
-                    <div class="controls-right">
-                        <!-- Audio tracks -->
-                        <div v-if="audioList.length" class="dropdown" ref="audioDropdown">
-                            <button class="control-btn" @click="toggleAudioMenu">
-                                <svg viewBox="0 0 24 24" fill="currentColor">
-                                    <path
-                                        d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" />
-                                </svg>
-                                <span class="btn-label">Audio</span>
-                            </button>
-                            <div class="dropdown-menu" :class="{ show: audioMenuOpen }">
-                                <div v-for="opt in audioList" :key="opt.id" class="dropdown-item"
-                                    :class="{ active: opt.index === selectedAudioIndex }"
-                                    @click="selectAudio(opt.index)">
-                                    <span class="check">&#10003;</span>
-                                    {{ opt.label }}
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Sous-titres -->
-                        <div v-if="subtitleList.length" class="dropdown" ref="subtitleDropdown">
-                            <button class="control-btn" @click="toggleSubtitleMenu">
-                                <svg viewBox="0 0 24 24" fill="currentColor">
-                                    <path
-                                        d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zM4 12h4v2H4v-2zm10 6H4v-2h10v2zm6 0h-4v-2h4v2zm0-4H10v-2h10v2z" />
-                                </svg>
-                                <span class="btn-label">Sous-titres</span>
-                            </button>
-                            <div class="dropdown-menu" :class="{ show: subtitleMenuOpen }">
-                                <div class="dropdown-item" :class="{ active: selectedSubtitleIndex === '-1' }"
-                                    @click="selectSubtitle('-1')">
-                                    <span class="check">&#10003;</span>
-                                    Desactives
-                                </div>
-                                <div v-for="opt in subtitleList" :key="opt.id" class="dropdown-item"
-                                    :class="{ active: opt.index === parseInt(selectedSubtitleIndex) }"
-                                    @click="selectSubtitle(String(opt.index))">
-                                    <span class="check">&#10003;</span>
-                                    {{ opt.label }}
-                                </div>
-                                <div class="dropdown-divider"></div>
-                                <div class="dropdown-item" @click="selectSubtitle('local')">
-                                    <span class="check"></span>
-                                    Charger un fichier local...
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Quality -->
-                        <div class="dropdown" ref="qualityDropdown">
-                            <button class="control-btn quality-btn" @click="toggleQualityMenu">
-                                <svg viewBox="0 0 24 24" fill="currentColor">
-                                    <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.488.488 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 00-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
-                                </svg>
-                                <span class="btn-label">{{ qualityLabel }}</span>
-                                <span class="play-method-badge">{{ playMethodLabel }}</span>
-                            </button>
-                            <div class="dropdown-menu" :class="{ show: qualityMenuOpen }">
-                                <div v-for="preset in qualityPresets" :key="preset.key" class="dropdown-item"
-                                    :class="{ active: preset.key === selectedQuality }"
-                                    @click="selectQuality(preset.key)">
-                                    <span class="check">&#10003;</span>
-                                    {{ preset.label }}
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Fullscreen -->
-                        <button class="control-btn" @click="toggleFullscreen">
-                            <svg v-if="!isFullscreen" viewBox="0 0 24 24" fill="currentColor">
-                                <path
-                                    d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z" />
-                            </svg>
-                            <svg v-else viewBox="0 0 24 24" fill="currentColor">
-                                <path
-                                    d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z" />
-                            </svg>
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <input ref="fileInput" type="file" accept=".vtt,.srt" class="hidden-input" @change="onPickSubtitleFile" />
+        <!-- Progress bar -->
+        <div class="w-full h-6 flex items-center cursor-pointer mb-3 group" @click="seek">
+          <div class="w-full h-1 bg-white/30 rounded-sm relative transition-[height] duration-200 group-hover:h-1.5">
+            <div class="h-full bg-accent-purple rounded-sm transition-[width] duration-100 ease-linear" :style="{ width: progress + '%' }"></div>
+          </div>
         </div>
+
+        <!-- Bottom controls -->
+        <div class="flex justify-between items-center">
+          <div class="flex items-center gap-2">
+            <!-- Play/Pause -->
+            <button class="bg-transparent border-none text-white cursor-pointer p-2 rounded flex items-center gap-1.5 transition-colors hover:bg-white/10" @click="togglePlayPause">
+              <Play v-if="!isPlaying" class="size-6 fill-current" />
+              <Pause v-else class="size-6 fill-current" />
+            </button>
+
+            <!-- Volume -->
+            <div class="flex items-center gap-2">
+              <button class="bg-transparent border-none text-white cursor-pointer p-2 rounded flex items-center transition-colors hover:bg-white/10" @click="toggleMute">
+                <Volume2 v-if="volume > 50" class="size-6" />
+                <Volume1 v-else-if="volume > 0" class="size-6" />
+                <VolumeX v-else class="size-6" />
+              </button>
+              <Slider :model-value="[volume]" :max="100" :step="1" class="w-20"
+                @update:model-value="(v?: number[]) => { if (v) { volume = v[0]; setVolume(); } }" />
+            </div>
+
+            <!-- Time -->
+            <div class="text-[0.9rem] text-white tabular-nums min-w-[110px]">
+              {{ formatTime(currentTime) }} / {{ formatTime(duration) }}
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <!-- Audio tracks -->
+            <div v-if="audioList.length" class="relative" ref="audioDropdown">
+              <button class="bg-transparent border-none text-white cursor-pointer p-2 rounded flex items-center gap-1.5 transition-colors hover:bg-white/10" @click="toggleAudioMenu">
+                <AudioLines class="size-6" />
+                <span class="text-[0.9rem] font-medium">Audio</span>
+              </button>
+              <div class="absolute bottom-full right-0 mb-2 bg-[rgba(28,28,28,0.98)] rounded-lg min-w-[250px] max-h-[400px] overflow-y-auto shadow-[0_8px_24px_rgba(0,0,0,0.5)] backdrop-blur-[10px] transition-all duration-200 scrollbar-hide"
+                :class="audioMenuOpen ? 'opacity-100 pointer-events-auto translate-y-0' : 'opacity-0 pointer-events-none translate-y-2.5'">
+                <div v-for="opt in audioList" :key="opt.id"
+                  class="flex items-center gap-2.5 px-4 py-3 cursor-pointer text-[0.9rem] transition-colors hover:bg-white/10"
+                  :class="opt.index === selectedAudioIndex && 'bg-accent-purple/20'"
+                  @click="selectAudio(opt.index)">
+                  <Check class="size-4 shrink-0" :class="opt.index === selectedAudioIndex ? 'opacity-100' : 'opacity-0'" />
+                  {{ opt.label }}
+                </div>
+              </div>
+            </div>
+
+            <!-- Subtitles -->
+            <div v-if="subtitleList.length" class="relative" ref="subtitleDropdown">
+              <button class="bg-transparent border-none text-white cursor-pointer p-2 rounded flex items-center gap-1.5 transition-colors hover:bg-white/10" @click="toggleSubtitleMenu">
+                <Subtitles class="size-6" />
+                <span class="text-[0.9rem] font-medium">Subtitles</span>
+              </button>
+              <div class="absolute bottom-full right-0 mb-2 bg-[rgba(28,28,28,0.98)] rounded-lg min-w-[250px] max-h-[400px] overflow-y-auto shadow-[0_8px_24px_rgba(0,0,0,0.5)] backdrop-blur-[10px] transition-all duration-200 scrollbar-hide"
+                :class="subtitleMenuOpen ? 'opacity-100 pointer-events-auto translate-y-0' : 'opacity-0 pointer-events-none translate-y-2.5'">
+                <div class="flex items-center gap-2.5 px-4 py-3 cursor-pointer text-[0.9rem] transition-colors hover:bg-white/10"
+                  :class="selectedSubtitleIndex === '-1' && 'bg-accent-purple/20'"
+                  @click="selectSubtitle('-1')">
+                  <Check class="size-4 shrink-0" :class="selectedSubtitleIndex === '-1' ? 'opacity-100' : 'opacity-0'" />
+                  Disabled
+                </div>
+                <div v-for="opt in subtitleList" :key="opt.id"
+                  class="flex items-center gap-2.5 px-4 py-3 cursor-pointer text-[0.9rem] transition-colors hover:bg-white/10"
+                  :class="opt.index === parseInt(selectedSubtitleIndex) && 'bg-accent-purple/20'"
+                  @click="selectSubtitle(String(opt.index))">
+                  <Check class="size-4 shrink-0" :class="opt.index === parseInt(selectedSubtitleIndex) ? 'opacity-100' : 'opacity-0'" />
+                  {{ opt.label }}
+                </div>
+                <div class="h-px bg-white/10 my-1"></div>
+                <div class="flex items-center gap-2.5 px-4 py-3 cursor-pointer text-[0.9rem] transition-colors hover:bg-white/10"
+                  @click="selectSubtitle('local')">
+                  <span class="size-4 shrink-0"></span>
+                  Load local file...
+                </div>
+              </div>
+            </div>
+
+            <!-- Quality -->
+            <div class="relative" ref="qualityDropdown">
+              <button class="bg-transparent border-none text-white cursor-pointer p-2 rounded flex flex-wrap items-center justify-center gap-1.5 transition-colors hover:bg-white/10" @click="toggleQualityMenu">
+                <Settings class="size-6" />
+                <span class="text-[0.9rem] font-medium">{{ qualityLabel }}</span>
+                <Badge class="text-[0.65rem] font-semibold uppercase tracking-wide bg-accent-purple/30 text-sky-300 border-none px-1.5 py-0.5 rounded">{{ playMethodLabel }}</Badge>
+              </button>
+              <div class="absolute bottom-full right-0 mb-2 bg-[rgba(28,28,28,0.98)] rounded-lg min-w-[250px] max-h-[400px] overflow-y-auto shadow-[0_8px_24px_rgba(0,0,0,0.5)] backdrop-blur-[10px] transition-all duration-200 scrollbar-hide"
+                :class="qualityMenuOpen ? 'opacity-100 pointer-events-auto translate-y-0' : 'opacity-0 pointer-events-none translate-y-2.5'">
+                <div v-for="preset in qualityPresets" :key="preset.key"
+                  class="flex items-center gap-2.5 px-4 py-3 cursor-pointer text-[0.9rem] transition-colors hover:bg-white/10"
+                  :class="preset.key === selectedQuality && 'bg-accent-purple/20'"
+                  @click="selectQuality(preset.key)">
+                  <Check class="size-4 shrink-0" :class="preset.key === selectedQuality ? 'opacity-100' : 'opacity-0'" />
+                  {{ preset.label }}
+                </div>
+              </div>
+            </div>
+
+            <!-- Fullscreen -->
+            <button class="bg-transparent border-none text-white cursor-pointer p-2 rounded flex items-center transition-colors hover:bg-white/10" @click="toggleFullscreen">
+              <Maximize v-if="!isFullscreen" class="size-6" />
+              <Minimize v-else class="size-6" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <input ref="fileInput" type="file" accept=".vtt,.srt" class="hidden" @change="onPickSubtitleFile" />
     </div>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { useJellyfinStore } from './store/jellyfin-store';
-import { useOfflineStore } from './store/offline-store';
-import { downloadService } from './services/downloadService';
-import { offlineDatabase } from './services/offlineDatabase';
+import { useJellyfinStore } from '@/store/jellyfin-store';
+import { useOfflineStore } from '@/store/offline-store';
+import { downloadService } from '@/services/downloadService';
+import { offlineDatabase } from '@/services/offlineDatabase';
 import shaka from 'shaka-player/dist/shaka-player.compiled.js';
-import { deviceProfile } from './constants';
-import { formatTime } from './utils/helpers';
-import { lockLandscape, unlockOrientation } from './utils/orientation';
-import { useAudioPlayerStore } from './store/audio-player-store';
+import { deviceProfile } from '@/constants';
+import { formatTime } from '@/utils/helpers';
+import { lockLandscape, unlockOrientation } from '@/utils/orientation';
+import { useAudioPlayerStore } from '@/store/audio-player-store';
+import { Badge } from '@/components/ui/badge';
+import { Slider } from '@/components/ui/slider';
+import { ArrowLeft, Play, Pause, Volume2, Volume1, VolumeX, AudioLines, Subtitles, Settings, Maximize, Minimize, Loader2, Check } from 'lucide-vue-next';
 
 const route = useRoute();
 const router = useRouter();
@@ -389,13 +385,10 @@ function stopProgressReporting() {
 
 // Interactions
 function handleVideoTap() {
-    // Toggle controls visibility instead of play/pause
     if (controlsVisible.value) {
-        // Controls are visible, hide them
         controlsVisible.value = false;
         if (controlsTimeout) clearTimeout(controlsTimeout);
     } else {
-        // Controls are hidden, show them
         showControls();
     }
 }
@@ -469,7 +462,6 @@ function toggleFullscreen() {
         requestFS(container).then(() => {
             isFullscreen.value = true;
         }).catch(() => {
-            // iOS Safari: try fullscreen on the video element itself
             if (videoEl.value && (videoEl.value as any).webkitEnterFullscreen) {
                 (videoEl.value as any).webkitEnterFullscreen();
                 isFullscreen.value = true;
@@ -530,7 +522,7 @@ function onLoadedMetadata() {
     volume.value = media.volume * 100;
 }
 
-// Chargement info item
+// Load item details
 async function loadDetails() {
     try {
         details.value =
@@ -538,7 +530,7 @@ async function loadDetails() {
                 ? store.currentItem
                 : await store.fetchItemDetails(itemId);
     } catch (e: any) {
-        error.value = 'Impossible de charger les details media';
+        error.value = 'Failed to load media details';
     }
 }
 
@@ -566,7 +558,7 @@ async function getPlaybackUrl() {
             : undefined;
         const data = await fetchPlaybackInfo(undefined, maxBitrate);
         mediaSource.value = data.MediaSources?.[0];
-        if (!mediaSource.value) throw new Error('Aucune source media disponible');
+        if (!mediaSource.value) throw new Error('No media source available');
 
         const streams = mediaSource.value.MediaStreams || [];
         const audioStreams = streams.filter((s: any) => s.Type === 'Audio');
@@ -607,18 +599,15 @@ async function getPlaybackUrl() {
         // Determine playback method
         determinePlaybackMethod(mediaSource.value);
     } catch (e: any) {
-        console.error('Erreur PlaybackInfo:', e);
-        error.value = "Impossible d'obtenir l'URL de lecture";
+        console.error('PlaybackInfo error:', e);
+        error.value = 'Failed to get playback URL';
     }
 }
 
 function buildHlsUrl() {
     if (baseTranscodingUrl.value) {
-        // Clean leading ?& and use the server's transcoding URL directly
         let transcodingPath = baseTranscodingUrl.value;
-        // Replace ?& with ? to avoid malformed query string
         transcodingPath = transcodingPath.replace('?&', '?');
-        // Update AudioStreamIndex in the URL
         transcodingPath = transcodingPath.replace(
             /AudioStreamIndex=\d+/,
             `AudioStreamIndex=${selectedAudioIndex.value}`
@@ -674,7 +663,6 @@ async function addSubtitleTrack(shakaPlayer: shaka.Player, blobUrl: string, lang
 }
 
 function addNativeSubtitleTrack(video: HTMLVideoElement, blobUrl: string, lang: string, label: string) {
-    // Remove any previously added dynamic tracks
     const existing = video.querySelectorAll('track.dynamic-sub');
     existing.forEach(t => t.remove());
 
@@ -687,7 +675,6 @@ function addNativeSubtitleTrack(video: HTMLVideoElement, blobUrl: string, lang: 
     track.classList.add('dynamic-sub');
     video.appendChild(track);
 
-    // Enable the new track, hide others
     for (let i = 0; i < video.textTracks.length; i++) {
         video.textTracks[i].mode = i === video.textTracks.length - 1 ? 'showing' : 'hidden';
     }
@@ -729,7 +716,6 @@ async function initPlayer(seekTo?: number, resumePlaying?: boolean) {
 
     try {
         if (playMethod.value === 'DirectPlay') {
-            // Native playback - no Shaka needed
             video.src = hlsUrl.value;
 
             if (seekTo !== undefined) {
@@ -750,7 +736,6 @@ async function initPlayer(seekTo?: number, resumePlaying?: boolean) {
                 await video.play().catch(() => {});
             }
         } else {
-            // HLS playback via Shaka (DirectStream or Transcode)
             shaka.polyfill.installAll();
 
             player = new shaka.Player(video);
@@ -775,7 +760,7 @@ async function initPlayer(seekTo?: number, resumePlaying?: boolean) {
             player.addEventListener('error', (ev: any) => {
                 const e = ev.detail;
                 console.error('Shaka error:', e);
-                error.value = `Erreur Shaka ${e.code}: ${e.data?.[2] || 'Erreur de lecture'}`;
+                error.value = `Shaka error ${e.code}: ${e.data?.[2] || 'Playback error'}`;
                 isLoading.value = false;
             });
 
@@ -803,8 +788,8 @@ async function initPlayer(seekTo?: number, resumePlaying?: boolean) {
             }
         }
     } catch (e: any) {
-        console.error('Erreur init player:', e);
-        error.value = "Erreur d'initialisation du lecteur";
+        console.error('Player init error:', e);
+        error.value = 'Player initialization error';
         isLoading.value = false;
     }
 }
@@ -823,7 +808,7 @@ async function teardownPlayer() {
     }
 }
 
-// Changement de piste audio
+// Audio track switching
 async function switchAudio() {
     if (selectedAudioIndex.value === null) return;
 
@@ -838,7 +823,6 @@ async function switchAudio() {
 
         await new Promise(resolve => setTimeout(resolve, 100));
 
-        // Re-fetch with new audio stream
         const maxBitrate = selectedQuality.value !== 'auto'
             ? qualityPresets.find(p => p.key === selectedQuality.value)?.bitrate
             : undefined;
@@ -859,8 +843,8 @@ async function switchAudio() {
         isLoading.value = false;
         switchSubtitle();
     } catch (e: any) {
-        console.error('Erreur switch audio:', e);
-        error.value = 'Erreur lors du changement de piste audio';
+        console.error('Audio switch error:', e);
+        error.value = 'Error switching audio track';
         isLoading.value = false;
     }
 }
@@ -879,7 +863,6 @@ async function switchQuality(key: string) {
     await teardownPlayer();
     await new Promise(resolve => setTimeout(resolve, 100));
 
-    // Re-fetch playback info with new bitrate
     const maxBitrate = key !== 'auto'
         ? qualityPresets.find(p => p.key === key)?.bitrate
         : undefined;
@@ -896,8 +879,8 @@ async function switchQuality(key: string) {
             determinePlaybackMethod(ms);
         }
     } catch (e: any) {
-        console.error('Erreur switch quality:', e);
-        error.value = 'Erreur lors du changement de qualite';
+        console.error('Quality switch error:', e);
+        error.value = 'Error switching quality';
         isLoading.value = false;
         return;
     }
@@ -909,7 +892,7 @@ async function switchQuality(key: string) {
     switchSubtitle();
 }
 
-// Nettoyage VTT: suppression des lignes Region:
+// Clean VTT: remove Region: lines
 function cleanVttRegions(vtt: string): string {
     return vtt
         .split('\n')
@@ -917,7 +900,7 @@ function cleanVttRegions(vtt: string): string {
         .join('\n');
 }
 
-// Sous-titres distants via Jellyfin
+// Remote subtitles via Jellyfin
 async function switchSubtitle() {
     const selected = selectedSubtitleIndex.value;
 
@@ -930,7 +913,6 @@ async function switchSubtitle() {
         if (player) {
             player.setTextTrackVisibility(false);
         } else {
-            // Native: hide all text tracks
             const video = videoEl.value;
             if (video) {
                 for (let i = 0; i < video.textTracks.length; i++) {
@@ -949,7 +931,6 @@ async function switchSubtitle() {
         const mediaSourceId = mediaSource.value?.Id || itemId;
         const vttUrl = `${serverUrl}/Videos/${itemId}/${mediaSourceId}/Subtitles/${subIndex}/Stream.vtt?api_key=${accessToken}`;
 
-        // On recupere et nettoie le VTT cote client
         const resp = await fetch(vttUrl);
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const raw = await resp.text();
@@ -967,31 +948,27 @@ async function switchSubtitle() {
             }
         }
     } catch (e: any) {
-        console.error('Erreur chargement sous-titres:', e);
-        error.value = `Impossible de charger les sous-titres: ${e.message}`;
+        console.error('Error loading subtitles:', e);
+        error.value = `Failed to load subtitles: ${e.message}`;
     }
 }
 
-// Conversion SRT -> VTT robuste
+// SRT to VTT conversion
 function srtToVtt(srt: string) {
     let vtt = srt
         .replace(/\r\n/g, '\n')
         .replace(/\r/g, '\n')
         .trim();
 
-    // Remove sequence numbers
     vtt = vtt.replace(/^\d+\s*$/gm, '');
-    // Replace commas by dots in timestamps
     vtt = vtt.replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2');
-    // Remove multiple empty lines
     vtt = vtt.replace(/\n{3,}/g, '\n\n');
 
     vtt = `WEBVTT\n\n${vtt}`;
-    // Nettoyage eventuel des Region:
     return cleanVttRegions(vtt);
 }
 
-// Sous-titre local
+// Local subtitle file
 async function onPickSubtitleFile(e: Event) {
     const input = e.target as HTMLInputElement;
     const file = input.files?.[0];
@@ -1014,12 +991,11 @@ async function onPickSubtitleFile(e: Event) {
         } else if (isSrt) {
             vttContent = srtToVtt(text);
         } else {
-            error.value = 'Format de sous-titre non supporte';
+            error.value = 'Unsupported subtitle format';
             selectedSubtitleIndex.value = '-1';
             return;
         }
 
-        // Nettoyage Region:
         vttContent = cleanVttRegions(vttContent);
 
         const blob = new Blob([vttContent], { type: 'text/vtt; charset=utf-8' });
@@ -1037,7 +1013,7 @@ async function onPickSubtitleFile(e: Event) {
             }
         }
     } catch (err: any) {
-        error.value = `Echec de chargement du sous-titre local: ${err.message}`;
+        error.value = `Failed to load local subtitle: ${err.message}`;
         selectedSubtitleIndex.value = '-1';
     } finally {
         if (fileInput.value) fileInput.value.value = '';
@@ -1098,37 +1074,56 @@ async function playOffline() {
     try {
         const localFileUrl = await downloadService.getLocalFile(itemId);
         if (!localFileUrl) {
-            throw new Error('Fichier local introuvable');
+            throw new Error('Local file not found');
         }
 
-        console.log('[Player] Lecture hors ligne:', localFileUrl);
+        console.log('[Player] Offline playback:', localFileUrl);
 
         const video = videoEl.value;
         if (!video) throw new Error('Video element not found');
 
-        // Use direct file playback
         video.src = localFileUrl;
 
-        // Setup media listeners
+        // Wait for metadata to load
+        await new Promise<void>((resolve, reject) => {
+            const onLoaded = () => {
+                video.removeEventListener('loadedmetadata', onLoaded);
+                video.removeEventListener('error', onError);
+                resolve();
+            };
+            const onError = (_: Event) => {
+                video.removeEventListener('loadedmetadata', onLoaded);
+                video.removeEventListener('error', onError);
+                reject(new Error('Failed to load video'));
+            };
+            video.addEventListener('loadedmetadata', onLoaded);
+            video.addEventListener('error', onError);
+        });
+
         attachMediaListeners(video);
 
-        // Load saved progress
+        // Restore saved progress
         const savedProgress = await offlineDatabase.getWatchProgress(itemId);
         if (savedProgress && savedProgress.position > 0) {
             video.currentTime = savedProgress.position;
         }
 
-        // Start tracking offline progress
         startOfflineProgressTracking();
 
-        // Setup media session
         setupMediaSession();
 
+        // Start playback
+        await video.play().catch((err) => {
+            console.warn('[Player] Auto-play blocked, user interaction needed:', err);
+        });
+
         isOfflinePlayback.value = true;
-        console.log('[Player] Lecture hors ligne initialisée');
+        isLoading.value = false;
+        console.log('[Player] Offline playback started');
     } catch (e: any) {
-        console.error('[Player] Erreur lecture hors ligne:', e);
-        error.value = 'Impossible de lire le fichier hors ligne';
+        console.error('[Player] Offline playback error:', e);
+        error.value = 'Unable to play offline file';
+        isLoading.value = false;
     }
 }
 
@@ -1150,7 +1145,7 @@ function startOfflineProgressTracking() {
         };
 
         await offlineDatabase.saveWatchProgress(progress);
-    }, 10000); // Save every 10 seconds
+    }, 10000);
 }
 
 function stopOfflineProgressTracking() {
@@ -1174,16 +1169,16 @@ onMounted(async () => {
     const isDownloaded = offlineStore.isItemDownloaded(itemId);
 
     if (isDownloaded) {
-        console.log('[Player] Item téléchargé, lecture hors ligne');
+        console.log('[Player] Item downloaded, playing offline');
         await playOffline();
     } else if (offlineStore.isFullyOnline) {
-        console.log('[Player] Lecture en ligne');
+        console.log('[Player] Online playback');
         await getPlaybackUrl();
         if (hlsUrl.value) {
             await initPlayer();
         }
     } else {
-        error.value = 'Fichier non disponible hors ligne. Connectez-vous à Internet pour regarder ce contenu.';
+        error.value = 'File not available offline. Connect to the internet to watch this content.';
         return;
     }
 
@@ -1215,375 +1210,24 @@ onBeforeUnmount(() => {
     unlockOrientation();
     clearMediaSession();
 
-    // 1. Stop intervals first
     if (progressInterval) {
         clearInterval(progressInterval);
         progressInterval = null;
     }
     stopOfflineProgressTracking();
 
-    // 2. Report stop before destroying elements (skip if offline)
     if (getMediaElement() && !isOfflinePlayback.value) {
         reportPlaybackStopped();
     }
 
-    // 3. Destroy Shaka player if present
     if (player) {
         player.destroy().catch(() => { });
         player = null;
     }
 
-    // 4. Clean controls timeout
     if (controlsTimeout) {
         clearTimeout(controlsTimeout);
         controlsTimeout = null;
     }
 });
-
 </script>
-
-<style scoped>
-.player-page {
-    position: fixed;
-    inset: 0;
-    background: #000;
-    color: #e0e0e0;
-    padding: 0;
-    padding-top: env(safe-area-inset-top, 0px);
-    padding-left: env(safe-area-inset-left, 0px);
-    padding-right: env(safe-area-inset-right, 0px);
-    padding-bottom: env(safe-area-inset-bottom, 0px);
-    display: flex;
-    flex-direction: column;
-    z-index: 100;
-    height: 100vh;
-    height: 100dvh; /* mobile: accounts for browser chrome */
-}
-
-.state.error {
-    position: absolute;
-    top: 70px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 200;
-    color: #ff6b6b;
-    background: rgba(0, 0, 0, 0.9);
-    padding: 12px 24px;
-    border-radius: 8px;
-}
-
-.video-container {
-    position: relative;
-    width: 100%;
-    height: 100%;
-    flex: 1;
-    overflow: hidden;
-    background: #000;
-}
-
-.player {
-    width: 100%;
-    height: 100%;
-    background: #000;
-    object-fit: contain;
-}
-
-/* Loader */
-.loading-overlay {
-    position: absolute;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.9);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    z-index: 50;
-}
-
-.spinner {
-    width: 60px;
-    height: 60px;
-    border: 4px solid rgba(255, 255, 255, 0.1);
-    border-top-color: #00a4dc;
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-    to {
-        transform: rotate(360deg);
-    }
-}
-
-.loading-text {
-    margin-top: 20px;
-    color: #fff;
-    font-size: 1rem;
-    font-weight: 500;
-}
-
-/* Controls */
-.player-controls {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-end;
-    background: linear-gradient(0deg,
-            rgba(0, 0, 0, 0.9) 0%,
-            rgba(0, 0, 0, 0.4) 30%,
-            transparent 50%,
-            rgba(0, 0, 0, 0.4) 85%,
-            rgba(0, 0, 0, 0.7) 100%);
-    padding: 20px 16px calc(16px + env(safe-area-inset-bottom, 0px));
-    opacity: 0;
-    transition: opacity 0.3s ease;
-    pointer-events: none;
-}
-
-.player-controls.show {
-    opacity: 1;
-    pointer-events: all;
-}
-
-.back-btn {
-    position: absolute;
-    top: env(safe-area-inset-top, 12px);
-    left: 12px;
-    background: rgba(0, 0, 0, 0.5);
-    border: none;
-    color: #fff;
-    cursor: pointer;
-    padding: 8px 14px;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 0.95rem;
-    font-weight: 500;
-    transition: background 0.2s ease;
-    z-index: 10;
-}
-
-.back-btn:hover {
-    background: rgba(255, 255, 255, 0.15);
-}
-
-.back-btn svg {
-    width: 20px;
-    height: 20px;
-}
-
-.progress-container {
-    width: 100%;
-    height: 24px;
-    display: flex;
-    align-items: center;
-    cursor: pointer;
-    margin-bottom: 12px;
-}
-
-.progress-bar {
-    width: 100%;
-    height: 4px;
-    background: rgba(255, 255, 255, 0.3);
-    border-radius: 2px;
-    position: relative;
-    transition: height 0.2s ease;
-}
-
-.progress-container:hover .progress-bar {
-    height: 6px;
-}
-
-.progress-filled {
-    height: 100%;
-    background: #00a4dc;
-    border-radius: 2px;
-    transition: width 0.1s ease;
-}
-
-.controls-bottom {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.controls-left,
-.controls-right {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.control-btn {
-    background: transparent;
-    border: none;
-    color: #fff;
-    cursor: pointer;
-    padding: 8px;
-    border-radius: 4px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    transition: background 0.2s ease;
-}
-
-.control-btn:hover {
-    background: rgba(255, 255, 255, 0.1);
-}
-
-.control-btn svg {
-    width: 24px;
-    height: 24px;
-}
-
-.btn-label {
-    font-size: 0.9rem;
-    font-weight: 500;
-}
-
-.volume-container {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.volume-slider {
-    width: 80px;
-    height: 4px;
-    appearance: none;
-    background: rgba(255, 255, 255, 0.3);
-    border-radius: 2px;
-    outline: none;
-    cursor: pointer;
-}
-
-.volume-slider::-webkit-slider-thumb {
-    appearance: none;
-    width: 12px;
-    height: 12px;
-    background: #fff;
-    border-radius: 50%;
-    cursor: pointer;
-}
-
-.volume-slider::-moz-range-thumb {
-    width: 12px;
-    height: 12px;
-    background: #fff;
-    border-radius: 50%;
-    cursor: pointer;
-    border: none;
-}
-
-.time-display {
-    font-size: 0.9rem;
-    color: #fff;
-    font-variant-numeric: tabular-nums;
-    min-width: 110px;
-}
-
-/* Dropdowns */
-.dropdown {
-    position: relative;
-}
-
-.dropdown-menu {
-    position: absolute;
-    bottom: 100%;
-    right: 0;
-    margin-bottom: 8px;
-    background: rgba(28, 28, 28, 0.98);
-    border-radius: 8px;
-    min-width: 250px;
-    max-height: 400px;
-    overflow-y: auto;
-    opacity: 0;
-    pointer-events: none;
-    transform: translateY(10px);
-    transition: opacity 0.2s ease, transform 0.2s ease;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(10px);
-}
-
-.dropdown-menu.show {
-    opacity: 1;
-    pointer-events: all;
-    transform: translateY(0);
-}
-
-.dropdown-item {
-    padding: 12px 16px;
-    cursor: pointer;
-    transition: background 0.2s ease;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 0.9rem;
-}
-
-.dropdown-item:hover {
-    background: rgba(255, 255, 255, 0.1);
-}
-
-.dropdown-item.active {
-    background: rgba(0, 164, 220, 0.2);
-}
-
-.dropdown-item .check {
-    width: 16px;
-    font-size: 0.9rem;
-    opacity: 0;
-}
-
-.dropdown-item.active .check {
-    opacity: 1;
-}
-
-.dropdown-divider {
-    height: 1px;
-    background: rgba(255, 255, 255, 0.1);
-    margin: 4px 0;
-}
-
-.hidden-input {
-    display: none;
-}
-
-.dropdown-menu::-webkit-scrollbar {
-    width: 8px;
-}
-
-.dropdown-menu::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 4px;
-}
-
-.dropdown-menu::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 4px;
-}
-
-.dropdown-menu::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.3);
-}
-
-/* Quality button & play method badge */
-.quality-btn {
-    flex-wrap: wrap;
-    justify-content: center;
-}
-
-.play-method-badge {
-    font-size: 0.65rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    background: rgba(0, 164, 220, 0.3);
-    color: #7dd3fc;
-    padding: 2px 6px;
-    border-radius: 4px;
-    white-space: nowrap;
-}
-</style>

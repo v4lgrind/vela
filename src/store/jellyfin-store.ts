@@ -166,6 +166,7 @@ export const useJellyfinStore = defineStore("jellyfin", {
         includeItemTypes: ["Episode"] as any,
         sortBy: ["SortName"],
         sortOrder: ["Ascending"],
+        fields: ["Overview", "PrimaryImageAspectRatio", "CommunityRating", "PremiereDate"] as any,
       });
       return resp.data.Items ?? [];
     },

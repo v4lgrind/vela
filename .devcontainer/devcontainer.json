@@ -18,7 +18,10 @@
 			"extensions": [
 				"Anthropic.claude-code",
 				"esbenp.prettier-vscode",
-				"Vue.volar"
+				"Vue.volar",
+				"pranaygp.vscode-css-peek",
+				"ecmel.vscode-html-css",
+				"kamikillerto.vscode-colorize"
 			]
 		}
 	}

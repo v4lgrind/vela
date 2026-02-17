@@ -1091,7 +1091,7 @@ async function playOffline() {
                 video.removeEventListener('error', onError);
                 resolve();
             };
-            const onError = (e: Event) => {
+            const onError = (_: Event) => {
                 video.removeEventListener('loadedmetadata', onLoaded);
                 video.removeEventListener('error', onError);
                 reject(new Error('Failed to load video'));

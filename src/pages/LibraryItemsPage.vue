@@ -1,23 +1,89 @@
 <template>
   <div class="min-h-dvh bg-surface text-text-primary p-5 flex flex-col">
+    <!-- Filters and Sorting -->
+    <section class="mb-4">
+      <div class="flex flex-wrap gap-2 items-center">
+        <select v-model="sortBy" @change="onFilterChange" class="bg-surface-raised border border-border-default rounded-md px-2.5 py-2 text-xs text-text-primary cursor-pointer hover:border-accent-purple transition-colors min-h-[36px]">
+          <option value="SortName">Name</option>
+          <option value="PremiereDate">Release Date</option>
+          <option value="DateCreated">Date Added</option>
+          <option value="CommunityRating">Rating</option>
+          <option value="PlayCount">Play Count</option>
+          <option value="Random">Random</option>
+        </select>
+
+        <select v-model="sortOrder" @change="onFilterChange" class="bg-surface-raised border border-border-default rounded-md px-2.5 py-2 text-xs text-text-primary cursor-pointer hover:border-accent-purple transition-colors min-h-[36px]">
+          <option value="Ascending">↑ Asc</option>
+          <option value="Descending">↓ Desc</option>
+        </select>
+
+        <select v-model="filter" @change="onFilterChange" class="bg-surface-raised border border-border-default rounded-md px-2.5 py-2 text-xs text-text-primary cursor-pointer hover:border-accent-purple transition-colors min-h-[36px]">
+          <option value="">All Items</option>
+          <option value="IsUnplayed">Unwatched</option>
+          <option value="IsPlayed">Watched</option>
+          <option value="IsFavorite">Favorites</option>
+        </select>
+
+        <div class="relative">
+          <button @click="showGenreDropdown = !showGenreDropdown" class="bg-surface-raised border border-border-default rounded-md px-2.5 py-2 text-xs text-text-primary cursor-pointer hover:border-accent-purple transition-colors flex items-center gap-1.5 min-h-[36px]">
+            <span>{{ selectedGenres.length > 0 ? `Genres (${selectedGenres.length})` : 'All Genres' }}</span>
+            <span class="text-[10px]">▼</span>
+          </button>
+          <div v-if="showGenreDropdown" @click.stop class="absolute top-full left-0 mt-1 bg-surface-raised border border-border-default rounded-md shadow-xl z-10 max-h-60 overflow-y-auto min-w-[220px]">
+            <label v-for="genre in availableGenres" :key="genre" class="flex items-center gap-3 px-4 py-3 hover:bg-surface-hover cursor-pointer text-sm">
+              <input type="checkbox" :value="genre" v-model="selectedGenres" @change="onFilterChange" class="size-4 cursor-pointer accent-accent-purple">
+              <span>{{ genre }}</span>
+            </label>
+          </div>
+        </div>
+
+        <Button variant="outline" size="sm" @click="resetFilters" class="text-xs min-h-[36px] px-3">Reset</Button>
+      </div>
+    </section>
+
     <section class="flex-1">
       <ul class="list-none p-0 m-0 grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-3 sm:grid-cols-[repeat(auto-fill,minmax(150px,1fr))] sm:gap-4">
         <li v-for="item in items" :key="item.Id">
           <Card class="bg-surface-raised border-border-default hover:-translate-y-1 hover:bg-surface-hover hover:border-border-hover hover:shadow-xl transition-all duration-200 flex flex-col items-center p-2.5 pb-3 overflow-hidden">
-            <router-link v-if="item.Type === 'BoxSet'"
-              :to="{ name: 'libraryItem', params: { id: item.Id, name: item.Name } }"
-              class="w-full rounded-[10px] overflow-hidden bg-black/60 shadow-lg"
+            <!-- Poster with overlay -->
+            <div class="relative group w-full rounded-[10px] overflow-hidden bg-black/60 shadow-lg"
               :class="isAudioType(item.Type) ? 'aspect-square' : 'aspect-[2/3]'">
-              <LazyImg :src="getImageUrl(item.Id, item.Type)" :alt="item.Name" :item-type="item.Type"
-                class="w-full h-full object-cover block" @click="loadPage()" />
-            </router-link>
+              <router-link
+                :to="item.Type === 'BoxSet'
+                  ? { name: 'libraryItem', params: { id: item.Id, name: item.Name } }
+                  : { name: 'ItemDetails', params: { id: item.Id } }"
+                class="block w-full h-full">
+                <LazyImg :src="getImageUrl(item.Id, item.Type)" :alt="item.Name" :item-type="item.Type"
+                  class="w-full h-full object-cover block" />
+              </router-link>
 
-            <router-link v-else :to="{ name: 'ItemDetails', params: { id: item.Id } }"
-              class="w-full rounded-[10px] overflow-hidden bg-black/60 shadow-lg"
-              :class="isAudioType(item.Type) ? 'aspect-square' : 'aspect-[2/3]'">
-              <LazyImg :src="getImageUrl(item.Id, item.Type)" :alt="item.Name" :item-type="item.Type"
-                class="w-full h-full object-cover block" />
-            </router-link>
+              <!-- Watched badge -->
+              <div v-if="item.UserData?.Played"
+                class="absolute top-1.5 right-1.5 bg-accent-purple rounded-full p-0.5 shadow pointer-events-none">
+                <Check class="size-3 text-white" />
+              </div>
+
+              <!-- Action overlay: always visible on mobile, hover-only on desktop -->
+              <div v-if="!isAudioType(item.Type) && item.Type !== 'BoxSet'"
+                class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent flex items-end justify-center gap-2 pb-2 transition-opacity duration-200 sm:opacity-0 sm:group-hover:opacity-100 pointer-events-none">
+                <button
+                  @click.prevent.stop="playItem(item)"
+                  :disabled="playingId === item.Id"
+                  class="bg-white/90 hover:bg-white text-black rounded-full p-2.5 shadow-lg transition-all active:scale-95 disabled:opacity-60 pointer-events-auto"
+                  title="Play">
+                  <Loader2 v-if="playingId === item.Id" class="size-4 animate-spin" />
+                  <Play v-else class="size-4 fill-black stroke-none" />
+                </button>
+                <button
+                  @click.prevent.stop="toggleWatched(item)"
+                  :disabled="watchingId === item.Id"
+                  class="rounded-full p-2.5 shadow-lg transition-all active:scale-95 disabled:opacity-60 pointer-events-auto"
+                  :class="item.UserData?.Played ? 'bg-accent-purple text-white' : 'bg-white/90 hover:bg-white text-black'"
+                  :title="item.UserData?.Played ? 'Mark as unwatched' : 'Mark as watched'">
+                  <Check class="size-4" />
+                </button>
+              </div>
+            </div>
 
             <div class="w-full text-center mt-2.5">
               <div class="text-[0.95rem] font-semibold text-text-heading truncate" :title="item.Name">{{ item.Name }}</div>
@@ -28,12 +94,12 @@
       </ul>
 
       <!-- Pagination -->
-      <div class="flex items-center justify-center gap-3 mt-5">
-        <Button variant="outline" :disabled="startIndex === 0" @click="prevPage">
+      <div class="flex items-center justify-center gap-3 mt-6">
+        <Button variant="outline" :disabled="startIndex === 0" @click="prevPage" class="min-h-[44px] px-4">
           <ArrowLeft class="size-4 mr-1" /> Previous
         </Button>
         <span class="text-text-primary font-semibold">Page {{ currentPage }}</span>
-        <Button variant="outline" :disabled="!hasNextPage" @click="nextPage">
+        <Button variant="outline" :disabled="!hasNextPage" @click="nextPage" class="min-h-[44px] px-4">
           Next <ArrowRight class="size-4 ml-1" />
         </Button>
       </div>
@@ -42,19 +108,23 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, computed, watch } from 'vue';
-import { useRoute } from 'vue-router';
+import { onMounted, onUnmounted, ref, computed, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { useJellyfinStore } from '@/store/jellyfin-store';
 import LazyImg from '@/components/LazyImg.vue';
 import { isAudioType } from '@/utils/helpers';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ArrowRight } from 'lucide-vue-next';
+import { ArrowLeft, ArrowRight, Play, Check, Loader2 } from 'lucide-vue-next';
 
 const store = useJellyfinStore();
 const route = useRoute();
+const router = useRouter();
 const libraryId = route.params.id as string;
+
+const playingId = ref<string | null>(null);
+const watchingId = ref<string | null>(null);
 
 const items = ref<any[]>([]);
 const limit = ref(50);
@@ -62,6 +132,14 @@ const startIndex = ref(0);
 const hasNextPage = ref(false);
 const loading = ref(true);
 const error = ref<string | null>(null);
+
+// Filtering and sorting
+const sortBy = ref('SortName');
+const sortOrder = ref('Ascending');
+const filter = ref('');
+const selectedGenres = ref<string[]>([]);
+const availableGenres = ref<string[]>([]);
+const showGenreDropdown = ref(false);
 
 const currentPage = computed(() => Math.floor(startIndex.value / limit.value) + 1);
 
@@ -77,6 +155,10 @@ async function loadPage() {
     const pageItems = await store.fetchItems(libraryId, {
       startIndex: startIndex.value,
       limit: limit.value,
+      sortBy: [sortBy.value],
+      sortOrder: [sortOrder.value],
+      filters: filter.value ? [filter.value] : undefined,
+      genres: selectedGenres.value.length > 0 ? selectedGenres.value : undefined,
     });
     items.value = pageItems;
     hasNextPage.value = pageItems.length === limit.value;
@@ -85,6 +167,29 @@ async function loadPage() {
   } finally {
     loading.value = false;
   }
+}
+
+async function loadGenres() {
+  try {
+    availableGenres.value = await store.fetchGenres(libraryId);
+  } catch (e) {
+    console.error('Failed to load genres', e);
+  }
+}
+
+function onFilterChange() {
+  startIndex.value = 0;
+  loadPage();
+}
+
+function resetFilters() {
+  sortBy.value = 'SortName';
+  sortOrder.value = 'Ascending';
+  filter.value = '';
+  selectedGenres.value = [];
+  showGenreDropdown.value = false;
+  startIndex.value = 0;
+  loadPage();
 }
 
 async function nextPage() {
@@ -109,11 +214,64 @@ function scrollTopSmooth() {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-onMounted(loadPage);
+async function playItem(item: any) {
+  if (playingId.value) return;
+  playingId.value = item.Id;
+  try {
+    if (item.Type === 'Series') {
+      const nextEp = await store.fetchNextUp(item.Id);
+      if (nextEp) {
+        router.push({ name: 'Player', params: { id: nextEp.Id } });
+      } else {
+        // All watched or no episodes – go to series detail
+        router.push({ name: 'ItemDetails', params: { id: item.Id } });
+      }
+    } else {
+      router.push({ name: 'Player', params: { id: item.Id } });
+    }
+  } finally {
+    playingId.value = null;
+  }
+}
+
+async function toggleWatched(item: any) {
+  if (watchingId.value) return;
+  watchingId.value = item.Id;
+  try {
+    if (item.UserData?.Played) {
+      await store.markUnplayed(item.Id);
+      if (item.UserData) item.UserData.Played = false;
+    } else {
+      await store.markPlayed(item.Id);
+      if (!item.UserData) item.UserData = {};
+      item.UserData.Played = true;
+    }
+  } finally {
+    watchingId.value = null;
+  }
+}
+
+function handleClickOutside(event: MouseEvent) {
+  const target = event.target as HTMLElement;
+  if (!target.closest('.relative')) {
+    showGenreDropdown.value = false;
+  }
+}
+
+onMounted(() => {
+  loadGenres();
+  loadPage();
+  document.addEventListener('click', handleClickOutside);
+});
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleClickOutside);
+});
 
 watch(() => route.params.id, async (newId) => {
   if (!newId) return;
   startIndex.value = 0;
+  await loadGenres();
   await loadPage();
 });
 </script>

@@ -1,11 +1,11 @@
 <template>
-  <img ref="imgRef" :src="loaded ? src : placeholder" :alt="alt"
+  <img ref="imgRef" :src="loaded ? activeSrc : placeholder" :alt="alt"
     :class="cn('opacity-0 transition-opacity duration-300', loaded && 'opacity-100', $attrs.class as string)"
     @error="onError" />
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, watch } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
 import { useJellyfinStore } from '@/store/jellyfin-store';
 import { cn } from '@/lib/utils';
 
@@ -21,13 +21,15 @@ const props = defineProps<{
 const store = useJellyfinStore();
 const imgRef = ref<HTMLImageElement | null>(null);
 const loaded = ref(false);
+const hasError = ref(false);
 let observer: IntersectionObserver | null = null;
 
 const placeholder = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"%3E%3Crect fill="%231e1e1e" width="1" height="1"/%3E%3C/svg%3E';
+const fallbackSrc = computed(() => store.getPlaceholderImage(props.itemType || 'default'));
+const activeSrc = computed(() => (hasError.value || !props.src) ? fallbackSrc.value : props.src);
 
-function onError(e: Event) {
-  const img = e.target as HTMLImageElement;
-  img.src = store.getPlaceholderImage(props.itemType || 'default');
+function onError() {
+  hasError.value = true;
 }
 
 function observe() {
@@ -51,6 +53,7 @@ function observe() {
 onMounted(observe);
 
 watch(() => props.src, () => {
+  hasError.value = false;
   loaded.value = false;
   if (observer) {
     observer.disconnect();

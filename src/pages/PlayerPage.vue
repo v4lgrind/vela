@@ -1084,8 +1084,25 @@ async function playOffline() {
 
         video.src = localFileUrl;
 
+        // Wait for metadata to load
+        await new Promise<void>((resolve, reject) => {
+            const onLoaded = () => {
+                video.removeEventListener('loadedmetadata', onLoaded);
+                video.removeEventListener('error', onError);
+                resolve();
+            };
+            const onError = (e: Event) => {
+                video.removeEventListener('loadedmetadata', onLoaded);
+                video.removeEventListener('error', onError);
+                reject(new Error('Failed to load video'));
+            };
+            video.addEventListener('loadedmetadata', onLoaded);
+            video.addEventListener('error', onError);
+        });
+
         attachMediaListeners(video);
 
+        // Restore saved progress
         const savedProgress = await offlineDatabase.getWatchProgress(itemId);
         if (savedProgress && savedProgress.position > 0) {
             video.currentTime = savedProgress.position;
@@ -1095,11 +1112,18 @@ async function playOffline() {
 
         setupMediaSession();
 
+        // Start playback
+        await video.play().catch((err) => {
+            console.warn('[Player] Auto-play blocked, user interaction needed:', err);
+        });
+
         isOfflinePlayback.value = true;
-        console.log('[Player] Offline playback initialized');
+        isLoading.value = false;
+        console.log('[Player] Offline playback started');
     } catch (e: any) {
         console.error('[Player] Offline playback error:', e);
         error.value = 'Unable to play offline file';
+        isLoading.value = false;
     }
 }
 

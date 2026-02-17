@@ -1,12 +1,12 @@
 <template>
-  <div class="min-h-dvh bg-surface text-text-primary p-5">
-    <header class="flex justify-between items-center mb-5">
-      <h2 class="text-3xl font-semibold">My Library</h2>
+  <div class="min-h-dvh bg-surface text-text-primary p-4 sm:p-6 md:p-8">
+    <header class="mb-6 sm:mb-8">
+      <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground">My Library</h2>
     </header>
 
     <!-- Loading state -->
-    <div v-if="loading" class="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3 sm:grid-cols-[repeat(auto-fill,minmax(240px,1fr))] sm:gap-4 xl:grid-cols-[repeat(auto-fill,minmax(300px,1fr))] xl:gap-5">
-      <Skeleton v-for="i in 6" :key="i" class="h-48 rounded-xl" />
+    <div v-if="loading" class="grid grid-cols-2 gap-4 sm:grid-cols-3 md:gap-5 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+      <Skeleton v-for="i in 6" :key="i" class="aspect-[2/1] rounded-2xl" />
     </div>
 
     <!-- Error state -->
@@ -15,12 +15,11 @@
     </div>
 
     <!-- Library grid -->
-    <ul v-else class="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3 sm:grid-cols-[repeat(auto-fill,minmax(240px,1fr))] sm:gap-4 xl:grid-cols-[repeat(auto-fill,minmax(300px,1fr))] xl:gap-5 list-none p-0 m-0">
+    <ul v-else class="grid grid-cols-2 gap-4 sm:grid-cols-3 md:gap-5 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 list-none p-0 m-0">
       <li v-for="item in mediaItems" :key="item.Id">
-        <Card class="bg-surface-raised border-border-default hover:-translate-y-1 hover:bg-surface-hover hover:border-border-hover hover:shadow-xl transition-all duration-200 flex flex-col items-center p-2.5 pb-3 overflow-hidden">
-          <router-link class="text-accent-purple-light text-center font-semibold no-underline hover:text-accent-purple hover:underline mt-2 max-w-full break-words" :to="{ name: 'libraryItem', params: { id: item.Id, name: item.Name } }">
-            <LazyImg :src="item.imageUrl" alt="poster" :item-type="item.Type" class="block w-full h-full object-cover rounded-[10px]" />
-            <div class="mt-2">{{ item.Name }}</div>
+        <Card class="bg-surface-raised border-border-default hover:-translate-y-1 hover:bg-surface-hover hover:border-border-hover hover:shadow-xl transition-all duration-200 overflow-hidden p-0 rounded-2xl aspect-[2/1]">
+          <router-link class="block w-full h-full" :to="{ name: 'libraryItem', params: { id: item.Id, name: item.Name } }">
+            <LazyImg :src="item.imageUrl" :alt="item.Name" :item-type="item.Type" class="block w-full h-full object-cover" />
           </router-link>
         </Card>
       </li>
@@ -50,7 +49,7 @@ async function loadMedia() {
       Id: lib.Id!,
       Name: lib.Name!,
       Type: lib.Type,
-      imageUrl: store.getImageUrl(lib.Id!, 'Primary', 300, 150) || ''
+      imageUrl: store.getImageUrl(lib.Id!, 'Primary', 800, 400) || ''
     }));
   } catch (e) {
     error.value = 'Failed to load media libraries';

@@ -50,6 +50,7 @@ jobs:
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         with:
           name: mediaserver-client-debug-${{ github.sha }}
           path: android/app/build/outputs/apk/debug/mediaserver-client-debug.apk

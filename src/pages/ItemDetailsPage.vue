@@ -3,20 +3,27 @@
         <section v-if="loading" class="text-center py-10 text-lg text-text-muted">Loading...</section>
         <section v-else-if="error" class="text-center py-10 text-lg text-error">{{ error }}</section>
 
-        <Card v-else class="bg-surface-raised border-border-default rounded-xl p-4 shadow-lg grid grid-cols-[200px_1fr] max-md:grid-cols-1 gap-4">
+        <Card v-else class="bg-surface-raised border-border-default rounded-xl p-4 shadow-lg grid gap-4"
+            :class="isLandscapePoster ? 'grid-cols-1' : 'grid-cols-[200px_1fr] max-md:grid-cols-1'">
             <div>
                 <div class="rounded-lg overflow-hidden bg-black/60 shadow-md mx-auto"
-                    :class="isAudioType(item.Type) ? 'w-[200px] h-[200px] max-md:w-[160px] max-md:h-[160px]' : 'w-[200px] h-[300px] max-md:w-[160px] max-md:h-[240px]'">
+                    :class="isAudioType(item.Type)
+                        ? 'w-[200px] h-[200px] max-md:w-[160px] max-md:h-[160px]'
+                        : isLandscapePoster
+                            ? 'w-full max-w-[480px] aspect-video'
+                            : 'w-[200px] h-[300px] max-md:w-[160px] max-md:h-[240px]'">
                     <LazyImg :src="posterUrl" :alt="item?.Name" :item-type="item?.Type" class="w-full h-full object-cover" />
                 </div>
             </div>
 
+            <Dialog v-model:open="showMediaInfo">
             <div>
                 <h3 class="text-xl font-bold text-text-heading m-0 mb-2">{{ item?.Name }}</h3>
 
                 <div class="flex flex-wrap gap-2 mt-3">
                 <Button v-if="isPlayable(item)" class="bg-gradient-to-r from-accent-green to-accent-teal text-surface-raised font-bold min-h-[44px]" @click="playMedia">
-                    <Play class="size-4 mr-1 fill-current stroke-none" /> Play
+                    <Play class="size-4 mr-1 fill-current stroke-none" />
+                    {{ resumePositionLabel ? `Resume at ${resumePositionLabel}` : 'Play' }}
                 </Button>
 
                 <Button v-if="item.Type === 'MusicAlbum' && audioTracks.length" class="bg-gradient-to-r from-accent-green to-accent-teal text-surface-raised font-bold min-h-[44px]" @click="playAlbum">
@@ -38,6 +45,13 @@
                 <Button v-if="isDownloading" variant="destructive" class="min-h-[44px]" @click="cancelDownload">
                     <X class="size-4 mr-1" /> Cancel
                 </Button>
+                </div>
+
+                <DialogTrigger v-if="videoDetails.length || sourceDetails.length || fileSizeHuman" as-child>
+                    <Button variant="outline" class="gap-2 min-h-[44px]">
+                        <Info class="size-4" /> Media Info
+                    </Button>
+                </DialogTrigger>
                 </div>
 
                 <div class="flex flex-wrap gap-2 mb-2 mt-2">
@@ -75,7 +89,52 @@
                         <Badge v-for="s in studioNames" :key="s" variant="secondary">{{ s }}</Badge>
                     </div>
                 </div>
+
+                <!-- Media Info Dialog Content -->
+                <DialogContent class="max-w-lg max-h-[85dvh] overflow-y-auto bg-surface-raised border-border-default">
+                    <DialogHeader>
+                        <DialogTitle class="text-text-heading text-lg">Media Information</DialogTitle>
+                        <DialogDescription class="text-text-muted text-sm">Technical details for {{ item?.Name }}</DialogDescription>
+                    </DialogHeader>
+
+                    <div v-if="videoDetails.length" class="mt-4">
+                        <h4 class="text-sm font-semibold text-accent-purple-light uppercase tracking-wider mb-3">Video Stream</h4>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div v-for="row in videoDetails" :key="`v-${row.label}`"
+                                class="bg-surface-hover/50 rounded-lg px-3 py-2">
+                                <div class="text-[11px] text-text-muted uppercase tracking-wider">{{ row.label }}</div>
+                                <div class="text-sm font-medium text-text-heading mt-0.5 break-all">{{ row.value }}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <Separator v-if="videoDetails.length && (sourceDetails.length || fileSizeHuman)" class="my-4 bg-border-default" />
+
+                    <div v-if="sourceDetails.length || fileSizeHuman">
+                        <h4 class="text-sm font-semibold text-accent-purple-light uppercase tracking-wider mb-3">Media Source</h4>
+                        <div class="grid grid-cols-2 gap-2">
+                            <template v-for="row in sourceDetails" :key="`s-${row.label}`">
+                                <div class="bg-surface-hover/50 rounded-lg px-3 py-2"
+                                    :class="row.label === 'Path' ? 'col-span-2' : ''">
+                                    <div class="text-[11px] text-text-muted uppercase tracking-wider">{{ row.label }}</div>
+                                    <div class="text-sm font-medium text-text-heading mt-0.5 break-all">{{ row.value }}</div>
+                                </div>
+                            </template>
+                            <div v-if="fileSizeHuman" class="bg-surface-hover/50 rounded-lg px-3 py-2">
+                                <div class="text-[11px] text-text-muted uppercase tracking-wider">File size</div>
+                                <div class="text-sm font-medium text-text-heading mt-0.5">{{ fileSizeHuman }}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <DialogFooter class="mt-4">
+                        <DialogClose as-child>
+                            <Button variant="outline" class="min-h-[44px]">Close</Button>
+                        </DialogClose>
+                    </DialogFooter>
+                </DialogContent>
             </div>
+            </Dialog>
         </Card>
 
         <!-- Seasons -->
@@ -201,30 +260,6 @@
             </div>
         </section>
 
-        <!-- Video Metadata -->
-        <section v-if="videoDetails.length" class="mt-6">
-            <h3 class="text-lg font-semibold mb-2.5">Video Metadata</h3>
-            <dl class="grid grid-cols-[180px_1fr] gap-x-3.5 gap-y-1.5 items-center">
-                <template v-for="row in videoDetails" :key="`v-${row.label}`">
-                    <dt class="text-text-muted font-semibold">{{ row.label }}</dt>
-                    <dd class="m-0 text-text-primary break-all">{{ row.value }}</dd>
-                </template>
-            </dl>
-        </section>
-
-        <section v-if="sourceDetails.length || fileSizeHuman" class="mt-6">
-            <h3 class="text-lg font-semibold mb-2.5">Media Source</h3>
-            <dl class="grid grid-cols-[180px_1fr] gap-x-3.5 gap-y-1.5 items-center">
-                <template v-for="row in sourceDetails" :key="`s-${row.label}`">
-                    <dt class="text-text-muted font-semibold">{{ row.label }}</dt>
-                    <dd class="m-0 text-text-primary break-all">{{ row.value }}</dd>
-                </template>
-                <template v-if="fileSizeHuman">
-                    <dt class="text-text-muted font-semibold">File size</dt>
-                    <dd class="m-0 text-text-primary break-all">{{ fileSizeHuman }}</dd>
-                </template>
-            </dl>
-        </section>
     </div>
 </template>
 
@@ -240,7 +275,9 @@ import { isAudioType, typeLabel as getTypeLabel, formatTicksDuration, formatTick
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Play, Check, Download as DownloadIcon, X, ArrowLeft, ArrowRight, Loader2 } from 'lucide-vue-next';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose, DialogTrigger } from '@/components/ui/dialog';
+import { Separator } from '@/components/ui/separator';
+import { Play, Check, Download as DownloadIcon, X, ArrowLeft, ArrowRight, Loader2, Info } from 'lucide-vue-next';
 
 const store = useJellyfinStore();
 const offlineStore = useOfflineStore();
@@ -258,6 +295,7 @@ const audioTracks = ref<any[]>([]);
 const itemId = computed(() => route.params.id as string);
 const accessToken = store.accessToken;
 
+const showMediaInfo = ref(false);
 const isDownloading = ref(false);
 const downloadProgress = ref(0);
 const playingSeasonId = ref<string | null>(null);
@@ -293,9 +331,23 @@ async function load() {
 onMounted(load);
 watch(() => route.params.id, load);
 
+const isLandscapePoster = computed(() => {
+    const type = item.value?.Type;
+    return type === 'Episode';
+});
+
 const posterUrl = computed(() => {
     if (!item.value?.Id) return '';
+    if (isLandscapePoster.value) {
+        return store.getImageUrl(item.value.Id, 'Primary', 960, 540) || '';
+    }
     return store.getImageUrl(item.value.Id, 'Primary', 300, 450) || '';
+});
+
+const resumePositionLabel = computed(() => {
+    const ticks = item.value?.UserData?.PlaybackPositionTicks;
+    if (!ticks || ticks <= 0) return null;
+    return formatTicksHuman(ticks);
 });
 
 const year = computed(() => item.value?.ProductionYear || null);

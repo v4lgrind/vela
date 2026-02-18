@@ -241,6 +241,18 @@ export const useJellyfinStore = defineStore("jellyfin", {
       return resp.data.Items?.[0] ?? null;
     },
 
+    async fetchAllNextUp(limit = 20) {
+      this.initializeApi();
+      const resp = await getTvShowsApi(this.api).getNextUp({
+        userId: this.userId,
+        limit,
+        fields: ["PrimaryImageAspectRatio", "SeriesInfo", "ParentId", "UserData"] as any,
+        enableImageTypes: ["Primary", "Backdrop", "Thumb"] as any,
+        imageTypeLimit: 1,
+      });
+      return resp.data.Items ?? [];
+    },
+
     async fetchFirstUnwatchedEpisode(seasonId: string) {
       this.initializeApi();
       const resp = await getItemsApi(this.api).getItems({

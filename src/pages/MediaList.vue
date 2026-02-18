@@ -5,8 +5,8 @@
     <section v-if="resumeItems.length" class="mb-8 sm:mb-10">
       <h2 class="text-xl sm:text-2xl font-bold text-foreground mb-4">Continue Watching</h2>
       <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:gap-4 lg:grid-cols-4 xl:grid-cols-5">
-        <div v-for="item in resumeItems" :key="item.Id" class="relative group cursor-pointer" @click="playResume(item)">
-          <Card class="bg-surface-raised border-border-default overflow-hidden p-0 rounded-xl aspect-video group-hover:-translate-y-1 group-hover:shadow-xl group-hover:border-border-hover transition-all duration-200">
+        <div v-for="item in resumeItems" :key="item.Id" class="relative group">
+          <Card class="bg-surface-raised border-border-default overflow-hidden p-0 rounded-xl aspect-video group-hover:-translate-y-1 group-hover:shadow-xl group-hover:border-border-hover transition-all duration-200 cursor-pointer" @click="playResume(item)">
             <LazyImg
               :src="getResumeImageUrl(item)"
               :alt="item.Name"
@@ -14,13 +14,13 @@
               class="block w-full h-full object-cover" />
 
             <!-- Progress bar -->
-            <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-white/20">
-              <div class="h-full bg-accent-purple transition-all"
+            <div class="absolute bottom-0 left-0 right-0 h-1 bg-white/20 rounded-full">
+              <div class="h-full bg-accent-purple rounded-full transition-all"
                 :style="{ width: (item.UserData?.PlayedPercentage ?? 0) + '%' }" />
             </div>
 
             <!-- Play overlay -->
-            <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
+            <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center pointer-events-none">
               <div class="bg-white/90 rounded-full p-3 shadow-lg">
                 <Play class="size-5 fill-black stroke-none" />
               </div>
@@ -28,12 +28,45 @@
           </Card>
 
           <!-- Title below card -->
-          <div class="mt-1.5 px-0.5">
-            <div class="text-xs font-semibold text-text-heading truncate" :title="resumeTitle(item)">
+          <div class="mb-4 px-0.5 cursor-pointer" @click="goToItem(item)">
+            <div class="text-sm font-semibold text-text-heading truncate hover:text-accent-purple-light transition-colors" :title="resumeTitle(item)">
               {{ resumeTitle(item) }}
             </div>
-            <div v-if="item.Type === 'Episode'" class="text-[11px] text-text-muted truncate mt-0.5">
+            <div v-if="item.Type === 'Episode'" class="text-xs text-text-muted truncate mt-0.5">
               S{{ item.ParentIndexNumber }}E{{ item.IndexNumber }} · {{ item.SeriesName }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Next Up -->
+    <section v-if="nextUpItems.length" class="mb-8 sm:mb-10">
+      <h2 class="text-xl sm:text-2xl font-bold text-foreground mb-4">Next Up</h2>
+      <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:gap-4 lg:grid-cols-4 xl:grid-cols-5">
+        <div v-for="item in nextUpItems" :key="item.Id" class="relative group">
+          <Card class="bg-surface-raised border-border-default overflow-hidden p-0 rounded-xl aspect-video group-hover:-translate-y-1 group-hover:shadow-xl group-hover:border-border-hover transition-all duration-200 cursor-pointer" @click="playResume(item)">
+            <LazyImg
+              :src="getResumeImageUrl(item)"
+              :alt="item.Name"
+              :item-type="item.Type"
+              class="block w-full h-full object-cover" />
+
+            <!-- Play overlay -->
+            <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center pointer-events-none">
+              <div class="bg-white/90 rounded-full p-3 shadow-lg">
+                <Play class="size-5 fill-black stroke-none" />
+              </div>
+            </div>
+          </Card>
+
+          <!-- Title below card -->
+          <div class="mt-4 px-0.5 cursor-pointer" @click="goToItem(item)">
+            <div class="text-sm font-semibold text-text-heading truncate hover:text-accent-purple-light transition-colors" :title="item.SeriesName ?? item.Name">
+              {{ item.SeriesName ?? item.Name }}
+            </div>
+            <div class="text-xs text-text-muted truncate mt-0.5">
+              S{{ item.ParentIndexNumber }}E{{ item.IndexNumber }} · {{ item.Name }}
             </div>
           </div>
         </div>
@@ -82,6 +115,7 @@ const router = useRouter();
 
 const mediaItems = ref<Array<{ Id: string; Name: string; imageUrl: string; Type?: string }>>([]);
 const resumeItems = ref<any[]>([]);
+const nextUpItems = ref<any[]>([]);
 const loading = ref(true);
 const error = ref<string | null>(null);
 
@@ -89,9 +123,10 @@ async function loadMedia() {
   loading.value = true;
   error.value = null;
   try {
-    const [libs, resume] = await Promise.all([
+    const [libs, resume, nextUp] = await Promise.all([
       store.fetchLibraries(),
       store.fetchResumeItems(12),
+      store.fetchAllNextUp(20),
     ]);
     mediaItems.value = libs.map(lib => ({
       Id: lib.Id!,
@@ -100,6 +135,7 @@ async function loadMedia() {
       imageUrl: store.getImageUrl(lib.Id!, 'Primary', 800, 400) || ''
     }));
     resumeItems.value = resume;
+    nextUpItems.value = nextUp;
   } catch (e) {
     error.value = 'Failed to load media libraries';
   } finally {
@@ -124,6 +160,10 @@ function resumeTitle(item: any): string {
 
 function playResume(item: any) {
   router.push({ name: 'Player', params: { id: item.Id } });
+}
+
+function goToItem(item: any) {
+  router.push({ name: 'ItemDetails', params: { id: item.Id } });
 }
 
 onMounted(() => {

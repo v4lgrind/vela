@@ -1,5 +1,8 @@
 <template>
   <nav class="flex items-center gap-2 md:gap-4 bg-surface-raised px-3 md:px-5 pb-2.5" style="padding-top: calc(10px + env(safe-area-inset-top, 0px))">
+    <Button v-if="canGoBack" variant="ghost" class="shrink-0 px-2 sm:px-3" @click="router.back()" aria-label="Go back">
+      <ArrowLeft class="size-5 sm:size-4" />
+    </Button>
     <Button variant="ghost" class="font-bold shrink-0 px-2 sm:px-3" @click="$router.push('/libraries')" aria-label="Home">
       <Home class="size-5 sm:size-4 sm:mr-1" /><span class="hidden sm:inline">Home</span>
     </Button>
@@ -103,16 +106,18 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { useJellyfinStore } from '@/store/jellyfin-store';
 import { useOfflineStore } from '@/store/offline-store';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Home, Download, LogOut, Loader2 } from 'lucide-vue-next';
+import { Home, Download, LogOut, Loader2, ArrowLeft } from 'lucide-vue-next';
 
 const placeholder = 'Search movies, shows, albums...';
+const route = useRoute();
 const router = useRouter();
+const canGoBack = computed(() => route.path !== '/libraries' && route.path !== '/');
 const store = useJellyfinStore();
 const offlineStore = useOfflineStore();
 

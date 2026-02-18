@@ -1175,7 +1175,9 @@ onMounted(async () => {
         console.log('[Player] Online playback');
         await getPlaybackUrl();
         if (hlsUrl.value) {
-            await initPlayer();
+            const resumeTicks = details.value?.UserData?.PlaybackPositionTicks;
+            const resumeSeconds = resumeTicks ? resumeTicks / 10_000_000 : undefined;
+            await initPlayer(resumeSeconds);
         }
     } else {
         error.value = 'File not available offline. Connect to the internet to watch this content.';

@@ -9,7 +9,7 @@ export interface DownloadedMedia {
   itemId: string; // Primary key
   type: "Movie" | "Episode" | "MusicAlbum" | "Audio";
   name: string;
-  filePath: string; // Tauri file path
+  filePath: string;
   fileSize: number;
   downloadDate: number; // timestamp
 

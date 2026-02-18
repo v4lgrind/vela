@@ -21,7 +21,9 @@
 				"Vue.volar",
 				"pranaygp.vscode-css-peek",
 				"ecmel.vscode-html-css",
-				"kamikillerto.vscode-colorize"
+				"kamikillerto.vscode-colorize",
+				"DavidAnson.vscode-markdownlint",
+				"eamodio.gitlens"
 			]
 		}
 	}

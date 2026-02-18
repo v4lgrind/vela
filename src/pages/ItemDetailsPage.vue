@@ -45,7 +45,6 @@
                 <Button v-if="isDownloading" variant="destructive" class="min-h-[44px]" @click="cancelDownload">
                     <X class="size-4 mr-1" /> Cancel
                 </Button>
-                </div>
 
                 <DialogTrigger v-if="videoDetails.length || sourceDetails.length || fileSizeHuman" as-child>
                     <Button variant="outline" class="gap-2 min-h-[44px]">

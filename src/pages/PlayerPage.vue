@@ -1,152 +1,174 @@
 <template>
-  <div class="fixed inset-0 bg-black text-gray-300 flex flex-col z-[100] h-dvh"
-    style="padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px)">
+    <div class="fixed inset-0 bg-black text-gray-300 flex flex-col z-[100] h-dvh"
+        style="padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px)">
 
-    <!-- Error -->
-    <section v-if="error" class="absolute top-[70px] left-1/2 -translate-x-1/2 z-[200] text-error bg-black/90 px-6 py-3 rounded-lg">
-      {{ error }}
-    </section>
+        <!-- Error -->
+        <section v-if="error"
+            class="absolute top-[70px] left-1/2 -translate-x-1/2 z-[200] text-error bg-black/90 px-6 py-3 rounded-lg">
+            {{ error }}
+        </section>
 
-    <div class="relative w-full flex-1 overflow-hidden bg-black"
-      @mousemove="showControls" @mouseleave="hideControls" @touchstart="showControls">
+        <div class="relative w-full flex-1 overflow-hidden bg-black" @mousemove="showControls"
+            @mouseleave="hideControls" @touchstart="showControls">
 
-      <!-- Loader -->
-      <div v-if="isLoading" class="absolute inset-0 bg-black/90 flex flex-col items-center justify-center z-50">
-        <Loader2 class="size-15 animate-spin text-accent-purple" />
-        <p class="mt-5 text-white text-base font-medium">Loading...</p>
-      </div>
+            <!-- Loader -->
+            <div v-if="isLoading" class="absolute inset-0 bg-black/90 flex flex-col items-center justify-center z-50">
+                <Loader2 class="size-15 animate-spin text-accent-purple" />
+                <p class="mt-5 text-white text-base font-medium">Loading...</p>
+            </div>
 
-      <!-- Video -->
-      <video ref="videoEl" class="w-full h-full bg-black object-contain" preload="metadata" playsinline :poster="posterUrl"
-        @click="handleVideoTap" @timeupdate="onTimeUpdate" @loadedmetadata="onLoadedMetadata"
-        @loadstart="onLoadStart" @canplay="onCanPlay" @waiting="onWaiting" @playing="onPlaying"></video>
+            <!-- Video -->
+            <video ref="videoEl" class="w-full h-full bg-black object-contain" preload="metadata" playsinline
+                :poster="posterUrl" @click="handleVideoTap" @timeupdate="onTimeUpdate"
+                @loadedmetadata="onLoadedMetadata" @loadstart="onLoadStart" @canplay="onCanPlay" @waiting="onWaiting"
+                @playing="onPlaying"></video>
 
-      <!-- Controls -->
-      <div class="absolute inset-0 flex flex-col justify-end player-gradient px-4 pt-5 transition-opacity duration-300"
-        :class="controlsVisible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'"
-        style="padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px))">
+            <!-- Controls -->
+            <div class="absolute inset-0 flex flex-col justify-end player-gradient px-4 pt-5 transition-opacity duration-300"
+                :class="controlsVisible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'"
+                style="padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px))">
 
-        <!-- Back button -->
-        <button class="absolute left-3 bg-black/50 text-white border-none cursor-pointer px-3.5 py-2 rounded-lg flex items-center gap-1.5 text-[0.95rem] font-medium transition-colors hover:bg-white/15 z-10"
-          style="top: env(safe-area-inset-top, 12px)"
-          @click="goBack">
-          <ArrowLeft class="size-5" />
-          Back
-        </button>
+                <!-- Back button -->
+                <button
+                    class="absolute left-3 bg-black/50 text-white border-none cursor-pointer px-3.5 py-2 rounded-lg flex items-center gap-1.5 text-[0.95rem] font-medium transition-colors hover:bg-white/15 z-10"
+                    style="top: env(safe-area-inset-top, 12px)" @click="goBack">
+                    <ArrowLeft class="size-5" />
+                    Back
+                </button>
 
-        <!-- Progress bar -->
-        <div class="w-full h-6 flex items-center cursor-pointer mb-3 group" @click="seek">
-          <div class="w-full h-1 bg-white/30 rounded-sm relative transition-[height] duration-200 group-hover:h-1.5">
-            <div class="h-full bg-accent-purple rounded-sm transition-[width] duration-100 ease-linear" :style="{ width: progress + '%' }"></div>
-          </div>
+                <!-- Progress bar -->
+                <div class="w-full h-6 flex items-center cursor-pointer mb-3 group" @click="seek">
+                    <div
+                        class="w-full h-1 bg-white/30 rounded-sm relative transition-[height] duration-200 group-hover:h-1.5">
+                        <div class="h-full bg-accent-purple rounded-sm transition-[width] duration-100 ease-linear"
+                            :style="{ width: progress + '%' }"></div>
+                    </div>
+                </div>
+
+                <!-- Bottom controls -->
+                <div class="flex justify-between items-center">
+                    <div class="flex items-center gap-2">
+                        <!-- Play/Pause -->
+                        <button
+                            class="bg-transparent border-none text-white cursor-pointer p-2 rounded flex items-center gap-1.5 transition-colors hover:bg-white/10"
+                            @click="togglePlayPause">
+                            <Play v-if="!isPlaying" class="size-6 fill-current" />
+                            <Pause v-else class="size-6 fill-current" />
+                        </button>
+
+                        <!-- Volume -->
+                        <div class="flex items-center gap-2">
+                            <button
+                                class="bg-transparent border-none text-white cursor-pointer p-2 rounded flex items-center transition-colors hover:bg-white/10"
+                                @click="toggleMute">
+                                <Volume2 v-if="volume > 50" class="size-6" />
+                                <Volume1 v-else-if="volume > 0" class="size-6" />
+                                <VolumeX v-else class="size-6" />
+                            </button>
+                            <Slider :model-value="[volume]" :max="100" :step="1" class="w-20"
+                                @update:model-value="(v?: number[]) => { if (v) { volume = v[0]; setVolume(); } }" />
+                        </div>
+
+                        <!-- Time -->
+                        <div class="text-[0.9rem] text-white tabular-nums min-w-[110px]">
+                            {{ formatTime(currentTime) }} / {{ formatTime(duration) }}
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                        <!-- Audio tracks -->
+                        <div v-if="audioList.length" class="relative" ref="audioDropdown">
+                            <button
+                                class="bg-transparent border-none text-white cursor-pointer p-2 rounded flex items-center gap-1.5 transition-colors hover:bg-white/10"
+                                @click="toggleAudioMenu">
+                                <AudioLines class="size-6" />
+                                <span class="text-[0.9rem] font-medium">Audio</span>
+                            </button>
+                            <div class="absolute bottom-full right-0 mb-2 bg-[rgba(28,28,28,0.98)] rounded-lg min-w-[250px] max-h-[400px] overflow-y-auto shadow-[0_8px_24px_rgba(0,0,0,0.5)] backdrop-blur-[10px] transition-all duration-200 scrollbar-hide"
+                                :class="audioMenuOpen ? 'opacity-100 pointer-events-auto translate-y-0' : 'opacity-0 pointer-events-none translate-y-2.5'">
+                                <div v-for="opt in audioList" :key="opt.id"
+                                    class="flex items-center gap-2.5 px-4 py-3 cursor-pointer text-[0.9rem] transition-colors hover:bg-white/10"
+                                    :class="opt.index === selectedAudioIndex && 'bg-accent-purple/20'"
+                                    @click="selectAudio(opt.index)">
+                                    <Check class="size-4 shrink-0"
+                                        :class="opt.index === selectedAudioIndex ? 'opacity-100' : 'opacity-0'" />
+                                    {{ opt.label }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Subtitles -->
+                        <div v-if="subtitleList.length" class="relative" ref="subtitleDropdown">
+                            <button
+                                class="bg-transparent border-none text-white cursor-pointer p-2 rounded flex items-center gap-1.5 transition-colors hover:bg-white/10"
+                                @click="toggleSubtitleMenu">
+                                <Subtitles class="size-6" />
+                                <span class="text-[0.9rem] font-medium">Subtitles</span>
+                            </button>
+                            <div class="absolute bottom-full right-0 mb-2 bg-[rgba(28,28,28,0.98)] rounded-lg min-w-[250px] max-h-[400px] overflow-y-auto shadow-[0_8px_24px_rgba(0,0,0,0.5)] backdrop-blur-[10px] transition-all duration-200 scrollbar-hide"
+                                :class="subtitleMenuOpen ? 'opacity-100 pointer-events-auto translate-y-0' : 'opacity-0 pointer-events-none translate-y-2.5'">
+                                <div class="flex items-center gap-2.5 px-4 py-3 cursor-pointer text-[0.9rem] transition-colors hover:bg-white/10"
+                                    :class="selectedSubtitleIndex === '-1' && 'bg-accent-purple/20'"
+                                    @click="selectSubtitle('-1')">
+                                    <Check class="size-4 shrink-0"
+                                        :class="selectedSubtitleIndex === '-1' ? 'opacity-100' : 'opacity-0'" />
+                                    Disabled
+                                </div>
+                                <div v-for="opt in subtitleList" :key="opt.id"
+                                    class="flex items-center gap-2.5 px-4 py-3 cursor-pointer text-[0.9rem] transition-colors hover:bg-white/10"
+                                    :class="opt.index === parseInt(selectedSubtitleIndex) && 'bg-accent-purple/20'"
+                                    @click="selectSubtitle(String(opt.index))">
+                                    <Check class="size-4 shrink-0"
+                                        :class="opt.index === parseInt(selectedSubtitleIndex) ? 'opacity-100' : 'opacity-0'" />
+                                    {{ opt.label }}
+                                </div>
+                                <div class="h-px bg-white/10 my-1"></div>
+                                <div class="flex items-center gap-2.5 px-4 py-3 cursor-pointer text-[0.9rem] transition-colors hover:bg-white/10"
+                                    @click="selectSubtitle('local')">
+                                    <span class="size-4 shrink-0"></span>
+                                    Load local file...
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Quality -->
+                        <div class="relative" ref="qualityDropdown">
+                            <button
+                                class="bg-transparent border-none text-white cursor-pointer p-2 rounded flex flex-wrap items-center justify-center gap-1.5 transition-colors hover:bg-white/10"
+                                @click="toggleQualityMenu">
+                                <Settings class="size-6" />
+                                <span class="text-[0.9rem] font-medium">{{ qualityLabel }}</span>
+                                <Badge
+                                    class="text-[0.65rem] font-semibold uppercase tracking-wide bg-accent-purple/30 text-sky-300 border-none px-1.5 py-0.5 rounded">
+                                    {{ playMethodLabel }}</Badge>
+                            </button>
+                            <div class="absolute bottom-full right-0 mb-2 bg-[rgba(28,28,28,0.98)] rounded-lg min-w-[250px] max-h-[400px] overflow-y-auto shadow-[0_8px_24px_rgba(0,0,0,0.5)] backdrop-blur-[10px] transition-all duration-200 scrollbar-hide"
+                                :class="qualityMenuOpen ? 'opacity-100 pointer-events-auto translate-y-0' : 'opacity-0 pointer-events-none translate-y-2.5'">
+                                <div v-for="preset in qualityPresets" :key="preset.key"
+                                    class="flex items-center gap-2.5 px-4 py-3 cursor-pointer text-[0.9rem] transition-colors hover:bg-white/10"
+                                    :class="preset.key === selectedQuality && 'bg-accent-purple/20'"
+                                    @click="selectQuality(preset.key)">
+                                    <Check class="size-4 shrink-0"
+                                        :class="preset.key === selectedQuality ? 'opacity-100' : 'opacity-0'" />
+                                    {{ preset.label }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Fullscreen -->
+                        <button
+                            class="bg-transparent border-none text-white cursor-pointer p-2 rounded flex items-center transition-colors hover:bg-white/10"
+                            @click="toggleFullscreen">
+                            <Maximize v-if="!isFullscreen" class="size-6" />
+                            <Minimize v-else class="size-6" />
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <input ref="fileInput" type="file" accept=".vtt,.srt" class="hidden" @change="onPickSubtitleFile" />
         </div>
-
-        <!-- Bottom controls -->
-        <div class="flex justify-between items-center">
-          <div class="flex items-center gap-2">
-            <!-- Play/Pause -->
-            <button class="bg-transparent border-none text-white cursor-pointer p-2 rounded flex items-center gap-1.5 transition-colors hover:bg-white/10" @click="togglePlayPause">
-              <Play v-if="!isPlaying" class="size-6 fill-current" />
-              <Pause v-else class="size-6 fill-current" />
-            </button>
-
-            <!-- Volume -->
-            <div class="flex items-center gap-2">
-              <button class="bg-transparent border-none text-white cursor-pointer p-2 rounded flex items-center transition-colors hover:bg-white/10" @click="toggleMute">
-                <Volume2 v-if="volume > 50" class="size-6" />
-                <Volume1 v-else-if="volume > 0" class="size-6" />
-                <VolumeX v-else class="size-6" />
-              </button>
-              <Slider :model-value="[volume]" :max="100" :step="1" class="w-20"
-                @update:model-value="(v?: number[]) => { if (v) { volume = v[0]; setVolume(); } }" />
-            </div>
-
-            <!-- Time -->
-            <div class="text-[0.9rem] text-white tabular-nums min-w-[110px]">
-              {{ formatTime(currentTime) }} / {{ formatTime(duration) }}
-            </div>
-          </div>
-
-          <div class="flex items-center gap-2">
-            <!-- Audio tracks -->
-            <div v-if="audioList.length" class="relative" ref="audioDropdown">
-              <button class="bg-transparent border-none text-white cursor-pointer p-2 rounded flex items-center gap-1.5 transition-colors hover:bg-white/10" @click="toggleAudioMenu">
-                <AudioLines class="size-6" />
-                <span class="text-[0.9rem] font-medium">Audio</span>
-              </button>
-              <div class="absolute bottom-full right-0 mb-2 bg-[rgba(28,28,28,0.98)] rounded-lg min-w-[250px] max-h-[400px] overflow-y-auto shadow-[0_8px_24px_rgba(0,0,0,0.5)] backdrop-blur-[10px] transition-all duration-200 scrollbar-hide"
-                :class="audioMenuOpen ? 'opacity-100 pointer-events-auto translate-y-0' : 'opacity-0 pointer-events-none translate-y-2.5'">
-                <div v-for="opt in audioList" :key="opt.id"
-                  class="flex items-center gap-2.5 px-4 py-3 cursor-pointer text-[0.9rem] transition-colors hover:bg-white/10"
-                  :class="opt.index === selectedAudioIndex && 'bg-accent-purple/20'"
-                  @click="selectAudio(opt.index)">
-                  <Check class="size-4 shrink-0" :class="opt.index === selectedAudioIndex ? 'opacity-100' : 'opacity-0'" />
-                  {{ opt.label }}
-                </div>
-              </div>
-            </div>
-
-            <!-- Subtitles -->
-            <div v-if="subtitleList.length" class="relative" ref="subtitleDropdown">
-              <button class="bg-transparent border-none text-white cursor-pointer p-2 rounded flex items-center gap-1.5 transition-colors hover:bg-white/10" @click="toggleSubtitleMenu">
-                <Subtitles class="size-6" />
-                <span class="text-[0.9rem] font-medium">Subtitles</span>
-              </button>
-              <div class="absolute bottom-full right-0 mb-2 bg-[rgba(28,28,28,0.98)] rounded-lg min-w-[250px] max-h-[400px] overflow-y-auto shadow-[0_8px_24px_rgba(0,0,0,0.5)] backdrop-blur-[10px] transition-all duration-200 scrollbar-hide"
-                :class="subtitleMenuOpen ? 'opacity-100 pointer-events-auto translate-y-0' : 'opacity-0 pointer-events-none translate-y-2.5'">
-                <div class="flex items-center gap-2.5 px-4 py-3 cursor-pointer text-[0.9rem] transition-colors hover:bg-white/10"
-                  :class="selectedSubtitleIndex === '-1' && 'bg-accent-purple/20'"
-                  @click="selectSubtitle('-1')">
-                  <Check class="size-4 shrink-0" :class="selectedSubtitleIndex === '-1' ? 'opacity-100' : 'opacity-0'" />
-                  Disabled
-                </div>
-                <div v-for="opt in subtitleList" :key="opt.id"
-                  class="flex items-center gap-2.5 px-4 py-3 cursor-pointer text-[0.9rem] transition-colors hover:bg-white/10"
-                  :class="opt.index === parseInt(selectedSubtitleIndex) && 'bg-accent-purple/20'"
-                  @click="selectSubtitle(String(opt.index))">
-                  <Check class="size-4 shrink-0" :class="opt.index === parseInt(selectedSubtitleIndex) ? 'opacity-100' : 'opacity-0'" />
-                  {{ opt.label }}
-                </div>
-                <div class="h-px bg-white/10 my-1"></div>
-                <div class="flex items-center gap-2.5 px-4 py-3 cursor-pointer text-[0.9rem] transition-colors hover:bg-white/10"
-                  @click="selectSubtitle('local')">
-                  <span class="size-4 shrink-0"></span>
-                  Load local file...
-                </div>
-              </div>
-            </div>
-
-            <!-- Quality -->
-            <div class="relative" ref="qualityDropdown">
-              <button class="bg-transparent border-none text-white cursor-pointer p-2 rounded flex flex-wrap items-center justify-center gap-1.5 transition-colors hover:bg-white/10" @click="toggleQualityMenu">
-                <Settings class="size-6" />
-                <span class="text-[0.9rem] font-medium">{{ qualityLabel }}</span>
-                <Badge class="text-[0.65rem] font-semibold uppercase tracking-wide bg-accent-purple/30 text-sky-300 border-none px-1.5 py-0.5 rounded">{{ playMethodLabel }}</Badge>
-              </button>
-              <div class="absolute bottom-full right-0 mb-2 bg-[rgba(28,28,28,0.98)] rounded-lg min-w-[250px] max-h-[400px] overflow-y-auto shadow-[0_8px_24px_rgba(0,0,0,0.5)] backdrop-blur-[10px] transition-all duration-200 scrollbar-hide"
-                :class="qualityMenuOpen ? 'opacity-100 pointer-events-auto translate-y-0' : 'opacity-0 pointer-events-none translate-y-2.5'">
-                <div v-for="preset in qualityPresets" :key="preset.key"
-                  class="flex items-center gap-2.5 px-4 py-3 cursor-pointer text-[0.9rem] transition-colors hover:bg-white/10"
-                  :class="preset.key === selectedQuality && 'bg-accent-purple/20'"
-                  @click="selectQuality(preset.key)">
-                  <Check class="size-4 shrink-0" :class="preset.key === selectedQuality ? 'opacity-100' : 'opacity-0'" />
-                  {{ preset.label }}
-                </div>
-              </div>
-            </div>
-
-            <!-- Fullscreen -->
-            <button class="bg-transparent border-none text-white cursor-pointer p-2 rounded flex items-center transition-colors hover:bg-white/10" @click="toggleFullscreen">
-              <Maximize v-if="!isFullscreen" class="size-6" />
-              <Minimize v-else class="size-6" />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <input ref="fileInput" type="file" accept=".vtt,.srt" class="hidden" @change="onPickSubtitleFile" />
     </div>
-  </div>
 </template>
 
 <script setup lang="ts">
@@ -468,7 +490,7 @@ function toggleFullscreen() {
             }
         });
     } else {
-        exitFS().catch(() => {});
+        exitFS().catch(() => { });
         isFullscreen.value = false;
     }
 }
@@ -758,7 +780,7 @@ async function initPlayer(seekTo?: number, resumePlaying?: boolean) {
             setupMediaSession();
 
             if (resumePlaying !== false) {
-                await video.play().catch(() => {});
+                await video.play().catch(() => { });
             }
         } else {
             shaka.polyfill.installAll();
@@ -833,7 +855,7 @@ async function initPlayer(seekTo?: number, resumePlaying?: boolean) {
             if (container) {
                 requestFS(container).then(() => {
                     isFullscreen.value = true;
-                }).catch(() => {});
+                }).catch(() => { });
             }
         }
     } catch (e: any) {
@@ -847,8 +869,8 @@ async function initPlayer(seekTo?: number, resumePlaying?: boolean) {
 async function teardownPlayer() {
     const video = videoEl.value;
     if (player) {
-        await player.unload().catch(() => {});
-        await player.destroy().catch(() => {});
+        await player.unload().catch(() => { });
+        await player.destroy().catch(() => { });
         player = null;
     }
     if (video) {

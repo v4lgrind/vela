@@ -11,6 +11,14 @@
         <div class="relative w-full flex-1 overflow-hidden bg-black" @mousemove="showControls"
             @mouseleave="hideControls" @touchstart="showControls">
 
+            <!-- Back button — always above the loader so the user can escape a stuck load -->
+            <button
+                class="absolute left-3 bg-black/50 text-white border-none cursor-pointer px-3.5 py-2 rounded-lg flex items-center gap-1.5 text-[0.95rem] font-medium transition-colors hover:bg-white/15 z-[60]"
+                style="top: env(safe-area-inset-top, 12px)" @click="goBack">
+                <ArrowLeft class="size-5" />
+                Back
+            </button>
+
             <!-- Loader -->
             <div v-if="isLoading" class="absolute inset-0 bg-black/90 flex flex-col items-center justify-center z-50">
                 <Loader2 class="size-15 animate-spin text-accent-purple" />
@@ -26,15 +34,8 @@
             <!-- Controls -->
             <div class="absolute inset-0 flex flex-col justify-end player-gradient px-4 pt-5 transition-opacity duration-300"
                 :class="controlsVisible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'"
-                style="padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px))">
-
-                <!-- Back button -->
-                <button
-                    class="absolute left-3 bg-black/50 text-white border-none cursor-pointer px-3.5 py-2 rounded-lg flex items-center gap-1.5 text-[0.95rem] font-medium transition-colors hover:bg-white/15 z-10"
-                    style="top: env(safe-area-inset-top, 12px)" @click="goBack">
-                    <ArrowLeft class="size-5" />
-                    Back
-                </button>
+                style="padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px))"
+                @click.self="handleVideoTap">
 
                 <!-- Progress bar -->
                 <div class="w-full h-6 flex items-center cursor-pointer mb-3 group" @click="seek">
@@ -197,6 +198,19 @@ const itemId = route.params.id as string;
 const accessToken = store.accessToken || '';
 const serverUrl = store.serverUrl;
 
+// Stable per-browser device ID so Jellyfin can match DELETE /Videos/ActiveEncodings
+// to the session we created. Without it, Jellyfin can't kill the FFmpeg job on demand.
+function getDeviceId(): string {
+    let id = localStorage.getItem('msplayer-device-id');
+    if (!id) {
+        id = `browser-${Math.random().toString(36).slice(2, 15)}`;
+        localStorage.setItem('msplayer-device-id', id);
+    }
+    return id;
+}
+const deviceId = getDeviceId();
+const embyAuthHeader = `MediaBrowser Client="MediaServerClient", Device="Browser", DeviceId="${deviceId}", Version="1.0.0", Token="${accessToken}"`;
+
 const videoEl = ref<HTMLVideoElement | null>(null);
 const fileInput = ref<HTMLInputElement | null>(null);
 const audioDropdown = ref<HTMLElement | null>(null);
@@ -207,6 +221,7 @@ const error = ref<string | null>(null);
 let player: shaka.Player | null = null;
 let controlsTimeout: ReturnType<typeof setTimeout> | null = null;
 let mediaListenersAttached = false;
+let audioSwitchInProgress = false;
 
 const details = ref<any | null>(null);
 const mediaSource = ref<any | null>(null);
@@ -226,6 +241,11 @@ const isPlaying = ref(false);
 const currentTime = ref(0);
 const duration = ref(0);
 const progress = ref(0);
+// When audio/quality is switched, Jellyfin creates a new HLS session whose
+// segment timestamps start at 0 even though the content starts at savedTime.
+// This offset is added to video.currentTime everywhere for correct display and
+// reporting.  Reset to 0 on initial load; set to savedTime on each switch.
+const streamTimeOffset = ref(0);
 const volume = ref(100);
 const isFullscreen = ref(false);
 const controlsVisible = ref(true);
@@ -314,7 +334,7 @@ function generateSessionId(): string {
 // Reporting Jellyfin
 const reportingHeaders = {
     'Content-Type': 'application/json',
-    'X-Emby-Token': accessToken
+    'Authorization': embyAuthHeader,
 };
 
 function buildReportingPayload(overrides: Record<string, any> = {}) {
@@ -323,7 +343,7 @@ function buildReportingPayload(overrides: Record<string, any> = {}) {
         ItemId: itemId,
         SessionId: playSessionId.value,
         MediaSourceId: mediaSource.value?.Id || itemId,
-        PositionTicks: Math.floor((media?.currentTime || 0) * 10_000_000),
+        PositionTicks: Math.floor(((media?.currentTime || 0) + streamTimeOffset.value) * 10_000_000),
         PlayMethod: playMethod.value,
         PlaySessionId: playSessionId.value,
         ...overrides
@@ -374,16 +394,37 @@ async function reportPlaybackProgress() {
 }
 
 async function reportPlaybackStopped() {
-    const media = getMediaElement();
-    if (!media) return;
     try {
+        // keepalive: true ensures the request completes even when the page navigates away.
+        // No media guard — buildReportingPayload handles a missing element gracefully.
         await fetch(`${serverUrl}/Sessions/Playing/Stopped`, {
             method: 'POST',
             headers: reportingHeaders,
-            body: JSON.stringify(buildReportingPayload())
+            body: JSON.stringify(buildReportingPayload()),
+            keepalive: true,
         });
     } catch (e) {
         console.error('reportPlaybackStopped error', e);
+    }
+}
+
+// Explicitly kill the Jellyfin FFmpeg transcoding job for the current session.
+// This is more reliable than Sessions/Playing/Stopped which only marks the session
+// stopped — the FFmpeg process can keep running for up to ~5 minutes otherwise.
+async function deleteActiveEncodings() {
+    if (!playSessionId.value) return;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 5000);
+    try {
+        await fetch(
+            `${serverUrl}/Videos/ActiveEncodings?deviceId=${encodeURIComponent(deviceId)}&playSessionId=${encodeURIComponent(playSessionId.value)}`,
+            { method: 'DELETE', headers: { 'Authorization': embyAuthHeader }, signal: controller.signal }
+        );
+        console.log('[deleteActiveEncodings] Killed session:', playSessionId.value);
+    } catch (e) {
+        console.warn('[deleteActiveEncodings] error:', e);
+    } finally {
+        clearTimeout(timer);
     }
 }
 
@@ -400,18 +441,33 @@ function stopProgressReporting() {
         clearInterval(progressInterval);
         progressInterval = null;
     }
-    if (getMediaElement()) {
-        reportPlaybackStopped();
-    }
+    reportPlaybackStopped();
 }
 
 // Interactions
 function handleVideoTap() {
-    if (controlsVisible.value) {
-        controlsVisible.value = false;
-        if (controlsTimeout) clearTimeout(controlsTimeout);
+    if (isMobile()) {
+        // Mobile: tap toggles control overlay visibility only
+        if (controlsVisible.value) {
+            controlsVisible.value = false;
+            if (controlsTimeout) clearTimeout(controlsTimeout);
+        } else {
+            showControls();
+        }
     } else {
-        showControls();
+        // Desktop: click toggles play/pause (controls stay visible via mouse hover)
+        togglePlayPause();
+    }
+}
+
+function handleKeyDown(e: KeyboardEvent) {
+    if (isMobile()) return;
+    // Ignore when focus is inside an input/textarea to avoid hijacking typing
+    const tag = (e.target as HTMLElement)?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    if (e.code === 'Space') {
+        e.preventDefault();
+        togglePlayPause();
     }
 }
 
@@ -450,7 +506,8 @@ function seek(e: MouseEvent) {
     const width = progressBar.offsetWidth;
     const media = getMediaElement();
     if (!media) return;
-    media.currentTime = (clickX / width) * duration.value;
+    const movieTime = (clickX / width) * duration.value;
+    media.currentTime = Math.max(0, movieTime - streamTimeOffset.value);
     reportPlaybackProgress();
 }
 
@@ -533,14 +590,16 @@ function selectQuality(key: string) {
 function onTimeUpdate() {
     const media = getMediaElement();
     if (!media) return;
-    currentTime.value = media.currentTime;
+    currentTime.value = media.currentTime + streamTimeOffset.value;
     if (duration.value > 0) {
-        progress.value = (media.currentTime / duration.value) * 100;
+        progress.value = (currentTime.value / duration.value) * 100;
     }
 }
 function onLoadedMetadata() {
     const media = getMediaElement()!;
-    duration.value = media.duration;
+    // media.duration is the length of the HLS stream starting from StartTimeTicks.
+    // Adding the offset gives the true total movie duration.
+    duration.value = media.duration + streamTimeOffset.value;
     volume.value = media.volume * 100;
 }
 
@@ -573,12 +632,18 @@ function determinePlaybackMethod(ms: any) {
     }
 }
 
-async function getPlaybackUrl() {
+async function getPlaybackUrl(resumeSeconds?: number) {
     try {
         const maxBitrate = selectedQuality.value !== 'auto'
             ? qualityPresets.find(p => p.key === selectedQuality.value)?.bitrate
             : undefined;
-        const data = await fetchPlaybackInfo(undefined, maxBitrate);
+        // Pass StartTimeTicks in the PlaybackInfo body so Jellyfin embeds the
+        // correct value directly into the returned TranscodingUrl. This avoids
+        // duplicate-param conflicts that arise from appending to the URL afterwards.
+        const startTicks = resumeSeconds !== undefined && resumeSeconds > 0
+            ? Math.floor(resumeSeconds * 10_000_000)
+            : undefined;
+        const data = await fetchPlaybackInfo(undefined, maxBitrate, startTicks);
         mediaSource.value = data.MediaSources?.[0];
         if (!mediaSource.value) throw new Error('No media source available');
 
@@ -618,8 +683,17 @@ async function getPlaybackUrl() {
         // Reset base transcoding URL
         baseTranscodingUrl.value = '';
 
-        // Determine playback method
+        // Determine playback method; TranscodingUrl from Jellyfin already has
+        // StartTimeTicks embedded when we passed startTicks above.
         determinePlaybackMethod(mediaSource.value);
+
+        // For Transcode/DirectStream: set streamTimeOffset so display/reporting
+        // reflect the correct movie-relative position. DirectPlay uses native seeking.
+        if (resumeSeconds !== undefined && resumeSeconds > 0 && playMethod.value !== 'DirectPlay') {
+            streamTimeOffset.value = resumeSeconds;
+        } else {
+            streamTimeOffset.value = 0;
+        }
     } catch (e: any) {
         console.error('PlaybackInfo error:', e);
         error.value = 'Failed to get playback URL';
@@ -636,8 +710,9 @@ function buildHlsUrl() {
         );
         hlsUrl.value = `${serverUrl}${transcodingPath}`;
     } else {
+        const sessionParam = playSessionId.value ? `&PlaySessionId=${playSessionId.value}` : '';
         hlsUrl.value = `${serverUrl}/Videos/${itemId}/master.m3u8?mediaSourceId=${mediaSource.value?.Id || itemId
-            }&AudioStreamIndex=${selectedAudioIndex.value}&api_key=${accessToken}`;
+            }&AudioStreamIndex=${selectedAudioIndex.value}&api_key=${accessToken}${sessionParam}`;
     }
 }
 
@@ -702,9 +777,14 @@ function addNativeSubtitleTrack(video: HTMLVideoElement, blobUrl: string, lang: 
     }
 }
 
-async function fetchPlaybackInfo(audioStreamIndex?: number, maxBitrate?: number, startTimeTicks?: number) {
+async function fetchPlaybackInfo(audioStreamIndex?: number, maxBitrate?: number, startTimeTicks?: number, forceTranscode = false) {
+    const baseDeviceProfile = forceTranscode
+        ? { ...deviceProfile.DeviceProfile, DirectPlayProfiles: [] }
+        : deviceProfile.DeviceProfile;
+
     const profile: any = {
         ...deviceProfile,
+        DeviceProfile: baseDeviceProfile,
         MediaSourceId: itemId,
         ...(audioStreamIndex !== undefined ? { AudioStreamIndex: audioStreamIndex } : {}),
         ...(startTimeTicks !== undefined ? { StartTimeTicks: startTimeTicks } : {}),
@@ -713,17 +793,17 @@ async function fetchPlaybackInfo(audioStreamIndex?: number, maxBitrate?: number,
     if (maxBitrate) {
         profile.MaxStreamingBitrate = maxBitrate;
         profile.DeviceProfile = {
-            ...deviceProfile.DeviceProfile,
+            ...baseDeviceProfile,
             MaxStreamingBitrate: maxBitrate,
             MaxStaticBitrate: maxBitrate,
         };
     }
 
     const response = await fetch(
-        `${serverUrl}/Items/${itemId}/PlaybackInfo?userId=${store.userId}&api_key=${accessToken}`,
+        `${serverUrl}/Items/${itemId}/PlaybackInfo?userId=${store.userId}`,
         {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'Authorization': embyAuthHeader },
             body: JSON.stringify(profile)
         }
     );
@@ -793,13 +873,24 @@ async function initPlayer(seekTo?: number, resumePlaying?: boolean) {
                     enabled: true,
                     defaultBandwidthEstimate: 5_000_000
                 },
+                manifest: {
+                    // Timeout per manifest request. Without this Shaka waits
+                    // indefinitely if Jellyfin is slow to respond (e.g. while
+                    // FFmpeg is starting for a HEVC transcode session).
+                    retryParameters: {
+                        maxAttempts: 3,
+                        baseDelay: 2000,
+                        timeout: 20000,
+                    }
+                },
                 streaming: {
                     bufferingGoal: 20,
                     rebufferingGoal: 2,
                     bufferBehind: 20,
                     retryParameters: {
                         maxAttempts: 5,
-                        baseDelay: 1000
+                        baseDelay: 1000,
+                        timeout: 20000,
                     }
                 }
             });
@@ -819,7 +910,13 @@ async function initPlayer(seekTo?: number, resumePlaying?: boolean) {
                 engine.registerRequestFilter((_type: number, request: any) => {
                     if (_type === shaka.net.NetworkingEngine.RequestType.SEGMENT) {
                         request.uris = request.uris.map((uri: string) =>
-                            uri.replace(/([&?])StartTimeTicks=\d+/g, '$1').replace(/[&?]$/, '')
+                            uri
+                                // Remove the param; if it was the first param keep '?' so
+                                // the separator before the next param stays valid.
+                                .replace(/([&?])StartTimeTicks=\d+/g, (_, sep) => sep === '?' ? '?' : '')
+                                // Clean up '?&' left when StartTimeTicks was first param.
+                                .replace('?&', '?')
+                                .replace(/[?&]$/, '')
                         );
                     }
                 });
@@ -883,11 +980,15 @@ async function teardownPlayer() {
 // Audio track switching
 async function switchAudio() {
     if (selectedAudioIndex.value === null) return;
+    if (audioSwitchInProgress) return;
+    audioSwitchInProgress = true;
 
     isLoading.value = true;
     const video = videoEl.value!;
     const wasPlaying = !video.paused;
-    const savedTime = video.currentTime;
+    // Include existing offset so savedTime is always movie-relative, even when
+    // this is a second consecutive switch after a previous one set an offset.
+    const savedTime = video.currentTime + streamTimeOffset.value;
 
     console.log('[switchAudio] Start:', {
         audioIndex: selectedAudioIndex.value,
@@ -901,17 +1002,26 @@ async function switchAudio() {
         stopProgressReporting();
         await teardownPlayer();
 
+        // Explicitly kill any active FFmpeg encoding for this session so Jellyfin
+        // doesn't keep the old transcode running while starting the new one.
+        await deleteActiveEncodings();
+
         await new Promise(resolve => setTimeout(resolve, 200));
 
         const maxBitrate = selectedQuality.value !== 'auto'
             ? qualityPresets.find(p => p.key === selectedQuality.value)?.bitrate
             : undefined;
 
-        // Tell the server to start transcoding from the current position
+        // Pass StartTimeTicks so Jellyfin starts its transcoding session directly
+        // at the current position instead of from the beginning. Without this,
+        // Jellyfin starts at segment 0 and must transcode potentially hundreds of
+        // seconds before serving the segment Shaka needs — causing a long hang on
+        // movies. forceTranscode=true strips DirectPlay profiles so Jellyfin always
+        // returns a TranscodingUrl.
         const startTicks = Math.floor(savedTime * 10_000_000);
 
         try {
-            const data = await fetchPlaybackInfo(selectedAudioIndex.value!, maxBitrate, startTicks);
+            const data = await fetchPlaybackInfo(selectedAudioIndex.value!, maxBitrate, startTicks, true);
             const ms = data.MediaSources?.[0];
             console.log('[switchAudio] PlaybackInfo response:', {
                 hasMediaSource: !!ms,
@@ -945,18 +1055,28 @@ async function switchAudio() {
             buildHlsUrl();
         }
 
-        // Append StartTimeTicks to the URL so the server starts transcoding
-        // from the current position instead of from the beginning.
-        if (startTicks > 0 && hlsUrl.value) {
+        // Guarantee StartTimeTicks is in the final HLS URL. Jellyfin includes it
+        // when we pass it in the PlaybackInfo body, but the fallback URL doesn't
+        // have it. Either way, appending ensures the session starts at savedTime.
+        if (startTicks > 0 && !hlsUrl.value.includes('StartTimeTicks')) {
             const sep = hlsUrl.value.includes('?') ? '&' : '?';
             hlsUrl.value += `${sep}StartTimeTicks=${startTicks}`;
         }
 
+        // Set the offset BEFORE initPlayer so onLoadedMetadata and onTimeUpdate
+        // immediately reflect the correct movie-relative position.
+        streamTimeOffset.value = savedTime;
+
         console.log('[switchAudio] Loading player with:', {
             playMethod: playMethod.value,
             hlsUrl: hlsUrl.value,
+            streamTimeOffset: savedTime,
         });
 
+        // Do NOT seek video.currentTime — Jellyfin started the HLS session at
+        // savedTime (via StartTimeTicks) so the first available segment is already
+        // the right content. streamTimeOffset compensates for the 0-based HLS
+        // timestamps in all display/reporting code.
         await initPlayer(undefined, wasPlaying);
         isLoading.value = false;
         switchSubtitle();
@@ -966,6 +1086,8 @@ async function switchAudio() {
         console.error('[switchAudio] Error:', e);
         error.value = 'Error switching audio track';
         isLoading.value = false;
+    } finally {
+        audioSwitchInProgress = false;
     }
 }
 
@@ -975,7 +1097,7 @@ async function switchQuality(key: string) {
 
     const video = videoEl.value!;
     const wasPlaying = !video.paused;
-    const savedTime = video.currentTime;
+    const savedTime = video.currentTime + streamTimeOffset.value;
 
     isLoading.value = true;
     video.pause();
@@ -1008,10 +1130,11 @@ async function switchQuality(key: string) {
     }
 
     if (hlsUrl.value) {
-        if (startTicks > 0) {
+        if (startTicks > 0 && !baseTranscodingUrl.value) {
             const sep = hlsUrl.value.includes('?') ? '&' : '?';
             hlsUrl.value += `${sep}StartTimeTicks=${startTicks}`;
         }
+        streamTimeOffset.value = savedTime;
         await initPlayer(undefined, wasPlaying);
     }
 
@@ -1299,14 +1422,22 @@ onMounted(async () => {
         await playOffline();
     } else if (offlineStore.isFullyOnline) {
         console.log('[Player] Online playback');
-        await getPlaybackUrl();
+        const resumeTicks = details.value?.UserData?.PlaybackPositionTicks;
+        const resumeSeconds = resumeTicks ? resumeTicks / 10_000_000 : undefined;
+        await getPlaybackUrl(resumeSeconds);
         if (hlsUrl.value) {
-            const resumeTicks = details.value?.UserData?.PlaybackPositionTicks;
-            const resumeSeconds = resumeTicks ? resumeTicks / 10_000_000 : undefined;
-            await initPlayer(resumeSeconds);
+            // DirectPlay: browser handles seeking, so pass resumeSeconds to initPlayer.
+            // Transcode/DirectStream: Jellyfin starts at StartTimeTicks; streamTimeOffset
+            // is already set in getPlaybackUrl(), so do NOT seek video.currentTime.
+            const seekTo = playMethod.value === 'DirectPlay' ? resumeSeconds : undefined;
+            await initPlayer(seekTo);
+        } else {
+            // getPlaybackUrl() failed — error is already set, stop the spinner
+            isLoading.value = false;
         }
     } else {
         error.value = 'File not available offline. Connect to the internet to watch this content.';
+        isLoading.value = false;
         return;
     }
 
@@ -1329,6 +1460,8 @@ onMounted(async () => {
         isFullscreen.value = !!getFullscreenElement();
     });
 
+    document.addEventListener('keydown', handleKeyDown);
+
     window.addEventListener('beforeunload', () => {
         stopProgressReporting();
     });
@@ -1337,6 +1470,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
     unlockOrientation();
     clearMediaSession();
+    document.removeEventListener('keydown', handleKeyDown);
 
     if (progressInterval) {
         clearInterval(progressInterval);
@@ -1344,7 +1478,10 @@ onBeforeUnmount(() => {
     }
     stopOfflineProgressTracking();
 
-    if (getMediaElement() && !isOfflinePlayback.value) {
+    if (!isOfflinePlayback.value) {
+        // Kill the FFmpeg session first, then report stopped.
+        // Both use keepalive:true so they complete even after navigation.
+        deleteActiveEncodings();
         reportPlaybackStopped();
     }
 

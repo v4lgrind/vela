@@ -26,7 +26,8 @@
 				"ecmel.vscode-html-css",
 				"kamikillerto.vscode-colorize",
 				"DavidAnson.vscode-markdownlint",
-				"eamodio.gitlens"
+				"eamodio.gitlens",
+				"christian-kohler.npm-intellisense"
 			],
 			"settings": {
 				"java.jdt.ls.java.home": "/usr/local/sdkman/candidates/java/current"

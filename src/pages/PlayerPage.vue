@@ -680,11 +680,12 @@ function addNativeSubtitleTrack(video: HTMLVideoElement, blobUrl: string, lang: 
     }
 }
 
-async function fetchPlaybackInfo(audioStreamIndex?: number, maxBitrate?: number) {
+async function fetchPlaybackInfo(audioStreamIndex?: number, maxBitrate?: number, startTimeTicks?: number) {
     const profile: any = {
         ...deviceProfile,
         MediaSourceId: itemId,
         ...(audioStreamIndex !== undefined ? { AudioStreamIndex: audioStreamIndex } : {}),
+        ...(startTimeTicks !== undefined ? { StartTimeTicks: startTimeTicks } : {}),
     };
 
     if (maxBitrate) {
@@ -714,18 +715,42 @@ async function initPlayer(seekTo?: number, resumePlaying?: boolean) {
     const video = videoEl.value!;
     isLoading.value = true;
 
+    console.log('[initPlayer] Start:', { playMethod: playMethod.value, hlsUrl: hlsUrl.value, seekTo, resumePlaying });
+
     try {
         if (playMethod.value === 'DirectPlay') {
             video.src = hlsUrl.value;
 
             if (seekTo !== undefined) {
-                await new Promise<void>(resolve => {
-                    const onSeekable = () => {
+                await new Promise<void>((resolve, reject) => {
+                    let settled = false;
+                    const cleanup = () => {
+                        video.removeEventListener('loadedmetadata', onLoaded);
+                        video.removeEventListener('error', onError);
+                        clearTimeout(timer);
+                    };
+                    const onLoaded = () => {
+                        if (settled) return;
+                        settled = true;
+                        cleanup();
                         video.currentTime = seekTo;
-                        video.removeEventListener('loadedmetadata', onSeekable);
                         resolve();
                     };
-                    video.addEventListener('loadedmetadata', onSeekable);
+                    const onError = () => {
+                        if (settled) return;
+                        settled = true;
+                        cleanup();
+                        reject(new Error('Video failed to load'));
+                    };
+                    const timer = setTimeout(() => {
+                        if (settled) return;
+                        settled = true;
+                        cleanup();
+                        // Resolve anyway — let playback attempt continue
+                        resolve();
+                    }, 15000);
+                    video.addEventListener('loadedmetadata', onLoaded);
+                    video.addEventListener('error', onError);
                 });
             }
 
@@ -764,9 +789,26 @@ async function initPlayer(seekTo?: number, resumePlaying?: boolean) {
                 isLoading.value = false;
             });
 
+            // Strip StartTimeTicks from segment requests — the manifest
+            // endpoint uses it to offset transcoding, but the segment
+            // endpoint rejects it with 400.
+            const engine = player.getNetworkingEngine();
+            if (engine) {
+                engine.registerRequestFilter((_type: number, request: any) => {
+                    if (_type === shaka.net.NetworkingEngine.RequestType.SEGMENT) {
+                        request.uris = request.uris.map((uri: string) =>
+                            uri.replace(/([&?])StartTimeTicks=\d+/g, '$1').replace(/[&?]$/, '')
+                        );
+                    }
+                });
+            }
+
+            console.log('[initPlayer] Shaka loading:', hlsUrl.value);
             await player.load(hlsUrl.value);
+            console.log('[initPlayer] Shaka loaded successfully');
 
             if (seekTo !== undefined) {
+                console.log('[initPlayer] Seeking to:', seekTo);
                 video.currentTime = seekTo;
             }
 
@@ -774,7 +816,14 @@ async function initPlayer(seekTo?: number, resumePlaying?: boolean) {
             setupMediaSession();
 
             if (resumePlaying !== false) {
-                await video.play().catch(() => {});
+                console.log('[initPlayer] Calling video.play()');
+                // Don't await play() — in the Shaka/MSE path it can stay
+                // pending indefinitely while buffering. Loading state is
+                // managed by @waiting/@playing/@canplay on the video element.
+                video.play().catch((err) => {
+                    console.warn('[initPlayer] play() rejected:', err);
+                });
+                console.log('[initPlayer] play() fired (not awaited)');
             }
         }
 
@@ -806,6 +855,7 @@ async function teardownPlayer() {
         video.removeAttribute('src');
         video.load();
     }
+    mediaListenersAttached = false;
 }
 
 // Audio track switching
@@ -817,33 +867,81 @@ async function switchAudio() {
     const wasPlaying = !video.paused;
     const savedTime = video.currentTime;
 
+    console.log('[switchAudio] Start:', {
+        audioIndex: selectedAudioIndex.value,
+        savedTime,
+        wasPlaying,
+        currentPlayMethod: playMethod.value,
+    });
+
     try {
         video.pause();
+        stopProgressReporting();
         await teardownPlayer();
 
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise(resolve => setTimeout(resolve, 200));
 
         const maxBitrate = selectedQuality.value !== 'auto'
             ? qualityPresets.find(p => p.key === selectedQuality.value)?.bitrate
             : undefined;
 
+        // Tell the server to start transcoding from the current position
+        const startTicks = Math.floor(savedTime * 10_000_000);
+
         try {
-            const data = await fetchPlaybackInfo(selectedAudioIndex.value!, maxBitrate);
+            const data = await fetchPlaybackInfo(selectedAudioIndex.value!, maxBitrate, startTicks);
             const ms = data.MediaSources?.[0];
+            console.log('[switchAudio] PlaybackInfo response:', {
+                hasMediaSource: !!ms,
+                supportsDirectPlay: ms?.SupportsDirectPlay,
+                supportsTranscoding: ms?.SupportsTranscoding,
+                transcodingUrl: ms?.TranscodingUrl?.substring(0, 120),
+                playSessionId: data.PlaySessionId,
+            });
             if (ms) {
                 mediaSource.value = ms;
-                baseTranscodingUrl.value = '';
-                determinePlaybackMethod(ms);
+                if (data.PlaySessionId) {
+                    playSessionId.value = data.PlaySessionId;
+                }
+
+                // For audio switching, we need the server to provide the specific
+                // audio track. Skip DirectPlay (serves raw file, no track selection)
+                // and build a transcoding/streaming URL with the audio index.
+                if (ms.TranscodingUrl) {
+                    baseTranscodingUrl.value = ms.TranscodingUrl;
+                    playMethod.value = ms.SupportsDirectStream ? 'DirectStream' : 'Transcode';
+                    buildHlsUrl();
+                } else {
+                    // No transcoding URL — build a fallback HLS URL
+                    baseTranscodingUrl.value = '';
+                    playMethod.value = 'Transcode';
+                    buildHlsUrl();
+                }
             }
-        } catch {
+        } catch (fetchErr) {
+            console.error('[switchAudio] fetchPlaybackInfo failed:', fetchErr);
             buildHlsUrl();
         }
 
-        await initPlayer(savedTime, wasPlaying);
+        // Append StartTimeTicks to the URL so the server starts transcoding
+        // from the current position instead of from the beginning.
+        if (startTicks > 0 && hlsUrl.value) {
+            const sep = hlsUrl.value.includes('?') ? '&' : '?';
+            hlsUrl.value += `${sep}StartTimeTicks=${startTicks}`;
+        }
+
+        console.log('[switchAudio] Loading player with:', {
+            playMethod: playMethod.value,
+            hlsUrl: hlsUrl.value,
+        });
+
+        await initPlayer(undefined, wasPlaying);
         isLoading.value = false;
         switchSubtitle();
+
+        console.log('[switchAudio] Complete');
     } catch (e: any) {
-        console.error('Audio switch error:', e);
+        console.error('[switchAudio] Error:', e);
         error.value = 'Error switching audio track';
         isLoading.value = false;
     }
@@ -859,16 +957,18 @@ async function switchQuality(key: string) {
 
     isLoading.value = true;
     video.pause();
+    stopProgressReporting();
 
     await teardownPlayer();
-    await new Promise(resolve => setTimeout(resolve, 100));
 
     const maxBitrate = key !== 'auto'
         ? qualityPresets.find(p => p.key === key)?.bitrate
         : undefined;
 
+    const startTicks = Math.floor(savedTime * 10_000_000);
+
     try {
-        const data = await fetchPlaybackInfo(selectedAudioIndex.value ?? undefined, maxBitrate);
+        const data = await fetchPlaybackInfo(selectedAudioIndex.value ?? undefined, maxBitrate, startTicks);
         const ms = data.MediaSources?.[0];
         if (ms) {
             mediaSource.value = ms;
@@ -886,7 +986,11 @@ async function switchQuality(key: string) {
     }
 
     if (hlsUrl.value) {
-        await initPlayer(savedTime, wasPlaying);
+        if (startTicks > 0) {
+            const sep = hlsUrl.value.includes('?') ? '&' : '?';
+            hlsUrl.value += `${sep}StartTimeTicks=${startTicks}`;
+        }
+        await initPlayer(undefined, wasPlaying);
     }
 
     switchSubtitle();

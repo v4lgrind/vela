@@ -471,9 +471,39 @@ function determinePlaybackMethod(ms: any) {
 
 // ── HLS.js init ────────────────────────────────────────────────────────────────
 
+// Jellyfin copies StartTimeTicks from the manifest URL into every segment URL it
+// generates inside the HLS playlist. The segment endpoint rejects that parameter
+// with 400 Bad Request — it is only valid on the manifest endpoint. We work around
+// this by supplying a custom fragment loader (fLoader) that strips StartTimeTicks
+// from each segment URL before the XHR is opened. This mirrors the request filter
+// the original Shaka player registered for the same reason.
+function makeJellyfinFragmentLoader() {
+    const DefaultLoader = (Hls as any).DefaultConfig.loader;
+    return class JellyfinFragmentLoader {
+        private inner: any;
+        constructor(config: any) { this.inner = new DefaultLoader(config); }
+        get stats() { return this.inner.stats; }
+        get context() { return this.inner.context; }
+        destroy() { this.inner.destroy(); }
+        abort() { this.inner.abort(); }
+        getResponseHeader(name: string) { return this.inner.getResponseHeader(name); }
+        load(context: any, config: any, callbacks: any) {
+            context.url = context.url
+                .replace(/([?&])StartTimeTicks=\d+/g, (_: string, sep: string) => sep === '?' ? '?' : '')
+                .replace('?&', '?')
+                .replace(/[?&]$/, '');
+            this.inner.load(context, config, callbacks);
+        }
+    };
+}
+
 function initHls(url: string, video: HTMLVideoElement, onFatalError?: () => void) {
     if (Hls.isSupported()) {
-        hls = new Hls({ maxBufferLength: 30, maxMaxBufferLength: 60 });
+        hls = new Hls({
+            maxBufferLength: 30,
+            maxMaxBufferLength: 60,
+            fLoader: makeJellyfinFragmentLoader() as any,
+        });
         hls.loadSource(url);
         hls.attachMedia(video);
         hls.on(Hls.Events.MANIFEST_PARSED, () => {

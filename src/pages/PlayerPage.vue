@@ -8,7 +8,7 @@
             {{ error }}
         </section>
 
-        <div class="relative w-full flex-1 overflow-hidden bg-black">
+        <div class="relative w-full flex-1 overflow-hidden bg-black" @mouseleave="hideControls" @mousemove="showControls">
 
             <!-- Back button — always visible above loader so user can escape a stuck load -->
             <button
@@ -27,10 +27,11 @@
 
             <!-- Video element -->
             <video ref="videoEl" class="w-full h-full bg-black object-contain" preload="metadata" playsinline
-                :poster="posterUrl" @click="handleVideoTap" @touchstart="handleVideoTap" @loadstart="onLoadStart" @canplay="onCanPlay"
+                :poster="posterUrl" @loadstart="onLoadStart" @canplay="onCanPlay"
                 @waiting="onWaiting" @playing="onPlaying" @pause="onPause" @timeupdate="onTimeUpdate"
-                @loadedmetadata="onLoadedMetadata" @ended="onEnded" @mousemove="showControls"
-            @mouseleave="hideControls">
+                @loadedmetadata="onLoadedMetadata" @ended="onEnded" 
+                @click="handleVideoTap"
+                @touchstart="handleVideoTap">
                 <track
                     v-if="activeTrackBlobUrl"
                     :key="selectedSubtitleIndex ?? -1"
@@ -266,6 +267,7 @@ function showControls() {
 }
 
 function hideControls() {
+    console.log("hidecontrols")
     if (controlsTimeout) clearTimeout(controlsTimeout);
     if (!audioMenuOpen.value && !subtitleMenuOpen.value) {
         controlsTimeout = setTimeout(() => { controlsVisible.value = false; }, 1000);

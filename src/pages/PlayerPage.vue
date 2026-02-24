@@ -48,8 +48,8 @@
 
                 <!-- Bottom controls -->
                 <div class="flex justify-between items-center">
+                    <!-- Left: play/pause, mute, time -->
                     <div class="flex items-center gap-2">
-                        <!-- Play/Pause -->
                         <button
                             class="bg-transparent border-none text-white cursor-pointer p-2 rounded flex items-center transition-colors hover:bg-white/10"
                             @click="togglePlayPause">
@@ -57,7 +57,6 @@
                             <Pause v-else class="size-6 fill-current" />
                         </button>
 
-                        <!-- Mute -->
                         <button
                             class="bg-transparent border-none text-white cursor-pointer p-2 rounded flex items-center transition-colors hover:bg-white/10"
                             @click="toggleMute">
@@ -65,19 +64,42 @@
                             <Volume2 v-else class="size-6" />
                         </button>
 
-                        <!-- Time -->
                         <div class="text-[0.9rem] text-white tabular-nums min-w-[110px]">
                             {{ formatTime(currentTime) }} / {{ formatTime(duration) }}
                         </div>
                     </div>
 
-                    <!-- Fullscreen -->
-                    <button
-                        class="bg-transparent border-none text-white cursor-pointer p-2 rounded flex items-center transition-colors hover:bg-white/10"
-                        @click="toggleFullscreen">
-                        <Maximize v-if="!isFullscreen" class="size-6" />
-                        <Minimize v-else class="size-6" />
-                    </button>
+                    <!-- Right: audio selector, fullscreen -->
+                    <div class="flex items-center gap-2">
+                        <!-- Audio track selector (only shown when multiple tracks exist) -->
+                        <div v-if="audioList.length > 1" class="relative" ref="audioDropdown">
+                            <button
+                                class="bg-transparent border-none text-white cursor-pointer p-2 rounded flex items-center gap-1.5 transition-colors hover:bg-white/10"
+                                @click="toggleAudioMenu">
+                                <AudioLines class="size-6" />
+                                <span class="text-[0.9rem] font-medium">Audio</span>
+                            </button>
+                            <div class="absolute bottom-full right-0 mb-2 bg-[rgba(28,28,28,0.98)] rounded-lg min-w-[250px] max-h-[400px] overflow-y-auto shadow-[0_8px_24px_rgba(0,0,0,0.5)] backdrop-blur-[10px] transition-all duration-200 scrollbar-hide"
+                                :class="audioMenuOpen ? 'opacity-100 pointer-events-auto translate-y-0' : 'opacity-0 pointer-events-none translate-y-2.5'">
+                                <div v-for="opt in audioList" :key="opt.index"
+                                    class="flex items-center gap-2.5 px-4 py-3 cursor-pointer text-[0.9rem] transition-colors hover:bg-white/10"
+                                    :class="opt.index === selectedAudioIndex ? 'bg-accent-purple/20' : ''"
+                                    @click="switchAudio(opt.index)">
+                                    <Check class="size-4 shrink-0"
+                                        :class="opt.index === selectedAudioIndex ? 'opacity-100' : 'opacity-0'" />
+                                    {{ opt.label }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Fullscreen -->
+                        <button
+                            class="bg-transparent border-none text-white cursor-pointer p-2 rounded flex items-center transition-colors hover:bg-white/10"
+                            @click="toggleFullscreen">
+                            <Maximize v-if="!isFullscreen" class="size-6" />
+                            <Minimize v-else class="size-6" />
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -93,7 +115,7 @@ import Hls from 'hls.js';
 import { deviceProfile } from '@/constants';
 import { formatTime } from '@/utils/helpers';
 import { lockLandscape, unlockOrientation } from '@/utils/orientation';
-import { ArrowLeft, Play, Pause, Volume2, VolumeX, Maximize, Minimize, Loader2 } from 'lucide-vue-next';
+import { ArrowLeft, Play, Pause, Volume2, VolumeX, AudioLines, Check, Maximize, Minimize, Loader2 } from 'lucide-vue-next';
 
 // ── Setup ──────────────────────────────────────────────────────────────────────
 
@@ -123,6 +145,8 @@ const reportingHeaders = { 'Content-Type': 'application/json', 'Authorization': 
 // ── Refs ──────────────────────────────────────────────────────────────────────
 
 const videoEl = ref<HTMLVideoElement | null>(null);
+const audioDropdown = ref<HTMLElement | null>(null);
+
 const isLoading = ref(true);
 const isPlaying = ref(false);
 const isMuted = ref(false);
@@ -139,11 +163,23 @@ const mediaSource = ref<any>(null);
 const hlsUrl = ref('');
 const playMethod = ref<'DirectPlay' | 'DirectStream' | 'Transcode'>('Transcode');
 
+// startOffset: for HLS streams that start at segment 0 from a mid-movie position,
+// this is the movie time (in seconds) of that segment-0 start point. Added to
+// video.currentTime everywhere so display, seek, and reporting stay movie-relative.
+// 0 for DirectPlay (video.currentTime is already the true movie position).
+const startOffset = ref(0);
+
+// Audio tracks
+const audioList = ref<Array<{ index: number; label: string }>>([]);
+const selectedAudioIndex = ref<number | null>(null);
+const audioMenuOpen = ref(false);
+
 const posterUrl = computed(() => store.getImageUrl(itemId, 'Primary') || '');
 
 let hls: Hls | null = null;
 let controlsTimeout: ReturnType<typeof setTimeout> | null = null;
 let progressInterval: ReturnType<typeof setInterval> | null = null;
+let isSwitching = false;
 
 // ── Video event handlers ───────────────────────────────────────────────────────
 
@@ -156,14 +192,16 @@ function onPause() { isPlaying.value = false; }
 function onTimeUpdate() {
     const video = videoEl.value;
     if (!video) return;
-    currentTime.value = video.currentTime;
-    if (duration.value > 0) progressPct.value = (video.currentTime / duration.value) * 100;
+    currentTime.value = video.currentTime + startOffset.value;
+    if (duration.value > 0) progressPct.value = (currentTime.value / duration.value) * 100;
 }
 
 function onLoadedMetadata() {
     const video = videoEl.value;
     if (!video) return;
-    duration.value = video.duration;
+    // For HLS with resume, video.duration is remaining movie time from start point.
+    // Adding startOffset gives the true total movie duration.
+    duration.value = video.duration + startOffset.value;
     isMuted.value = video.muted;
 }
 
@@ -178,13 +216,13 @@ function showControls() {
     controlsVisible.value = true;
     if (controlsTimeout) clearTimeout(controlsTimeout);
     controlsTimeout = setTimeout(() => {
-        if (isPlaying.value) controlsVisible.value = false;
+        if (isPlaying.value && !audioMenuOpen.value) controlsVisible.value = false;
     }, 3000);
 }
 
 function hideControls() {
     if (controlsTimeout) clearTimeout(controlsTimeout);
-    if (isPlaying.value) {
+    if (isPlaying.value && !audioMenuOpen.value) {
         controlsTimeout = setTimeout(() => { controlsVisible.value = false; }, 1000);
     }
 }
@@ -229,7 +267,8 @@ function seek(e: MouseEvent) {
     const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
     const video = videoEl.value;
     if (!video || !duration.value) return;
-    video.currentTime = ratio * duration.value;
+    // Convert ratio of total movie to a video.currentTime value (subtracting offset)
+    video.currentTime = Math.max(0, ratio * duration.value - startOffset.value);
     reportPlaybackProgress();
 }
 
@@ -255,7 +294,6 @@ function toggleFullscreen() {
     if (!container) return;
     if (!getFullscreenElement()) {
         requestFS(container).then(() => { isFullscreen.value = true; }).catch(() => {
-            // Fallback: iOS Safari video element fullscreen
             if (videoEl.value && (videoEl.value as any).webkitEnterFullscreen) {
                 (videoEl.value as any).webkitEnterFullscreen();
                 isFullscreen.value = true;
@@ -267,10 +305,21 @@ function toggleFullscreen() {
     }
 }
 
+function toggleAudioMenu() {
+    audioMenuOpen.value = !audioMenuOpen.value;
+    showControls(); // reset idle timer so menu stays visible
+}
+
 function handleKeyDown(e: KeyboardEvent) {
     const tag = (e.target as HTMLElement)?.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
     if (e.code === 'Space') { e.preventDefault(); togglePlayPause(); }
+}
+
+function handleClickOutside(e: MouseEvent) {
+    if (audioDropdown.value && !audioDropdown.value.contains(e.target as Node)) {
+        audioMenuOpen.value = false;
+    }
 }
 
 function goBack() { router.back(); }
@@ -283,7 +332,8 @@ function buildReportingPayload(overrides: Record<string, any> = {}) {
         ItemId: itemId,
         SessionId: playSessionId.value,
         MediaSourceId: mediaSource.value?.Id || itemId,
-        PositionTicks: Math.floor((video?.currentTime || 0) * 10_000_000),
+        PositionTicks: Math.floor(((video?.currentTime || 0) + startOffset.value) * 10_000_000),
+        AudioStreamIndex: selectedAudioIndex.value,
         PlayMethod: playMethod.value,
         PlaySessionId: playSessionId.value,
         ...overrides
@@ -361,12 +411,19 @@ function stopProgressReporting() {
 
 // ── Jellyfin API ───────────────────────────────────────────────────────────────
 
-async function fetchPlaybackInfo(startTimeTicks?: number) {
+async function fetchPlaybackInfo(startTimeTicks?: number, audioStreamIndex?: number, forceTranscode = false) {
+    const baseProfile = forceTranscode
+        ? { ...deviceProfile.DeviceProfile, DirectPlayProfiles: [] }
+        : deviceProfile.DeviceProfile;
+
     const profile: any = {
         ...deviceProfile,
+        DeviceProfile: baseProfile,
         MediaSourceId: itemId,
         ...(startTimeTicks !== undefined ? { StartTimeTicks: startTimeTicks } : {}),
+        ...(audioStreamIndex !== undefined ? { AudioStreamIndex: audioStreamIndex } : {}),
     };
+
     const response = await fetch(
         `${serverUrl}/Items/${itemId}/PlaybackInfo?userId=${store.userId}`,
         {
@@ -377,6 +434,24 @@ async function fetchPlaybackInfo(startTimeTicks?: number) {
     );
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return await response.json();
+}
+
+function parseAudioStreams(ms: any) {
+    const streams: any[] = ms.MediaStreams || [];
+    const audioStreams = streams.filter(s => s.Type === 'Audio');
+
+    audioList.value = audioStreams.map(s => ({
+        index: s.Index as number,
+        label: `${(s.Language || 'und').toUpperCase()} ${
+            s.ChannelLayout ? `(${s.ChannelLayout})` :
+            s.Channels ? `(${s.Channels}ch)` : ''
+        } ${s.Codec ? `- ${s.Codec.toUpperCase()}` : ''}`.trim(),
+    }));
+
+    // Default preference: French → marked default → first track
+    const french = audioStreams.find(s => ['fra', 'fre', 'fr'].includes(s.Language));
+    const preferred = french || audioStreams.find(s => s.IsDefault) || audioStreams[0];
+    selectedAudioIndex.value = preferred?.Index ?? 0;
 }
 
 function determinePlaybackMethod(ms: any) {
@@ -439,12 +514,14 @@ async function initPlayer(resumeSeconds?: number) {
         if (!mediaSource.value) throw new Error('No media source available');
 
         if (data.PlaySessionId) playSessionId.value = data.PlaySessionId;
+        parseAudioStreams(mediaSource.value);
         determinePlaybackMethod(mediaSource.value);
 
         if (playMethod.value === 'DirectPlay') {
+            startOffset.value = 0; // video.currentTime is already movie-relative
             video.src = hlsUrl.value;
             if (resumeSeconds && resumeSeconds > 0) {
-                // Seek after metadata loads to avoid brief flash from position 0
+                // Seek after metadata loads to avoid a brief flash from position 0
                 const seekOnce = () => {
                     video.removeEventListener('loadedmetadata', seekOnce);
                     video.currentTime = resumeSeconds;
@@ -457,7 +534,9 @@ async function initPlayer(resumeSeconds?: number) {
                 startProgressReporting();
             }
         } else {
-            // HLS.js handles Transcode and DirectStream
+            // HLS stream starts at segment 0 = resumeSeconds into the movie.
+            // startOffset lets onTimeUpdate/onLoadedMetadata/seek stay movie-relative.
+            startOffset.value = resumeSeconds && resumeSeconds > 0 ? resumeSeconds : 0;
             initHls(hlsUrl.value, video);
         }
 
@@ -474,10 +553,60 @@ async function initPlayer(resumeSeconds?: number) {
     }
 }
 
+// ── Audio track switching ──────────────────────────────────────────────────────
+
+async function switchAudio(index: number) {
+    if (index === selectedAudioIndex.value || isSwitching) return;
+    isSwitching = true;
+    audioMenuOpen.value = false;
+
+    const video = videoEl.value;
+    if (!video) { isSwitching = false; return; }
+
+    isLoading.value = true;
+    // Capture current movie-relative position before teardown
+    const movieTime = video.currentTime + startOffset.value;
+
+    // Teardown: pause → stop reporting → destroy HLS → clear src
+    video.pause();
+    stopProgressReporting();
+    if (hls) { hls.destroy(); hls = null; }
+    video.removeAttribute('src');
+    video.load();
+
+    // Kill the old FFmpeg session before asking Jellyfin to start a new one
+    await deleteActiveEncodings();
+
+    try {
+        const startTicks = Math.floor(movieTime * 10_000_000);
+        // forceTranscode=true strips DirectPlay profiles — ensures Jellyfin always
+        // returns a TranscodingUrl so we can select the specific audio stream.
+        const data = await fetchPlaybackInfo(startTicks, index, true);
+
+        mediaSource.value = data.MediaSources?.[0];
+        if (!mediaSource.value) throw new Error('No media source');
+
+        if (data.PlaySessionId) playSessionId.value = data.PlaySessionId;
+        selectedAudioIndex.value = index;
+        determinePlaybackMethod(mediaSource.value);
+
+        // New HLS stream's segment 0 = movieTime, so update offset before
+        // onLoadedMetadata fires (which uses it for duration calculation).
+        startOffset.value = movieTime;
+
+        initHls(hlsUrl.value, video);
+    } catch (e: any) {
+        console.error('[switchAudio] error:', e);
+        error.value = 'Failed to switch audio track';
+        isLoading.value = false;
+    } finally {
+        isSwitching = false;
+    }
+}
+
 // ── Lifecycle ──────────────────────────────────────────────────────────────────
 
 onMounted(async () => {
-    // Stop any background audio before starting video
     if (audioPlayerStore.isPlaying) audioPlayerStore.stop();
     lockLandscape();
 
@@ -496,6 +625,7 @@ onMounted(async () => {
 
     await initPlayer(resumeSeconds);
 
+    document.addEventListener('click', handleClickOutside);
     document.addEventListener('fullscreenchange', () => { isFullscreen.value = !!getFullscreenElement(); });
     document.addEventListener('webkitfullscreenchange', () => { isFullscreen.value = !!getFullscreenElement(); });
     document.addEventListener('keydown', handleKeyDown);
@@ -503,6 +633,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
     unlockOrientation();
+    document.removeEventListener('click', handleClickOutside);
     document.removeEventListener('keydown', handleKeyDown);
 
     if (controlsTimeout) clearTimeout(controlsTimeout);

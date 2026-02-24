@@ -117,7 +117,7 @@
                                 <div
                                     class="flex items-center gap-2.5 px-4 py-3 cursor-pointer text-[0.9rem] transition-colors hover:bg-white/10"
                                     :class="selectedSubtitleIndex === null ? 'bg-accent-purple/20' : ''"
-                                    @click="selectedSubtitleIndex = null; subtitleMenuOpen = false">
+                                    @click="switchSubtitle(null)">
                                     <Check class="size-4 shrink-0"
                                         :class="selectedSubtitleIndex === null ? 'opacity-100' : 'opacity-0'" />
                                     Off
@@ -125,7 +125,7 @@
                                 <div v-for="sub in subtitleList" :key="sub.index"
                                     class="flex items-center gap-2.5 px-4 py-3 cursor-pointer text-[0.9rem] transition-colors hover:bg-white/10"
                                     :class="sub.index === selectedSubtitleIndex ? 'bg-accent-purple/20' : ''"
-                                    @click="selectedSubtitleIndex = sub.index; subtitleMenuOpen = false">
+                                    @click="switchSubtitle(sub.index)">
                                     <Check class="size-4 shrink-0"
                                         :class="sub.index === selectedSubtitleIndex ? 'opacity-100' : 'opacity-0'" />
                                     {{ sub.label }}
@@ -522,11 +522,26 @@ function parseSubtitleStreams(ms: any) {
             deliveryUrl: `${serverUrl}${s.DeliveryUrl}`,
         }));
 
+    // Per-item saved choice (null = never set) → global language preference → off
+    // Stored value: 'off' = explicitly off, numeric string = exact stream index
+    const savedVal = localStorage.getItem(`msplayer-subtitle-${itemId}`);
     const globalSubLang = preferencesStore.preferredSubtitleLanguage;
-    const preferred = globalSubLang
-        ? subtitleList.value.find(s => s.language === globalSubLang) ?? null
-        : null;
+    let preferred = null;
+    if (savedVal !== null) {
+        if (savedVal !== 'off') {
+            const savedIdx = parseInt(savedVal, 10);
+            preferred = !isNaN(savedIdx) ? subtitleList.value.find(s => s.index === savedIdx) ?? null : null;
+        }
+    } else if (globalSubLang) {
+        preferred = subtitleList.value.find(s => s.language === globalSubLang) ?? null;
+    }
     selectedSubtitleIndex.value = preferred?.index ?? null;
+}
+
+function switchSubtitle(index: number | null) {
+    selectedSubtitleIndex.value = index;
+    subtitleMenuOpen.value = false;
+    localStorage.setItem(`msplayer-subtitle-${itemId}`, index !== null ? String(index) : 'off');
 }
 
 async function applySubtitleTracks() {
@@ -655,7 +670,7 @@ function initHls(url: string, video: HTMLVideoElement, startSeconds?: number, on
 
 // ── Player init ────────────────────────────────────────────────────────────────
 
-async function initPlayer(resumeSeconds?: number, preferredAudioIndex?: number, preferredSubtitleIndex?: number) {
+async function initPlayer(resumeSeconds?: number, preferredAudioIndex?: number) {
     const video = videoEl.value;
     if (!video) return;
     isLoading.value = true;
@@ -857,23 +872,15 @@ onMounted(async () => {
     const allStreams: any[] = details?.MediaStreams || [];
     const audioStreams = allStreams.filter(s => s.Type === 'Audio');
     const savedLang = localStorage.getItem(`msplayer-audio-${itemId}`);
-    const savedSubtitles = localStorage.getItem(`msplayer-subtitles-${itemId}`);
     const globalLang = preferencesStore.preferredAudioLanguage;
-    const globalLangSubtitles = preferencesStore.preferredSubtitleLanguage;
     const preferred =
         (savedLang ? audioStreams.find((s: any) => s.Language === savedLang) : null) ||
         (globalLang ? audioStreams.find((s: any) => s.Language === globalLang) : null) ||
         audioStreams.find((s: any) => s.IsDefault) ||
         audioStreams[0];
-    const preferedSubtitles =
-        (savedSubtitles ? audioStreams.find((s: any) => s.Language === savedSubtitles) : null) ||
-        (globalLangSubtitles ? audioStreams.find((s: any) => s.Language === globalLangSubtitles) : null) ||
-        audioStreams.find((s: any) => s.IsDefault) ||
-        audioStreams[0];
     const preferredAudioIndex: number | undefined = preferred?.Index;
-    const preferredSubtitleIndex: number | undefined = preferedSubtitles?.Index;
 
-    await initPlayer(resumeSeconds, preferredAudioIndex, preferredSubtitleIndex);
+    await initPlayer(resumeSeconds, preferredAudioIndex);
 
     document.addEventListener('click', handleClickOutside);
     document.addEventListener('fullscreenchange', () => { isFullscreen.value = !!getFullscreenElement(); });

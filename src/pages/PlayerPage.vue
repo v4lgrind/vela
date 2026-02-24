@@ -8,12 +8,12 @@
             {{ error }}
         </section>
 
-        <div class="relative w-full flex-1 overflow-hidden bg-black" @mousemove="showControls"
-            @mouseleave="hideControls" @touchstart="showControls">
+        <div class="relative w-full flex-1 overflow-hidden bg-black">
 
             <!-- Back button — always visible above loader so user can escape a stuck load -->
             <button
-                class="absolute left-3 bg-black/50 text-white border-none cursor-pointer px-3.5 py-2 rounded-lg flex items-center gap-1.5 text-[0.95rem] font-medium transition-colors hover:bg-white/15 z-[60]"
+                :class="controlsVisible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'"
+                class="mt-3 absolute left-3 bg-black/50 text-white border-none cursor-pointer px-3.5 py-2 rounded-lg flex items-center gap-1.5 text-[0.95rem] font-medium transition-colors hover:bg-white/15 z-[60]"
                 style="top: env(safe-area-inset-top, 12px)" @click="goBack">
                 <ArrowLeft class="size-5" />
                 Back
@@ -27,9 +27,10 @@
 
             <!-- Video element -->
             <video ref="videoEl" class="w-full h-full bg-black object-contain" preload="metadata" playsinline
-                :poster="posterUrl" @click="handleVideoTap" @loadstart="onLoadStart" @canplay="onCanPlay"
+                :poster="posterUrl" @click="handleVideoTap" @touchstart="handleVideoTap" @loadstart="onLoadStart" @canplay="onCanPlay"
                 @waiting="onWaiting" @playing="onPlaying" @pause="onPause" @timeupdate="onTimeUpdate"
-                @loadedmetadata="onLoadedMetadata" @ended="onEnded">
+                @loadedmetadata="onLoadedMetadata" @ended="onEnded" @mousemove="showControls"
+            @mouseleave="hideControls">
                 <track
                     v-if="activeTrackBlobUrl"
                     :key="selectedSubtitleIndex ?? -1"
@@ -260,13 +261,13 @@ function showControls() {
     controlsVisible.value = true;
     if (controlsTimeout) clearTimeout(controlsTimeout);
     controlsTimeout = setTimeout(() => {
-        if (isPlaying.value && !audioMenuOpen.value && !subtitleMenuOpen.value) controlsVisible.value = false;
+        if (!audioMenuOpen.value && !subtitleMenuOpen.value) controlsVisible.value = false;
     }, 3000);
 }
 
 function hideControls() {
     if (controlsTimeout) clearTimeout(controlsTimeout);
-    if (isPlaying.value && !audioMenuOpen.value && !subtitleMenuOpen.value) {
+    if (!audioMenuOpen.value && !subtitleMenuOpen.value) {
         controlsTimeout = setTimeout(() => { controlsVisible.value = false; }, 1000);
     }
 }
@@ -274,9 +275,8 @@ function hideControls() {
 function handleVideoTap() {
     const isTouchDevice = navigator.maxTouchPoints > 0 && window.innerWidth < 1024;
     if (isTouchDevice) {
-        if (controlsVisible.value) {
-            controlsVisible.value = false;
-            if (controlsTimeout) clearTimeout(controlsTimeout);
+        if (controlsVisible.value == true) {
+            hideControls();
         } else {
             showControls();
         }

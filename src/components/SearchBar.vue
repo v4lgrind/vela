@@ -10,6 +10,9 @@
       <Download class="size-5 sm:size-4 sm:mr-1" /><span class="hidden sm:inline">Offline</span>
       <Badge class="ml-1 bg-accent-purple text-white text-xs">{{ offlineStore.downloadCount }}</Badge>
     </Button>
+    <Button variant="ghost" class="shrink-0 px-2 sm:px-3" @click="$router.push('/settings')" aria-label="Settings">
+      <Settings class="size-5 sm:size-4" />
+    </Button>
 
     <div class="relative flex-1 min-w-0" role="combobox" aria-expanded="true" aria-owns="search-listbox" aria-haspopup="listbox">
       <Input ref="inputEl" v-model="query" type="search" :placeholder="placeholder"
@@ -112,7 +115,7 @@ import { useOfflineStore } from '@/store/offline-store';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Home, Download, LogOut, Loader2, ArrowLeft } from 'lucide-vue-next';
+import { Home, Download, LogOut, Loader2, ArrowLeft, Settings } from 'lucide-vue-next';
 
 const placeholder = 'Search movies, shows, albums...';
 const route = useRoute();

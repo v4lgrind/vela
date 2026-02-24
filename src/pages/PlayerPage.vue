@@ -29,7 +29,16 @@
             <video ref="videoEl" class="w-full h-full bg-black object-contain" preload="metadata" playsinline
                 :poster="posterUrl" @click="handleVideoTap" @loadstart="onLoadStart" @canplay="onCanPlay"
                 @waiting="onWaiting" @playing="onPlaying" @pause="onPause" @timeupdate="onTimeUpdate"
-                @loadedmetadata="onLoadedMetadata" @ended="onEnded" />
+                @loadedmetadata="onLoadedMetadata" @ended="onEnded">
+                <track
+                    v-if="activeTrackBlobUrl"
+                    :key="selectedSubtitleIndex ?? -1"
+                    kind="subtitles"
+                    :srclang="activeTrackLang"
+                    :label="activeTrackLabel"
+                    :src="activeTrackBlobUrl"
+                />
+            </video>
 
             <!-- Controls overlay (auto-hide) -->
             <div class="absolute inset-0 flex flex-col justify-end player-gradient px-4 pt-5 transition-opacity duration-300"
@@ -92,6 +101,36 @@
                             </div>
                         </div>
 
+                        <!-- Subtitle track selector (only shown when subtitles exist) -->
+                        <div v-if="subtitleList.length > 0" class="relative" ref="subtitleDropdown">
+                            <button
+                                class="bg-transparent border-none text-white cursor-pointer p-2 rounded flex items-center gap-1.5 transition-colors hover:bg-white/10"
+                                @click="toggleSubtitleMenu">
+                                <Captions class="size-6" />
+                                <span class="text-[0.9rem] font-medium">Subs</span>
+                            </button>
+                            <div class="absolute bottom-full right-0 mb-2 bg-[rgba(28,28,28,0.98)] rounded-lg min-w-[250px] max-h-[400px] overflow-y-auto shadow-[0_8px_24px_rgba(0,0,0,0.5)] backdrop-blur-[10px] transition-all duration-200 scrollbar-hide"
+                                :class="subtitleMenuOpen ? 'opacity-100 pointer-events-auto translate-y-0' : 'opacity-0 pointer-events-none translate-y-2.5'">
+                                <!-- Off -->
+                                <div
+                                    class="flex items-center gap-2.5 px-4 py-3 cursor-pointer text-[0.9rem] transition-colors hover:bg-white/10"
+                                    :class="selectedSubtitleIndex === null ? 'bg-accent-purple/20' : ''"
+                                    @click="selectedSubtitleIndex = null; subtitleMenuOpen = false">
+                                    <Check class="size-4 shrink-0"
+                                        :class="selectedSubtitleIndex === null ? 'opacity-100' : 'opacity-0'" />
+                                    Off
+                                </div>
+                                <div v-for="sub in subtitleList" :key="sub.index"
+                                    class="flex items-center gap-2.5 px-4 py-3 cursor-pointer text-[0.9rem] transition-colors hover:bg-white/10"
+                                    :class="sub.index === selectedSubtitleIndex ? 'bg-accent-purple/20' : ''"
+                                    @click="selectedSubtitleIndex = sub.index; subtitleMenuOpen = false">
+                                    <Check class="size-4 shrink-0"
+                                        :class="sub.index === selectedSubtitleIndex ? 'opacity-100' : 'opacity-0'" />
+                                    {{ sub.label }}
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Fullscreen -->
                         <button
                             class="bg-transparent border-none text-white cursor-pointer p-2 rounded flex items-center transition-colors hover:bg-white/10"
@@ -107,15 +146,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
+import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useJellyfinStore } from '@/store/jellyfin-store';
 import { useAudioPlayerStore } from '@/store/audio-player-store';
+import { usePreferencesStore } from '@/store/preferences-store';
 import Hls from 'hls.js';
 import { deviceProfile } from '@/constants';
 import { formatTime } from '@/utils/helpers';
 import { lockLandscape, unlockOrientation } from '@/utils/orientation';
-import { ArrowLeft, Play, Pause, Volume2, VolumeX, AudioLines, Check, Maximize, Minimize, Loader2 } from 'lucide-vue-next';
+import { ArrowLeft, Play, Pause, Volume2, VolumeX, AudioLines, Captions, Check, Maximize, Minimize, Loader2 } from 'lucide-vue-next';
 
 // ── Setup ──────────────────────────────────────────────────────────────────────
 
@@ -123,6 +163,7 @@ const route = useRoute();
 const router = useRouter();
 const store = useJellyfinStore();
 const audioPlayerStore = useAudioPlayerStore();
+const preferencesStore = usePreferencesStore();
 
 const itemId = route.params.id as string;
 const accessToken = store.accessToken || '';
@@ -146,6 +187,7 @@ const reportingHeaders = { 'Content-Type': 'application/json', 'Authorization': 
 
 const videoEl = ref<HTMLVideoElement | null>(null);
 const audioDropdown = ref<HTMLElement | null>(null);
+const subtitleDropdown = ref<HTMLElement | null>(null);
 
 const isLoading = ref(true);
 const isPlaying = ref(false);
@@ -163,16 +205,20 @@ const mediaSource = ref<any>(null);
 const hlsUrl = ref('');
 const playMethod = ref<'DirectPlay' | 'DirectStream' | 'Transcode'>('Transcode');
 
-// startOffset: for HLS streams that start at segment 0 from a mid-movie position,
-// this is the movie time (in seconds) of that segment-0 start point. Added to
-// video.currentTime everywhere so display, seek, and reporting stay movie-relative.
-// 0 for DirectPlay (video.currentTime is already the true movie position).
-const startOffset = ref(0);
-
 // Audio tracks
-const audioList = ref<Array<{ index: number; label: string }>>([]);
+const audioList = ref<Array<{ index: number; label: string; language: string }>>([]);
 const selectedAudioIndex = ref<number | null>(null);
 const audioMenuOpen = ref(false);
+
+// Subtitle tracks
+const subtitleList = ref<Array<{ index: number; label: string; language: string; deliveryUrl: string }>>([]);
+const selectedSubtitleIndex = ref<number | null>(null); // null = off
+const subtitleMenuOpen = ref(false);
+// Active track — blob: URL so the browser never hits the cross-origin <track> restriction
+const activeTrackBlobUrl = ref<string | null>(null);
+const activeTrackLang = ref('und');
+const activeTrackLabel = ref('');
+const subtitleBlobCache = new Map<number, string>(); // index → blob URL
 
 const posterUrl = computed(() => store.getImageUrl(itemId, 'Primary') || '');
 
@@ -192,16 +238,14 @@ function onPause() { isPlaying.value = false; }
 function onTimeUpdate() {
     const video = videoEl.value;
     if (!video) return;
-    currentTime.value = video.currentTime + startOffset.value;
+    currentTime.value = video.currentTime;
     if (duration.value > 0) progressPct.value = (currentTime.value / duration.value) * 100;
 }
 
 function onLoadedMetadata() {
     const video = videoEl.value;
     if (!video) return;
-    // For HLS with resume, video.duration is remaining movie time from start point.
-    // Adding startOffset gives the true total movie duration.
-    duration.value = video.duration + startOffset.value;
+    duration.value = video.duration;
     isMuted.value = video.muted;
 }
 
@@ -216,13 +260,13 @@ function showControls() {
     controlsVisible.value = true;
     if (controlsTimeout) clearTimeout(controlsTimeout);
     controlsTimeout = setTimeout(() => {
-        if (isPlaying.value && !audioMenuOpen.value) controlsVisible.value = false;
+        if (isPlaying.value && !audioMenuOpen.value && !subtitleMenuOpen.value) controlsVisible.value = false;
     }, 3000);
 }
 
 function hideControls() {
     if (controlsTimeout) clearTimeout(controlsTimeout);
-    if (isPlaying.value && !audioMenuOpen.value) {
+    if (isPlaying.value && !audioMenuOpen.value && !subtitleMenuOpen.value) {
         controlsTimeout = setTimeout(() => { controlsVisible.value = false; }, 1000);
     }
 }
@@ -267,8 +311,7 @@ function seek(e: MouseEvent) {
     const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
     const video = videoEl.value;
     if (!video || !duration.value) return;
-    // Convert ratio of total movie to a video.currentTime value (subtracting offset)
-    video.currentTime = Math.max(0, ratio * duration.value - startOffset.value);
+    video.currentTime = Math.max(0, ratio * duration.value);
     reportPlaybackProgress();
 }
 
@@ -310,6 +353,11 @@ function toggleAudioMenu() {
     showControls(); // reset idle timer so menu stays visible
 }
 
+function toggleSubtitleMenu() {
+    subtitleMenuOpen.value = !subtitleMenuOpen.value;
+    showControls();
+}
+
 function handleKeyDown(e: KeyboardEvent) {
     const tag = (e.target as HTMLElement)?.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
@@ -317,9 +365,10 @@ function handleKeyDown(e: KeyboardEvent) {
 }
 
 function handleClickOutside(e: MouseEvent) {
-    if (audioDropdown.value && !audioDropdown.value.contains(e.target as Node)) {
+    if (audioDropdown.value && !audioDropdown.value.contains(e.target as Node))
         audioMenuOpen.value = false;
-    }
+    if (subtitleDropdown.value && !subtitleDropdown.value.contains(e.target as Node))
+        subtitleMenuOpen.value = false;
 }
 
 function goBack() { router.back(); }
@@ -332,7 +381,7 @@ function buildReportingPayload(overrides: Record<string, any> = {}) {
         ItemId: itemId,
         SessionId: playSessionId.value,
         MediaSourceId: mediaSource.value?.Id || itemId,
-        PositionTicks: Math.floor(((video?.currentTime || 0) + startOffset.value) * 10_000_000),
+        PositionTicks: Math.floor((video?.currentTime || 0) * 10_000_000),
         AudioStreamIndex: selectedAudioIndex.value,
         PlayMethod: playMethod.value,
         PlaySessionId: playSessionId.value,
@@ -436,23 +485,86 @@ async function fetchPlaybackInfo(startTimeTicks?: number, audioStreamIndex?: num
     return await response.json();
 }
 
-function parseAudioStreams(ms: any) {
+function parseAudioStreams(ms: any, preferredIndex?: number) {
     const streams: any[] = ms.MediaStreams || [];
     const audioStreams = streams.filter(s => s.Type === 'Audio');
 
     audioList.value = audioStreams.map(s => ({
         index: s.Index as number,
+        language: (s.Language || 'und') as string,
         label: `${(s.Language || 'und').toUpperCase()} ${
             s.ChannelLayout ? `(${s.ChannelLayout})` :
             s.Channels ? `(${s.Channels}ch)` : ''
         } ${s.Codec ? `- ${s.Codec.toUpperCase()}` : ''}`.trim(),
     }));
 
-    // Default preference: French → marked default → first track
-    const french = audioStreams.find(s => ['fra', 'fre', 'fr'].includes(s.Language));
-    const preferred = french || audioStreams.find(s => s.IsDefault) || audioStreams[0];
-    selectedAudioIndex.value = preferred?.Index ?? 0;
+    if (preferredIndex !== undefined) {
+        selectedAudioIndex.value = preferredIndex;
+    } else {
+        const globalLang = preferencesStore.preferredAudioLanguage;
+        const preferred =
+            (globalLang ? audioStreams.find(s => s.Language === globalLang) : null) ||
+            audioStreams.find(s => s.IsDefault) ||
+            audioStreams[0];
+        selectedAudioIndex.value = preferred?.Index ?? 0;
+    }
 }
+
+function parseSubtitleStreams(ms: any) {
+    const streams: any[] = ms.MediaStreams || [];
+    subtitleList.value = streams
+        .filter(s => s.Type === 'Subtitle' && s.DeliveryUrl)
+        .map(s => ({
+            index: s.Index as number,
+            language: s.Language || 'und',
+            label: s.DisplayTitle || `${(s.Language || 'und').toUpperCase()}${s.IsForced ? ' (Forced)' : ''}`,
+            deliveryUrl: `${serverUrl}${s.DeliveryUrl}`,
+        }));
+
+    const globalSubLang = preferencesStore.preferredSubtitleLanguage;
+    const preferred = globalSubLang
+        ? subtitleList.value.find(s => s.language === globalSubLang) ?? null
+        : null;
+    selectedSubtitleIndex.value = preferred?.index ?? null;
+}
+
+async function applySubtitleTracks() {
+    const index = selectedSubtitleIndex.value;
+    if (index === null) {
+        activeTrackBlobUrl.value = null;
+        return;
+    }
+    const sub = subtitleList.value.find(s => s.index === index);
+    if (!sub) { activeTrackBlobUrl.value = null; return; }
+
+    // Fetch and cache as a blob: URL — bypasses the browser's cross-origin <track> block
+    let blobUrl = subtitleBlobCache.get(index);
+    if (!blobUrl) {
+        try {
+            const resp = await fetch(sub.deliveryUrl);
+            blobUrl = URL.createObjectURL(await resp.blob());
+            subtitleBlobCache.set(index, blobUrl);
+        } catch (e) {
+            console.error('[subtitle] fetch failed:', e);
+            return;
+        }
+    }
+
+    activeTrackLang.value = sub.language;
+    activeTrackLabel.value = sub.label;
+    activeTrackBlobUrl.value = blobUrl;
+
+    // Set mode = 'showing' after Vue inserts the <track> element
+    await nextTick();
+    const video = videoEl.value;
+    if (!video) return;
+    for (let i = 0; i < video.textTracks.length; i++) {
+        const t = video.textTracks[i];
+        if (t.label === sub.label) t.mode = 'showing';
+    }
+}
+
+watch(selectedSubtitleIndex, applySubtitleTracks);
 
 function determinePlaybackMethod(ms: any) {
     if (ms.SupportsDirectPlay) {
@@ -497,7 +609,7 @@ function makeJellyfinFragmentLoader() {
     };
 }
 
-function initHls(url: string, video: HTMLVideoElement, onFatalError?: () => void) {
+function initHls(url: string, video: HTMLVideoElement, startSeconds?: number, onFatalError?: () => void) {
     if (Hls.isSupported()) {
         hls = new Hls({
             maxBufferLength: 30,
@@ -507,8 +619,13 @@ function initHls(url: string, video: HTMLVideoElement, onFatalError?: () => void
         hls.loadSource(url);
         hls.attachMedia(video);
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
+            // Jellyfin always serves the full VOD stream starting from t=0.
+            // Seek to the resume/switch position here so HLS.js loads the
+            // correct segment directly instead of starting from the beginning.
+            if (startSeconds && startSeconds > 0) video.currentTime = startSeconds;
             video.play().catch(() => { });
             startProgressReporting();
+            applySubtitleTracks();
         });
         hls.on(Hls.Events.ERROR, (_, data) => {
             if (data.fatal) {
@@ -537,7 +654,7 @@ function initHls(url: string, video: HTMLVideoElement, onFatalError?: () => void
 
 // ── Player init ────────────────────────────────────────────────────────────────
 
-async function initPlayer(resumeSeconds?: number) {
+async function initPlayer(resumeSeconds?: number, preferredAudioIndex?: number, preferredSubtitleIndex?: number) {
     const video = videoEl.value;
     if (!video) return;
     isLoading.value = true;
@@ -547,16 +664,19 @@ async function initPlayer(resumeSeconds?: number) {
             ? Math.floor(resumeSeconds * 10_000_000)
             : undefined;
 
-        const data = await fetchPlaybackInfo(startTicks);
+        // Force transcode when resuming so Jellyfin always returns an HLS stream.
+        // DirectPlay serves the raw file and relies on video.currentTime seeking, which
+        // is unreliable for MKV/HEVC content. HLS + StartTimeTicks is the reliable path.
+        const data = await fetchPlaybackInfo(startTicks, preferredAudioIndex, !!(startTicks && startTicks > 0));
         mediaSource.value = data.MediaSources?.[0];
         if (!mediaSource.value) throw new Error('No media source available');
 
         if (data.PlaySessionId) playSessionId.value = data.PlaySessionId;
-        parseAudioStreams(mediaSource.value);
+        parseAudioStreams(mediaSource.value, preferredAudioIndex);
+        parseSubtitleStreams(mediaSource.value);
         determinePlaybackMethod(mediaSource.value);
 
         if (playMethod.value === 'DirectPlay') {
-            startOffset.value = 0; // video.currentTime is already movie-relative
             video.src = hlsUrl.value;
             if (resumeSeconds && resumeSeconds > 0) {
                 // Seek after metadata loads to avoid a brief flash from position 0
@@ -572,10 +692,11 @@ async function initPlayer(resumeSeconds?: number) {
                 startProgressReporting();
             }
         } else {
-            // HLS stream starts at segment 0 = resumeSeconds into the movie.
-            // startOffset lets onTimeUpdate/onLoadedMetadata/seek stay movie-relative.
-            startOffset.value = resumeSeconds && resumeSeconds > 0 ? resumeSeconds : 0;
-            initHls(hlsUrl.value, video);
+            // Jellyfin serves a full VOD HLS stream starting from t=0 regardless of
+            // StartTimeTicks. Pre-seed the timer and seek via video.currentTime in
+            // MANIFEST_PARSED so HLS.js jumps directly to the right segment.
+            if (resumeSeconds && resumeSeconds > 0) currentTime.value = resumeSeconds;
+            initHls(hlsUrl.value, video, resumeSeconds);
         }
 
         // Auto-fullscreen on mobile on initial load
@@ -618,7 +739,6 @@ async function rollbackAudio(previousIndex: number | null, movieTime: number) {
 
         if (data.PlaySessionId) playSessionId.value = data.PlaySessionId;
         determinePlaybackMethod(mediaSource.value);
-        startOffset.value = playMethod.value !== 'DirectPlay' && movieTime > 0 ? movieTime : 0;
 
         if (playMethod.value === 'DirectPlay') {
             video.src = hlsUrl.value;
@@ -635,7 +755,7 @@ async function rollbackAudio(previousIndex: number | null, movieTime: number) {
                 startProgressReporting();
             }
         } else {
-            initHls(hlsUrl.value, video); // if rollback itself fails, show a plain error
+            initHls(hlsUrl.value, video, movieTime); // if rollback itself fails, show a plain error
         }
 
         // Clear the revert notice once the player has recovered
@@ -656,7 +776,7 @@ async function switchAudio(index: number) {
     if (!video) { isSwitching = false; return; }
 
     isLoading.value = true;
-    const movieTime = video.currentTime + startOffset.value;
+    const movieTime = video.currentTime;
     const previousIndex = selectedAudioIndex.value; // saved for rollback on either failure path
 
     // Teardown: pause → stop reporting → destroy HLS → clear src
@@ -680,6 +800,8 @@ async function switchAudio(index: number) {
 
         if (data.PlaySessionId) playSessionId.value = data.PlaySessionId;
         selectedAudioIndex.value = index;
+        const chosenLang = audioList.value.find(a => a.index === index)?.language;
+        if (chosenLang) localStorage.setItem(`msplayer-audio-${itemId}`, chosenLang);
 
         // For audio switching we must always use HLS — DirectPlay serves the raw
         // file and cannot select a specific audio stream. We build the URL ourselves
@@ -688,30 +810,23 @@ async function switchAudio(index: number) {
         // stripped DirectPlayProfiles via forceTranscode=true.
         const ms = mediaSource.value;
         if (ms.TranscodingUrl) {
-            // Use Jellyfin's returned URL as the base, then explicitly replace/add
-            // AudioStreamIndex and StartTimeTicks. Jellyfin doesn't always embed
-            // these correctly when passed via the request body.
+            // Ensure AudioStreamIndex is correct in the URL — Jellyfin doesn't always
+            // embed it from the request body.
             let url = ms.TranscodingUrl.replace('?&', '?');
             url = /AudioStreamIndex=\d+/.test(url)
                 ? url.replace(/AudioStreamIndex=\d+/, `AudioStreamIndex=${index}`)
                 : url + `&AudioStreamIndex=${index}`;
-            if (startTicks > 0 && !url.includes('StartTimeTicks')) {
-                url += `&StartTimeTicks=${startTicks}`;
-            }
             hlsUrl.value = `${serverUrl}${url}`;
             playMethod.value = ms.SupportsDirectStream ? 'DirectStream' : 'Transcode';
         } else {
             // Jellyfin didn't return a TranscodingUrl — build one manually.
-            hlsUrl.value = `${serverUrl}/Videos/${itemId}/master.m3u8?mediaSourceId=${ms.Id || itemId}&api_key=${accessToken}&AudioStreamIndex=${index}&PlaySessionId=${playSessionId.value}&StartTimeTicks=${startTicks}`;
+            hlsUrl.value = `${serverUrl}/Videos/${itemId}/master.m3u8?mediaSourceId=${ms.Id || itemId}&api_key=${accessToken}&AudioStreamIndex=${index}&PlaySessionId=${playSessionId.value}`;
             playMethod.value = 'Transcode';
         }
 
-        startOffset.value = movieTime;
-
-        console.log('[switchAudio]', { playMethod: playMethod.value, url: hlsUrl.value.substring(0, 120) });
         // Pass rollback as the fatal-error callback so an async HLS.js failure also
         // triggers recovery — not just synchronous errors caught below.
-        initHls(hlsUrl.value, video, () => rollbackAudio(previousIndex, movieTime));
+        initHls(hlsUrl.value, video, movieTime, () => rollbackAudio(previousIndex, movieTime));
     } catch (e: any) {
         console.error('[switchAudio] error:', e);
         await rollbackAudio(previousIndex, movieTime);
@@ -726,12 +841,10 @@ onMounted(async () => {
     if (audioPlayerStore.isPlaying) audioPlayerStore.stop();
     lockLandscape();
 
-    // Load item details to get resume position (PlaybackPositionTicks)
+    // Always fetch fresh details — cached currentItem may have stale PlaybackPositionTicks
     let details: any = null;
     try {
-        details = store.currentItem?.Id === itemId
-            ? store.currentItem
-            : await store.fetchItemDetails(itemId);
+        details = await store.fetchItemDetails(itemId);
     } catch (e) {
         console.warn('[Player] Failed to load item details:', e);
     }
@@ -739,7 +852,27 @@ onMounted(async () => {
     const resumeTicks = details?.UserData?.PlaybackPositionTicks;
     const resumeSeconds = resumeTicks ? resumeTicks / 10_000_000 : undefined;
 
-    await initPlayer(resumeSeconds);
+    // Determine preferred audio: saved user choice → global preferred lang → marked default → first track.
+    const allStreams: any[] = details?.MediaStreams || [];
+    const audioStreams = allStreams.filter(s => s.Type === 'Audio');
+    const savedLang = localStorage.getItem(`msplayer-audio-${itemId}`);
+    const savedSubtitles = localStorage.getItem(`msplayer-subtitles-${itemId}`);
+    const globalLang = preferencesStore.preferredAudioLanguage;
+    const globalLangSubtitles = preferencesStore.preferredSubtitleLanguage;
+    const preferred =
+        (savedLang ? audioStreams.find((s: any) => s.Language === savedLang) : null) ||
+        (globalLang ? audioStreams.find((s: any) => s.Language === globalLang) : null) ||
+        audioStreams.find((s: any) => s.IsDefault) ||
+        audioStreams[0];
+    const preferedSubtitles =
+        (savedSubtitles ? audioStreams.find((s: any) => s.Language === savedSubtitles) : null) ||
+        (globalLangSubtitles ? audioStreams.find((s: any) => s.Language === globalLangSubtitles) : null) ||
+        audioStreams.find((s: any) => s.IsDefault) ||
+        audioStreams[0];
+    const preferredAudioIndex: number | undefined = preferred?.Index;
+    const preferredSubtitleIndex: number | undefined = preferedSubtitles?.Index;
+
+    await initPlayer(resumeSeconds, preferredAudioIndex, preferredSubtitleIndex);
 
     document.addEventListener('click', handleClickOutside);
     document.addEventListener('fullscreenchange', () => { isFullscreen.value = !!getFullscreenElement(); });
@@ -758,6 +891,9 @@ onBeforeUnmount(() => {
 
     hls?.destroy();
     hls = null;
+
+    subtitleBlobCache.forEach(url => URL.revokeObjectURL(url));
+    subtitleBlobCache.clear();
 
     const video = videoEl.value;
     if (video) {

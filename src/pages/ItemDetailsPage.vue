@@ -239,16 +239,16 @@
             </div>
         </section>
 
-        <!-- Cast -->
+                <!-- Cast -->
         <section v-if="cast?.length" class="mt-6">
-            <div class="flex items-center justify-between gap-3 mb-3">
+            <div class="flex items-center justify-between gap-3">
                 <h3 class="text-xl font-semibold m-0">Cast</h3>
                 <div class="flex gap-2">
                     <Button variant="outline" size="icon" class="size-8" @click="scrollCast('left')"><ArrowLeft class="size-4" /></Button>
                     <Button variant="outline" size="icon" class="size-8" @click="scrollCast('right')"><ArrowRight class="size-4" /></Button>
                 </div>
             </div>
-            <div ref="castRail" class="grid grid-flow-col auto-cols-[minmax(140px,160px)] gap-3 overflow-x-auto overflow-y-hidden overscroll-x-contain snap-x snap-proximity scroll-smooth pb-1.5 scrollbar-hide" role="list">
+            <div ref="castRail" class="grid grid-flow-col auto-cols-[minmax(140px,160px)] gap-3 overflow-x-auto overflow-y-hidden overscroll-x-contain snap-x snap-proximity scroll-smooth p-3 scrollbar-hide" role="list">
                 <Card v-for="p in cast" :key="p.Id || p.Name" class="bg-surface-raised border-border-default p-2.5 text-center snap-center hover:-translate-y-1 hover:bg-surface-hover hover:border-border-hover transition-all duration-200" role="listitem" :title="p.Name">
                     <div class="w-full aspect-[2/3] rounded-lg overflow-hidden bg-black/60 shadow-lg mb-2.5">
                         <LazyImg :src="personImageUrl(p)" :alt="p.Name" item-type="person" class="w-full h-full object-cover object-top" />
@@ -258,6 +258,33 @@
                 </Card>
             </div>
         </section>
+
+
+        <!-- Similar Items -->
+        <section v-if="similarItems.length" class="mt-6">
+            <div class="flex items-center justify-between gap-3">
+                <h3 class="text-xl font-semibold m-0">More Like This</h3>
+                <div class="flex gap-2">
+                    <Button variant="outline" size="icon" class="size-8" @click="scrollSimilar('left')"><ArrowLeft class="size-4" /></Button>
+                    <Button variant="outline" size="icon" class="size-8" @click="scrollSimilar('right')"><ArrowRight class="size-4" /></Button>
+                </div>
+            </div>
+            <div ref="similarRail" class="grid grid-flow-col auto-cols-[minmax(140px,160px)] gap-3 overflow-x-auto overflow-y-hidden overscroll-x-contain snap-x snap-proximity scroll-smooth p-3 scrollbar-hide" role="list">
+                <Card v-for="sim in similarItems" :key="sim.Id"
+                    class="bg-surface-raised border-border-default cursor-pointer overflow-hidden hover:-translate-y-1 hover:border-accent-purple transition-all duration-200 snap-center"
+                    role="listitem"
+                    @click="goToItem(sim.Id)">
+                    <div class="w-full aspect-[2/3] overflow-hidden bg-black/60">
+                        <LazyImg :src="getImageUrl(sim.Id, 'Primary', 300, 450)" :alt="sim.Name" :item-type="sim.Type" class="w-full h-full object-cover" />
+                    </div>
+                    <div class="p-2">
+                        <div class="font-semibold text-text-heading text-sm truncate">{{ sim.Name }}</div>
+                        <div class="text-text-muted text-xs mt-0.5">{{ sim.ProductionYear }}</div>
+                    </div>
+                </Card>
+            </div>
+        </section>
+
 
     </div>
 </template>
@@ -290,6 +317,7 @@ const item = ref<any | null>(null);
 const seasons = ref<any[]>([]);
 const episodes = ref<any[]>([]);
 const audioTracks = ref<any[]>([]);
+const similarItems = ref<any[]>([]);
 
 const itemId = computed(() => route.params.id as string);
 const accessToken = store.accessToken;
@@ -306,6 +334,7 @@ async function load() {
     seasons.value = [];
     episodes.value = [];
     audioTracks.value = [];
+    similarItems.value = [];
 
     try {
         const data = await store.fetchItemDetails(itemId.value);
@@ -319,6 +348,9 @@ async function load() {
         }
         if (data?.Type === 'MusicAlbum') {
             audioTracks.value = await store.fetchAudioTracks(itemId.value);
+        }
+        if (data?.Type === 'Movie' || data?.Type === 'Series') {
+            similarItems.value = await store.fetchSimilarItems(itemId.value);
         }
     } catch (e) {
         error.value = 'Failed to load details';
@@ -451,6 +483,15 @@ function playAlbum() {
 const castRail = ref<HTMLDivElement | null>(null);
 function scrollCast(dir: 'left' | 'right') {
     const el = castRail.value;
+    if (!el) return;
+    const cardWidth = 160;
+    const delta = dir === 'left' ? -cardWidth * 3 : cardWidth * 3;
+    el.scrollBy({ left: delta, behavior: 'smooth' });
+}
+
+const similarRail = ref<HTMLDivElement | null>(null);
+function scrollSimilar(dir: 'left' | 'right') {
+    const el = similarRail.value;
     if (!el) return;
     const cardWidth = 160;
     const delta = dir === 'left' ? -cardWidth * 3 : cardWidth * 3;

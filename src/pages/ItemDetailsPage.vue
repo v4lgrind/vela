@@ -6,133 +6,161 @@
         <Card v-else class="bg-surface-raised border-border-default rounded-xl p-4 shadow-lg grid gap-4"
             :class="isLandscapePoster ? 'grid-cols-1' : 'grid-cols-[200px_1fr] max-md:grid-cols-1'">
             <div>
-                <div class="rounded-lg overflow-hidden bg-black/60 shadow-md mx-auto"
-                    :class="isAudioType(item.Type)
-                        ? 'w-[200px] h-[200px] max-md:w-[160px] max-md:h-[160px]'
-                        : isLandscapePoster
-                            ? 'w-full max-w-[480px] aspect-video'
-                            : 'w-[200px] h-[300px] max-md:w-[160px] max-md:h-[240px]'">
-                    <LazyImg :src="posterUrl" :alt="item?.Name" :item-type="item?.Type" class="w-full h-full object-cover" />
+                <div class="rounded-lg overflow-hidden bg-black/60 shadow-md mx-auto" :class="isAudioType(item.Type)
+                    ? 'w-[200px] h-[200px] max-md:w-[160px] max-md:h-[160px]'
+                    : isLandscapePoster
+                        ? 'w-full max-w-[480px] aspect-video'
+                        : 'w-[200px] h-[300px] max-md:w-[160px] max-md:h-[240px]'">
+                    <LazyImg :src="posterUrl" :alt="item?.Name" :item-type="item?.Type"
+                        class="w-full h-full object-cover" />
                 </div>
             </div>
 
             <Dialog v-model:open="showMediaInfo">
-            <div>
-                <h3 class="text-xl font-bold text-text-heading m-0 mb-2">{{ item?.Name }}</h3>
-
-                <div class="flex flex-wrap gap-2 mt-3">
-                <Button v-if="isPlayable(item)" class="bg-gradient-to-r from-accent-green to-accent-teal text-surface-raised font-bold min-h-[44px]" @click="playMedia">
-                    <Play class="size-4 mr-1 fill-current stroke-none" />
-                    {{ resumePositionLabel ? `Resume at ${resumePositionLabel}` : 'Play' }}
-                </Button>
-
-                <Button v-if="item.Type === 'MusicAlbum' && audioTracks.length" class="bg-gradient-to-r from-accent-green to-accent-teal text-surface-raised font-bold min-h-[44px]" @click="playAlbum">
-                    <Play class="size-4 mr-1 fill-current stroke-none" /> Play album
-                </Button>
-
-                <Button v-if="isItemDownloaded && !isDownloading" class="bg-accent-purple text-white hover:bg-error-dark min-h-[44px]" @click="deleteDownload">
-                    <Check class="size-4 mr-1" /> Downloaded - Remove
-                </Button>
-
-                <Button v-else-if="canDownload(item) && !isItemDownloaded && !isDownloading" class="bg-gradient-to-r from-[#667eea] to-[#764ba2] text-white font-bold min-h-[44px]" @click="handleDownload">
-                    <DownloadIcon class="size-4 mr-1" /> Download
-                </Button>
-
-                <Button v-if="isDownloading" class="bg-[#1a5f7a] text-white font-bold cursor-wait min-h-[44px]" disabled>
-                    Downloading... {{ downloadProgress }}%
-                </Button>
-
-                <Button v-if="isDownloading" variant="destructive" class="min-h-[44px]" @click="cancelDownload">
-                    <X class="size-4 mr-1" /> Cancel
-                </Button>
-
-                <DialogTrigger v-if="videoDetails.length || sourceDetails.length || fileSizeHuman" as-child>
-                    <Button variant="outline" class="gap-2 min-h-[44px]">
-                        <Info class="size-4" /> Media Info
-                    </Button>
-                </DialogTrigger>
-                </div>
-
-                <div class="flex flex-wrap gap-2 mb-2 mt-2">
-                    <Badge v-if="year" variant="secondary">{{ year }}</Badge>
-                    <Badge v-if="item?.Type === 'Season' && episodes.length" variant="secondary">{{ episodes.length }} Episodes</Badge>
-                    <Badge v-if="duration" variant="secondary">{{ duration }}</Badge>
-                    <Badge v-if="item?.CommunityRating" variant="secondary">⭐ {{ item.CommunityRating.toFixed(1) }}</Badge>
-                    <Badge v-if="item?.Type === 'Season' && item?.PremiereDate" variant="secondary">Aired: {{ new Date(item.PremiereDate).getFullYear() }}</Badge>
-                    <Badge v-if="typeLabel" variant="secondary">{{ typeLabel }}</Badge>
-                    <Badge v-if="videoCodec" variant="secondary">Codec: {{ videoCodec }}</Badge>
-                    <Badge v-if="videoResolution" variant="secondary">{{ videoResolution }}</Badge>
-                </div>
-
-                <p v-if="item?.Overview" class="my-2 leading-relaxed text-sm text-text-primary/85">
-                    {{ item.Overview }}
-                </p>
-
-                <div v-if="genres?.length" class="mt-3">
-                    <h4 class="text-sm font-semibold text-text-bright m-0 mb-1.5">Genres</h4>
-                    <div class="flex flex-wrap gap-2">
-                        <Badge v-for="g in genres" :key="g" variant="secondary">{{ g }}</Badge>
+                <div>
+                    <div class="flex flex-wrap">
+                        <Button v-if="item?.SeriesId" variant="link" @click="goToItem(item?.SeriesId)"
+                            class="cursor-pointer p-0 mr-3">{{ item?.SeriesName }}</Button>
+                        <Button v-if="item?.SeasonId" variant="link" @click="goToItem(item?.SeasonId)"
+                            class="cursor-pointer p-0">{{ item?.SeasonName }}</Button>
                     </div>
-                </div>
 
-                <div v-if="directorNames?.length" class="mt-3">
-                    <h4 class="text-sm font-semibold text-text-bright m-0 mb-1.5">Director</h4>
-                    <div class="flex flex-wrap gap-2">
-                        <Badge v-for="d in directorNames" :key="d" variant="secondary">{{ d }}</Badge>
+                    <h3 class="text-xl font-bold text-text-heading m-0 mb-2">{{ item?.Name }}</h3>
+
+                    <div class="flex flex-wrap gap-2 mt-3">
+                        <Button v-if="isPlayable(item)"
+                            class="bg-gradient-to-r from-accent-green to-accent-teal text-surface-raised font-bold min-h-[44px]"
+                            @click="playMedia">
+                            <Play class="size-4 mr-1 fill-current stroke-none" />
+                            {{ resumePositionLabel ? `Resume at ${resumePositionLabel}` : 'Play' }}
+                        </Button>
+
+                        <Button v-if="item.Type === 'MusicAlbum' && audioTracks.length"
+                            class="bg-gradient-to-r from-accent-green to-accent-teal text-surface-raised font-bold min-h-[44px]"
+                            @click="playAlbum">
+                            <Play class="size-4 mr-1 fill-current stroke-none" /> Play album
+                        </Button>
+
+                        <Button v-if="isItemDownloaded && !isDownloading"
+                            class="bg-accent-purple text-white hover:bg-error-dark min-h-[44px]"
+                            @click="deleteDownload">
+                            <Check class="size-4 mr-1" /> Downloaded - Remove
+                        </Button>
+
+                        <Button v-else-if="canDownload(item) && !isItemDownloaded && !isDownloading"
+                            class="bg-gradient-to-r from-[#667eea] to-[#764ba2] text-white font-bold min-h-[44px]"
+                            @click="handleDownload">
+                            <DownloadIcon class="size-4 mr-1" /> Download
+                        </Button>
+
+                        <Button v-if="isDownloading" class="bg-[#1a5f7a] text-white font-bold cursor-wait min-h-[44px]"
+                            disabled>
+                            Downloading... {{ downloadProgress }}%
+                        </Button>
+
+                        <Button v-if="isDownloading" variant="destructive" class="min-h-[44px]" @click="cancelDownload">
+                            <X class="size-4 mr-1" /> Cancel
+                        </Button>
+
+                        <DialogTrigger v-if="videoDetails.length || sourceDetails.length || fileSizeHuman" as-child>
+                            <Button variant="outline" class="gap-2 min-h-[44px]">
+                                <Info class="size-4" /> Media Info
+                            </Button>
+                        </DialogTrigger>
                     </div>
-                </div>
 
-                <div v-if="studioNames?.length" class="mt-3">
-                    <h4 class="text-sm font-semibold text-text-bright m-0 mb-1.5">Studios</h4>
-                    <div class="flex flex-wrap gap-2">
-                        <Badge v-for="s in studioNames" :key="s" variant="secondary">{{ s }}</Badge>
+                    <div class="flex flex-wrap gap-2 mb-2 mt-2">
+                        <Badge v-if="year" variant="secondary">{{ year }}</Badge>
+                        <Badge v-if="item?.Type === 'Season' && episodes.length" variant="secondary">{{ episodes.length
+                            }} Episodes</Badge>
+                        <Badge v-if="duration" variant="secondary">{{ duration }}</Badge>
+                        <Badge v-if="item?.CommunityRating" variant="secondary">⭐ {{ item.CommunityRating.toFixed(1) }}
+                        </Badge>
+                        <Badge v-if="item?.Type === 'Season' && item?.PremiereDate" variant="secondary">Aired: {{ new
+                            Date(item.PremiereDate).getFullYear() }}</Badge>
+                        <Badge v-if="typeLabel" variant="secondary">{{ typeLabel }}</Badge>
+                        <Badge v-if="videoCodec" variant="secondary">Codec: {{ videoCodec }}</Badge>
+                        <Badge v-if="videoResolution" variant="secondary">{{ videoResolution }}</Badge>
                     </div>
-                </div>
 
-                <!-- Media Info Dialog Content -->
-                <DialogContent class="max-w-lg max-h-[85dvh] overflow-y-auto bg-surface-raised border-border-default">
-                    <DialogHeader>
-                        <DialogTitle class="text-text-heading text-lg">Media Information</DialogTitle>
-                        <DialogDescription class="text-text-muted text-sm">Technical details for {{ item?.Name }}</DialogDescription>
-                    </DialogHeader>
+                    <p v-if="item?.Overview" class="my-2 leading-relaxed text-sm text-text-primary/85">
+                        {{ item.Overview }}
+                    </p>
 
-                    <div v-if="videoDetails.length" class="mt-4">
-                        <h4 class="text-sm font-semibold text-accent-purple-light uppercase tracking-wider mb-3">Video Stream</h4>
-                        <div class="grid grid-cols-2 gap-2">
-                            <div v-for="row in videoDetails" :key="`v-${row.label}`"
-                                class="bg-surface-hover/50 rounded-lg px-3 py-2">
-                                <div class="text-[11px] text-text-muted uppercase tracking-wider">{{ row.label }}</div>
-                                <div class="text-sm font-medium text-text-heading mt-0.5 break-all">{{ row.value }}</div>
-                            </div>
+                    <div v-if="genres?.length" class="mt-3">
+                        <h4 class="text-sm font-semibold text-text-bright m-0 mb-1.5">Genres</h4>
+                        <div class="flex flex-wrap gap-2">
+                            <Badge v-for="g in genres" :key="g" variant="secondary">{{ g }}</Badge>
                         </div>
                     </div>
 
-                    <Separator v-if="videoDetails.length && (sourceDetails.length || fileSizeHuman)" class="my-4 bg-border-default" />
+                    <div v-if="directorNames?.length" class="mt-3">
+                        <h4 class="text-sm font-semibold text-text-bright m-0 mb-1.5">Director</h4>
+                        <div class="flex flex-wrap gap-2">
+                            <Badge v-for="d in directorNames" :key="d" variant="secondary">{{ d }}</Badge>
+                        </div>
+                    </div>
 
-                    <div v-if="sourceDetails.length || fileSizeHuman">
-                        <h4 class="text-sm font-semibold text-accent-purple-light uppercase tracking-wider mb-3">Media Source</h4>
-                        <div class="grid grid-cols-2 gap-2">
-                            <template v-for="row in sourceDetails" :key="`s-${row.label}`">
-                                <div class="bg-surface-hover/50 rounded-lg px-3 py-2"
-                                    :class="row.label === 'Path' ? 'col-span-2' : ''">
-                                    <div class="text-[11px] text-text-muted uppercase tracking-wider">{{ row.label }}</div>
-                                    <div class="text-sm font-medium text-text-heading mt-0.5 break-all">{{ row.value }}</div>
+                    <div v-if="studioNames?.length" class="mt-3">
+                        <h4 class="text-sm font-semibold text-text-bright m-0 mb-1.5">Studios</h4>
+                        <div class="flex flex-wrap gap-2">
+                            <Badge v-for="s in studioNames" :key="s" variant="secondary">{{ s }}</Badge>
+                        </div>
+                    </div>
+
+                    <!-- Media Info Dialog Content -->
+                    <DialogContent
+                        class="max-w-lg max-h-[85dvh] overflow-y-auto bg-surface-raised border-border-default">
+                        <DialogHeader>
+                            <DialogTitle class="text-text-heading text-lg">Media Information</DialogTitle>
+                            <DialogDescription class="text-text-muted text-sm">Technical details for {{ item?.Name }}
+                            </DialogDescription>
+                        </DialogHeader>
+
+                        <div v-if="videoDetails.length" class="mt-4">
+                            <h4 class="text-sm font-semibold text-accent-purple-light uppercase tracking-wider mb-3">
+                                Video Stream</h4>
+                            <div class="grid grid-cols-2 gap-2">
+                                <div v-for="row in videoDetails" :key="`v-${row.label}`"
+                                    class="bg-surface-hover/50 rounded-lg px-3 py-2">
+                                    <div class="text-[11px] text-text-muted uppercase tracking-wider">{{ row.label }}
+                                    </div>
+                                    <div class="text-sm font-medium text-text-heading mt-0.5 break-all">{{ row.value }}
+                                    </div>
                                 </div>
-                            </template>
-                            <div v-if="fileSizeHuman" class="bg-surface-hover/50 rounded-lg px-3 py-2">
-                                <div class="text-[11px] text-text-muted uppercase tracking-wider">File size</div>
-                                <div class="text-sm font-medium text-text-heading mt-0.5">{{ fileSizeHuman }}</div>
                             </div>
                         </div>
-                    </div>
 
-                    <DialogFooter class="mt-4">
-                        <DialogClose as-child>
-                            <Button variant="outline" class="min-h-[44px]">Close</Button>
-                        </DialogClose>
-                    </DialogFooter>
-                </DialogContent>
-            </div>
+                        <Separator v-if="videoDetails.length && (sourceDetails.length || fileSizeHuman)"
+                            class="my-4 bg-border-default" />
+
+                        <div v-if="sourceDetails.length || fileSizeHuman">
+                            <h4 class="text-sm font-semibold text-accent-purple-light uppercase tracking-wider mb-3">
+                                Media Source</h4>
+                            <div class="grid grid-cols-2 gap-2">
+                                <template v-for="row in sourceDetails" :key="`s-${row.label}`">
+                                    <div class="bg-surface-hover/50 rounded-lg px-3 py-2"
+                                        :class="row.label === 'Path' ? 'col-span-2' : ''">
+                                        <div class="text-[11px] text-text-muted uppercase tracking-wider">{{ row.label
+                                            }}</div>
+                                        <div class="text-sm font-medium text-text-heading mt-0.5 break-all">{{ row.value
+                                            }}</div>
+                                    </div>
+                                </template>
+                                <div v-if="fileSizeHuman" class="bg-surface-hover/50 rounded-lg px-3 py-2">
+                                    <div class="text-[11px] text-text-muted uppercase tracking-wider">File size</div>
+                                    <div class="text-sm font-medium text-text-heading mt-0.5">{{ fileSizeHuman }}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <DialogFooter class="mt-4">
+                            <DialogClose as-child>
+                                <Button variant="outline" class="min-h-[44px]">Close</Button>
+                            </DialogClose>
+                        </DialogFooter>
+                    </DialogContent>
+                </div>
             </Dialog>
         </Card>
 
@@ -140,19 +168,21 @@
         <section v-if="item?.Type === 'Series' && seasons.length" class="mt-6">
             <h3 class="text-xl font-semibold mb-3">Seasons</h3>
             <div class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-4">
-                <Card v-for="season in seasons" :key="season.Id" class="bg-surface-raised border-border-default cursor-pointer overflow-hidden hover:-translate-y-1 hover:border-accent-purple transition-all duration-200" @click="goToItem(season.Id)">
+                <Card v-for="season in seasons" :key="season.Id"
+                    class="bg-surface-raised border-border-default cursor-pointer overflow-hidden hover:-translate-y-1 hover:border-accent-purple transition-all duration-200"
+                    @click="goToItem(season.Id)">
                     <div class="relative group w-full aspect-[2/3] overflow-hidden">
-                        <LazyImg :src="getImageUrl(season.Id, 'Primary', 300, 450)" :alt="season.Name" item-type="Season"
-                            class="w-full h-full object-cover" />
+                        <LazyImg :src="getImageUrl(season.Id, 'Primary', 300, 450)" :alt="season.Name"
+                            item-type="Season" class="w-full h-full object-cover" />
                         <!-- watched badge -->
                         <div v-if="season.UserData?.UnplayedItemCount === 0 && season.UserData?.PlayCount > 0"
                             class="absolute top-1.5 right-1.5 bg-accent-purple rounded-full p-0.5 shadow pointer-events-none">
                             <Check class="size-3 text-white" />
                         </div>
                         <!-- overlay: always visible on mobile, hover-only on desktop -->
-                        <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent flex items-end justify-center gap-2 pb-2 transition-opacity duration-200 sm:opacity-0 sm:group-hover:opacity-100 pointer-events-none">
-                            <button @click.stop="playNextInSeason(season)"
-                                :disabled="playingSeasonId === season.Id"
+                        <div
+                            class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent flex items-end justify-center gap-2 pb-2 transition-opacity duration-200 sm:opacity-0 sm:group-hover:opacity-100 pointer-events-none">
+                            <button @click.stop="playNextInSeason(season)" :disabled="playingSeasonId === season.Id"
                                 class="bg-white/90 hover:bg-white text-black rounded-full p-2 shadow-lg transition-all hover:scale-110 disabled:opacity-60 pointer-events-auto"
                                 title="Play next episode">
                                 <Loader2 v-if="playingSeasonId === season.Id" class="size-4 animate-spin" />
@@ -174,11 +204,13 @@
                     :class="ep.UserData?.Played ? 'opacity-60 hover:opacity-100 border-border-default' : 'hover:border-accent-purple'"
                     @click="goToItem(ep.Id)">
                     <!-- Thumbnail with play overlay -->
-                    <div class="relative group w-[100px] h-[56px] sm:w-[180px] sm:h-[101px] md:w-[240px] md:h-[135px] rounded-lg overflow-hidden shrink-0">
+                    <div
+                        class="relative group w-[100px] h-[56px] sm:w-[180px] sm:h-[101px] md:w-[240px] md:h-[135px] rounded-lg overflow-hidden shrink-0">
                         <LazyImg :src="getImageUrl(ep.Id, 'Primary', 240, 135)" :alt="ep.Name" item-type="Episode"
                             class="w-full h-full object-cover" />
                         <!-- Always visible on mobile, hover-only on desktop -->
-                        <div class="absolute inset-0 bg-black/50 flex items-center justify-center sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+                        <div
+                            class="absolute inset-0 bg-black/50 flex items-center justify-center sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
                             <button @click.stop="playEpisode(ep)"
                                 class="bg-white/90 hover:bg-white text-black rounded-full p-2 sm:p-2.5 shadow-lg transition-all active:scale-95 pointer-events-auto"
                                 title="Play episode">
@@ -188,12 +220,15 @@
                     </div>
                     <div class="flex-1 min-w-0">
                         <div class="flex items-start justify-between gap-2 mb-1.5">
-                            <h4 class="font-bold text-sm sm:text-lg text-text-heading m-0 leading-snug">{{ ep.IndexNumber }}. {{ ep.Name }}</h4>
+                            <h4 class="font-bold text-sm sm:text-lg text-text-heading m-0 leading-snug">{{
+                                ep.IndexNumber }}. {{
+                                    ep.Name }}</h4>
                             <div class="flex items-center gap-1.5 shrink-0">
-                                <Badge v-if="ep.RunTimeTicks" variant="secondary" class="text-xs hidden sm:inline-flex">{{ formatTicksDuration(ep.RunTimeTicks) }}</Badge>
+                                <Badge v-if="ep.RunTimeTicks" variant="secondary" class="text-xs hidden sm:inline-flex">
+                                    {{
+                                        formatTicksDuration(ep.RunTimeTicks) }}</Badge>
                                 <!-- Watched toggle -->
-                                <button @click.stop="toggleWatchedEpisode(ep)"
-                                    :disabled="watchingEpId === ep.Id"
+                                <button @click.stop="toggleWatchedEpisode(ep)" :disabled="watchingEpId === ep.Id"
                                     class="rounded-full p-2 transition-all active:scale-95 disabled:opacity-50"
                                     :class="ep.UserData?.Played ? 'bg-accent-purple text-white' : 'bg-surface-hover text-text-muted hover:text-white hover:bg-accent-purple'"
                                     :title="ep.UserData?.Played ? 'Mark as unwatched' : 'Mark as watched'">
@@ -201,14 +236,16 @@
                                 </button>
                             </div>
                         </div>
-                        <p v-if="ep.Overview" class="text-text-primary text-xs sm:text-sm leading-relaxed mb-0 line-clamp-2 sm:line-clamp-none">
+                        <p v-if="ep.Overview"
+                            class="text-text-primary text-xs sm:text-sm leading-relaxed mb-0 line-clamp-2 sm:line-clamp-none">
                             {{ ep.Overview }}
                         </p>
                         <p v-else class="text-text-muted text-xs sm:text-sm italic mb-0">
                             No synopsis available
                         </p>
                         <div v-if="ep.CommunityRating || ep.PremiereDate || ep.RunTimeTicks" class="flex gap-2 mt-1.5">
-                            <Badge v-if="ep.RunTimeTicks" variant="secondary" class="text-xs sm:hidden">{{ formatTicksDuration(ep.RunTimeTicks) }}</Badge>
+                            <Badge v-if="ep.RunTimeTicks" variant="secondary" class="text-xs sm:hidden">{{
+                                formatTicksDuration(ep.RunTimeTicks) }}</Badge>
                             <Badge v-if="ep.CommunityRating" variant="secondary" class="text-xs">
                                 ⭐ {{ ep.CommunityRating.toFixed(1) }}
                             </Badge>
@@ -231,27 +268,42 @@
                     @click="playTrack(track.Id, i)">
                     <div class="text-center text-text-muted font-semibold text-sm">{{ track.IndexNumber || '·' }}</div>
                     <div class="min-w-0">
-                        <div class="font-semibold text-text-heading truncate" :class="audioPlayerStore.currentTrack?.id === track.Id && 'text-accent-purple-light'">{{ track.Name }}</div>
-                        <div v-if="track.Artists?.length" class="text-text-muted text-sm mt-0.5 truncate">{{ track.Artists.join(', ') }}</div>
+                        <div class="font-semibold text-text-heading truncate"
+                            :class="audioPlayerStore.currentTrack?.id === track.Id && 'text-accent-purple-light'">{{
+                                track.Name
+                            }}</div>
+                        <div v-if="track.Artists?.length" class="text-text-muted text-sm mt-0.5 truncate">{{
+                            track.Artists.join(', ') }}</div>
                     </div>
-                    <div class="text-right text-text-muted text-sm tabular-nums">{{ formatTrackDuration(track.RunTimeTicks) }}</div>
+                    <div class="text-right text-text-muted text-sm tabular-nums">{{
+                        formatTrackDuration(track.RunTimeTicks) }}
+                    </div>
                 </div>
             </div>
         </section>
 
-                <!-- Cast -->
+        <!-- Cast -->
         <section v-if="cast?.length" class="mt-6">
             <div class="flex items-center justify-between gap-3">
                 <h3 class="text-xl font-semibold m-0">Cast</h3>
                 <div class="flex gap-2">
-                    <Button variant="outline" size="icon" class="size-8" @click="scrollCast('left')"><ArrowLeft class="size-4" /></Button>
-                    <Button variant="outline" size="icon" class="size-8" @click="scrollCast('right')"><ArrowRight class="size-4" /></Button>
+                    <Button variant="outline" size="icon" class="size-8" @click="scrollCast('left')">
+                        <ArrowLeft class="size-4" />
+                    </Button>
+                    <Button variant="outline" size="icon" class="size-8" @click="scrollCast('right')">
+                        <ArrowRight class="size-4" />
+                    </Button>
                 </div>
             </div>
-            <div ref="castRail" class="grid grid-flow-col auto-cols-[minmax(140px,160px)] gap-3 overflow-x-auto overflow-y-hidden overscroll-x-contain snap-x snap-proximity scroll-smooth p-3 scrollbar-hide" role="list">
-                <Card v-for="p in cast" :key="p.Id || p.Name" class="bg-surface-raised border-border-default p-2.5 text-center snap-center hover:-translate-y-1 hover:bg-surface-hover hover:border-border-hover transition-all duration-200" role="listitem" :title="p.Name">
+            <div ref="castRail"
+                class="grid grid-flow-col auto-cols-[minmax(140px,160px)] gap-3 overflow-x-auto overflow-y-hidden overscroll-x-contain snap-x snap-proximity scroll-smooth p-3 scrollbar-hide"
+                role="list">
+                <Card v-for="p in cast" :key="p.Id || p.Name"
+                    class="bg-surface-raised border-border-default p-2.5 text-center snap-center hover:-translate-y-1 hover:bg-surface-hover hover:border-border-hover transition-all duration-200"
+                    role="listitem" :title="p.Name">
                     <div class="w-full aspect-[2/3] rounded-lg overflow-hidden bg-black/60 shadow-lg mb-2.5">
-                        <LazyImg :src="personImageUrl(p)" :alt="p.Name" item-type="person" class="w-full h-full object-cover object-top" />
+                        <LazyImg :src="personImageUrl(p)" :alt="p.Name" item-type="person"
+                            class="w-full h-full object-cover object-top" />
                     </div>
                     <div class="font-semibold text-text-heading truncate">{{ p.Name }}</div>
                     <div v-if="p.Role" class="text-text-muted text-sm mt-1">{{ p.Role }}</div>
@@ -265,17 +317,23 @@
             <div class="flex items-center justify-between gap-3">
                 <h3 class="text-xl font-semibold m-0">More Like This</h3>
                 <div class="flex gap-2">
-                    <Button variant="outline" size="icon" class="size-8" @click="scrollSimilar('left')"><ArrowLeft class="size-4" /></Button>
-                    <Button variant="outline" size="icon" class="size-8" @click="scrollSimilar('right')"><ArrowRight class="size-4" /></Button>
+                    <Button variant="outline" size="icon" class="size-8" @click="scrollSimilar('left')">
+                        <ArrowLeft class="size-4" />
+                    </Button>
+                    <Button variant="outline" size="icon" class="size-8" @click="scrollSimilar('right')">
+                        <ArrowRight class="size-4" />
+                    </Button>
                 </div>
             </div>
-            <div ref="similarRail" class="grid grid-flow-col auto-cols-[minmax(140px,160px)] gap-3 overflow-x-auto overflow-y-hidden overscroll-x-contain snap-x snap-proximity scroll-smooth p-3 scrollbar-hide" role="list">
+            <div ref="similarRail"
+                class="grid grid-flow-col auto-cols-[minmax(140px,160px)] gap-3 overflow-x-auto overflow-y-hidden overscroll-x-contain snap-x snap-proximity scroll-smooth p-3 scrollbar-hide"
+                role="list">
                 <Card v-for="sim in similarItems" :key="sim.Id"
                     class="bg-surface-raised border-border-default cursor-pointer overflow-hidden hover:-translate-y-1 hover:border-accent-purple transition-all duration-200 snap-center"
-                    role="listitem"
-                    @click="goToItem(sim.Id)">
+                    role="listitem" @click="goToItem(sim.Id)">
                     <div class="w-full aspect-[2/3] overflow-hidden bg-black/60">
-                        <LazyImg :src="getImageUrl(sim.Id, 'Primary', 300, 450)" :alt="sim.Name" :item-type="sim.Type" class="w-full h-full object-cover" />
+                        <LazyImg :src="getImageUrl(sim.Id, 'Primary', 300, 450)" :alt="sim.Name" :item-type="sim.Type"
+                            class="w-full h-full object-cover" />
                     </div>
                     <div class="p-2">
                         <div class="font-semibold text-text-heading text-sm truncate">{{ sim.Name }}</div>

@@ -471,7 +471,7 @@ function determinePlaybackMethod(ms: any) {
 
 // ── HLS.js init ────────────────────────────────────────────────────────────────
 
-function initHls(url: string, video: HTMLVideoElement) {
+function initHls(url: string, video: HTMLVideoElement, onFatalError?: () => void) {
     if (Hls.isSupported()) {
         hls = new Hls({ maxBufferLength: 30, maxMaxBufferLength: 60 });
         hls.loadSource(url);
@@ -482,8 +482,16 @@ function initHls(url: string, video: HTMLVideoElement) {
         });
         hls.on(Hls.Events.ERROR, (_, data) => {
             if (data.fatal) {
-                error.value = `Playback error: ${data.type}`;
-                isLoading.value = false;
+                console.error('[HLS] fatal error:', data.type, data.details);
+                // Always destroy the dead instance so hls is never left as a zombie
+                hls?.destroy();
+                hls = null;
+                if (onFatalError) {
+                    onFatalError();
+                } else {
+                    error.value = `Playback error: ${data.type}`;
+                    isLoading.value = false;
+                }
             }
         });
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
@@ -555,6 +563,60 @@ async function initPlayer(resumeSeconds?: number) {
 
 // ── Audio track switching ──────────────────────────────────────────────────────
 
+// Restart playback after a failed audio switch. Fetches a fresh session for
+// previousIndex from movieTime and re-initialises the player. Called from both
+// the synchronous catch path and the async HLS.js fatal-error callback.
+async function rollbackAudio(previousIndex: number | null, movieTime: number) {
+    console.warn('[rollbackAudio] reverting to index', previousIndex, 'at', movieTime);
+
+    // Ensure any partially-initialised HLS instance is gone before we start fresh
+    if (hls) { hls.destroy(); hls = null; }
+    const video = videoEl.value;
+    if (video) { video.removeAttribute('src'); video.load(); }
+
+    error.value = 'Audio switch failed — reverting to previous track';
+    selectedAudioIndex.value = previousIndex;
+
+    if (!video) { isLoading.value = false; return; }
+
+    try {
+        const startTicks = movieTime > 0 ? Math.floor(movieTime * 10_000_000) : undefined;
+        const data = await fetchPlaybackInfo(startTicks, previousIndex ?? undefined);
+
+        mediaSource.value = data.MediaSources?.[0];
+        if (!mediaSource.value) throw new Error('No media source for rollback');
+
+        if (data.PlaySessionId) playSessionId.value = data.PlaySessionId;
+        determinePlaybackMethod(mediaSource.value);
+        startOffset.value = playMethod.value !== 'DirectPlay' && movieTime > 0 ? movieTime : 0;
+
+        if (playMethod.value === 'DirectPlay') {
+            video.src = hlsUrl.value;
+            if (movieTime > 0) {
+                const seekOnce = () => {
+                    video.removeEventListener('loadedmetadata', seekOnce);
+                    video.currentTime = movieTime;
+                    video.play().catch(() => { });
+                    startProgressReporting();
+                };
+                video.addEventListener('loadedmetadata', seekOnce);
+            } else {
+                video.play().catch(() => { });
+                startProgressReporting();
+            }
+        } else {
+            initHls(hlsUrl.value, video); // if rollback itself fails, show a plain error
+        }
+
+        // Clear the revert notice once the player has recovered
+        setTimeout(() => { if (error.value?.startsWith('Audio switch failed')) error.value = null; }, 3000);
+    } catch (e) {
+        console.error('[rollbackAudio] failed:', e);
+        error.value = 'Playback error — please go back and try again';
+        isLoading.value = false;
+    }
+}
+
 async function switchAudio(index: number) {
     if (index === selectedAudioIndex.value || isSwitching) return;
     isSwitching = true;
@@ -564,8 +626,8 @@ async function switchAudio(index: number) {
     if (!video) { isSwitching = false; return; }
 
     isLoading.value = true;
-    // Capture current movie-relative position before teardown
     const movieTime = video.currentTime + startOffset.value;
+    const previousIndex = selectedAudioIndex.value; // saved for rollback on either failure path
 
     // Teardown: pause → stop reporting → destroy HLS → clear src
     video.pause();
@@ -614,16 +676,15 @@ async function switchAudio(index: number) {
             playMethod.value = 'Transcode';
         }
 
-        // New HLS stream's segment 0 = movieTime, so update offset before
-        // onLoadedMetadata fires (which uses it for duration calculation).
         startOffset.value = movieTime;
 
         console.log('[switchAudio]', { playMethod: playMethod.value, url: hlsUrl.value.substring(0, 120) });
-        initHls(hlsUrl.value, video);
+        // Pass rollback as the fatal-error callback so an async HLS.js failure also
+        // triggers recovery — not just synchronous errors caught below.
+        initHls(hlsUrl.value, video, () => rollbackAudio(previousIndex, movieTime));
     } catch (e: any) {
         console.error('[switchAudio] error:', e);
-        error.value = 'Failed to switch audio track';
-        isLoading.value = false;
+        await rollbackAudio(previousIndex, movieTime);
     } finally {
         isSwitching = false;
     }

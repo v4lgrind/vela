@@ -267,7 +267,6 @@ function showControls() {
 }
 
 function hideControls() {
-    console.log("hidecontrols")
     if (controlsTimeout) clearTimeout(controlsTimeout);
     if (!audioMenuOpen.value && !subtitleMenuOpen.value) {
         controlsTimeout = setTimeout(() => { controlsVisible.value = false; }, 1000);

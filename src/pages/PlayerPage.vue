@@ -588,12 +588,37 @@ async function switchAudio(index: number) {
 
         if (data.PlaySessionId) playSessionId.value = data.PlaySessionId;
         selectedAudioIndex.value = index;
-        determinePlaybackMethod(mediaSource.value);
+
+        // For audio switching we must always use HLS — DirectPlay serves the raw
+        // file and cannot select a specific audio stream. We build the URL ourselves
+        // rather than calling determinePlaybackMethod(), which might resolve to
+        // DirectPlay if Jellyfin still marks SupportsDirectPlay even after we
+        // stripped DirectPlayProfiles via forceTranscode=true.
+        const ms = mediaSource.value;
+        if (ms.TranscodingUrl) {
+            // Use Jellyfin's returned URL as the base, then explicitly replace/add
+            // AudioStreamIndex and StartTimeTicks. Jellyfin doesn't always embed
+            // these correctly when passed via the request body.
+            let url = ms.TranscodingUrl.replace('?&', '?');
+            url = /AudioStreamIndex=\d+/.test(url)
+                ? url.replace(/AudioStreamIndex=\d+/, `AudioStreamIndex=${index}`)
+                : url + `&AudioStreamIndex=${index}`;
+            if (startTicks > 0 && !url.includes('StartTimeTicks')) {
+                url += `&StartTimeTicks=${startTicks}`;
+            }
+            hlsUrl.value = `${serverUrl}${url}`;
+            playMethod.value = ms.SupportsDirectStream ? 'DirectStream' : 'Transcode';
+        } else {
+            // Jellyfin didn't return a TranscodingUrl — build one manually.
+            hlsUrl.value = `${serverUrl}/Videos/${itemId}/master.m3u8?mediaSourceId=${ms.Id || itemId}&api_key=${accessToken}&AudioStreamIndex=${index}&PlaySessionId=${playSessionId.value}&StartTimeTicks=${startTicks}`;
+            playMethod.value = 'Transcode';
+        }
 
         // New HLS stream's segment 0 = movieTime, so update offset before
         // onLoadedMetadata fires (which uses it for duration calculation).
         startOffset.value = movieTime;
 
+        console.log('[switchAudio]', { playMethod: playMethod.value, url: hlsUrl.value.substring(0, 120) });
         initHls(hlsUrl.value, video);
     } catch (e: any) {
         console.error('[switchAudio] error:', e);

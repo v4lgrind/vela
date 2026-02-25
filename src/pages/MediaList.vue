@@ -4,7 +4,7 @@
     <!-- Continue Watching -->
     <section v-if="resumeItems.length" class="mb-5">
       <h2 class="text-xl sm:text-2xl font-bold text-foreground mb-4">Continue Watching</h2>
-      <div class="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
+      <div class="flex gap-3 overflow-x-auto pt-2 pb-1 scrollbar-hide">
         <div v-for="item in resumeItems" :key="item.Id" class="shrink-0 w-44 sm:w-52 group">
           <!-- Thumbnail -->
           <div class="relative rounded-xl overflow-hidden aspect-video mb-1.5
@@ -58,7 +58,7 @@
     <!-- Next Up -->
     <section v-if="nextUpItems.length" class="mb-5">
       <h2 class="text-xl sm:text-2xl font-bold text-foreground mb-4">Next Up</h2>
-      <div class="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
+      <div class="flex gap-3 overflow-x-auto pt-2 pb-1 scrollbar-hide">
         <div v-for="item in nextUpItems" :key="item.Id" class="shrink-0 w-44 sm:w-52 group">
           <!-- Thumbnail -->
           <div class="relative rounded-xl overflow-hidden aspect-video mb-1.5
@@ -104,7 +104,7 @@
     <template v-if="latestLoading">
       <section v-for="lib in mediaItems" :key="'latest-skeleton-' + lib.Id" class="mb-5">
         <Skeleton class="h-6 w-56 mb-4 rounded-md" />
-        <div class="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
+        <div class="flex gap-3 overflow-x-auto pt-2 pb-1 scrollbar-hide">
           <Skeleton v-for="i in 5" :key="i" class="shrink-0 w-32 sm:w-36 aspect-[2/3] rounded-xl" />
         </div>
       </section>
@@ -116,7 +116,7 @@
         <h2 class="text-xl sm:text-2xl font-bold text-foreground mb-4">
           Recently Added · {{ lib.Name }}
         </h2>
-        <div class="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
+        <div class="flex gap-3 overflow-x-auto pt-2 pb-1 scrollbar-hide">
           <div v-for="item in latestByLibrary[lib.Id]" :key="item.Id"
             class="shrink-0 w-32 sm:w-36 group cursor-pointer"
             @click="goToItem(item)">
@@ -156,7 +156,7 @@
       <h2 class="text-xl sm:text-2xl font-bold text-foreground mb-4">My Library</h2>
 
       <!-- Loading state -->
-      <div v-if="loading" class="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
+      <div v-if="loading" class="flex gap-3 overflow-x-auto pt-2 pb-1 scrollbar-hide">
         <Skeleton v-for="i in 6" :key="i" class="shrink-0 w-44 sm:w-52 aspect-video rounded-xl" />
       </div>
 
@@ -166,7 +166,7 @@
       </div>
 
       <!-- Library row -->
-      <div v-else class="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
+      <div v-else class="flex gap-3 overflow-x-auto pt-2 pb-1 scrollbar-hide">
         <router-link v-for="item in mediaItems" :key="item.Id"
           class="shrink-0 w-44 sm:w-52 group"
           :to="{ name: 'libraryItem', params: { id: item.Id, name: item.Name } }">

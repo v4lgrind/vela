@@ -559,15 +559,14 @@ async function reportPlaybackStart() {
 
 async function reportPlaybackProgress() {
     const video = videoEl.value;
-    if (!video) return;
     try {
         await fetch(`${serverUrl}/Sessions/Playing/Progress`, {
             method: 'POST',
             headers: reportingHeaders,
             body: JSON.stringify(buildReportingPayload({
                 IsPaused: !isPlaying.value,
-                IsMuted: video.muted,
-                VolumeLevel: Math.floor(video.volume * 100),
+                IsMuted: video?.muted ?? false,
+                VolumeLevel: Math.floor((video?.volume ?? 1) * 100),
             }))
         });
     } catch (e) { console.error('reportPlaybackProgress error', e); }
@@ -850,6 +849,11 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
         parseSubtitleStreams(mediaSource.value);
         determinePlaybackMethod(mediaSource.value);
 
+        // Pre-seed currentTime so reportPlaybackStart sends the correct resume position.
+        // Without this, PositionTicks:0 is sent and Jellyfin immediately overwrites
+        // the stored position — causing startMs=0 on the very next resume attempt.
+        if (resumeSeconds && resumeSeconds > 0) currentTime.value = resumeSeconds;
+
         await reportPlaybackStart();
 
         // Build subtitle tracks for ExoPlayer
@@ -861,16 +865,24 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
 
         const startPositionMs = resumeSeconds && resumeSeconds > 0 ? Math.floor(resumeSeconds * 1000) : 0;
 
+        // For HLS transcode, ExoPlayer's position is relative to the stream start
+        // (position 0 = resume point T in the movie) so we add the resume offset
+        // to get the absolute movie position when reporting back to Jellyfin.
+        // For DirectPlay, ExoPlayer already reports the absolute file position
+        // (because seekTo(startMs) was called), so no offset is needed.
+        const isDirectPlayRaw = playMethod.value === 'DirectPlay' && !hlsUrl.value.includes('.m3u8');
+        const resumeOffsetMs = isDirectPlayRaw ? 0 : startPositionMs;
+
         // Register event listeners before starting
         await NativeVideo.addListener('progress', (data) => {
-            currentTime.value = data.positionMs / 1000;
+            currentTime.value = (data.positionMs + resumeOffsetMs) / 1000;
             duration.value = data.durationMs / 1000;
             if (duration.value > 0) progressPct.value = (currentTime.value / duration.value) * 100;
             reportPlaybackProgress();
         });
 
         await NativeVideo.addListener('stopped', async (data) => {
-            currentTime.value = data.positionMs / 1000;
+            currentTime.value = (data.positionMs + resumeOffsetMs) / 1000;
             await reportPlaybackStopped();
             await deleteActiveEncodings();
             router.back();
@@ -887,20 +899,77 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
             isLoading.value = false;
         });
 
-        await NativeVideo.addListener('tracksReady', (data) => {
+        await NativeVideo.addListener('tracksReady', async (data) => {
             try {
                 const parsed = JSON.parse(data.tracks);
                 const nativeAudio: any[] = parsed.audioTracks ?? [];
-                // Merge native ExoPlayer audio track group indices into audioList for UI display
+                const nativeSubtitle: any[] = parsed.subtitleTracks ?? [];
+
                 if (nativeAudio.length > 0) {
                     audioList.value = nativeAudio.map((t: any) => ({
                         index: t.groupIndex,
                         language: t.language || 'und',
                         label: `${(t.language || 'und').toUpperCase()} ${t.channelCount > 0 ? `(${t.channelCount}ch)` : ''} ${t.codec ? `- ${t.codec.toUpperCase()}` : ''}`.trim(),
                     }));
+
+                    // Apply saved audio preference to ExoPlayer
+                    const savedLang = localStorage.getItem(`msplayer-audio-${itemId}`);
+                    const globalLang = preferencesStore.preferredAudioLanguage;
+                    const preferredAudio =
+                        (savedLang ? nativeAudio.find((t: any) => t.language === savedLang) : null) ||
+                        (globalLang ? nativeAudio.find((t: any) => t.language === globalLang) : null);
+                    if (preferredAudio) {
+                        NativeVideo.selectAudioTrack({ groupIndex: preferredAudio.groupIndex });
+                        selectedAudioIndex.value = preferredAudio.groupIndex;
+                    }
+                }
+
+                // Apply saved subtitle preference to ExoPlayer
+                const savedSub = localStorage.getItem(`msplayer-subtitle-${itemId}`);
+                const globalSubLang = preferencesStore.preferredSubtitleLanguage;
+                if (savedSub === 'off' || (savedSub === null && !globalSubLang)) {
+                    NativeVideo.selectSubtitleTrack({ groupIndex: -1 });
+                } else if (savedSub !== null && savedSub !== 'off') {
+                    const savedIdx = parseInt(savedSub, 10);
+                    const jellyfinSub = !isNaN(savedIdx) ? subtitleList.value.find(s => s.index === savedIdx) : null;
+                    const nativeSub = jellyfinSub
+                        ? nativeSubtitle.find((t: any) => t.label === jellyfinSub.label)
+                        : null;
+                    if (nativeSub) {
+                        NativeVideo.selectSubtitleTrack({ groupIndex: nativeSub.groupIndex });
+                        selectedSubtitleIndex.value = nativeSub.groupIndex;
+                    } else {
+                        NativeVideo.selectSubtitleTrack({ groupIndex: -1 });
+                    }
+                } else if (globalSubLang && nativeSubtitle.length > 0) {
+                    const nativeSub = nativeSubtitle.find((t: any) => t.language === globalSubLang);
+                    if (nativeSub) {
+                        NativeVideo.selectSubtitleTrack({ groupIndex: nativeSub.groupIndex });
+                        selectedSubtitleIndex.value = nativeSub.groupIndex;
+                    } else {
+                        NativeVideo.selectSubtitleTrack({ groupIndex: -1 });
+                    }
                 }
             } catch (e) {
                 console.warn('[NativePlayer] Failed to parse tracksReady:', e);
+            }
+        });
+
+        await NativeVideo.addListener('audioSelected', (data) => {
+            localStorage.setItem(`msplayer-audio-${itemId}`, data.language);
+        });
+
+        await NativeVideo.addListener('subtitleSelected', (data) => {
+            if (data.groupIndex < 0) {
+                localStorage.setItem(`msplayer-subtitle-${itemId}`, 'off');
+                selectedSubtitleIndex.value = null;
+            } else {
+                // Map ExoPlayer label back to the Jellyfin stream index for storage
+                const jellyfinSub = subtitleList.value.find(s => s.label === data.label);
+                if (jellyfinSub) {
+                    localStorage.setItem(`msplayer-subtitle-${itemId}`, String(jellyfinSub.index));
+                    selectedSubtitleIndex.value = jellyfinSub.index;
+                }
             }
         });
 
@@ -1215,7 +1284,10 @@ onMounted(async () => {
         console.warn('[Player] Failed to load item details:', e);
     }
 
-    const resumeTicks = details?.UserData?.PlaybackPositionTicks;
+    // Prefer ticks passed through the route query (set by the calling page which has live data).
+    // Fall back to Jellyfin's stored value only if no route ticks are present.
+    const routeStartTicks = route.query.startTicks ? Number(route.query.startTicks) : null;
+    const resumeTicks = routeStartTicks ?? details?.UserData?.PlaybackPositionTicks;
     const resumeSeconds = resumeTicks ? resumeTicks / 10_000_000 : undefined;
 
     // Determine preferred audio: saved user choice → global preferred lang → marked default → first track.

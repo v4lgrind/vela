@@ -51,6 +51,8 @@ class NativePlayerActivity : AppCompatActivity() {
         const val ACTION_STOPPED = "com.jellyfin_v4lgrind_client.app.PLAYER_STOPPED"
         const val ACTION_ERROR = "com.jellyfin_v4lgrind_client.app.PLAYER_ERROR"
         const val ACTION_TRACKS = "com.jellyfin_v4lgrind_client.app.PLAYER_TRACKS"
+        const val ACTION_AUDIO_SELECTED = "com.jellyfin_v4lgrind_client.app.AUDIO_SELECTED"
+        const val ACTION_SUBTITLE_SELECTED = "com.jellyfin_v4lgrind_client.app.SUBTITLE_SELECTED"
 
         const val CMD_STOP = "stop"
         const val CMD_PAUSE = "pause"
@@ -335,8 +337,15 @@ class NativePlayerActivity : AppCompatActivity() {
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
 
-        if (startMs > 0) exo.seekTo(startMs)
+        android.util.Log.d("NativePlayer", "buildPlayer: startMs=$startMs playMethod=$playMethod isHls=${url.contains(".m3u8")}")
+
         exo.setMediaSource(mediaSource)
+        // For HLS (transcode / direct-stream), Jellyfin already starts the stream at
+        // the requested position via StartTimeTicks in the URL — no additional seek needed.
+        // For raw-file DirectPlay the stream always starts at byte 0, so we must seek.
+        val isRawDirectPlay = playMethod == "DirectPlay" && !url.contains(".m3u8")
+        if (startMs > 0 && isRawDirectPlay) exo.seekTo(startMs)
+        android.util.Log.d("NativePlayer", "isRawDirectPlay=$isRawDirectPlay seekTo=${if (startMs > 0 && isRawDirectPlay) startMs else -1L}")
         exo.prepare()
         exo.playWhenReady = true
 
@@ -451,17 +460,26 @@ class NativePlayerActivity : AppCompatActivity() {
             .setOverrideForType(TrackSelectionOverride(group.second, 0))
             .build()
         selectedAudioGroupIndex = groupIndex
+
+        val language = group.second.getFormat(0).language ?: "und"
+        val broadcastIntent = Intent(ACTION_AUDIO_SELECTED)
+        broadcastIntent.putExtra("language", language)
+        LocalBroadcastManager.getInstance(this).sendBroadcast(broadcastIntent)
     }
 
     private fun selectSubtitleTrack(groupIndex: Int) {
         val p = player ?: return
         if (groupIndex < 0) {
-            // Disable subtitles
             p.trackSelectionParameters = p.trackSelectionParameters
                 .buildUpon()
                 .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
                 .build()
             selectedSubtitleGroupIndex = -1
+
+            val broadcastIntent = Intent(ACTION_SUBTITLE_SELECTED)
+            broadcastIntent.putExtra("groupIndex", -1)
+            broadcastIntent.putExtra("label", "")
+            LocalBroadcastManager.getInstance(this).sendBroadcast(broadcastIntent)
         } else {
             val group = subtitleTrackGroups.firstOrNull { it.first == groupIndex } ?: return
             p.trackSelectionParameters = p.trackSelectionParameters
@@ -470,6 +488,12 @@ class NativePlayerActivity : AppCompatActivity() {
                 .setOverrideForType(TrackSelectionOverride(group.second, 0))
                 .build()
             selectedSubtitleGroupIndex = groupIndex
+
+            val format = group.second.getFormat(0)
+            val broadcastIntent = Intent(ACTION_SUBTITLE_SELECTED)
+            broadcastIntent.putExtra("groupIndex", groupIndex)
+            broadcastIntent.putExtra("label", format.label ?: "")
+            LocalBroadcastManager.getInstance(this).sendBroadcast(broadcastIntent)
         }
     }
 
@@ -560,6 +584,7 @@ class NativePlayerActivity : AppCompatActivity() {
     // ── Broadcast helpers ──────────────────────────────────────────────────────
 
     private fun sendProgressBroadcast(posMs: Long, durMs: Long) {
+        android.util.Log.d("NativePlayer", "progress: posMs=$posMs durMs=$durMs")
         val intent = Intent(ACTION_PROGRESS)
         intent.putExtra("positionMs", posMs)
         intent.putExtra("durationMs", durMs)

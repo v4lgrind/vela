@@ -517,7 +517,12 @@ function playMedia() {
         audioPlayerStore.playTrack(track);
         return;
     }
-    router.push({ name: 'Player', params: { id: item.value.Id } });
+    const ticks = item.value.UserData?.PlaybackPositionTicks;
+    router.push({
+        name: 'Player',
+        params: { id: item.value.Id },
+        query: ticks ? { startTicks: String(ticks) } : {},
+    });
 }
 
 function goToItem(id: string) {

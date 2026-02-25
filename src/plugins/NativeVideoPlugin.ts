@@ -35,6 +35,15 @@ export interface NativeVideoTracksReadyEvent {
     tracks: string;
 }
 
+export interface NativeVideoAudioSelectedEvent {
+    language: string;
+}
+
+export interface NativeVideoSubtitleSelectedEvent {
+    groupIndex: number;
+    label: string;
+}
+
 export interface NativeVideoPlugin {
     start(options: NativeVideoStartOptions): Promise<void>;
     stop(): Promise<void>;
@@ -49,6 +58,8 @@ export interface NativeVideoPlugin {
     addListener(event: 'stopped', handler: (data: NativeVideoStoppedEvent) => void): Promise<PluginListenerHandle>;
     addListener(event: 'error', handler: (data: NativeVideoErrorEvent) => void): Promise<PluginListenerHandle>;
     addListener(event: 'tracksReady', handler: (data: NativeVideoTracksReadyEvent) => void): Promise<PluginListenerHandle>;
+    addListener(event: 'audioSelected', handler: (data: NativeVideoAudioSelectedEvent) => void): Promise<PluginListenerHandle>;
+    addListener(event: 'subtitleSelected', handler: (data: NativeVideoSubtitleSelectedEvent) => void): Promise<PluginListenerHandle>;
 
     removeAllListeners(): Promise<void>;
 }

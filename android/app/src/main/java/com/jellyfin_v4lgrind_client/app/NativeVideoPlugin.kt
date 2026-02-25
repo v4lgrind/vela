@@ -23,7 +23,10 @@ class NativeVideoPlugin : Plugin() {
             return
         }
         val authHeader = call.getString("authHeader") ?: ""
-        val startPositionMs = call.getLong("startPositionMs") ?: 0L
+        // call.getLong() only matches JSON Long type; JS numbers within int range arrive as Integer.
+        // optLong() coerces Integer → Long correctly.
+        val startPositionMs = call.data.optLong("startPositionMs", 0L)
+        android.util.Log.d("NativePlayer", "plugin.start: startPositionMs=$startPositionMs")
         val title = call.getString("title") ?: ""
         val playMethod = call.getString("playMethod") ?: "Transcode"
 
@@ -147,6 +150,20 @@ class NativeVideoPlugin : Plugin() {
                         data.put("tracks", tracksJson)
                         notifyListeners("tracksReady", data)
                     }
+                    NativePlayerActivity.ACTION_AUDIO_SELECTED -> {
+                        val language = intent.getStringExtra("language") ?: "und"
+                        val data = JSObject()
+                        data.put("language", language)
+                        notifyListeners("audioSelected", data)
+                    }
+                    NativePlayerActivity.ACTION_SUBTITLE_SELECTED -> {
+                        val groupIndex = intent.getIntExtra("groupIndex", -1)
+                        val label = intent.getStringExtra("label") ?: ""
+                        val data = JSObject()
+                        data.put("groupIndex", groupIndex)
+                        data.put("label", label)
+                        notifyListeners("subtitleSelected", data)
+                    }
                 }
             }
         }
@@ -157,6 +174,8 @@ class NativeVideoPlugin : Plugin() {
             addAction(NativePlayerActivity.ACTION_STOPPED)
             addAction(NativePlayerActivity.ACTION_ERROR)
             addAction(NativePlayerActivity.ACTION_TRACKS)
+            addAction(NativePlayerActivity.ACTION_AUDIO_SELECTED)
+            addAction(NativePlayerActivity.ACTION_SUBTITLE_SELECTED)
         }
         LocalBroadcastManager.getInstance(context).registerReceiver(receiver, filter)
         eventReceiver = receiver

@@ -286,7 +286,12 @@ async function markPlayed(item: any) {
 }
 
 function playResume(item: any) {
-  router.push({ name: 'Player', params: { id: item.Id } });
+  const ticks = item.UserData?.PlaybackPositionTicks;
+  router.push({
+    name: 'Player',
+    params: { id: item.Id },
+    query: ticks ? { startTicks: String(ticks) } : {},
+  });
 }
 
 function goToItem(item: any) {

@@ -34,7 +34,7 @@
 			}
 		}
 	},
-	"postCreateCommand": "bash .devcontainer/setup-android-sdk.sh && npm install && bash .devcontainer/setup-rtk.sh ",
+	"postCreateCommand": "bash .devcontainer/setup-android-sdk.sh && npm install && sh .devcontainer/setup-rtk.sh && rtk init --global --auto-patch",
 	"remoteEnv": {
 		"ANDROID_HOME": "/home/vscode/android-sdk",
 		"ANDROID_SDK_ROOT": "/home/vscode/android-sdk",

@@ -429,7 +429,7 @@ class NativePlayerActivity : AppCompatActivity() {
     private fun showAudioPicker() {
         if (audioTrackGroups.isEmpty()) return
         val labels = audioTrackGroups.map { (idx, group) ->
-            val format = group.second.getFormat(0)
+            val format = group.getFormat(0)
             "${format.language ?: "und"} ${if (format.channelCount > 0) "(${format.channelCount}ch)" else ""} ${if (!format.codecs.isNullOrEmpty()) "- ${format.codecs!!.uppercase()}" else ""}".trim()
         }.toTypedArray()
         val checkedItem = audioTrackGroups.indexOfFirst { it.first == selectedAudioGroupIndex }
@@ -449,7 +449,7 @@ class NativePlayerActivity : AppCompatActivity() {
         val labels = buildList {
             add("Off")
             addAll(subtitleTrackGroups.map { (_, group) ->
-                val format = group.second.getFormat(0)
+                val format = group.getFormat(0)
                 format.label ?: (format.language ?: "und")
             })
         }.toTypedArray()

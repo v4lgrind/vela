@@ -15,6 +15,9 @@ import android.widget.SeekBar
 import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -64,6 +67,7 @@ class NativePlayerActivity : AppCompatActivity() {
     private lateinit var btnPlayPause: ImageButton
     private lateinit var btnAudio: ImageButton
     private lateinit var btnSubtitle: ImageButton
+    private lateinit var btnFullscreen: ImageButton
     private lateinit var seekBar: SeekBar
     private lateinit var tvCurrentTime: TextView
     private lateinit var tvTotalTime: TextView
@@ -71,6 +75,7 @@ class NativePlayerActivity : AppCompatActivity() {
 
     private val handler = Handler(Looper.getMainLooper())
     private var controlsVisible = true
+    private var isFullscreen = true
     private var tracksReported = false
     private var stoppedSent = false
 
@@ -135,23 +140,30 @@ class NativePlayerActivity : AppCompatActivity() {
 
     private var isUserSeeking = false
 
-    @Suppress("DEPRECATION")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Keep screen on and go fullscreen
+        // Keep screen on, extend layout edge-to-edge, then hide system bars.
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        WindowInsetsControllerCompat(window, window.decorView).let { ctrl ->
+            ctrl.hide(WindowInsetsCompat.Type.systemBars())
+            ctrl.systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             window.setDecorFitsSystemWindows(false)
         } else {
+            @Suppress("DEPRECATION")
             window.decorView.systemUiVisibility = (
-                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                    or View.SYSTEM_UI_FLAG_FULLSCREEN
-                    or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                    or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
                     or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
                     or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
             )
+        }
+        // Keep content outside the display cutout (hole-punch camera).
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            window.attributes.layoutInDisplayCutoutMode =
+                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_NEVER
         }
 
         setContentView(R.layout.activity_native_player)
@@ -162,6 +174,7 @@ class NativePlayerActivity : AppCompatActivity() {
         btnPlayPause = findViewById(R.id.btn_play_pause)
         btnAudio = findViewById(R.id.btn_audio)
         btnSubtitle = findViewById(R.id.btn_subtitle)
+        btnFullscreen = findViewById(R.id.btn_fullscreen)
         seekBar = findViewById(R.id.seek_bar)
         tvCurrentTime = findViewById(R.id.tv_current_time)
         tvTotalTime = findViewById(R.id.tv_total_time)
@@ -178,6 +191,19 @@ class NativePlayerActivity : AppCompatActivity() {
         val subtitleTracksJson = intent.getStringExtra(EXTRA_SUBTITLE_TRACKS) ?: "[]"
 
         tvTitle.text = title
+
+        // Pad the controls overlay to keep all UI outside the display cutout and system bars.
+        ViewCompat.setOnApplyWindowInsetsListener(controlsOverlay) { view, windowInsets ->
+            val cutout = windowInsets.getInsets(WindowInsetsCompat.Type.displayCutout())
+            val sysBars = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
+            view.setPadding(
+                maxOf(cutout.left, sysBars.left),
+                maxOf(cutout.top, sysBars.top),
+                maxOf(cutout.right, sysBars.right),
+                maxOf(cutout.bottom, sysBars.bottom)
+            )
+            windowInsets
+        }
 
         setupControls()
         buildPlayer(url, authHeader, startMs, playMethod, subtitleTracksJson)
@@ -250,6 +276,27 @@ class NativePlayerActivity : AppCompatActivity() {
         // Subtitle track picker
         btnSubtitle.setOnClickListener {
             showSubtitlePicker()
+        }
+
+        // Fullscreen toggle
+        btnFullscreen.setOnClickListener {
+            toggleFullscreen()
+            scheduleHideControls()
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun toggleFullscreen() {
+        isFullscreen = !isFullscreen
+        val insetsController = WindowInsetsControllerCompat(window, window.decorView)
+        if (isFullscreen) {
+            insetsController.hide(WindowInsetsCompat.Type.systemBars())
+            insetsController.systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            btnFullscreen.setImageResource(R.drawable.ic_fullscreen_exit)
+        } else {
+            insetsController.show(WindowInsetsCompat.Type.systemBars())
+            btnFullscreen.setImageResource(R.drawable.ic_fullscreen)
         }
     }
 

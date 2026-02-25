@@ -146,6 +146,15 @@
                 android:layout_height="1dp"
                 android:layout_weight="1" />
 
+            <ImageButton
+                android:id="@+id/btn_fullscreen"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:src="@drawable/ic_fullscreen_exit"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:tint="#FFFFFF"
+                android:contentDescription="Toggle fullscreen" />
+
         </LinearLayout>
 
     </androidx.constraintlayout.widget.ConstraintLayout>

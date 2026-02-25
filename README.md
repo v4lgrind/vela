@@ -9,6 +9,9 @@ A modern Jellyfin media client built with Vue 3 + Capacitor. Stream your media l
 - **Media Playback:** Shaka Player
 - **State Management:** Pinia with persistence
 - **API Client:** Jellyfin SDK
+- **UI Components:** Reka UI (headless) + Lucide icons
+- **Styling:** Tailwind CSS v4
+- **Utilities:** VueUse
 
 ## Features
 

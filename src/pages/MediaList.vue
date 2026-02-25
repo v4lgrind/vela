@@ -38,6 +38,9 @@
             <div v-if="item.Type === 'Episode'" class="text-xs text-text-muted truncate mt-0.5">
               S{{ item.ParentIndexNumber }}E{{ item.IndexNumber }}
             </div>
+            <div v-if="remainingTime(item)" class="text-xs text-text-muted mt-0.5">
+              {{ remainingTime(item) }} left
+            </div>
           </div>
         </div>
       </div>
@@ -167,6 +170,17 @@ function getResumeImageUrl(item: any): string {
 
 function resumeTitle(item: any): string {
   return item.Type === 'Episode' ? (item.SeriesName ?? item.Name) : item.Name;
+}
+
+function remainingTime(item: any): string {
+  const total = item.RunTimeTicks;
+  const position = item.UserData?.PlaybackPositionTicks ?? 0;
+  if (!total || !position) return '';
+  const remainingSecs = Math.max(0, Math.floor((total - position) / 10_000_000));
+  if (remainingSecs < 60) return '';
+  const h = Math.floor(remainingSecs / 3600);
+  const m = Math.floor((remainingSecs % 3600) / 60);
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
 function playResume(item: any) {

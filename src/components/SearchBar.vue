@@ -102,12 +102,13 @@
       <Badge class="ml-1 bg-accent-purple text-white text-xs">{{ offlineStore.downloadCount }}</Badge>
     </Button>
 
-    <div class="relative flex-1 min-w-0" role="combobox" aria-expanded="true" aria-owns="search-listbox"
+    <div ref="searchContainerEl" class="relative flex-1 min-w-0" role="combobox" aria-expanded="true" aria-owns="search-listbox"
       aria-haspopup="listbox">
       <Input ref="inputEl" v-model="query" type="search" :placeholder="placeholder"
         aria-autocomplete="list" aria-controls="search-listbox" aria-label="Search libraries"
         class="w-full focus:border-accent-purple focus:ring-accent-purple/15"
-        @input="onInput" @keydown.down.prevent="moveActive(1)" @keydown.up.prevent="moveActive(-1)"
+        @input="onInput" @focus="onFocus"
+        @keydown.down.prevent="moveActive(1)" @keydown.up.prevent="moveActive(-1)"
         @keydown.enter.prevent="selectActive" @keydown.esc="close" />
 
       <div v-if="open && (hasResults || isSearching)"
@@ -206,7 +207,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useJellyfinStore } from '@/store/jellyfin-store';
 import { useOfflineStore } from '@/store/offline-store';
@@ -292,12 +293,25 @@ watch(sidebarOpen, open => { if (!open) editingOrder.value = false; });
 // ── Search ─────────────────────────────────────────────────────────────────────
 
 const inputEl = ref<HTMLInputElement | null>(null);
+const searchContainerEl = ref<HTMLElement | null>(null);
 const query = ref('');
 const results = ref<any[]>([]);
 const open = ref(false);
 const activeIndex = ref(0);
 const isSearching = ref(false);
 let debounceId: number | undefined;
+
+function onFocus() {
+    if (query.value && (hasResults.value || isSearching.value)) {
+        open.value = true;
+    }
+}
+
+function onClickOutside(e: MouseEvent) {
+    if (searchContainerEl.value && !searchContainerEl.value.contains(e.target as Node)) {
+        open.value = false;
+    }
+}
 
 function onLogout() {
     store.logout();
@@ -405,6 +419,12 @@ onMounted(() => {
             inputEl.value?.focus();
         }
     });
+
+    document.addEventListener('mousedown', onClickOutside);
+});
+
+onUnmounted(() => {
+    document.removeEventListener('mousedown', onClickOutside);
 });
 
 watch(query, (val) => {

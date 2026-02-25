@@ -133,6 +133,34 @@
                             </div>
                         </div>
 
+                        <!-- Quality selector -->
+                        <div class="relative" ref="qualityDropdown">
+                            <button
+                                class="bg-transparent border-none text-white cursor-pointer p-2 rounded flex items-center gap-1.5 transition-colors hover:bg-white/10"
+                                @click="toggleQualityMenu">
+                                <Gauge class="size-6" />
+                                <span class="text-[0.9rem] font-medium">{{ currentQualityLabel }}</span>
+                            </button>
+                            <div class="absolute bottom-full right-0 mb-2 bg-[rgba(28,28,28,0.98)] rounded-lg min-w-[160px] overflow-y-auto shadow-[0_8px_24px_rgba(0,0,0,0.5)] backdrop-blur-[10px] transition-all duration-200"
+                                :class="qualityMenuOpen ? 'opacity-100 pointer-events-auto translate-y-0' : 'opacity-0 pointer-events-none translate-y-2.5'">
+                                <div v-for="preset in QUALITY_PRESETS" :key="preset.bitrate"
+                                    class="flex items-center gap-2.5 px-4 py-3 cursor-pointer text-[0.9rem] transition-colors hover:bg-white/10"
+                                    :class="preset.bitrate === selectedBitrate ? 'bg-accent-purple/20' : ''"
+                                    @click="switchQuality(preset.bitrate)">
+                                    <Check class="size-4 shrink-0"
+                                        :class="preset.bitrate === selectedBitrate ? 'opacity-100' : 'opacity-0'" />
+                                    {{ preset.label }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Stream info -->
+                        <button
+                            class="bg-transparent border-none text-white cursor-pointer p-2 rounded flex items-center transition-colors hover:bg-white/10"
+                            @click="openInfoModal" title="Stream info">
+                            <Info class="size-6" />
+                        </button>
+
                         <!-- Fullscreen -->
                         <button
                             class="bg-transparent border-none text-white cursor-pointer p-2 rounded flex items-center transition-colors hover:bg-white/10"
@@ -144,6 +172,89 @@
                 </div>
             </div>
         </div>
+
+        <!-- Stream info modal -->
+        <Transition name="info-fade">
+            <div v-if="infoModalOpen"
+                class="absolute inset-0 z-[150] flex items-center justify-center p-4"
+                @click.self="closeInfoModal">
+                <div class="bg-[rgba(18,18,18,0.97)] border border-white/10 rounded-2xl p-5 w-full max-w-sm shadow-2xl backdrop-blur-md text-sm"
+                    @click.stop>
+                    <!-- Header -->
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-semibold text-base text-white">Stream Info</h3>
+                        <button class="text-white/50 hover:text-white transition-colors p-1" @click="closeInfoModal">✕</button>
+                    </div>
+
+                    <!-- Playback method badge + transcode reason -->
+                    <div class="flex items-center gap-2 mb-4 flex-wrap">
+                        <span class="px-2.5 py-1 rounded-full text-xs font-semibold"
+                            :class="{
+                                'bg-green-500/20 text-green-400': playMethod === 'DirectPlay',
+                                'bg-blue-500/20 text-blue-400': playMethod === 'DirectStream',
+                                'bg-accent-purple/20 text-accent-purple': playMethod === 'Transcode',
+                            }">
+                            {{ playMethod }}
+                        </span>
+                        <span v-if="liveTranscodingInfo?.TranscodeReasons?.length"
+                            class="text-xs text-white/40" :title="liveTranscodingInfo.TranscodeReasons.join(', ')">
+                            {{ liveTranscodingInfo.TranscodeReasons[0] }}
+                        </span>
+                    </div>
+
+                    <!-- Video -->
+                    <div v-if="videoStream" class="mb-4">
+                        <p class="text-xs font-semibold uppercase tracking-wider text-white/40 mb-2">Video</p>
+                        <div class="grid grid-cols-2 gap-x-4 gap-y-1.5">
+                            <span class="text-white/50">Resolution</span>
+                            <span class="text-white font-medium">
+                                <template v-if="liveTranscodingInfo?.Width != null">{{ liveTranscodingInfo.Width }}×{{ liveTranscodingInfo.Height }} <span class="text-white/40 text-xs">(stream)</span></template>
+                                <template v-else>{{ videoStream.Width }}×{{ videoStream.Height }} <span class="text-white/40 text-xs">(source)</span></template>
+                            </span>
+                            <span class="text-white/50">Codec</span>
+                            <span class="text-white font-medium uppercase">
+                                {{ liveTranscodingInfo?.VideoCodec ?? videoStream.Codec }}
+                                <span v-if="liveTranscodingInfo" class="text-xs text-white/40 normal-case">
+                                    ({{ liveTranscodingInfo.IsVideoDirect ? 'copy' : 'transcoding' }})
+                                </span>
+                            </span>
+                            <span class="text-white/50">Bitrate</span>
+                            <span class="text-white font-medium">
+                                <template v-if="liveTranscodingInfo?.Bitrate != null">{{ Math.round(liveTranscodingInfo.Bitrate / 1000) }} kbps <span class="text-white/40 text-xs">(stream)</span></template>
+                                <template v-else-if="videoStream.BitRate">{{ Math.round(videoStream.BitRate / 1000) }} kbps <span class="text-white/40 text-xs">(source)</span></template>
+                                <template v-else>—</template>
+                            </span>
+                            <template v-if="liveTranscodingInfo && !liveTranscodingInfo.IsVideoDirect">
+                                <span class="text-white/50">Encode speed</span>
+                                <span class="text-white font-medium">{{ liveTranscodingInfo.Framerate?.toFixed(1) ?? '—' }} fps</span>
+                            </template>
+                            <template v-else>
+                                <span class="text-white/50">Frame rate</span>
+                                <span class="text-white font-medium">{{ videoStream.RealFrameRate?.toFixed(2) ?? videoStream.AverageFrameRate?.toFixed(2) ?? '—' }} fps</span>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- Audio -->
+                    <div v-if="activeAudioStream">
+                        <p class="text-xs font-semibold uppercase tracking-wider text-white/40 mb-2">Audio</p>
+                        <div class="grid grid-cols-2 gap-x-4 gap-y-1.5">
+                            <span class="text-white/50">Codec</span>
+                            <span class="text-white font-medium uppercase">
+                                {{ liveTranscodingInfo?.AudioCodec ?? activeAudioStream.Codec }}
+                                <span v-if="liveTranscodingInfo" class="text-xs text-white/40 normal-case">
+                                    ({{ liveTranscodingInfo.IsAudioDirect ? 'copy' : 'transcoding' }})
+                                </span>
+                            </span>
+                            <span class="text-white/50">Channels</span>
+                            <span class="text-white font-medium">{{ activeAudioStream.ChannelLayout ?? (activeAudioStream.Channels + 'ch') }}</span>
+                            <span class="text-white/50">Bitrate</span>
+                            <span class="text-white font-medium">{{ activeAudioStream.BitRate ? Math.round(activeAudioStream.BitRate / 1000) + ' kbps' : '—' }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </Transition>
     </div>
 </template>
 
@@ -157,7 +268,7 @@ import Hls from 'hls.js';
 import { deviceProfile } from '@/constants';
 import { formatTime } from '@/utils/helpers';
 import { lockLandscape, unlockOrientation } from '@/utils/orientation';
-import { ArrowLeft, Play, Pause, Volume2, VolumeX, AudioLines, Captions, Check, Maximize, Minimize, Loader2 } from 'lucide-vue-next';
+import { ArrowLeft, Play, Pause, Volume2, VolumeX, AudioLines, Captions, Gauge, Info, Check, Maximize, Minimize, Loader2 } from 'lucide-vue-next';
 
 // ── Setup ──────────────────────────────────────────────────────────────────────
 
@@ -221,6 +332,34 @@ const activeTrackBlobUrl = ref<string | null>(null);
 const activeTrackLang = ref('und');
 const activeTrackLabel = ref('');
 const subtitleBlobCache = new Map<number, string>(); // index → blob URL
+
+// Quality / bitrate
+const QUALITY_PRESETS = [
+    { label: 'Auto',    bitrate: 0 },
+    { label: '1080p',   bitrate: 20_000_000 },
+    { label: '720p',    bitrate:  8_000_000 },
+    { label: '480p',    bitrate:  3_000_000 },
+    { label: '360p',    bitrate:  1_500_000 },
+] as const;
+const selectedBitrate = ref(preferencesStore.preferredBitrate); // 0 = Auto (unlimited)
+const qualityMenuOpen = ref(false);
+const qualityDropdown = ref<HTMLElement | null>(null);
+const currentQualityLabel = computed(() =>
+    QUALITY_PRESETS.find(p => p.bitrate === selectedBitrate.value)?.label ?? 'Auto'
+);
+
+// Stream info modal
+const infoModalOpen = ref(false);
+const liveTranscodingInfo = ref<any>(null);
+let infoPollingInterval: ReturnType<typeof setInterval> | null = null;
+
+const videoStream = computed(() =>
+    (mediaSource.value?.MediaStreams ?? []).find((s: any) => s.Type === 'Video')
+);
+const activeAudioStream = computed(() =>
+    (mediaSource.value?.MediaStreams ?? []).find((s: any) => s.Type === 'Audio' && s.Index === selectedAudioIndex.value)
+    ?? (mediaSource.value?.MediaStreams ?? []).find((s: any) => s.Type === 'Audio')
+);
 
 const posterUrl = computed(() => store.getImageUrl(itemId, 'Primary') || '');
 
@@ -370,6 +509,8 @@ function handleClickOutside(e: MouseEvent) {
         audioMenuOpen.value = false;
     if (subtitleDropdown.value && !subtitleDropdown.value.contains(e.target as Node))
         subtitleMenuOpen.value = false;
+    if (qualityDropdown.value && !qualityDropdown.value.contains(e.target as Node))
+        qualityMenuOpen.value = false;
 }
 
 function goBack() { router.back(); }
@@ -462,12 +603,22 @@ function stopProgressReporting() {
 // ── Jellyfin API ───────────────────────────────────────────────────────────────
 
 async function fetchPlaybackInfo(startTimeTicks?: number, audioStreamIndex?: number, forceTranscode = false) {
-    const baseProfile = forceTranscode
-        ? { ...deviceProfile.DeviceProfile, DirectPlayProfiles: [] }
+    const bitrateCap = selectedBitrate.value || 1_000_000_000;
+    // When a quality cap is active we must force a real video re-encode.
+    // Stripping DirectPlayProfiles prevents DirectPlay, but Jellyfin can still
+    // fall back to DirectStream (remux without re-encoding), which ignores the
+    // bitrate cap completely. AllowVideoStreamCopy: false tells Jellyfin it MUST
+    // re-encode the video, so the bitrate/resolution cap is actually honoured.
+    const shouldForce = forceTranscode || selectedBitrate.value > 0;
+
+    const baseProfile = shouldForce
+        ? { ...deviceProfile.DeviceProfile, DirectPlayProfiles: [], MaxStreamingBitrate: bitrateCap }
         : deviceProfile.DeviceProfile;
 
     const profile: any = {
         ...deviceProfile,
+        MaxStreamingBitrate: bitrateCap,
+        ...(shouldForce ? { AllowVideoStreamCopy: false } : {}),
         DeviceProfile: baseProfile,
         MediaSourceId: itemId,
         ...(startTimeTicks !== undefined ? { StartTimeTicks: startTimeTicks } : {}),
@@ -851,6 +1002,103 @@ async function switchAudio(index: number) {
     }
 }
 
+// ── Stream info ────────────────────────────────────────────────────────────────
+
+async function fetchTranscodingInfo() {
+    try {
+        const res = await fetch(
+            `${serverUrl}/Sessions?activeWithinSeconds=10`,
+            { headers: { 'Authorization': embyAuthHeader } }
+        );
+        if (!res.ok) return;
+        const sessions: any[] = await res.json();
+        // Match by our stable deviceId first, then fall back to playSessionId
+        const session = sessions.find(s => s.DeviceId === deviceId)
+            ?? sessions.find(s => s.PlayState?.PlaySessionId === playSessionId.value);
+        liveTranscodingInfo.value = session?.TranscodingInfo ?? null;
+    } catch { liveTranscodingInfo.value = null; }
+}
+
+function openInfoModal() {
+    infoModalOpen.value = true;
+    showControls();
+    fetchTranscodingInfo();
+    infoPollingInterval = setInterval(fetchTranscodingInfo, 2000);
+}
+
+function closeInfoModal() {
+    infoModalOpen.value = false;
+    if (infoPollingInterval) { clearInterval(infoPollingInterval); infoPollingInterval = null; }
+    liveTranscodingInfo.value = null;
+}
+
+// ── Quality ────────────────────────────────────────────────────────────────────
+
+function toggleQualityMenu() {
+    qualityMenuOpen.value = !qualityMenuOpen.value;
+    showControls();
+}
+
+async function switchQuality(bitrate: number) {
+    if (bitrate === selectedBitrate.value || isSwitching) return;
+    isSwitching = true;
+    qualityMenuOpen.value = false;
+
+    const video = videoEl.value;
+    if (!video) { isSwitching = false; return; }
+
+    isLoading.value = true;
+    const movieTime = video.currentTime;
+    const previousBitrate = selectedBitrate.value;
+
+    video.pause();
+    stopProgressReporting();
+    if (hls) { hls.destroy(); hls = null; }
+    video.removeAttribute('src');
+    video.load();
+    await deleteActiveEncodings();
+
+    try {
+        selectedBitrate.value = bitrate;
+        preferencesStore.preferredBitrate = bitrate;
+        const startTicks = Math.floor(movieTime * 10_000_000);
+        // bitrate > 0 forces transcode (DirectPlay can't honour a bitrate cap)
+        const data = await fetchPlaybackInfo(startTicks, selectedAudioIndex.value ?? undefined, bitrate > 0);
+        mediaSource.value = data.MediaSources?.[0];
+        if (!mediaSource.value) throw new Error('No media source');
+        if (data.PlaySessionId) playSessionId.value = data.PlaySessionId;
+
+        parseAudioStreams(mediaSource.value, selectedAudioIndex.value ?? undefined);
+        parseSubtitleStreams(mediaSource.value);
+
+        const ms = mediaSource.value;
+        if (ms.TranscodingUrl) {
+            hlsUrl.value = `${serverUrl}${ms.TranscodingUrl.replace('?&', '?')}`;
+            // If we requested AllowVideoStreamCopy:false (bitrate > 0), it's a real transcode.
+            // Otherwise fall back to what Jellyfin reports.
+            playMethod.value = bitrate > 0 ? 'Transcode' : (ms.SupportsDirectStream ? 'DirectStream' : 'Transcode');
+            initHls(hlsUrl.value, video, movieTime);
+        } else {
+            determinePlaybackMethod(ms);
+            if (playMethod.value === 'DirectPlay') {
+                video.src = hlsUrl.value;
+                video.currentTime = movieTime;
+                video.play().catch(() => { });
+                startProgressReporting();
+            } else {
+                initHls(hlsUrl.value, video, movieTime);
+            }
+        }
+    } catch (e: any) {
+        console.error('[switchQuality] error:', e);
+        selectedBitrate.value = previousBitrate;
+        error.value = 'Failed to switch quality';
+        isLoading.value = false;
+    } finally {
+        isSwitching = false;
+    }
+}
+
 // ── Lifecycle ──────────────────────────────────────────────────────────────────
 
 onMounted(async () => {
@@ -894,6 +1142,7 @@ onBeforeUnmount(() => {
     document.removeEventListener('keydown', handleKeyDown);
 
     if (controlsTimeout) clearTimeout(controlsTimeout);
+    if (infoPollingInterval) { clearInterval(infoPollingInterval); infoPollingInterval = null; }
     stopProgressReporting();
     deleteActiveEncodings();
 
@@ -915,5 +1164,13 @@ onBeforeUnmount(() => {
 <style scoped>
 .player-gradient {
     background: linear-gradient(to top, rgba(0, 0, 0, 0.7) 0%, transparent 40%);
+}
+.info-fade-enter-active,
+.info-fade-leave-active {
+    transition: opacity 150ms ease;
+}
+.info-fade-enter-from,
+.info-fade-leave-to {
+    opacity: 0;
 }
 </style>

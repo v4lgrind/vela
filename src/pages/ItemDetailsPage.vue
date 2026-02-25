@@ -62,6 +62,18 @@
                             <X class="size-4 mr-1" /> Cancel
                         </Button>
 
+                        <Button
+                            v-if="item.Type !== 'Series' && item.Type !== 'Season' && item.Type !== 'MusicAlbum' && item.Type !== 'BoxSet'"
+                            :disabled="togglingWatched"
+                            variant="outline"
+                            class="min-h-[44px] px-3"
+                            :class="item.UserData?.Played ? 'border-accent-purple text-accent-purple' : ''"
+                            :title="item.UserData?.Played ? 'Mark as unwatched' : 'Mark as watched'"
+                            @click="toggleWatched">
+                            <Loader2 v-if="togglingWatched" class="size-4 animate-spin" />
+                            <Check v-else class="size-4" />
+                        </Button>
+
                         <DialogTrigger v-if="videoDetails.length || sourceDetails.length || fileSizeHuman" as-child>
                             <Button variant="outline" class="gap-2 min-h-[44px]">
                                 <Info class="size-4" /> Media Info
@@ -393,6 +405,7 @@ const isDownloading = ref(false);
 const downloadProgress = ref(0);
 const playingSeasonId = ref<string | null>(null);
 const watchingEpId = ref<string | null>(null);
+const togglingWatched = ref(false);
 
 async function load() {
     loading.value = true;
@@ -499,6 +512,23 @@ async function playNextInSeason(season: any) {
 
 function playEpisode(ep: any) {
     router.push({ name: 'Player', params: { id: ep.Id } });
+}
+
+async function toggleWatched() {
+    if (togglingWatched.value || !item.value) return;
+    togglingWatched.value = true;
+    try {
+        if (item.value.UserData?.Played) {
+            await store.markUnplayed(item.value.Id);
+            if (item.value.UserData) item.value.UserData.Played = false;
+        } else {
+            await store.markPlayed(item.value.Id);
+            if (!item.value.UserData) item.value.UserData = {};
+            item.value.UserData.Played = true;
+        }
+    } finally {
+        togglingWatched.value = false;
+    }
 }
 
 async function toggleWatchedEpisode(ep: any) {

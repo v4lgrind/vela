@@ -1,39 +1,42 @@
 <template>
-  <div class="min-h-dvh bg-surface text-text-primary p-4 sm:p-6 md:p-8">
+  <div class="bg-surface text-text-primary p-4">
 
     <!-- Continue Watching -->
-    <section v-if="resumeItems.length" class="mb-8 sm:mb-10">
+    <section v-if="resumeItems.length" class="mb-5">
       <h2 class="text-xl sm:text-2xl font-bold text-foreground mb-4">Continue Watching</h2>
-      <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:gap-4 lg:grid-cols-4 xl:grid-cols-5">
-        <div v-for="item in resumeItems" :key="item.Id" class="relative group">
-          <Card class="bg-surface-raised border-border-default overflow-hidden p-0 rounded-xl aspect-video group-hover:-translate-y-1 group-hover:shadow-xl group-hover:border-border-hover transition-all duration-200 cursor-pointer" @click="playResume(item)">
-            <LazyImg
-              :src="getResumeImageUrl(item)"
-              :alt="item.Name"
-              :item-type="item.Type"
+      <div class="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
+        <div v-for="item in resumeItems" :key="item.Id" class="shrink-0 w-44 sm:w-52 group">
+          <!-- Thumbnail -->
+          <div class="relative rounded-xl overflow-hidden aspect-video mb-1.5
+                      group-hover:-translate-y-1 group-hover:shadow-xl transition-all duration-200 cursor-pointer"
+               @click="playResume(item)">
+            <LazyImg :src="getResumeImageUrl(item)" :alt="item.Name" :item-type="item.Type"
               class="block w-full h-full object-cover" />
 
-            <!-- Progress bar -->
-            <div class="absolute bottom-0 left-0 right-0 h-1 bg-white/20 rounded-full">
-              <div class="h-full bg-accent-purple rounded-full transition-all"
-                :style="{ width: (item.UserData?.PlayedPercentage ?? 0) + '%' }" />
-            </div>
-
             <!-- Play overlay -->
-            <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center pointer-events-none">
-              <div class="bg-white/90 rounded-full p-3 shadow-lg">
-                <Play class="size-5 fill-black stroke-none" />
+            <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent
+                        opacity-0 group-hover:opacity-100 transition-opacity duration-200
+                        flex items-center justify-center pointer-events-none">
+              <div class="bg-white/90 rounded-full p-2.5 shadow-lg">
+                <Play class="size-4 fill-black stroke-none" />
               </div>
             </div>
-          </Card>
 
-          <!-- Title below card -->
-          <div class="mb-4 px-0.5 cursor-pointer" @click="goToItem(item)">
-            <div class="text-sm font-semibold text-text-heading truncate hover:text-accent-purple-light transition-colors" :title="resumeTitle(item)">
+            <!-- Progress bar — after overlay in DOM so it always renders on top -->
+            <div class="absolute bottom-0 left-0 right-0 h-1 bg-white/20">
+              <div class="h-full bg-accent-purple transition-all"
+                :style="{ width: (item.UserData?.PlayedPercentage ?? 0) + '%' }" />
+            </div>
+          </div>
+
+          <!-- Title -->
+          <div class="px-0.5 cursor-pointer" @click="goToItem(item)">
+            <div class="text-xs font-semibold text-text-heading truncate hover:text-accent-purple-light transition-colors"
+                 :title="resumeTitle(item)">
               {{ resumeTitle(item) }}
             </div>
             <div v-if="item.Type === 'Episode'" class="text-xs text-text-muted truncate mt-0.5">
-              S{{ item.ParentIndexNumber }}E{{ item.IndexNumber }} · {{ item.SeriesName }}
+              S{{ item.ParentIndexNumber }}E{{ item.IndexNumber }}
             </div>
           </div>
         </div>
@@ -41,28 +44,31 @@
     </section>
 
     <!-- Next Up -->
-    <section v-if="nextUpItems.length" class="mb-8 sm:mb-10">
+    <section v-if="nextUpItems.length" class="mb-5">
       <h2 class="text-xl sm:text-2xl font-bold text-foreground mb-4">Next Up</h2>
-      <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:gap-4 lg:grid-cols-4 xl:grid-cols-5">
-        <div v-for="item in nextUpItems" :key="item.Id" class="relative group">
-          <Card class="bg-surface-raised border-border-default overflow-hidden p-0 rounded-xl aspect-video group-hover:-translate-y-1 group-hover:shadow-xl group-hover:border-border-hover transition-all duration-200 cursor-pointer" @click="playResume(item)">
-            <LazyImg
-              :src="getResumeImageUrl(item)"
-              :alt="item.Name"
-              :item-type="item.Type"
+      <div class="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
+        <div v-for="item in nextUpItems" :key="item.Id" class="shrink-0 w-44 sm:w-52 group">
+          <!-- Thumbnail -->
+          <div class="relative rounded-xl overflow-hidden aspect-video mb-1.5
+                      group-hover:-translate-y-1 group-hover:shadow-xl transition-all duration-200 cursor-pointer"
+               @click="playResume(item)">
+            <LazyImg :src="getResumeImageUrl(item)" :alt="item.Name" :item-type="item.Type"
               class="block w-full h-full object-cover" />
 
             <!-- Play overlay -->
-            <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center pointer-events-none">
-              <div class="bg-white/90 rounded-full p-3 shadow-lg">
-                <Play class="size-5 fill-black stroke-none" />
+            <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent
+                        opacity-0 group-hover:opacity-100 transition-opacity duration-200
+                        flex items-center justify-center pointer-events-none">
+              <div class="bg-white/90 rounded-full p-2.5 shadow-lg">
+                <Play class="size-4 fill-black stroke-none" />
               </div>
             </div>
-          </Card>
+          </div>
 
-          <!-- Title below card -->
-          <div class="mt-4 px-0.5 cursor-pointer" @click="goToItem(item)">
-            <div class="text-sm font-semibold text-text-heading truncate hover:text-accent-purple-light transition-colors" :title="item.SeriesName ?? item.Name">
+          <!-- Title -->
+          <div class="px-0.5 cursor-pointer" @click="goToItem(item)">
+            <div class="text-xs font-semibold text-text-heading truncate hover:text-accent-purple-light transition-colors"
+                 :title="item.SeriesName ?? item.Name">
               {{ item.SeriesName ?? item.Name }}
             </div>
             <div class="text-xs text-text-muted truncate mt-0.5">
@@ -74,30 +80,36 @@
     </section>
 
     <!-- Libraries -->
-    <header class="mb-4 sm:mb-6">
-      <h2 class="text-xl sm:text-2xl font-bold text-foreground">My Library</h2>
-    </header>
+    <section>
+      <h2 class="text-xl sm:text-2xl font-bold text-foreground mb-4">My Library</h2>
 
-    <!-- Loading state -->
-    <div v-if="loading" class="grid grid-cols-2 gap-4 sm:grid-cols-3 md:gap-5 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
-      <Skeleton v-for="i in 6" :key="i" class="aspect-[2/1] rounded-2xl" />
-    </div>
+      <!-- Loading state -->
+      <div v-if="loading" class="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
+        <Skeleton v-for="i in 6" :key="i" class="shrink-0 w-44 sm:w-52 aspect-video rounded-xl" />
+      </div>
 
-    <!-- Error state -->
-    <div v-else-if="error" class="p-10 text-center">
-      <p class="text-error text-lg">{{ error }}</p>
-    </div>
+      <!-- Error state -->
+      <div v-else-if="error" class="p-10 text-center">
+        <p class="text-error text-lg">{{ error }}</p>
+      </div>
 
-    <!-- Library grid -->
-    <ul v-else class="grid grid-cols-2 gap-4 sm:grid-cols-3 md:gap-5 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 list-none p-0 m-0">
-      <li v-for="item in mediaItems" :key="item.Id">
-        <Card class="bg-surface-raised border-border-default hover:-translate-y-1 hover:bg-surface-hover hover:border-border-hover hover:shadow-xl transition-all duration-200 overflow-hidden p-0 rounded-2xl aspect-[2/1]">
-          <router-link class="block w-full h-full" :to="{ name: 'libraryItem', params: { id: item.Id, name: item.Name } }">
-            <LazyImg :src="item.imageUrl" :alt="item.Name" :item-type="item.Type" class="block w-full h-full object-cover" />
-          </router-link>
-        </Card>
-      </li>
-    </ul>
+      <!-- Library row -->
+      <div v-else class="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
+        <router-link v-for="item in mediaItems" :key="item.Id"
+          class="shrink-0 w-44 sm:w-52 group"
+          :to="{ name: 'libraryItem', params: { id: item.Id, name: item.Name } }">
+          <div class="relative rounded-xl overflow-hidden aspect-video mb-1.5
+                      group-hover:-translate-y-1 group-hover:shadow-xl transition-all duration-200">
+            <LazyImg :src="item.imageUrl" :alt="item.Name" :item-type="item.Type"
+              class="block w-full h-full object-cover" />
+          </div>
+          <div class="px-0.5 text-xs font-semibold text-text-heading truncate
+                      group-hover:text-accent-purple-light transition-colors">
+            {{ item.Name }}
+          </div>
+        </router-link>
+      </div>
+    </section>
   </div>
 </template>
 
@@ -106,7 +118,6 @@ import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useJellyfinStore } from '@/store/jellyfin-store';
 import LazyImg from '@/components/LazyImg.vue';
-import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Play } from 'lucide-vue-next';
 

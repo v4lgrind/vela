@@ -63,10 +63,11 @@ export const useJellyfinStore = defineStore("jellyfin", {
       this.initializeApi();
       const libraries = await getLibraryApi(this.api).getMediaFolders();
 
-      let Items = libraries.data.Items?.filter(
+      const Items = libraries.data.Items?.filter(
         (library) => library.CollectionType !== "playlists"
-      );
-      return Items || [];
+      ) || [];
+      this.libraries = Items;
+      return Items;
     },
     async fetchItems(
       libraryId: string,

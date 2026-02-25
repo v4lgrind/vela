@@ -83,9 +83,16 @@
                         <Badge v-if="videoResolution" variant="secondary">{{ videoResolution }}</Badge>
                     </div>
 
-                    <p v-if="item?.Overview" class="my-2 leading-relaxed text-sm text-text-primary/85">
-                        {{ item.Overview }}
-                    </p>
+                    <div v-if="item?.Overview" class="my-2">
+                        <p class="leading-relaxed text-sm text-text-primary/85 m-0 transition-all"
+                           :class="overviewExpanded ? '' : 'line-clamp-3'">
+                            {{ item.Overview }}
+                        </p>
+                        <button @click="overviewExpanded = !overviewExpanded"
+                            class="mt-1 text-xs text-accent-purple hover:text-accent-purple-light transition-colors">
+                            {{ overviewExpanded ? 'Show less' : 'Show more' }}
+                        </button>
+                    </div>
 
                     <div v-if="genres?.length" class="mt-3">
                         <h4 class="text-sm font-semibold text-text-bright m-0 mb-1.5">Genres</h4>
@@ -167,7 +174,7 @@
         <!-- Seasons -->
         <section v-if="item?.Type === 'Series' && seasons.length" class="mt-6">
             <h3 class="text-xl font-semibold mb-3">Seasons</h3>
-            <div class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-4">
+            <div class="grid grid-cols-3 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(150px,1fr))] sm:gap-4">
                 <Card v-for="season in seasons" :key="season.Id"
                     class="bg-surface-raised border-border-default cursor-pointer overflow-hidden hover:-translate-y-1 hover:border-accent-purple transition-all duration-200"
                     @click="goToItem(season.Id)">
@@ -370,6 +377,7 @@ const route = useRoute();
 const router = useRouter();
 
 const loading = ref(true);
+const overviewExpanded = ref(false);
 const error = ref<string | null>(null);
 const item = ref<any | null>(null);
 const seasons = ref<any[]>([]);

@@ -1,19 +1,22 @@
 <template>
-    <div class="min-h-dvh text-white relative isolate" style="background-color:#0c0c12">
+    <div class="min-h-dvh text-foreground bg-background relative isolate">
 
         <!-- ── Ambient backdrop ──────────────────────────────── -->
         <!-- absolute (not fixed) so it stays within the page area below the nav bar.
              isolate on root creates a stacking context; -z-10 is scoped inside it,
              above the root's bg-color but below all page content. -->
         <div aria-hidden="true" class="absolute inset-x-0 top-0 h-screen overflow-hidden pointer-events-none -z-10">
-            <img v-if="backdropUrl" :src="backdropUrl"
-                class="w-full h-full object-cover scale-110 blur-3xl opacity-50 select-none" />
-            <div class="absolute inset-0 bg-gradient-to-b from-black/60 via-[#0c0c12]/80 to-[#0c0c12]" />
+            <template v-if="backdropUrl">
+                <img :src="backdropUrl"
+                    class="w-full h-full object-cover scale-110 blur-2xl opacity-100 select-none" />
+                <div class="absolute inset-0" style="background-color: var(--item-backdrop-tint)" />
+                <div class="absolute inset-0 item-page-overlay" />
+            </template>
         </div>
 
         <!-- Loading -->
         <section v-if="loading"
-            class="flex items-center justify-center min-h-dvh text-white/40 text-lg">Loading…</section>
+            class="flex items-center justify-center min-h-dvh text-text-muted text-lg">Loading…</section>
 
         <!-- Error -->
         <section v-else-if="error"
@@ -22,12 +25,12 @@
         <template v-else>
 
             <!-- ── HERO ──────────────────────────────────────── -->
-            <section class="relative px-4 pt-8 pb-10 sm:px-6 md:px-10 lg:px-16">
+            <section class="relative px-4 pt-8 pb-10 sm:px-6 md:px-10 lg:px-16 text-white">
                 <div class="mx-auto max-w-5xl flex flex-col sm:flex-row gap-7 sm:gap-10 items-start">
 
                     <!-- Poster -->
                     <div class="shrink-0 mx-auto sm:mx-0">
-                        <div class="rounded-2xl overflow-hidden shadow-[0_25px_70px_rgba(0,0,0,0.85)] ring-1 ring-white/10"
+                        <div class="rounded-2xl overflow-hidden shadow-[0_25px_70px_rgba(0,0,0,0.85)] ring-1 ring-border-default"
                             :class="isAudioType(item.Type)
                                 ? 'w-40 h-40 sm:w-48 sm:h-48'
                                 : isLandscapePoster
@@ -44,12 +47,12 @@
 
                             <!-- Breadcrumb -->
                             <div v-if="item.SeriesId || item.SeasonId"
-                                class="flex items-center gap-1.5 text-sm text-white/40 mb-2">
+                                class="flex items-center gap-1.5 text-sm text-white/70 mb-2">
                                 <button v-if="item.SeriesId" @click="goToItem(item.SeriesId)"
-                                    class="hover:text-white/80 transition-colors cursor-pointer">{{ item.SeriesName }}</button>
-                                <span v-if="item.SeriesId && item.SeasonId" class="text-white/20">/</span>
+                                    class="hover:text-white transition-colors cursor-pointer">{{ item.SeriesName }}</button>
+                                <span v-if="item.SeriesId && item.SeasonId" class="text-white/40">/</span>
                                 <button v-if="item.SeasonId" @click="goToItem(item.SeasonId)"
-                                    class="hover:text-white/80 transition-colors cursor-pointer">{{ item.SeasonName }}</button>
+                                    class="hover:text-white transition-colors cursor-pointer">{{ item.SeasonName }}</button>
                             </div>
 
                             <!-- Title -->
@@ -57,23 +60,23 @@
 
                             <!-- Metadata row -->
                             <div class="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-sm mb-5">
-                                <span v-if="year" class="text-white/55">{{ year }}</span>
-                                <span v-if="year && duration" class="text-white/20">·</span>
-                                <span v-if="duration" class="text-white/55">{{ duration }}</span>
+                                <span v-if="year" class="text-white/80">{{ year }}</span>
+                                <span v-if="year && duration" class="text-white/35">·</span>
+                                <span v-if="duration" class="text-white/80">{{ duration }}</span>
                                 <template v-if="item.CommunityRating">
-                                    <span class="text-white/20">·</span>
-                                    <span class="text-yellow-400/90 font-semibold">★ {{ item.CommunityRating.toFixed(1) }}</span>
+                                    <span class="text-white/35">·</span>
+                                    <span class="text-yellow-400 font-semibold">★ {{ item.CommunityRating.toFixed(1) }}</span>
                                 </template>
-                                <span v-if="item.Type === 'Season' && episodes.length" class="text-white/40">
+                                <span v-if="item.Type === 'Season' && episodes.length" class="text-white/70">
                                     {{ episodes.length }} episodes
                                 </span>
-                                <span v-if="item.Type === 'Season' && item.PremiereDate" class="text-white/40">
+                                <span v-if="item.Type === 'Season' && item.PremiereDate" class="text-white/70">
                                     {{ new Date(item.PremiereDate).getFullYear() }}
                                 </span>
                                 <span v-if="videoResolution"
-                                    class="px-2 py-0.5 rounded-md bg-white/10 text-xs font-medium text-white/60">{{ videoResolution }}</span>
+                                    class="px-2 py-0.5 rounded-md bg-white/10 text-xs font-medium text-white/80">{{ videoResolution }}</span>
                                 <span v-if="videoCodec"
-                                    class="px-2 py-0.5 rounded-md bg-white/10 text-xs font-medium text-white/60 uppercase">{{ videoCodec }}</span>
+                                    class="px-2 py-0.5 rounded-md bg-white/10 text-xs font-medium text-white/80 uppercase">{{ videoCodec }}</span>
                             </div>
 
                             <!-- Actions -->
@@ -95,11 +98,11 @@
                                 </button>
                                 <button v-else-if="canDownload(item) && !isItemDownloaded && !isDownloading"
                                     @click="handleDownload"
-                                    class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 border border-white/10 text-white/70 text-sm font-medium hover:bg-white/15 transition-all cursor-pointer">
+                                    class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 border border-white/10 text-white/90 text-sm font-medium hover:bg-white/15 transition-all cursor-pointer">
                                     <DownloadIcon class="size-4" /> Download
                                 </button>
                                 <button v-if="isDownloading" disabled
-                                    class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 text-white/40 text-sm cursor-wait">
+                                    class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 text-white/65 text-sm cursor-wait">
                                     Downloading… {{ downloadProgress }}%
                                 </button>
                                 <button v-if="isDownloading" @click="cancelDownload"
@@ -114,7 +117,7 @@
                                     class="flex items-center justify-center w-11 h-11 rounded-xl border transition-all cursor-pointer"
                                     :class="item.UserData?.Played
                                         ? 'bg-accent-purple/20 border-accent-purple/50 text-accent-purple'
-                                        : 'bg-white/10 border-white/10 text-white/50 hover:bg-white/15 hover:text-white'">
+                                        : 'bg-white/10 border-white/10 text-white/75 hover:bg-white/15 hover:text-white'">
                                     <Loader2 v-if="togglingWatched" class="size-4 animate-spin" />
                                     <Check v-else class="size-4" />
                                 </button>
@@ -122,7 +125,7 @@
                                 <DialogTrigger v-if="videoDetails.length || sourceDetails.length || fileSizeHuman"
                                     as-child>
                                     <button
-                                        class="flex items-center justify-center w-11 h-11 rounded-xl bg-white/10 border border-white/10 text-white/50 hover:bg-white/15 hover:text-white transition-all cursor-pointer"
+                                        class="flex items-center justify-center w-11 h-11 rounded-xl bg-white/10 border border-white/10 text-white/75 hover:bg-white/15 hover:text-white transition-all cursor-pointer"
                                         title="Media info">
                                         <Info class="size-4" />
                                     </button>
@@ -131,7 +134,7 @@
 
                             <!-- Overview -->
                             <div v-if="item.Overview" class="mb-5 max-w-2xl">
-                                <p class="text-sm leading-relaxed text-white/60 m-0 transition-all"
+                                <p class="text-sm leading-relaxed text-white/85 m-0 transition-all"
                                     :class="overviewExpanded ? '' : 'line-clamp-3'">
                                     {{ item.Overview }}
                                 </p>
@@ -144,7 +147,7 @@
                             <!-- Genres -->
                             <div v-if="genres.length" class="flex flex-wrap gap-1.5 mb-4">
                                 <span v-for="g in genres" :key="g"
-                                    class="px-3 py-1 rounded-full text-xs text-white/55 border border-white/10 bg-white/5">
+                                    class="px-3 py-1 rounded-full text-xs text-white/80 border border-white/20 bg-white/10">
                                     {{ g }}
                                 </span>
                             </div>
@@ -152,12 +155,12 @@
                             <!-- Director / Studio inline -->
                             <div class="flex flex-wrap gap-x-5 gap-y-1 text-xs">
                                 <span v-if="directorNames.length">
-                                    <span class="text-white/25 uppercase tracking-wider text-[10px] mr-1.5">Director</span>
-                                    <span class="text-white/45">{{ directorNames.join(', ') }}</span>
+                                    <span class="text-white/50 uppercase tracking-wider text-[10px] mr-1.5">Director</span>
+                                    <span class="text-white/80">{{ directorNames.join(', ') }}</span>
                                 </span>
                                 <span v-if="studioNames.length">
-                                    <span class="text-white/25 uppercase tracking-wider text-[10px] mr-1.5">Studio</span>
-                                    <span class="text-white/45">{{ studioNames.join(', ') }}</span>
+                                    <span class="text-white/50 uppercase tracking-wider text-[10px] mr-1.5">Studio</span>
+                                    <span class="text-white/80">{{ studioNames.join(', ') }}</span>
                                 </span>
                             </div>
 
@@ -217,11 +220,11 @@
 
                 <!-- Seasons -->
                 <section v-if="item.Type === 'Series' && seasons.length"
-                    class="bg-white/[0.04] border border-white/[0.07] rounded-2xl p-5 backdrop-blur-sm">
-                    <h3 class="text-xs font-semibold text-white/40 uppercase tracking-widest mb-4">Seasons</h3>
+                    class="bg-surface-raised border border-border-default rounded-2xl p-5 backdrop-blur-sm">
+                    <h3 class="text-xs font-semibold text-text-muted uppercase tracking-widest mb-4">Seasons</h3>
                     <div class="grid grid-cols-3 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(150px,1fr))] sm:gap-4">
                         <div v-for="season in seasons" :key="season.Id"
-                            class="cursor-pointer group rounded-xl overflow-hidden bg-white/5 border border-white/[0.07] hover:-translate-y-1 hover:border-white/20 transition-all duration-200"
+                            class="cursor-pointer group rounded-xl overflow-hidden bg-surface-raised border border-border-default hover:-translate-y-1 hover:border-border-hover transition-all duration-200"
                             @click="goToItem(season.Id)">
                             <div class="relative w-full aspect-[2/3] overflow-hidden">
                                 <LazyImg :src="getImageUrl(season.Id, 'Primary', 300, 450)" :alt="season.Name"
@@ -238,18 +241,18 @@
                                     </button>
                                 </div>
                             </div>
-                            <div class="px-2 py-2 text-center text-xs font-semibold text-white/70">{{ season.Name }}</div>
+                            <div class="px-2 py-2 text-center text-xs font-semibold text-text-primary">{{ season.Name }}</div>
                         </div>
                     </div>
                 </section>
 
                 <!-- Episodes -->
                 <section v-if="item.Type === 'Season' && episodes.length"
-                    class="bg-white/[0.04] border border-white/[0.07] rounded-2xl p-5 backdrop-blur-sm">
-                    <h3 class="text-xs font-semibold text-white/40 uppercase tracking-widest mb-4">Episodes</h3>
+                    class="bg-surface-raised border border-border-default rounded-2xl p-5 backdrop-blur-sm">
+                    <h3 class="text-xs font-semibold text-text-muted uppercase tracking-widest mb-4">Episodes</h3>
                     <div class="flex flex-col gap-2">
                         <div v-for="ep in episodes" :key="ep.Id"
-                            class="flex gap-3 sm:gap-4 p-2.5 rounded-xl cursor-pointer transition-all duration-200 border border-transparent hover:bg-white/5 hover:border-white/[0.07]"
+                            class="flex gap-3 sm:gap-4 p-2.5 rounded-xl cursor-pointer transition-all duration-200 border border-transparent hover:bg-surface-raised hover:border-border-default"
                             :class="ep.UserData?.Played ? 'opacity-50 hover:opacity-80' : ''"
                             @click="goToItem(ep.Id)">
                             <!-- Thumbnail -->
@@ -272,28 +275,28 @@
                             <!-- Info -->
                             <div class="flex-1 min-w-0 py-0.5">
                                 <div class="flex items-start justify-between gap-2 mb-1">
-                                    <p class="font-semibold text-sm text-white/90 m-0 leading-snug">
-                                        <span class="text-white/35 mr-1">{{ ep.IndexNumber }}.</span>{{ ep.Name }}
+                                    <p class="font-semibold text-sm text-text-heading m-0 leading-snug">
+                                        <span class="text-text-subtle mr-1">{{ ep.IndexNumber }}.</span>{{ ep.Name }}
                                     </p>
                                     <div class="flex items-center gap-1.5 shrink-0">
                                         <span v-if="ep.RunTimeTicks"
-                                            class="text-xs text-white/35 hidden sm:block tabular-nums">{{ formatTicksDuration(ep.RunTimeTicks) }}</span>
+                                            class="text-xs text-text-subtle hidden sm:block tabular-nums">{{ formatTicksDuration(ep.RunTimeTicks) }}</span>
                                         <button @click.stop="toggleWatchedEpisode(ep)" :disabled="watchingEpId === ep.Id"
                                             class="rounded-full p-1.5 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
-                                            :class="ep.UserData?.Played ? 'bg-accent-purple text-white' : 'bg-white/10 text-white/40 hover:bg-white/20 hover:text-white'"
+                                            :class="ep.UserData?.Played ? 'bg-accent-purple text-white' : 'bg-surface-hover text-text-muted hover:bg-surface-raised hover:text-text-heading'"
                                             :title="ep.UserData?.Played ? 'Mark as unwatched' : 'Mark as watched'">
                                             <Check class="size-3.5" />
                                         </button>
                                     </div>
                                 </div>
                                 <p v-if="ep.Overview"
-                                    class="text-white/40 text-xs leading-relaxed mb-0 line-clamp-2">
+                                    class="text-text-muted text-xs leading-relaxed mb-0 line-clamp-2">
                                     {{ ep.Overview }}
                                 </p>
-                                <p v-else class="text-white/25 text-xs italic mb-0">No synopsis available</p>
+                                <p v-else class="text-text-subtle text-xs italic mb-0">No synopsis available</p>
                                 <div v-if="ep.CommunityRating || ep.PremiereDate" class="flex gap-2 mt-1">
                                     <span v-if="ep.CommunityRating" class="text-xs text-yellow-400/70">★ {{ ep.CommunityRating.toFixed(1) }}</span>
-                                    <span v-if="ep.PremiereDate" class="text-xs text-white/30">{{ new Date(ep.PremiereDate).getFullYear() }}</span>
+                                    <span v-if="ep.PremiereDate" class="text-xs text-text-subtle">{{ new Date(ep.PremiereDate).getFullYear() }}</span>
                                 </div>
                             </div>
                         </div>
@@ -302,36 +305,36 @@
 
                 <!-- Audio Tracks -->
                 <section v-if="item.Type === 'MusicAlbum' && audioTracks.length"
-                    class="bg-white/[0.04] border border-white/[0.07] rounded-2xl p-5 backdrop-blur-sm">
-                    <h3 class="text-xs font-semibold text-white/40 uppercase tracking-widest mb-4">Tracks</h3>
+                    class="bg-surface-raised border border-border-default rounded-2xl p-5 backdrop-blur-sm">
+                    <h3 class="text-xs font-semibold text-text-muted uppercase tracking-widest mb-4">Tracks</h3>
                     <div class="flex flex-col gap-0.5">
                         <div v-for="(track, i) in audioTracks" :key="track.Id"
-                            class="grid grid-cols-[36px_1fr_56px] gap-3 items-center rounded-lg px-3 py-2.5 cursor-pointer transition-all duration-150 hover:bg-white/5"
+                            class="grid grid-cols-[36px_1fr_56px] gap-3 items-center rounded-lg px-3 py-2.5 cursor-pointer transition-all duration-150 hover:bg-surface-raised"
                             :class="audioPlayerStore.currentTrack?.id === track.Id ? 'bg-accent-purple/10 text-accent-purple-light' : ''"
                             @click="playTrack(track.Id, i)">
-                            <div class="text-center text-white/30 font-medium text-sm tabular-nums">{{ track.IndexNumber || '·' }}</div>
+                            <div class="text-center text-text-subtle font-medium text-sm tabular-nums">{{ track.IndexNumber || '·' }}</div>
                             <div class="min-w-0">
-                                <div class="font-medium text-white/80 truncate text-sm"
+                                <div class="font-medium text-text-primary truncate text-sm"
                                     :class="audioPlayerStore.currentTrack?.id === track.Id ? 'text-accent-purple-light' : ''">
                                     {{ track.Name }}
                                 </div>
-                                <div v-if="track.Artists?.length" class="text-white/35 text-xs mt-0.5 truncate">{{ track.Artists.join(', ') }}</div>
+                                <div v-if="track.Artists?.length" class="text-text-subtle text-xs mt-0.5 truncate">{{ track.Artists.join(', ') }}</div>
                             </div>
-                            <div class="text-right text-white/30 text-xs tabular-nums">{{ formatTrackDuration(track.RunTimeTicks) }}</div>
+                            <div class="text-right text-text-subtle text-xs tabular-nums">{{ formatTrackDuration(track.RunTimeTicks) }}</div>
                         </div>
                     </div>
                 </section>
 
                 <!-- Cast -->
                 <section v-if="cast.length"
-                    class="bg-white/[0.04] border border-white/[0.07] rounded-2xl p-5 backdrop-blur-sm">
+                    class="bg-surface-raised border border-border-default rounded-2xl p-5 backdrop-blur-sm">
                     <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-xs font-semibold text-white/40 uppercase tracking-widest">Cast</h3>
+                        <h3 class="text-xs font-semibold text-text-muted uppercase tracking-widest">Cast</h3>
                         <div class="flex gap-1.5">
-                            <button class="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/40 hover:text-white transition-all cursor-pointer" @click="scrollCast('left')">
+                            <button class="p-1.5 rounded-lg bg-surface-raised hover:bg-surface-hover text-text-muted hover:text-text-heading transition-all cursor-pointer" @click="scrollCast('left')">
                                 <ArrowLeft class="size-3.5" />
                             </button>
-                            <button class="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/40 hover:text-white transition-all cursor-pointer" @click="scrollCast('right')">
+                            <button class="p-1.5 rounded-lg bg-surface-raised hover:bg-surface-hover text-text-muted hover:text-text-heading transition-all cursor-pointer" @click="scrollCast('right')">
                                 <ArrowRight class="size-3.5" />
                             </button>
                         </div>
@@ -341,26 +344,26 @@
                         role="list">
                         <div v-for="p in cast" :key="p.Id || p.Name"
                             class="snap-center text-center group" role="listitem" :title="p.Name">
-                            <div class="w-full aspect-[2/3] rounded-xl overflow-hidden bg-white/5 shadow-lg mb-2 group-hover:-translate-y-1 transition-transform duration-200">
+                            <div class="w-full aspect-[2/3] rounded-xl overflow-hidden bg-surface-raised shadow-lg mb-2 group-hover:-translate-y-1 transition-transform duration-200">
                                 <LazyImg :src="personImageUrl(p)" :alt="p.Name" item-type="person"
                                     class="w-full h-full object-cover object-top" />
                             </div>
-                            <div class="font-medium text-white/80 truncate text-xs">{{ p.Name }}</div>
-                            <div v-if="p.Role" class="text-white/35 text-xs mt-0.5 truncate">{{ p.Role }}</div>
+                            <div class="font-medium text-text-primary truncate text-xs">{{ p.Name }}</div>
+                            <div v-if="p.Role" class="text-text-subtle text-xs mt-0.5 truncate">{{ p.Role }}</div>
                         </div>
                     </div>
                 </section>
 
                 <!-- Similar Items -->
                 <section v-if="similarItems.length"
-                    class="bg-white/[0.04] border border-white/[0.07] rounded-2xl p-5 backdrop-blur-sm">
+                    class="bg-surface-raised border border-border-default rounded-2xl p-5 backdrop-blur-sm">
                     <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-xs font-semibold text-white/40 uppercase tracking-widest">More Like This</h3>
+                        <h3 class="text-xs font-semibold text-text-muted uppercase tracking-widest">More Like This</h3>
                         <div class="flex gap-1.5">
-                            <button class="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/40 hover:text-white transition-all cursor-pointer" @click="scrollSimilar('left')">
+                            <button class="p-1.5 rounded-lg bg-surface-raised hover:bg-surface-hover text-text-muted hover:text-text-heading transition-all cursor-pointer" @click="scrollSimilar('left')">
                                 <ArrowLeft class="size-3.5" />
                             </button>
-                            <button class="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/40 hover:text-white transition-all cursor-pointer" @click="scrollSimilar('right')">
+                            <button class="p-1.5 rounded-lg bg-surface-raised hover:bg-surface-hover text-text-muted hover:text-text-heading transition-all cursor-pointer" @click="scrollSimilar('right')">
                                 <ArrowRight class="size-3.5" />
                             </button>
                         </div>
@@ -369,15 +372,15 @@
                         class="grid grid-flow-col auto-cols-[minmax(120px,140px)] gap-3 overflow-x-auto overflow-y-hidden snap-x snap-proximity scroll-smooth scrollbar-hide"
                         role="list">
                         <div v-for="sim in similarItems" :key="sim.Id"
-                            class="snap-center cursor-pointer group rounded-xl overflow-hidden bg-white/5 border border-white/[0.07] hover:-translate-y-1 hover:border-white/20 transition-all duration-200"
+                            class="snap-center cursor-pointer group rounded-xl overflow-hidden bg-surface-raised border border-border-default hover:-translate-y-1 hover:border-border-hover transition-all duration-200"
                             role="listitem" @click="goToItem(sim.Id)">
                             <div class="w-full aspect-[2/3] overflow-hidden">
                                 <LazyImg :src="getImageUrl(sim.Id, 'Primary', 300, 450)" :alt="sim.Name"
                                     :item-type="sim.Type" class="w-full h-full object-cover" />
                             </div>
                             <div class="p-2">
-                                <div class="font-medium text-white/75 text-xs truncate">{{ sim.Name }}</div>
-                                <div class="text-white/30 text-xs mt-0.5">{{ sim.ProductionYear }}</div>
+                                <div class="font-medium text-text-primary text-xs truncate">{{ sim.Name }}</div>
+                                <div class="text-text-subtle text-xs mt-0.5">{{ sim.ProductionYear }}</div>
                             </div>
                         </div>
                     </div>
@@ -476,9 +479,10 @@ const posterUrl = computed(() => {
 
 const backdropUrl = computed(() => {
     if (!item.value?.Id) return '';
-    return store.getImageUrl(item.value.Id, 'Backdrop', 1920, 1080)
-        || store.getImageUrl(item.value.Id, 'Primary', 1920, 1080)
-        || '';
+    if (item.value.Type === 'Episode' && item.value.SeriesId) {
+        return store.getImageUrl(item.value.SeriesId, 'Backdrop', 1920, 1080) || '';
+    }
+    return store.getImageUrl(item.value.Id, 'Backdrop', 1920, 1080) || '';
 });
 
 const resumePositionLabel = computed(() => {

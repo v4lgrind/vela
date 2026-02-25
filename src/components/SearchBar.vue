@@ -12,12 +12,12 @@
       <div class="flex items-center justify-between px-4 border-b border-border-input"
         style="padding-top: calc(14px + env(safe-area-inset-top, 0px)); padding-bottom: 14px">
         <button
-          class="flex items-center gap-2 text-sm font-semibold text-text-heading hover:text-accent-purple transition-colors"
+          class="flex items-center gap-2 text-sm font-semibold text-text-heading hover:text-accent-purple transition-colors cursor-pointer"
           @click="sidebarOpen = false; $router.push('/libraries')">
           <Home class="size-4" />
           Home
         </button>
-        <button class="p-1.5 rounded-lg hover:bg-surface-hover transition-colors" @click="sidebarOpen = false">
+        <button class="p-1.5 rounded-lg hover:bg-surface-hover transition-colors cursor-pointer" @click="sidebarOpen = false">
           <X class="size-5 text-text-muted" />
         </button>
       </div>
@@ -27,12 +27,12 @@
         <div class="flex items-center justify-between px-2 mb-1.5">
           <p class="text-xs font-semibold text-text-muted uppercase tracking-wider">Libraries</p>
           <button v-if="!editingOrder"
-            class="text-xs text-text-muted hover:text-text-heading transition-colors p-1 rounded"
+            class="text-xs text-text-muted hover:text-text-heading transition-colors p-1 rounded cursor-pointer"
             @click="startEditingOrder">
             Edit order
           </button>
           <button v-else
-            class="text-xs font-semibold text-accent-purple hover:opacity-80 transition-opacity p-1 rounded"
+            class="text-xs font-semibold text-accent-purple hover:opacity-80 transition-opacity p-1 rounded cursor-pointer"
             @click="editingOrder = false">
             Done
           </button>
@@ -42,13 +42,13 @@
           <!-- Up/down controls (edit mode only) -->
           <div v-if="editingOrder" class="flex flex-col shrink-0">
             <button
-              class="p-0.5 rounded hover:bg-surface-hover transition-colors disabled:opacity-25"
+              class="p-0.5 rounded hover:bg-surface-hover transition-colors disabled:opacity-25 cursor-pointer"
               :disabled="i === 0"
               @click="moveLibrary(lib.Id, -1)">
               <ChevronUp class="size-3.5 text-text-muted" />
             </button>
             <button
-              class="p-0.5 rounded hover:bg-surface-hover transition-colors disabled:opacity-25"
+              class="p-0.5 rounded hover:bg-surface-hover transition-colors disabled:opacity-25 cursor-pointer"
               :disabled="i === orderedLibraries.length - 1"
               @click="moveLibrary(lib.Id, 1)">
               <ChevronDown class="size-3.5 text-text-muted" />
@@ -57,7 +57,7 @@
 
           <button
             class="flex-1 flex items-center gap-3 px-3 py-2.5 rounded-lg text-left text-sm font-medium text-text-heading transition-colors"
-            :class="editingOrder ? 'cursor-default' : 'hover:bg-surface-hover'"
+            :class="editingOrder ? 'cursor-default' : 'hover:bg-surface-hover cursor-pointer'"
             @click="!editingOrder && goToLibrary(lib)">
             <component :is="libraryIcon(lib)" class="size-4 shrink-0 text-text-muted" />
             {{ lib.Name }}
@@ -68,14 +68,32 @@
       <!-- Footer actions -->
       <div class="border-t border-border-input p-3 flex flex-col gap-1"
         style="padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px))">
+
+        <!-- Theme toggle -->
+        <div class="flex items-center justify-between px-3 py-2.5">
+          <span class="text-sm font-medium text-text-heading">Appearance</span>
+          <div class="flex items-center gap-1 bg-surface-hover rounded-lg p-0.5">
+            <button
+              v-for="opt in themeOptions" :key="opt.value"
+              class="p-1.5 rounded-md transition-colors cursor-pointer"
+              :class="preferencesStore.colorScheme === opt.value
+                ? 'bg-accent-purple text-white shadow-sm'
+                : 'text-text-muted hover:text-text-heading'"
+              :title="opt.label"
+              @click="preferencesStore.colorScheme = opt.value">
+              <component :is="opt.icon" class="size-4" />
+            </button>
+          </div>
+        </div>
+
         <button
-          class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left text-sm font-medium text-text-heading hover:bg-surface-hover transition-colors"
+          class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left text-sm font-medium text-text-heading hover:bg-surface-hover transition-colors cursor-pointer"
           @click="goToSettings">
           <Settings class="size-4 text-text-muted" />
           Settings
         </button>
         <button
-          class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left text-sm font-medium text-red-400 hover:bg-red-500/10 transition-colors"
+          class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left text-sm font-medium text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
           @click="onLogout">
           <LogOut class="size-4" />
           Logout
@@ -89,6 +107,11 @@
     <!-- Hamburger -->
     <Button variant="ghost" class="shrink-0 px-2 sm:px-3" aria-label="Open menu" @click="openSidebar">
       <Menu class="size-5 sm:size-4" />
+    </Button>
+
+    <!-- Home -->
+    <Button variant="ghost" class="shrink-0 px-2 sm:px-3" aria-label="Go home" @click="$router.push('/')">
+      <Home class="size-5 sm:size-4" />
     </Button>
 
     <Button v-if="canGoBack" variant="ghost" class="shrink-0 px-2 sm:px-3" aria-label="Go back"
@@ -214,7 +237,7 @@ import { useOfflineStore } from '@/store/offline-store';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Home, Download, LogOut, Loader2, ArrowLeft, Settings, Menu, X, Film, Tv2, Music2, BookOpen, Folder, ChevronUp, ChevronDown } from 'lucide-vue-next';
+import { Home, Download, LogOut, Loader2, ArrowLeft, Settings, Menu, X, Film, Tv2, Music2, BookOpen, Folder, ChevronUp, ChevronDown, Sun, Moon, Monitor } from 'lucide-vue-next';
 import type { Component } from 'vue';
 import { usePreferencesStore } from '@/store/preferences-store';
 
@@ -225,6 +248,14 @@ const canGoBack = computed(() => route.path !== '/libraries' && route.path !== '
 const store = useJellyfinStore();
 const offlineStore = useOfflineStore();
 const preferencesStore = usePreferencesStore();
+
+// ── Theme ──────────────────────────────────────────────────────────────────────
+
+const themeOptions = [
+  { value: 'light' as const, icon: Sun,     label: 'Light' },
+  { value: 'system' as const, icon: Monitor, label: 'System' },
+  { value: 'dark' as const,  icon: Moon,    label: 'Dark'  },
+];
 
 // ── Sidebar ────────────────────────────────────────────────────────────────────
 

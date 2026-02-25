@@ -89,6 +89,58 @@
   }
 }
 
+/* Light theme overrides — applied via html.light class */
+html.light {
+  --color-surface: #f5f6f8;
+  --color-surface-raised: #ffffff;
+  --color-surface-hover: #eceef1;
+  --color-border-default: #dde0e6;
+  --color-border-hover: #c8ccd4;
+  --color-border-input: #d4d8e0;
+
+  --color-text-primary: #0a0b0f;
+  --color-text-heading: #000000;
+  --color-text-bright: #000000;
+  --color-text-muted: #374151;
+  --color-text-subtle: #4b5563;
+
+  --color-background: #eef0f3;
+  --color-foreground: #000000;
+  --color-card: #ffffff;
+  --color-card-foreground: #000000;
+  --color-popover: #ffffff;
+  --color-popover-foreground: #000000;
+  --color-muted: #eceef1;
+  --color-muted-foreground: #374151;
+  --color-secondary: #e4e7ec;
+  --color-secondary-foreground: #0a0b0f;
+  --color-accent: #e4e7ec;
+  --color-accent-foreground: #0a0b0f;
+  --color-border: #dde0e6;
+  --color-input: #dde0e6;
+
+  /* shadcn HSL variables */
+  --background: 220 14% 93%;
+  --foreground: 0 0% 0%;
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 0%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 0%;
+  --primary: 263 70% 50%;
+  --primary-foreground: 210 40% 98%;
+  --secondary: 220 13% 90%;
+  --secondary-foreground: 222 47% 8%;
+  --muted: 220 13% 90%;
+  --muted-foreground: 215 20% 25%;
+  --accent: 220 13% 90%;
+  --accent-foreground: 222 47% 8%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 220 13% 88%;
+  --input: 220 13% 88%;
+  --ring: 263 70% 50%;
+}
+
 /* Safe area utilities */
 @utility safe-pt {
   padding-top: env(safe-area-inset-top, 0px);
@@ -101,6 +153,26 @@
 }
 @utility safe-pr {
   padding-right: env(safe-area-inset-right, 0px);
+}
+
+/* Item details page ambient overlay — fades the blurred backdrop into the page background */
+:root {
+  --item-overlay-start: rgba(0, 0, 0, 0.25);
+  --item-backdrop-tint: transparent;
+}
+html.light {
+  --item-overlay-start: rgba(255, 255, 255, 0.35);
+  --item-backdrop-tint: rgba(0, 0, 0, 0.3);
+}
+@utility item-page-overlay {
+  background: linear-gradient(
+    to bottom,
+    var(--item-overlay-start) 0%,
+    transparent 30%,
+    transparent 55%,
+    color-mix(in srgb, var(--color-background) 60%, transparent) 75%,
+    var(--color-background) 92%
+  );
 }
 
 /* Player gradient utility */

@@ -18,7 +18,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted } from "vue";
+import { computed, onMounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import SearchBar from "@/components/SearchBar.vue";
 import MiniAudioPlayer from "@/components/MiniAudioPlayer.vue";
@@ -26,8 +26,10 @@ import ExpandedAudioPlayer from "@/components/ExpandedAudioPlayer.vue";
 import { useJellyfinStore } from "@/store/jellyfin-store";
 import { useAudioPlayerStore } from "@/store/audio-player-store";
 import { useOfflineStore } from "@/store/offline-store";
+import { usePreferencesStore } from "@/store/preferences-store";
 import { App as CapacitorApp } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
+import { StatusBar, Style } from "@capacitor/status-bar";
 import { Loader2 } from "lucide-vue-next";
 
 const route = useRoute();
@@ -35,10 +37,43 @@ const router = useRouter();
 const store = useJellyfinStore();
 const audioStore = useAudioPlayerStore();
 const offlineStore = useOfflineStore();
+const preferencesStore = usePreferencesStore();
 const isAuthenticated = computed(() => store.isAuthenticated);
+
+// ── Theme ──────────────────────────────────────────────────────────────────────
+
+async function updateStatusBar(isDark: boolean) {
+  if (!Capacitor.isNativePlatform()) return;
+  await StatusBar.setStyle({ style: isDark ? Style.Dark : Style.Light });
+}
+
+function applyTheme(scheme: 'dark' | 'light' | 'system') {
+  const html = document.documentElement;
+  if (scheme === 'light') {
+    html.classList.add('light');
+    updateStatusBar(false);
+  } else if (scheme === 'dark') {
+    html.classList.remove('light');
+    updateStatusBar(true);
+  } else {
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    html.classList.toggle('light', !prefersDark);
+    updateStatusBar(prefersDark);
+  }
+}
+
+watch(() => preferencesStore.colorScheme, (scheme) => applyTheme(scheme));
 
 // Initialize offline store on app mount
 onMounted(async () => {
+  // Apply persisted theme immediately
+  applyTheme(preferencesStore.colorScheme);
+
+  // Track system preference changes for 'system' mode
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    if (preferencesStore.colorScheme === 'system') applyTheme('system');
+  });
+
   if (Capacitor.isNativePlatform()) {
     await CapacitorApp.addListener("backButton", ({ canGoBack }) => {
       if (route.path === "/" || !canGoBack) {

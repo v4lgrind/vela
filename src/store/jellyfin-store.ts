@@ -3,9 +3,9 @@ import { Api, Jellyfin } from "@jellyfin/sdk";
 import {
   getLibraryApi,
   getItemsApi,
-  getUserLibraryApi,
   getPlaystateApi,
   getTvShowsApi,
+  getUserLibraryApi,
 } from "@jellyfin/sdk/lib/utils/api";
 import { downloadService } from "../services/downloadService";
 
@@ -285,6 +285,19 @@ export const useJellyfinStore = defineStore("jellyfin", {
         limit: 1,
       });
       return resp.data.Items?.[0] ?? null;
+    },
+
+    async fetchLatestItems(libraryId: string, limit = 10) {
+      this.initializeApi();
+      const resp = await getUserLibraryApi(this.api).getLatestMedia({
+        userId: this.userId!,
+        parentId: libraryId,
+        limit,
+        fields: ['PrimaryImageAspectRatio', 'Overview', 'ProductionYear'] as any,
+        enableImageTypes: ['Primary', 'Backdrop', 'Thumb'] as any,
+        imageTypeLimit: 1,
+      });
+      return resp.data ?? [];
     },
 
     async fetchSimilarItems(itemId: string, limit = 12) {

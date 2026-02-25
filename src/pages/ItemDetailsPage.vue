@@ -396,9 +396,7 @@ import { useOfflineStore } from '@/store/offline-store';
 import { useAudioPlayerStore, type AudioTrack } from '@/store/audio-player-store';
 import { downloadService } from '@/services/downloadService';
 import LazyImg from '@/components/LazyImg.vue';
-import { isAudioType, typeLabel as getTypeLabel, formatTicksDuration, formatTicksHuman, formatBytes } from '@/utils/helpers';
-import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { isAudioType, formatTicksDuration, formatTicksHuman, formatBytes } from '@/utils/helpers';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose, DialogTrigger } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
@@ -492,7 +490,6 @@ const resumePositionLabel = computed(() => {
 const year = computed(() => item.value?.ProductionYear || null);
 const duration = computed(() => formatTicksHuman(item.value?.RunTimeTicks));
 const genres = computed<string[]>(() => item.value?.Genres || []);
-const typeLabel = computed(() => getTypeLabel(item.value?.Type));
 
 type Person = { Id?: string; Name: string; Role?: string; Type?: string; PrimaryImageTag?: string };
 const people = computed<Person[]>(() => item.value?.People || []);

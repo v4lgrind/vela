@@ -12,6 +12,7 @@ const config: CapacitorConfig = {
     buildOptions: {
       releaseType: 'APK',
     },
+    edgeToEdge: true,
   },
 };
 

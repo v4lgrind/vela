@@ -100,6 +100,57 @@
       </div>
     </section>
 
+    <!-- Recently Added per library -->
+    <template v-if="latestLoading">
+      <section v-for="lib in mediaItems" :key="'latest-skeleton-' + lib.Id" class="mb-5">
+        <Skeleton class="h-6 w-56 mb-4 rounded-md" />
+        <div class="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
+          <Skeleton v-for="i in 5" :key="i" class="shrink-0 w-32 sm:w-36 aspect-[2/3] rounded-xl" />
+        </div>
+      </section>
+    </template>
+    <template v-else>
+      <section v-for="lib in mediaItems" :key="'latest-' + lib.Id"
+        class="mb-5"
+        v-show="latestByLibrary[lib.Id]?.length">
+        <h2 class="text-xl sm:text-2xl font-bold text-foreground mb-4">
+          Recently Added · {{ lib.Name }}
+        </h2>
+        <div class="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
+          <div v-for="item in latestByLibrary[lib.Id]" :key="item.Id"
+            class="shrink-0 w-32 sm:w-36 group cursor-pointer"
+            @click="goToItem(item)">
+            <div class="relative rounded-xl overflow-hidden mb-1.5
+                        group-hover:-translate-y-1 group-hover:shadow-xl transition-all duration-200"
+              :class="item.Type === 'Episode' ? 'aspect-video' : 'aspect-[2/3]'">
+              <LazyImg :src="getLatestImageUrl(item)" :alt="item.Name" :item-type="item.Type"
+                class="block w-full h-full object-cover" />
+            </div>
+            <div class="px-0.5 text-xs font-semibold text-text-heading truncate
+                        group-hover:text-accent-purple-light transition-colors"
+              :title="item.Name">
+              {{ item.Name }}
+            </div>
+            <div v-if="item.ProductionYear" class="px-0.5 text-xs text-text-muted mt-0.5">
+              {{ item.ProductionYear }}
+            </div>
+          </div>
+
+          <!-- View all button -->
+          <router-link
+            :to="{ name: 'libraryItem', params: { id: lib.Id, name: lib.Name } }"
+            class="shrink-0 w-32 sm:w-36 flex flex-col items-center justify-center gap-2
+                   aspect-[2/3] rounded-xl border border-white/10 bg-white/5
+                   hover:bg-white/10 hover:border-white/20 transition-colors group">
+            <ArrowRight class="size-6 text-text-muted group-hover:text-accent-purple-light transition-colors" />
+            <span class="text-xs font-medium text-text-muted group-hover:text-accent-purple-light transition-colors">
+              View all
+            </span>
+          </router-link>
+        </div>
+      </section>
+    </template>
+
     <!-- Libraries -->
     <section>
       <h2 class="text-xl sm:text-2xl font-bold text-foreground mb-4">My Library</h2>
@@ -140,7 +191,7 @@ import { useRouter } from 'vue-router';
 import { useJellyfinStore } from '@/store/jellyfin-store';
 import LazyImg from '@/components/LazyImg.vue';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Check, Loader2, Play } from 'lucide-vue-next';
+import { ArrowRight, Check, Loader2, Play } from 'lucide-vue-next';
 
 const store = useJellyfinStore();
 const router = useRouter();
@@ -148,7 +199,9 @@ const router = useRouter();
 const mediaItems = ref<Array<{ Id: string; Name: string; imageUrl: string; Type?: string }>>([]);
 const resumeItems = ref<any[]>([]);
 const nextUpItems = ref<any[]>([]);
+const latestByLibrary = ref<Record<string, any[]>>({});
 const loading = ref(true);
+const latestLoading = ref(false);
 const error = ref<string | null>(null);
 
 async function loadMedia() {
@@ -168,11 +221,28 @@ async function loadMedia() {
     }));
     resumeItems.value = resume;
     nextUpItems.value = nextUp;
+    loading.value = false;
+
+    // Fetch latest items per library in parallel after main content is shown
+    latestLoading.value = true;
+    const latestResults = await Promise.all(libs.map(lib => store.fetchLatestItems(lib.Id!, 10)));
+    const map: Record<string, any[]> = {};
+    libs.forEach((lib, i) => { map[lib.Id!] = latestResults[i]; });
+    latestByLibrary.value = map;
   } catch (e) {
     error.value = 'Failed to load media libraries';
   } finally {
     loading.value = false;
+    latestLoading.value = false;
   }
+}
+
+function getLatestImageUrl(item: any): string {
+  if (item.Type === 'Episode') {
+    if (item.BackdropImageTags?.length) return store.getImageUrl(item.Id, 'Backdrop', 640, 360);
+    if (item.ParentBackdropItemId) return store.getImageUrl(item.ParentBackdropItemId, 'Backdrop', 640, 360);
+  }
+  return store.getImageUrl(item.Id, 'Primary', 300, 450) || '';
 }
 
 function getResumeImageUrl(item: any): string {

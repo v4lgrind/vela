@@ -13,8 +13,8 @@
             <!-- Back button — always visible above loader so user can escape a stuck load -->
             <button
                 :class="controlsVisible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'"
-                class="mt-3 absolute left-3 bg-black/50 text-white border-none cursor-pointer px-3.5 py-2 rounded-lg flex items-center gap-1.5 text-[0.95rem] font-medium transition-colors hover:bg-white/15 z-[60]"
-                style="top: env(safe-area-inset-top, 12px)" @click="goBack">
+                class="absolute bg-black/50 text-white border-none cursor-pointer px-3.5 py-2 rounded-lg flex items-center gap-1.5 text-[0.95rem] font-medium transition-colors hover:bg-white/15 z-[60]"
+                style="top: calc(12px + env(safe-area-inset-top, 0px)); left: calc(12px + env(safe-area-inset-left, 0px))" @click="goBack">
                 <ArrowLeft class="size-5" />
                 Back
             </button>
@@ -43,9 +43,9 @@
             </video>
 
             <!-- Controls overlay (auto-hide) -->
-            <div class="absolute inset-0 flex flex-col justify-end player-gradient px-4 pt-5 transition-opacity duration-300"
+            <div class="absolute inset-0 flex flex-col justify-end player-gradient transition-opacity duration-300"
                 :class="controlsVisible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'"
-                style="padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px))"
+                style="padding-top: 20px; padding-right: calc(16px + env(safe-area-inset-right, 0px)); padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); padding-left: calc(16px + env(safe-area-inset-left, 0px));"
                 @click.self="handleVideoTap">
 
                 <!-- Progress bar -->

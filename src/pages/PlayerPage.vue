@@ -88,7 +88,6 @@
                                 class="bg-transparent border-none text-white cursor-pointer p-2 rounded flex items-center gap-1.5 transition-colors hover:bg-white/10"
                                 @click="toggleAudioMenu">
                                 <AudioLines class="size-6" />
-                                <span class="text-[0.9rem] font-medium">Audio</span>
                             </button>
                             <div class="absolute bottom-full right-0 mb-2 bg-[rgba(28,28,28,0.98)] rounded-lg min-w-[250px] max-h-[400px] overflow-y-auto shadow-[0_8px_24px_rgba(0,0,0,0.5)] backdrop-blur-[10px] transition-all duration-200 scrollbar-hide"
                                 :class="audioMenuOpen ? 'opacity-100 pointer-events-auto translate-y-0' : 'opacity-0 pointer-events-none translate-y-2.5'">
@@ -109,7 +108,6 @@
                                 class="bg-transparent border-none text-white cursor-pointer p-2 rounded flex items-center gap-1.5 transition-colors hover:bg-white/10"
                                 @click="toggleSubtitleMenu">
                                 <Captions class="size-6" />
-                                <span class="text-[0.9rem] font-medium">Subs</span>
                             </button>
                             <div class="absolute bottom-full right-0 mb-2 bg-[rgba(28,28,28,0.98)] rounded-lg min-w-[250px] max-h-[400px] overflow-y-auto shadow-[0_8px_24px_rgba(0,0,0,0.5)] backdrop-blur-[10px] transition-all duration-200 scrollbar-hide"
                                 :class="subtitleMenuOpen ? 'opacity-100 pointer-events-auto translate-y-0' : 'opacity-0 pointer-events-none translate-y-2.5'">
@@ -143,7 +141,7 @@
                             </button>
                             <div class="absolute bottom-full right-0 mb-2 bg-[rgba(28,28,28,0.98)] rounded-lg min-w-[160px] overflow-y-auto shadow-[0_8px_24px_rgba(0,0,0,0.5)] backdrop-blur-[10px] transition-all duration-200"
                                 :class="qualityMenuOpen ? 'opacity-100 pointer-events-auto translate-y-0' : 'opacity-0 pointer-events-none translate-y-2.5'">
-                                <div v-for="preset in QUALITY_PRESETS" :key="preset.bitrate"
+                                <div v-for="preset in availablePresets" :key="preset.bitrate"
                                     class="flex items-center gap-2.5 px-4 py-3 cursor-pointer text-[0.9rem] transition-colors hover:bg-white/10"
                                     :class="preset.bitrate === selectedBitrate ? 'bg-accent-purple/20' : ''"
                                     @click="switchQuality(preset.bitrate)">
@@ -334,18 +332,25 @@ const activeTrackLabel = ref('');
 const subtitleBlobCache = new Map<number, string>(); // index → blob URL
 
 // Quality / bitrate
-const QUALITY_PRESETS = [
-    { label: 'Auto',    bitrate: 0 },
-    { label: '1080p',   bitrate: 20_000_000 },
-    { label: '720p',    bitrate:  8_000_000 },
-    { label: '480p',    bitrate:  3_000_000 },
-    { label: '360p',    bitrate:  1_500_000 },
-] as const;
+const ALL_QUALITY_PRESETS = [
+    { label: 'Auto',     bitrate: 0,          minHeight: 0    },
+    { label: '4K',      bitrate: 80_000_000, minHeight: 2160 },
+    { label: '1080p',   bitrate: 20_000_000, minHeight: 1080 },
+    { label: '720p',    bitrate:  8_000_000, minHeight: 720  },
+    { label: '480p',    bitrate:  3_000_000, minHeight: 480  },
+    { label: '360p',    bitrate:  1_500_000, minHeight: 360  },
+];
 const selectedBitrate = ref(preferencesStore.preferredBitrate); // 0 = Auto (unlimited)
 const qualityMenuOpen = ref(false);
 const qualityDropdown = ref<HTMLElement | null>(null);
+// Only show presets that make sense for the source resolution
+const availablePresets = computed(() => {
+    const sourceHeight = videoStream.value?.Height ?? 0;
+    if (!sourceHeight) return ALL_QUALITY_PRESETS;
+    return ALL_QUALITY_PRESETS.filter(p => p.minHeight === 0 || p.minHeight <= sourceHeight);
+});
 const currentQualityLabel = computed(() =>
-    QUALITY_PRESETS.find(p => p.bitrate === selectedBitrate.value)?.label ?? 'Auto'
+    ALL_QUALITY_PRESETS.find(p => p.bitrate === selectedBitrate.value)?.label ?? 'Auto'
 );
 
 // Stream info modal

@@ -22,6 +22,15 @@
               </div>
             </div>
 
+            <!-- Mark as played button -->
+            <button @click.stop="markPlayed(item)" title="Mark as played"
+              class="absolute top-1.5 right-1.5 p-1.5 rounded-full bg-black/50 text-white/70
+                     opacity-0 group-hover:opacity-100 hover:bg-black/80 hover:text-white
+                     transition-all duration-200 cursor-pointer pointer-events-auto">
+              <Loader2 v-if="markingPlayed.has(item.Id)" class="size-3 animate-spin" />
+              <Check v-else class="size-3" />
+            </button>
+
             <!-- Progress bar — after overlay in DOM so it always renders on top -->
             <div class="absolute bottom-0 left-0 right-0 h-1 bg-white/20">
               <div class="h-full bg-accent-purple transition-all"
@@ -66,6 +75,15 @@
                 <Play class="size-4 fill-black stroke-none" />
               </div>
             </div>
+
+            <!-- Mark as played button -->
+            <button @click.stop="markPlayed(item)" title="Mark as played"
+              class="absolute top-1.5 right-1.5 p-1.5 rounded-full bg-black/50 text-white/70
+                     opacity-0 group-hover:opacity-100 hover:bg-black/80 hover:text-white
+                     transition-all duration-200 cursor-pointer pointer-events-auto">
+              <Loader2 v-if="markingPlayed.has(item.Id)" class="size-3 animate-spin" />
+              <Check v-else class="size-3" />
+            </button>
           </div>
 
           <!-- Title -->
@@ -122,7 +140,7 @@ import { useRouter } from 'vue-router';
 import { useJellyfinStore } from '@/store/jellyfin-store';
 import LazyImg from '@/components/LazyImg.vue';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Play } from 'lucide-vue-next';
+import { Check, Loader2, Play } from 'lucide-vue-next';
 
 const store = useJellyfinStore();
 const router = useRouter();
@@ -181,6 +199,20 @@ function remainingTime(item: any): string {
   const h = Math.floor(remainingSecs / 3600);
   const m = Math.floor((remainingSecs % 3600) / 60);
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+
+const markingPlayed = ref<Set<string>>(new Set());
+
+async function markPlayed(item: any) {
+  if (markingPlayed.value.has(item.Id)) return;
+  markingPlayed.value.add(item.Id);
+  try {
+    await store.markPlayed(item.Id);
+    resumeItems.value = resumeItems.value.filter(i => i.Id !== item.Id);
+    nextUpItems.value = nextUpItems.value.filter(i => i.Id !== item.Id);
+  } finally {
+    markingPlayed.value.delete(item.Id);
+  }
 }
 
 function playResume(item: any) {

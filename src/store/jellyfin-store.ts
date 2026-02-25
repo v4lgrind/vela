@@ -63,10 +63,11 @@ export const useJellyfinStore = defineStore("jellyfin", {
       this.initializeApi();
       const libraries = await getLibraryApi(this.api).getMediaFolders();
 
-      let Items = libraries.data.Items?.filter(
+      const Items = libraries.data.Items?.filter(
         (library) => library.CollectionType !== "playlists"
-      );
-      return Items || [];
+      ) || [];
+      this.libraries = Items;
+      return Items;
     },
     async fetchItems(
       libraryId: string,
@@ -144,12 +145,18 @@ export const useJellyfinStore = defineStore("jellyfin", {
     async fetchItemDetails(itemId: string) {
       this.initializeApi();
 
-      // getItem (UserLibraryApi) accepte itemId et userId
-      const resp = await getUserLibraryApi(this.api).getItem({
-        itemId,
+      // Use getItems with explicit fields — getUserLibraryApi.getItem does not expose
+      // enableUserData or fields params, so UserData and MediaStreams can be missing
+      // on some Jellyfin versions, causing resume position and audio track to be lost.
+      const resp = await getItemsApi(this.api).getItems({
+        ids: [itemId],
         userId: this.userId,
+        fields: ['MediaStreams', 'UserData', 'People', 'Overview', 'Genres', 'Studios', 'MediaSources'] as any,
+        enableUserData: true,
       });
-      this.currentItem = resp.data;
+      const item = resp.data.Items?.[0];
+      if (!item) throw new Error(`Item not found: ${itemId}`);
+      this.currentItem = item;
       return this.currentItem;
     },
 
@@ -278,6 +285,17 @@ export const useJellyfinStore = defineStore("jellyfin", {
         limit: 1,
       });
       return resp.data.Items?.[0] ?? null;
+    },
+
+    async fetchSimilarItems(itemId: string, limit = 12) {
+      this.initializeApi();
+      const resp = await getLibraryApi(this.api).getSimilarItems({
+        itemId,
+        userId: this.userId,
+        limit,
+        fields: ['Overview'] as any,
+      });
+      return resp.data.Items ?? [];
     },
 
     async fetchAudioTracks(albumId: string) {

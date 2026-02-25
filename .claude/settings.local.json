@@ -18,7 +18,8 @@
       "Bash(npm install:*)",
       "Bash(ls:*)",
       "Bash(grep:*)",
-      "Bash(head:*)"
+      "Bash(head:*)",
+      "Bash(npx vue-tsc)"
     ]
   }
 }

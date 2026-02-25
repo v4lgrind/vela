@@ -2,8 +2,25 @@
   <div class="min-h-dvh bg-surface text-text-primary p-5 flex flex-col">
     <!-- Filters and Sorting -->
     <section class="mb-4">
-      <div class="flex flex-wrap gap-2 items-center">
-        <select v-model="sortBy" @change="onFilterChange" class="bg-surface-raised border border-border-default rounded-md px-2.5 py-2 text-xs text-text-primary cursor-pointer hover:border-accent-purple transition-colors min-h-[36px]">
+      <!-- Toggle row -->
+      <div class="flex items-center gap-2">
+        <button
+          @click="showFilters = !showFilters"
+          class="flex items-center gap-1.5 px-3 py-2 rounded-md border text-sm font-medium transition-colors"
+          :class="hasActiveFilters
+            ? 'border-accent-purple text-accent-purple bg-accent-purple/10'
+            : 'border-border-default text-text-primary bg-surface-raised hover:border-accent-purple'">
+          <SlidersHorizontal class="size-4" />
+          Filters
+          <span v-if="hasActiveFilters" class="bg-accent-purple text-white text-xs rounded-full w-4 h-4 flex items-center justify-center leading-none">!</span>
+          <ChevronDown class="size-3.5 transition-transform duration-200" :class="showFilters ? 'rotate-180' : ''" />
+        </button>
+        <Button v-if="hasActiveFilters" variant="ghost" size="sm" @click="resetFilters" class="text-xs px-2 text-text-muted">Reset</Button>
+      </div>
+
+      <!-- Collapsible filter panel -->
+      <div v-show="showFilters" class="flex flex-wrap gap-2 items-center mt-3">
+        <select v-model="sortBy" @change="onFilterChange" class="bg-surface-raised border border-border-default rounded-md px-3 py-2 text-base text-text-primary cursor-pointer hover:border-accent-purple transition-colors">
           <option value="SortName">Name</option>
           <option value="PremiereDate">Release Date</option>
           <option value="DateCreated">Date Added</option>
@@ -12,37 +29,27 @@
           <option value="Random">Random</option>
         </select>
 
-        <select v-model="sortOrder" @change="onFilterChange" class="bg-surface-raised border border-border-default rounded-md px-2.5 py-2 text-xs text-text-primary cursor-pointer hover:border-accent-purple transition-colors min-h-[36px]">
+        <select v-model="sortOrder" @change="onFilterChange" class="bg-surface-raised border border-border-default rounded-md px-3 py-2 text-base text-text-primary cursor-pointer hover:border-accent-purple transition-colors">
           <option value="Ascending">↑ Asc</option>
           <option value="Descending">↓ Desc</option>
         </select>
 
-        <select v-model="filter" @change="onFilterChange" class="bg-surface-raised border border-border-default rounded-md px-2.5 py-2 text-xs text-text-primary cursor-pointer hover:border-accent-purple transition-colors min-h-[36px]">
+        <select v-model="filter" @change="onFilterChange" class="bg-surface-raised border border-border-default rounded-md px-3 py-2 text-base text-text-primary cursor-pointer hover:border-accent-purple transition-colors">
           <option value="">All Items</option>
           <option value="IsUnplayed">Unwatched</option>
           <option value="IsPlayed">Watched</option>
           <option value="IsFavorite">Favorites</option>
         </select>
 
-        <div class="relative">
-          <button @click="showGenreDropdown = !showGenreDropdown" class="bg-surface-raised border border-border-default rounded-md px-2.5 py-2 text-xs text-text-primary cursor-pointer hover:border-accent-purple transition-colors flex items-center gap-1.5 min-h-[36px]">
-            <span>{{ selectedGenres.length > 0 ? `Genres (${selectedGenres.length})` : 'All Genres' }}</span>
-            <span class="text-[10px]">▼</span>
-          </button>
-          <div v-if="showGenreDropdown" @click.stop class="absolute top-full left-0 mt-1 bg-surface-raised border border-border-default rounded-md shadow-xl z-10 max-h-60 overflow-y-auto min-w-[220px]">
-            <label v-for="genre in availableGenres" :key="genre" class="flex items-center gap-3 px-4 py-3 hover:bg-surface-hover cursor-pointer text-sm">
-              <input type="checkbox" :value="genre" v-model="selectedGenres" @change="onFilterChange" class="size-4 cursor-pointer accent-accent-purple">
-              <span>{{ genre }}</span>
-            </label>
-          </div>
-        </div>
-
-        <Button variant="outline" size="sm" @click="resetFilters" class="text-xs min-h-[36px] px-3">Reset</Button>
+        <select v-model="selectedGenre" @change="onFilterChange" class="bg-surface-raised border border-border-default rounded-md px-3 py-2 text-base text-text-primary cursor-pointer hover:border-accent-purple transition-colors">
+          <option value="">All Genres</option>
+          <option v-for="genre in availableGenres" :key="genre" :value="genre">{{ genre }}</option>
+        </select>
       </div>
     </section>
 
     <section class="flex-1">
-      <ul class="list-none p-0 m-0 grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-3 sm:grid-cols-[repeat(auto-fill,minmax(150px,1fr))] sm:gap-4">
+      <ul class="list-none p-0 m-0 grid grid-cols-3 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(150px,1fr))] sm:gap-4">
         <li v-for="item in items" :key="item.Id">
           <Card class="bg-surface-raised border-border-default hover:-translate-y-1 hover:bg-surface-hover hover:border-border-hover hover:shadow-xl transition-all duration-200 flex flex-col items-center p-2.5 pb-3 overflow-hidden">
             <!-- Poster with overlay -->
@@ -69,18 +76,18 @@
                 <button
                   @click.prevent.stop="playItem(item)"
                   :disabled="playingId === item.Id"
-                  class="bg-white/90 hover:bg-white text-black rounded-full p-2.5 shadow-lg transition-all active:scale-95 disabled:opacity-60 pointer-events-auto"
+                  class="bg-white/90 hover:bg-white text-black rounded-full p-1.5 shadow-lg transition-all active:scale-95 disabled:opacity-60 pointer-events-auto"
                   title="Play">
-                  <Loader2 v-if="playingId === item.Id" class="size-4 animate-spin" />
-                  <Play v-else class="size-4 fill-black stroke-none" />
+                  <Loader2 v-if="playingId === item.Id" class="size-3 animate-spin" />
+                  <Play v-else class="size-3 fill-black stroke-none" />
                 </button>
                 <button
                   @click.prevent.stop="toggleWatched(item)"
                   :disabled="watchingId === item.Id"
-                  class="rounded-full p-2.5 shadow-lg transition-all active:scale-95 disabled:opacity-60 pointer-events-auto"
+                  class="rounded-full p-1.5 shadow-lg transition-all active:scale-95 disabled:opacity-60 pointer-events-auto"
                   :class="item.UserData?.Played ? 'bg-accent-purple text-white' : 'bg-white/90 hover:bg-white text-black'"
                   :title="item.UserData?.Played ? 'Mark as unwatched' : 'Mark as watched'">
-                  <Check class="size-4" />
+                  <Check class="size-3" />
                 </button>
               </div>
             </div>
@@ -108,7 +115,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, computed, watch } from 'vue';
+import { onMounted, ref, computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useJellyfinStore } from '@/store/jellyfin-store';
 import LazyImg from '@/components/LazyImg.vue';
@@ -116,7 +123,7 @@ import { isAudioType } from '@/utils/helpers';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ArrowRight, Play, Check, Loader2 } from 'lucide-vue-next';
+import { ArrowLeft, ArrowRight, Play, Check, Loader2, SlidersHorizontal, ChevronDown } from 'lucide-vue-next';
 
 const store = useJellyfinStore();
 const route = useRoute();
@@ -134,12 +141,15 @@ const loading = ref(true);
 const error = ref<string | null>(null);
 
 // Filtering and sorting
+const showFilters = ref(false);
 const sortBy = ref('SortName');
 const sortOrder = ref('Ascending');
 const filter = ref('');
-const selectedGenres = ref<string[]>([]);
+const selectedGenre = ref('');
+const hasActiveFilters = computed(() =>
+  sortBy.value !== 'SortName' || sortOrder.value !== 'Ascending' || filter.value !== '' || selectedGenre.value !== ''
+);
 const availableGenres = ref<string[]>([]);
-const showGenreDropdown = ref(false);
 
 const currentPage = computed(() => Math.floor(startIndex.value / limit.value) + 1);
 
@@ -158,7 +168,7 @@ async function loadPage() {
       sortBy: [sortBy.value],
       sortOrder: [sortOrder.value],
       filters: filter.value ? [filter.value] : undefined,
-      genres: selectedGenres.value.length > 0 ? selectedGenres.value : undefined,
+      genres: selectedGenre.value ? [selectedGenre.value] : undefined,
     });
     items.value = pageItems;
     hasNextPage.value = pageItems.length === limit.value;
@@ -186,9 +196,9 @@ function resetFilters() {
   sortBy.value = 'SortName';
   sortOrder.value = 'Ascending';
   filter.value = '';
-  selectedGenres.value = [];
-  showGenreDropdown.value = false;
+  selectedGenre.value = '';
   startIndex.value = 0;
+  showFilters.value = false;
   loadPage();
 }
 
@@ -251,21 +261,9 @@ async function toggleWatched(item: any) {
   }
 }
 
-function handleClickOutside(event: MouseEvent) {
-  const target = event.target as HTMLElement;
-  if (!target.closest('.relative')) {
-    showGenreDropdown.value = false;
-  }
-}
-
 onMounted(() => {
   loadGenres();
   loadPage();
-  document.addEventListener('click', handleClickOutside);
-});
-
-onUnmounted(() => {
-  document.removeEventListener('click', handleClickOutside);
 });
 
 watch(() => route.params.id, async (newId) => {

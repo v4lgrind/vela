@@ -34,7 +34,7 @@
 			}
 		}
 	},
-	"postCreateCommand": "bash .devcontainer/setup-android-sdk.sh && npm install",
+	"postCreateCommand": "bash .devcontainer/setup-android-sdk.sh && npm install && bash .devcontainer/setup-rtk.sh ",
 	"remoteEnv": {
 		"ANDROID_HOME": "/home/vscode/android-sdk",
 		"ANDROID_SDK_ROOT": "/home/vscode/android-sdk",

@@ -25,11 +25,11 @@
                 <p class="mt-5 text-white text-base font-medium">Loading...</p>
             </div>
 
-            <!-- Video element -->
-            <video ref="videoEl" class="w-full h-full bg-black object-contain" preload="metadata" playsinline
+            <!-- Video element (web only) -->
+            <video v-if="!isNative" ref="videoEl" class="w-full h-full bg-black object-contain" preload="metadata" playsinline
                 :poster="posterUrl" @loadstart="onLoadStart" @canplay="onCanPlay"
                 @waiting="onWaiting" @playing="onPlaying" @pause="onPause" @timeupdate="onTimeUpdate"
-                @loadedmetadata="onLoadedMetadata" @ended="onEnded" 
+                @loadedmetadata="onLoadedMetadata" @ended="onEnded"
                 @click="handleVideoTap"
                 @touchstart="handleVideoTap">
                 <track
@@ -42,8 +42,8 @@
                 />
             </video>
 
-            <!-- Controls overlay (auto-hide) -->
-            <div class="absolute inset-0 flex flex-col justify-end player-gradient transition-opacity duration-300"
+            <!-- Controls overlay (auto-hide, web only) -->
+            <div v-if="!isNative" class="absolute inset-0 flex flex-col justify-end player-gradient transition-opacity duration-300"
                 :class="controlsVisible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'"
                 style="padding-top: 20px; padding-right: calc(16px + env(safe-area-inset-right, 0px)); padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); padding-left: calc(16px + env(safe-area-inset-left, 0px));"
                 @click.self="handleVideoTap">
@@ -263,7 +263,9 @@ import { useJellyfinStore } from '@/store/jellyfin-store';
 import { useAudioPlayerStore } from '@/store/audio-player-store';
 import { usePreferencesStore } from '@/store/preferences-store';
 import Hls from 'hls.js';
-import { deviceProfile } from '@/constants';
+import { Capacitor } from '@capacitor/core';
+import { NativeVideo } from '@/plugins/NativeVideoPlugin';
+import { deviceProfile, nativeAndroidDeviceProfile } from '@/constants';
 import { formatTime } from '@/utils/helpers';
 import { lockLandscape, unlockOrientation } from '@/utils/orientation';
 import { ArrowLeft, Play, Pause, Volume2, VolumeX, AudioLines, Captions, Gauge, Info, Check, Maximize, Minimize, Loader2 } from 'lucide-vue-next';
@@ -279,6 +281,7 @@ const preferencesStore = usePreferencesStore();
 const itemId = route.params.id as string;
 const accessToken = store.accessToken || '';
 const serverUrl = store.serverUrl;
+const isNative = Capacitor.isNativePlatform();
 
 // Stable per-browser device ID so Jellyfin can match DELETE /Videos/ActiveEncodings
 // to the session we created. Without it, Jellyfin can't kill the FFmpeg job on demand.
@@ -524,11 +527,13 @@ function goBack() { router.back(); }
 
 function buildReportingPayload(overrides: Record<string, any> = {}) {
     const video = videoEl.value;
+    // On native path, videoEl is not available — use currentTime ref updated from progress events
+    const positionSec = video?.currentTime ?? currentTime.value;
     return {
         ItemId: itemId,
         SessionId: playSessionId.value,
         MediaSourceId: mediaSource.value?.Id || itemId,
-        PositionTicks: Math.floor((video?.currentTime || 0) * 10_000_000),
+        PositionTicks: Math.floor(positionSec * 10_000_000),
         AudioStreamIndex: selectedAudioIndex.value,
         PlayMethod: playMethod.value,
         PlaySessionId: playSessionId.value,
@@ -546,6 +551,7 @@ async function reportPlaybackStart() {
                 IsPaused: false,
                 IsMuted: video?.muted || false,
                 VolumeLevel: Math.floor((video?.volume || 1) * 100),
+                CanSeek: true,
             }))
         });
     } catch (e) { console.error('reportPlaybackStart error', e); }
@@ -607,7 +613,7 @@ function stopProgressReporting() {
 
 // ── Jellyfin API ───────────────────────────────────────────────────────────────
 
-async function fetchPlaybackInfo(startTimeTicks?: number, audioStreamIndex?: number, forceTranscode = false) {
+async function fetchPlaybackInfo(startTimeTicks?: number, audioStreamIndex?: number, forceTranscode = false, useNativeProfile = false) {
     const bitrateCap = selectedBitrate.value || 1_000_000_000;
     // When a quality cap is active we must force a real video re-encode.
     // Stripping DirectPlayProfiles prevents DirectPlay, but Jellyfin can still
@@ -616,12 +622,13 @@ async function fetchPlaybackInfo(startTimeTicks?: number, audioStreamIndex?: num
     // re-encode the video, so the bitrate/resolution cap is actually honoured.
     const shouldForce = forceTranscode || selectedBitrate.value > 0;
 
+    const baseDeviceProfile = useNativeProfile ? nativeAndroidDeviceProfile : deviceProfile;
     const baseProfile = shouldForce
-        ? { ...deviceProfile.DeviceProfile, DirectPlayProfiles: [], MaxStreamingBitrate: bitrateCap }
-        : deviceProfile.DeviceProfile;
+        ? { ...baseDeviceProfile.DeviceProfile, DirectPlayProfiles: [], MaxStreamingBitrate: bitrateCap }
+        : baseDeviceProfile.DeviceProfile;
 
     const profile: any = {
-        ...deviceProfile,
+        ...baseDeviceProfile,
         MaxStreamingBitrate: bitrateCap,
         ...(shouldForce ? { AllowVideoStreamCopy: false } : {}),
         DeviceProfile: baseProfile,
@@ -820,6 +827,96 @@ function initHls(url: string, video: HTMLVideoElement, startSeconds?: number, on
         startProgressReporting();
     } else {
         error.value = 'HLS playback is not supported on this device';
+        isLoading.value = false;
+    }
+}
+
+// ── Native player init (Android ExoPlayer) ─────────────────────────────────────
+
+async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: number) {
+    isLoading.value = true;
+
+    try {
+        const startTicks = resumeSeconds && resumeSeconds > 0
+            ? Math.floor(resumeSeconds * 10_000_000)
+            : undefined;
+
+        const data = await fetchPlaybackInfo(startTicks, preferredAudioIndex, false, true);
+        mediaSource.value = data.MediaSources?.[0];
+        if (!mediaSource.value) throw new Error('No media source available');
+
+        if (data.PlaySessionId) playSessionId.value = data.PlaySessionId;
+        parseAudioStreams(mediaSource.value, preferredAudioIndex);
+        parseSubtitleStreams(mediaSource.value);
+        determinePlaybackMethod(mediaSource.value);
+
+        await reportPlaybackStart();
+
+        // Build subtitle tracks for ExoPlayer
+        const subtitleTracks = subtitleList.value.map(s => ({
+            url: s.deliveryUrl,
+            lang: s.language,
+            label: s.label,
+        }));
+
+        const startPositionMs = resumeSeconds && resumeSeconds > 0 ? Math.floor(resumeSeconds * 1000) : 0;
+
+        // Register event listeners before starting
+        await NativeVideo.addListener('progress', (data) => {
+            currentTime.value = data.positionMs / 1000;
+            duration.value = data.durationMs / 1000;
+            if (duration.value > 0) progressPct.value = (currentTime.value / duration.value) * 100;
+            reportPlaybackProgress();
+        });
+
+        await NativeVideo.addListener('stopped', async (data) => {
+            currentTime.value = data.positionMs / 1000;
+            await reportPlaybackStopped();
+            await deleteActiveEncodings();
+            router.back();
+        });
+
+        await NativeVideo.addListener('ended', async () => {
+            await reportPlaybackStopped();
+            await deleteActiveEncodings();
+            router.back();
+        });
+
+        await NativeVideo.addListener('error', (data) => {
+            error.value = data.message;
+            isLoading.value = false;
+        });
+
+        await NativeVideo.addListener('tracksReady', (data) => {
+            try {
+                const parsed = JSON.parse(data.tracks);
+                const nativeAudio: any[] = parsed.audioTracks ?? [];
+                // Merge native ExoPlayer audio track group indices into audioList for UI display
+                if (nativeAudio.length > 0) {
+                    audioList.value = nativeAudio.map((t: any) => ({
+                        index: t.groupIndex,
+                        language: t.language || 'und',
+                        label: `${(t.language || 'und').toUpperCase()} ${t.channelCount > 0 ? `(${t.channelCount}ch)` : ''} ${t.codec ? `- ${t.codec.toUpperCase()}` : ''}`.trim(),
+                    }));
+                }
+            } catch (e) {
+                console.warn('[NativePlayer] Failed to parse tracksReady:', e);
+            }
+        });
+
+        await NativeVideo.start({
+            url: hlsUrl.value,
+            authHeader: embyAuthHeader,
+            startPositionMs,
+            title: (mediaSource.value as any)?.Name || '',
+            playMethod: playMethod.value,
+            subtitleTracks,
+        });
+
+        isLoading.value = false;
+    } catch (e: any) {
+        console.error('[initNativePlayer] error:', e);
+        error.value = 'Failed to initialize native player';
         isLoading.value = false;
     }
 }
@@ -1133,16 +1230,30 @@ onMounted(async () => {
         audioStreams[0];
     const preferredAudioIndex: number | undefined = preferred?.Index;
 
-    await initPlayer(resumeSeconds, preferredAudioIndex);
-
-    document.addEventListener('click', handleClickOutside);
-    document.addEventListener('fullscreenchange', () => { isFullscreen.value = !!getFullscreenElement(); });
-    document.addEventListener('webkitfullscreenchange', () => { isFullscreen.value = !!getFullscreenElement(); });
-    document.addEventListener('keydown', handleKeyDown);
+    if (isNative) {
+        await initNativePlayer(resumeSeconds, preferredAudioIndex);
+    } else {
+        await initPlayer(resumeSeconds, preferredAudioIndex);
+        document.addEventListener('click', handleClickOutside);
+        document.addEventListener('fullscreenchange', () => { isFullscreen.value = !!getFullscreenElement(); });
+        document.addEventListener('webkitfullscreenchange', () => { isFullscreen.value = !!getFullscreenElement(); });
+        document.addEventListener('keydown', handleKeyDown);
+    }
 });
 
 onBeforeUnmount(() => {
     unlockOrientation();
+
+    if (isNative) {
+        // Native teardown — the Activity handles its own playback stop;
+        // we just clean up listeners and ensure session reporting fires.
+        NativeVideo.removeAllListeners();
+        NativeVideo.stop().catch(() => {});
+        reportPlaybackStopped();
+        deleteActiveEncodings();
+        return;
+    }
+
     document.removeEventListener('click', handleClickOutside);
     document.removeEventListener('keydown', handleKeyDown);
 

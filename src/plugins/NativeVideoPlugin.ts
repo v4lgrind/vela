@@ -1,0 +1,60 @@
+import { registerPlugin } from '@capacitor/core';
+import type { PluginListenerHandle } from '@capacitor/core';
+
+export interface SubtitleTrack {
+    url: string;
+    lang: string;
+    label: string;
+}
+
+export interface NativeVideoStartOptions {
+    url: string;
+    authHeader: string;
+    startPositionMs?: number;
+    title?: string;
+    playMethod?: 'DirectPlay' | 'DirectStream' | 'Transcode';
+    subtitleTracks?: SubtitleTrack[];
+}
+
+export interface NativeVideoProgressEvent {
+    positionMs: number;
+    durationMs: number;
+}
+
+export interface NativeVideoStoppedEvent {
+    positionMs: number;
+    durationMs: number;
+}
+
+export interface NativeVideoErrorEvent {
+    message: string;
+}
+
+export interface NativeVideoTracksReadyEvent {
+    /** JSON string containing { audioTracks: [...], subtitleTracks: [...] } */
+    tracks: string;
+}
+
+export interface NativeVideoPlugin {
+    start(options: NativeVideoStartOptions): Promise<void>;
+    stop(): Promise<void>;
+    pause(): Promise<void>;
+    resume(): Promise<void>;
+    seek(options: { positionMs: number }): Promise<void>;
+    selectAudioTrack(options: { groupIndex: number }): Promise<void>;
+    selectSubtitleTrack(options: { groupIndex: number }): Promise<void>;
+
+    addListener(event: 'progress', handler: (data: NativeVideoProgressEvent) => void): Promise<PluginListenerHandle>;
+    addListener(event: 'ended', handler: () => void): Promise<PluginListenerHandle>;
+    addListener(event: 'stopped', handler: (data: NativeVideoStoppedEvent) => void): Promise<PluginListenerHandle>;
+    addListener(event: 'error', handler: (data: NativeVideoErrorEvent) => void): Promise<PluginListenerHandle>;
+    addListener(event: 'tracksReady', handler: (data: NativeVideoTracksReadyEvent) => void): Promise<PluginListenerHandle>;
+
+    removeAllListeners(): Promise<void>;
+}
+
+const NativeVideo = registerPlugin<NativeVideoPlugin>('NativeVideo', {
+    web: () => import('./NativeVideoPluginWeb').then((m) => new m.NativeVideoPluginWeb()),
+});
+
+export { NativeVideo };

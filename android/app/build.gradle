@@ -41,6 +41,16 @@ dependencies {
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
     implementation project(':capacitor-cordova-android-plugins')
+
+    implementation "androidx.constraintlayout:constraintlayout:2.2.1"
+
+    def media3_version = "1.5.1"
+    implementation "androidx.media3:media3-exoplayer:$media3_version"
+    implementation "androidx.media3:media3-exoplayer-hls:$media3_version"
+    implementation "androidx.media3:media3-ui:$media3_version"
+    implementation "androidx.media3:media3-datasource:$media3_version"
+    implementation "androidx.media3:media3-common:$media3_version"
+    implementation "androidx.localbroadcastmanager:localbroadcastmanager:1.1.0"
 }
 
 apply from: 'capacitor.build.gradle'

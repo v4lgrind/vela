@@ -25,7 +25,7 @@
             <!-- Mark as played button -->
             <button @click.stop="markPlayed(item)" title="Mark as played"
               class="absolute top-1.5 right-1.5 p-1.5 rounded-full bg-black/50 text-white/70
-                     opacity-0 group-hover:opacity-100 hover:bg-black/80 hover:text-white
+                     opacity-100 sm:opacity-0 sm:group-hover:opacity-100 hover:bg-black/80 hover:text-white
                      transition-all duration-200 cursor-pointer pointer-events-auto">
               <Loader2 v-if="markingPlayed.has(item.Id)" class="size-3 animate-spin" />
               <Check v-else class="size-3" />
@@ -79,7 +79,7 @@
             <!-- Mark as played button -->
             <button @click.stop="markPlayed(item)" title="Mark as played"
               class="absolute top-1.5 right-1.5 p-1.5 rounded-full bg-black/50 text-white/70
-                     opacity-0 group-hover:opacity-100 hover:bg-black/80 hover:text-white
+                     opacity-100 sm:opacity-0 sm:group-hover:opacity-100 hover:bg-black/80 hover:text-white
                      transition-all duration-200 cursor-pointer pointer-events-auto">
               <Loader2 v-if="markingPlayed.has(item.Id)" class="size-3 animate-spin" />
               <Check v-else class="size-3" />

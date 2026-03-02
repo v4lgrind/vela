@@ -443,6 +443,12 @@ class NativePlayerActivity : AppCompatActivity() {
         if (audioTrackGroups.size > 1) btnAudio.visibility = View.VISIBLE
         if (subtitleTrackGroups.isNotEmpty()) btnSubtitle.visibility = View.VISIBLE
 
+        android.util.Log.d("NativePlayer", "reportTracks: ${audioTrackGroups.size} audio, ${subtitleTrackGroups.size} subtitle")
+        subtitleTrackGroups.forEach { (idx, group) ->
+            val f = group.getFormat(0)
+            android.util.Log.d("NativePlayer", "  subtitle groupIndex=$idx lang=${f.language} label=${f.label}")
+        }
+
         val result = JSONObject()
         result.put("audioTracks", audioArr)
         result.put("subtitleTracks", subtitleArr)
@@ -490,9 +496,12 @@ class NativePlayerActivity : AppCompatActivity() {
             selectedSubtitleGroupIndex = groupIndex
 
             val format = group.second.getFormat(0)
+            val label = format.label ?: (format.language ?: "und")
+            android.util.Log.d("NativePlayer", "selectSubtitleTrack: groupIndex=$groupIndex label=$label")
             val broadcastIntent = Intent(ACTION_SUBTITLE_SELECTED)
             broadcastIntent.putExtra("groupIndex", groupIndex)
-            broadcastIntent.putExtra("label", format.label ?: "")
+            // Use same fallback as reportTracks so save and restore labels always match.
+            broadcastIntent.putExtra("label", label)
             LocalBroadcastManager.getInstance(this).sendBroadcast(broadcastIntent)
         }
     }

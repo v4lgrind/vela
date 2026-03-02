@@ -865,6 +865,11 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
 
         const startPositionMs = resumeSeconds && resumeSeconds > 0 ? Math.floor(resumeSeconds * 1000) : 0;
 
+        // Flag that suppresses localStorage writes in the subtitleSelected listener while
+        // we are programmatically restoring a saved preference from tracksReady.
+        // Without this, restore calls fire subtitleSelected which overwrites the saved value.
+        let restoringSubtitle = false;
+
         // For HLS transcode, ExoPlayer's position is relative to the stream start
         // (position 0 = resume point T in the movie) so we add the resume offset
         // to get the absolute movie position when reporting back to Jellyfin.
@@ -924,32 +929,37 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
                     }
                 }
 
-                // Apply saved subtitle preference to ExoPlayer
-                const savedSub = localStorage.getItem(`msplayer-subtitle-${itemId}`);
+                // Apply saved subtitle preference to ExoPlayer.
+                // Use a native-specific key storing the track label directly to avoid
+                // a fragile Jellyfin-index → label round-trip that could silently fail.
+                // Set restoringSubtitle=true before every programmatic call so the
+                // subtitleSelected listener does not overwrite localStorage.
+                const savedNative = localStorage.getItem(`msplayer-subtitle-native-${itemId}`);
                 const globalSubLang = preferencesStore.preferredSubtitleLanguage;
-                if (savedSub === 'off' || (savedSub === null && !globalSubLang)) {
-                    NativeVideo.selectSubtitleTrack({ groupIndex: -1 });
-                } else if (savedSub !== null && savedSub !== 'off') {
-                    const savedIdx = parseInt(savedSub, 10);
-                    const jellyfinSub = !isNaN(savedIdx) ? subtitleList.value.find(s => s.index === savedIdx) : null;
-                    const nativeSub = jellyfinSub
-                        ? nativeSubtitle.find((t: any) => t.label === jellyfinSub.label)
-                        : null;
+                console.log('[SubRestore] savedNative=', savedNative, 'globalSubLang=', globalSubLang);
+                console.log('[SubRestore] nativeSubtitle labels=', nativeSubtitle.map((t: any) => `${t.groupIndex}:${t.label}`).join(', '));
+                if (savedNative === 'off') {
+                    // ExoPlayer already defaults to no subtitles — no command needed.
+                    // Skipping the selectSubtitleTrack(-1) call avoids firing subtitleSelected
+                    // which could race with the user's own pick.
+                } else if (savedNative !== null) {
+                    const nativeSub = nativeSubtitle.find((t: any) => t.label === savedNative);
                     if (nativeSub) {
+                        restoringSubtitle = true;
                         NativeVideo.selectSubtitleTrack({ groupIndex: nativeSub.groupIndex });
                         selectedSubtitleIndex.value = nativeSub.groupIndex;
-                    } else {
-                        NativeVideo.selectSubtitleTrack({ groupIndex: -1 });
                     }
-                } else if (globalSubLang && nativeSubtitle.length > 0) {
+                    // If track not found, leave ExoPlayer at its default — don't touch localStorage.
+                } else if (globalSubLang) {
                     const nativeSub = nativeSubtitle.find((t: any) => t.language === globalSubLang);
                     if (nativeSub) {
+                        restoringSubtitle = true;
                         NativeVideo.selectSubtitleTrack({ groupIndex: nativeSub.groupIndex });
                         selectedSubtitleIndex.value = nativeSub.groupIndex;
-                    } else {
-                        NativeVideo.selectSubtitleTrack({ groupIndex: -1 });
                     }
+                    // No match for global lang — leave ExoPlayer default, don't touch localStorage.
                 }
+                // No preference at all — leave ExoPlayer at its default (no subtitles).
             } catch (e) {
                 console.warn('[NativePlayer] Failed to parse tracksReady:', e);
             }
@@ -960,17 +970,22 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
         });
 
         await NativeVideo.addListener('subtitleSelected', (data) => {
+            console.log('[SubSelected] groupIndex=', data.groupIndex, 'label=', data.label, 'restoringSubtitle=', restoringSubtitle);
+            // Ignore events that originated from our own restore calls in tracksReady.
+            if (restoringSubtitle) {
+                restoringSubtitle = false;
+                return;
+            }
+            // User-initiated selection — persist it.
             if (data.groupIndex < 0) {
-                localStorage.setItem(`msplayer-subtitle-${itemId}`, 'off');
+                localStorage.setItem(`msplayer-subtitle-native-${itemId}`, 'off');
                 selectedSubtitleIndex.value = null;
             } else {
-                // Map ExoPlayer label back to the Jellyfin stream index for storage
-                const jellyfinSub = subtitleList.value.find(s => s.label === data.label);
-                if (jellyfinSub) {
-                    localStorage.setItem(`msplayer-subtitle-${itemId}`, String(jellyfinSub.index));
-                    selectedSubtitleIndex.value = jellyfinSub.index;
-                }
+                // Store the ExoPlayer track label directly — no Jellyfin index lookup needed.
+                localStorage.setItem(`msplayer-subtitle-native-${itemId}`, data.label);
+                selectedSubtitleIndex.value = data.groupIndex;
             }
+            console.log('[SubSelected] saved to localStorage:', localStorage.getItem(`msplayer-subtitle-native-${itemId}`));
         });
 
         await NativeVideo.start({

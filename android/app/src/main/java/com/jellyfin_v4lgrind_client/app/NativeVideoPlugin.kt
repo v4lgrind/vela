@@ -95,7 +95,7 @@ class NativeVideoPlugin : Plugin() {
     @PluginMethod
     fun selectSubtitleTrack(call: PluginCall) {
         val groupIndex = call.getInt("groupIndex") ?: -1
-        android.util.Log.d("NativePlayer", "plugin.selectSubtitleTrack: JS requested groupIndex=$groupIndex")
+        android.util.Log.d("NativePlayer", "[Subtitles] plugin.selectSubtitleTrack: JS requested groupIndex=$groupIndex")
         val intent = Intent(NativePlayerActivity.ACTION_COMMAND)
         intent.putExtra("command", NativePlayerActivity.CMD_SELECT_SUBTITLE)
         intent.putExtra("groupIndex", groupIndex)
@@ -160,7 +160,7 @@ class NativeVideoPlugin : Plugin() {
                     NativePlayerActivity.ACTION_SUBTITLE_SELECTED -> {
                         val groupIndex = intent.getIntExtra("groupIndex", -1)
                         val label = intent.getStringExtra("label") ?: ""
-                        android.util.Log.d("NativePlayer", "plugin.subtitleSelected event: groupIndex=$groupIndex label=$label")
+                        android.util.Log.d("NativePlayer", "[Subtitles] plugin.subtitleSelected event: groupIndex=$groupIndex label=$label")
                         val data = JSObject()
                         data.put("groupIndex", groupIndex)
                         data.put("label", label)

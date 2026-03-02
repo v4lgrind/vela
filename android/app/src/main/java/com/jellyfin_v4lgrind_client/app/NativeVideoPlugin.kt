@@ -4,7 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import androidx.localbroadcastmanager.content.LocalBroadcastManager
+import androidx.core.content.ContextCompat
 import com.getcapacitor.JSObject
 import com.getcapacitor.Plugin
 import com.getcapacitor.PluginCall
@@ -75,7 +75,8 @@ class NativeVideoPlugin : Plugin() {
         val intent = Intent(NativePlayerActivity.ACTION_COMMAND)
         intent.putExtra("command", NativePlayerActivity.CMD_SEEK)
         intent.putExtra("positionMs", posMs)
-        LocalBroadcastManager.getInstance(context).sendBroadcast(intent)
+        intent.setPackage(context.packageName)
+        context.sendBroadcast(intent)
         call.resolve()
     }
 
@@ -88,7 +89,8 @@ class NativeVideoPlugin : Plugin() {
         val intent = Intent(NativePlayerActivity.ACTION_COMMAND)
         intent.putExtra("command", NativePlayerActivity.CMD_SELECT_AUDIO)
         intent.putExtra("groupIndex", groupIndex)
-        LocalBroadcastManager.getInstance(context).sendBroadcast(intent)
+        intent.setPackage(context.packageName)
+        context.sendBroadcast(intent)
         call.resolve()
     }
 
@@ -106,7 +108,8 @@ class NativeVideoPlugin : Plugin() {
         val intent = Intent(NativePlayerActivity.ACTION_COMMAND)
         intent.putExtra("command", NativePlayerActivity.CMD_SELECT_SUBTITLE)
         intent.putExtra("groupIndex", groupIndex)
-        LocalBroadcastManager.getInstance(context).sendBroadcast(intent)
+        intent.setPackage(context.packageName)
+        context.sendBroadcast(intent)
         call.resolve()
     }
 
@@ -115,7 +118,8 @@ class NativeVideoPlugin : Plugin() {
     private fun sendCommand(command: String) {
         val intent = Intent(NativePlayerActivity.ACTION_COMMAND)
         intent.putExtra("command", command)
-        LocalBroadcastManager.getInstance(context).sendBroadcast(intent)
+        intent.setPackage(context.packageName)
+        context.sendBroadcast(intent)
     }
 
     private fun registerEventReceiver() {
@@ -186,13 +190,13 @@ class NativeVideoPlugin : Plugin() {
             addAction(NativePlayerActivity.ACTION_AUDIO_SELECTED)
             addAction(NativePlayerActivity.ACTION_SUBTITLE_SELECTED)
         }
-        LocalBroadcastManager.getInstance(context).registerReceiver(receiver, filter)
+        ContextCompat.registerReceiver(context, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
         eventReceiver = receiver
     }
 
     private fun unregisterEventReceiver() {
         eventReceiver?.let {
-            LocalBroadcastManager.getInstance(context).unregisterReceiver(it)
+            context.unregisterReceiver(it)
             eventReceiver = null
         }
     }

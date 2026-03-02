@@ -15,10 +15,11 @@ import android.widget.SeekBar
 import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -152,16 +153,7 @@ class NativePlayerActivity : AppCompatActivity() {
             ctrl.systemBarsBehavior =
                 WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            window.setDecorFitsSystemWindows(false)
-        } else {
-            @Suppress("DEPRECATION")
-            window.decorView.systemUiVisibility = (
-                View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                    or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                    or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-            )
-        }
+        WindowCompat.setDecorFitsSystemWindows(window, false)
         // Keep content outside the display cutout (hole-punch camera).
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             window.attributes.layoutInDisplayCutoutMode =
@@ -210,9 +202,11 @@ class NativePlayerActivity : AppCompatActivity() {
         setupControls()
         buildPlayer(url, authHeader, startMs, playMethod, subtitleTracksJson)
 
-        LocalBroadcastManager.getInstance(this).registerReceiver(
+        ContextCompat.registerReceiver(
+            this,
             commandReceiver,
-            IntentFilter(ACTION_COMMAND)
+            IntentFilter(ACTION_COMMAND),
+            ContextCompat.RECEIVER_NOT_EXPORTED
         )
 
         // Back gesture / button
@@ -455,7 +449,8 @@ class NativePlayerActivity : AppCompatActivity() {
 
         val broadcastIntent = Intent(ACTION_TRACKS)
         broadcastIntent.putExtra("tracks", result.toString())
-        LocalBroadcastManager.getInstance(this).sendBroadcast(broadcastIntent)
+        broadcastIntent.setPackage(packageName)
+        sendBroadcast(broadcastIntent)
     }
 
     private fun selectAudioTrack(groupIndex: Int) {
@@ -470,7 +465,8 @@ class NativePlayerActivity : AppCompatActivity() {
         val language = group.second.getFormat(0).language ?: "und"
         val broadcastIntent = Intent(ACTION_AUDIO_SELECTED)
         broadcastIntent.putExtra("language", language)
-        LocalBroadcastManager.getInstance(this).sendBroadcast(broadcastIntent)
+        broadcastIntent.setPackage(packageName)
+        sendBroadcast(broadcastIntent)
     }
 
     private fun selectSubtitleTrack(groupIndex: Int) {
@@ -485,7 +481,8 @@ class NativePlayerActivity : AppCompatActivity() {
             val broadcastIntent = Intent(ACTION_SUBTITLE_SELECTED)
             broadcastIntent.putExtra("groupIndex", -1)
             broadcastIntent.putExtra("label", "")
-            LocalBroadcastManager.getInstance(this).sendBroadcast(broadcastIntent)
+            broadcastIntent.setPackage(packageName)
+        sendBroadcast(broadcastIntent)
         } else {
             val group = subtitleTrackGroups.firstOrNull { it.first == groupIndex } ?: return
             p.trackSelectionParameters = p.trackSelectionParameters
@@ -502,7 +499,8 @@ class NativePlayerActivity : AppCompatActivity() {
             broadcastIntent.putExtra("groupIndex", groupIndex)
             // Use same fallback as reportTracks so save and restore labels always match.
             broadcastIntent.putExtra("label", label)
-            LocalBroadcastManager.getInstance(this).sendBroadcast(broadcastIntent)
+            broadcastIntent.setPackage(packageName)
+        sendBroadcast(broadcastIntent)
         }
     }
 
@@ -597,11 +595,12 @@ class NativePlayerActivity : AppCompatActivity() {
         val intent = Intent(ACTION_PROGRESS)
         intent.putExtra("positionMs", posMs)
         intent.putExtra("durationMs", durMs)
-        LocalBroadcastManager.getInstance(this).sendBroadcast(intent)
+        intent.setPackage(packageName)
+        sendBroadcast(intent)
     }
 
     private fun sendEndedBroadcast() {
-        LocalBroadcastManager.getInstance(this).sendBroadcast(Intent(ACTION_ENDED))
+        sendBroadcast(Intent(ACTION_ENDED).also { it.setPackage(packageName) })
     }
 
     fun sendStoppedBroadcast() {
@@ -613,13 +612,15 @@ class NativePlayerActivity : AppCompatActivity() {
             intent.putExtra("positionMs", p.currentPosition)
             intent.putExtra("durationMs", p.duration.coerceAtLeast(0L))
         }
-        LocalBroadcastManager.getInstance(this).sendBroadcast(intent)
+        intent.setPackage(packageName)
+        sendBroadcast(intent)
     }
 
     private fun sendErrorBroadcast(message: String) {
         val intent = Intent(ACTION_ERROR)
         intent.putExtra("message", message)
-        LocalBroadcastManager.getInstance(this).sendBroadcast(intent)
+        intent.setPackage(packageName)
+        sendBroadcast(intent)
     }
 
     // ── Lifecycle ──────────────────────────────────────────────────────────────
@@ -638,7 +639,7 @@ class NativePlayerActivity : AppCompatActivity() {
         super.onDestroy()
         sendStoppedBroadcast()
         handler.removeCallbacksAndMessages(null)
-        LocalBroadcastManager.getInstance(this).unregisterReceiver(commandReceiver)
+        unregisterReceiver(commandReceiver)
         player?.release()
         player = null
     }

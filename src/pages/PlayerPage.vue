@@ -936,8 +936,8 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
                 // subtitleSelected listener does not overwrite localStorage.
                 const savedNative = localStorage.getItem(`msplayer-subtitle-native-${itemId}`);
                 const globalSubLang = preferencesStore.preferredSubtitleLanguage;
-                console.log('[Subtitles] savedNative=', savedNative, 'globalSubLang=', globalSubLang);
-                console.log('[Subtitles] nativeSubtitle labels=', nativeSubtitle.map((t: any) => `${t.groupIndex}:${t.label}`).join(', '));
+                NativeVideo.nativeLog({ message: `[Subtitles] savedNative=${savedNative} globalSubLang=${globalSubLang}` });
+                NativeVideo.nativeLog({ message: `[Subtitles] nativeSubtitle labels=${nativeSubtitle.map((t: any) => `${t.groupIndex}:${t.label}`).join(', ')}` });
                 if (savedNative === 'off') {
                     // ExoPlayer already defaults to no subtitles — no command needed.
                     // Skipping the selectSubtitleTrack(-1) call avoids firing subtitleSelected
@@ -970,7 +970,7 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
         });
 
         await NativeVideo.addListener('subtitleSelected', (data) => {
-            console.log('[Subtitles] selected groupIndex=', data.groupIndex, 'label=', data.label, 'restoringSubtitle=', restoringSubtitle);
+            NativeVideo.nativeLog({ message: `[Subtitles] selected groupIndex=${data.groupIndex} label=${data.label} restoringSubtitle=${restoringSubtitle}` });
             // Ignore events that originated from our own restore calls in tracksReady.
             if (restoringSubtitle) {
                 restoringSubtitle = false;
@@ -985,7 +985,7 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
                 localStorage.setItem(`msplayer-subtitle-native-${itemId}`, data.label);
                 selectedSubtitleIndex.value = data.groupIndex;
             }
-            console.log('[Subtitles] saved to localStorage:', localStorage.getItem(`msplayer-subtitle-native-${itemId}`));
+            NativeVideo.nativeLog({ message: `[Subtitles] saved to localStorage: ${localStorage.getItem(`msplayer-subtitle-native-${itemId}`)}` });
         });
 
         await NativeVideo.start({

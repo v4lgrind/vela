@@ -93,6 +93,13 @@ class NativeVideoPlugin : Plugin() {
     }
 
     @PluginMethod
+    fun nativeLog(call: PluginCall) {
+        val message = call.getString("message") ?: return
+        android.util.Log.d("NativePlayer", message)
+        call.resolve()
+    }
+
+    @PluginMethod
     fun selectSubtitleTrack(call: PluginCall) {
         val groupIndex = call.getInt("groupIndex") ?: -1
         android.util.Log.d("NativePlayer", "[Subtitles] plugin.selectSubtitleTrack: JS requested groupIndex=$groupIndex")

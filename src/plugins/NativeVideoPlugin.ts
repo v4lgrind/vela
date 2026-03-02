@@ -52,6 +52,7 @@ export interface NativeVideoPlugin {
     seek(options: { positionMs: number }): Promise<void>;
     selectAudioTrack(options: { groupIndex: number }): Promise<void>;
     selectSubtitleTrack(options: { groupIndex: number }): Promise<void>;
+    nativeLog(options: { message: string }): Promise<void>;
 
     addListener(event: 'progress', handler: (data: NativeVideoProgressEvent) => void): Promise<PluginListenerHandle>;
     addListener(event: 'ended', handler: () => void): Promise<PluginListenerHandle>;

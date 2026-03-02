@@ -16,4 +16,5 @@ export class NativeVideoPluginWeb extends WebPlugin implements NativeVideoPlugin
     async seek(_options: { positionMs: number }): Promise<void> {}
     async selectAudioTrack(_options: { groupIndex: number }): Promise<void> {}
     async selectSubtitleTrack(_options: { groupIndex: number }): Promise<void> {}
+    async nativeLog(_options: { message: string }): Promise<void> {}
 }

@@ -128,98 +128,97 @@ class DownloadService {
     metadata: any,
     onProgress?: (progress: DownloadProgress) => void
   ): Promise<void> {
+    const controller = new AbortController();
+    this.downloads.set(itemId, controller);
+    if (onProgress) this.progressCallbacks.set(itemId, onProgress);
+
+    const extension = this.getFileExtension(metadata);
+    const filename = this.sanitizeFilename(`${metadata.Name || itemId}.${extension}`);
+    const filePath = this.buildFilePath(metadata, filename);
+    const downloadUrl = `${serverUrl}/Items/${itemId}/Download?api_key=${accessToken}`;
+
+    console.log("📥 Téléchargement offline:", filename);
+
     try {
-      // Créer un AbortController pour pouvoir annuler
-      const controller = new AbortController();
-      this.downloads.set(itemId, controller);
-
-      if (onProgress) {
-        this.progressCallbacks.set(itemId, onProgress);
-      }
-
-      // Déterminer l'extension du fichier
-      const extension = this.getFileExtension(metadata);
-      const filename = this.sanitizeFilename(`${metadata.Name || itemId}.${extension}`);
-
-      // URL de téléchargement Jellyfin
-      const downloadUrl = `${serverUrl}/Items/${itemId}/Download?api_key=${accessToken}`;
-
-      console.log("📥 Téléchargement offline:", filename);
-
-      // Fetch avec signal pour pouvoir annuler
-      const response = await fetch(downloadUrl, {
-        signal: controller.signal,
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
+      const response = await fetch(downloadUrl, { signal: controller.signal });
+      if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
 
       const contentLength = response.headers.get("Content-Length");
       const total = contentLength ? parseInt(contentLength, 10) : 0;
 
-      // Lire le stream
       const reader = response.body?.getReader();
-      if (!reader) {
-        throw new Error("Impossible de lire le stream");
-      }
+      if (!reader) throw new Error("Impossible de lire le stream");
 
-      const chunks: Uint8Array[] = [];
+      // Create the file and the downloads/ directory in one shot.
+      // recursive: true ensures the parent directory is created if missing.
+      await Filesystem.writeFile({
+        path: filePath,
+        data: '',
+        directory: Directory.Data,
+        recursive: true,
+      });
+
+      // Stream chunks directly to disk instead of buffering the whole file in
+      // memory. Base64 encodes 3 bytes per character, so we must always write
+      // a multiple of 3 bytes per appendFile call — otherwise the segments
+      // won't concatenate correctly. Carry any leftover bytes into the next chunk.
       let loaded = 0;
+      let remainder = new Uint8Array(0);
+
+      const flush = async (incoming: Uint8Array, isFinal: boolean) => {
+        const combined = new Uint8Array(remainder.length + incoming.length);
+        combined.set(remainder);
+        combined.set(incoming, remainder.length);
+
+        if (isFinal) {
+          if (combined.length > 0) {
+            await Filesystem.appendFile({
+              path: filePath,
+              data: this.arrayBufferToBase64(combined),
+              directory: Directory.Data,
+            });
+          }
+          remainder = new Uint8Array(0);
+        } else {
+          const writeLen = Math.floor(combined.length / 3) * 3;
+          if (writeLen > 0) {
+            await Filesystem.appendFile({
+              path: filePath,
+              data: this.arrayBufferToBase64(combined.subarray(0, writeLen)),
+              directory: Directory.Data,
+            });
+          }
+          remainder = combined.subarray(writeLen);
+        }
+      };
 
       while (true) {
         const { done, value } = await reader.read();
+        if (done) {
+          await flush(new Uint8Array(0), true);
+          break;
+        }
 
-        if (done) break;
-
-        chunks.push(value);
         loaded += value.length;
+        await flush(value, false);
 
-        // Callback de progression
         if (onProgress && total > 0) {
-          const percentage = Math.round((loaded / total) * 100);
-          onProgress({
-            itemId,
-            filename,
-            loaded,
-            total,
-            percentage,
-          });
+          onProgress({ itemId, filename, loaded, total, percentage: Math.round((loaded / total) * 100) });
         }
       }
 
-      // Créer le buffer
-      const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
-      const buffer = new Uint8Array(totalLength);
-      let offset = 0;
-      for (const chunk of chunks) {
-        buffer.set(chunk, offset);
-        offset += chunk.length;
-      }
-
-      // Sauvegarder via Capacitor
-      const filePath = `downloads/${filename}`;
-      const base64Data = this.arrayBufferToBase64(buffer);
-      await Filesystem.writeFile({
-        path: filePath,
-        data: base64Data,
-        directory: Directory.Data
-      });
-
       console.log("💾 Fichier sauvegardé:", filePath);
 
-      // Créer l'objet DownloadedMedia
       const downloadedMedia: DownloadedMedia = {
         itemId: metadata.Id,
         type: this.getMediaType(metadata.Type),
         name: metadata.Name || 'Unknown',
-        filePath: filePath,
-        fileSize: total,
+        filePath,
+        fileSize: total || loaded,
         downloadDate: Date.now(),
         jellyfinItem: metadata,
       };
 
-      // Ajouter les métadonnées spécifiques selon le type
       if (metadata.Type === 'Episode') {
         downloadedMedia.seriesId = metadata.SeriesId;
         downloadedMedia.seriesName = metadata.SeriesName;
@@ -231,22 +230,18 @@ class DownloadService {
         downloadedMedia.albumName = metadata.Album;
       }
 
-      // Sauvegarder dans IndexedDB
       await offlineDatabase.addDownload(downloadedMedia);
-
       console.log("✅ Téléchargement offline terminé:", filename);
-
-      // Nettoyer
-      this.downloads.delete(itemId);
-      this.progressCallbacks.delete(itemId);
     } catch (error: any) {
-      if (error.name === "AbortError") {
+      if (error.name === 'AbortError') {
         console.log("🚫 Téléchargement annulé:", metadata.Name);
+        // Clean up any partial file left on disk.
+        try { await Filesystem.deleteFile({ path: filePath, directory: Directory.Data }); } catch { /* ignore */ }
       } else {
         console.error("❌ Erreur téléchargement offline:", error);
         throw error;
       }
-
+    } finally {
       this.downloads.delete(itemId);
       this.progressCallbacks.delete(itemId);
     }
@@ -355,6 +350,39 @@ class DownloadService {
    */
   private sanitizeFilename(filename: string): string {
     return filename.replace(/[/\\?%*:|"<>]/g, '-');
+  }
+
+  /**
+   * Build the structured file path based on media type:
+   *   Movies  → Jellyfin V4lgrind/Movies/{Title}/{file}
+   *   Episode → Jellyfin V4lgrind/TV Shows/{Series}/Season {N}/{file}
+   *   Audio   → Jellyfin V4lgrind/Music/{Artist}/{Album}/{file}
+   */
+  private buildFilePath(metadata: any, filename: string): string {
+    const s = (v: string | undefined | null, fallback: string) =>
+      this.sanitizeFilename(v || fallback);
+
+    const root = 'Jellyfin V4lgrind';
+
+    switch (metadata.Type) {
+      case 'Movie':
+        return `${root}/Movies/${s(metadata.Name, 'Unknown')}/${filename}`;
+
+      case 'Episode': {
+        const series = s(metadata.SeriesName, 'Unknown Series');
+        const season = `Season ${metadata.ParentIndexNumber ?? 1}`;
+        return `${root}/TV Shows/${series}/${season}/${filename}`;
+      }
+
+      case 'Audio': {
+        const artist = s(metadata.AlbumArtist ?? metadata.Artists?.[0], 'Unknown Artist');
+        const album = s(metadata.Album, 'Unknown Album');
+        return `${root}/Music/${artist}/${album}/${filename}`;
+      }
+
+      default:
+        return `${root}/${filename}`;
+    }
   }
 
   /**

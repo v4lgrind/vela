@@ -149,15 +149,6 @@ class DownloadService {
       const reader = response.body?.getReader();
       if (!reader) throw new Error("Impossible de lire le stream");
 
-      // Create the file and the downloads/ directory in one shot.
-      // recursive: true ensures the parent directory is created if missing.
-      await Filesystem.writeFile({
-        path: filePath,
-        data: '',
-        directory: Directory.Data,
-        recursive: true,
-      });
-
       // Batch network chunks into 4 MB writes to minimise Capacitor bridge
       // crossings (each appendFile crosses the JS→native bridge with full
       // serialisation overhead). Without batching a 1 GB file causes ~15 000
@@ -165,9 +156,15 @@ class DownloadService {
       //
       // Base64 encodes 3 bytes per character, so every batch written must be
       // a multiple of 3 bytes — carry the ≤2 leftover bytes into the next batch.
+      //
+      // The first batch uses writeFile (recursive: true) so it creates the
+      // full directory tree and the file in one operation. Subsequent batches
+      // use appendFile. This avoids writing an empty placeholder file which
+      // some Capacitor/Android versions reject.
       const WRITE_BATCH = 4 * 1024 * 1024; // 4 MB
 
       let loaded = 0;
+      let isFirstWrite = true;
       let remainder = new Uint8Array(0); // ≤ 2 bytes pending 3-byte alignment
       let pendingChunks: Uint8Array[] = [];
       let pendingSize = 0;
@@ -178,11 +175,13 @@ class DownloadService {
         const buf = new Uint8Array(len);
         let off = 0;
         for (const c of chunks) { buf.set(c, off); off += c.length; }
-        await Filesystem.appendFile({
-          path: filePath,
-          data: this.arrayBufferToBase64(buf),
-          directory: Directory.Data,
-        });
+        const data = this.arrayBufferToBase64(buf);
+        if (isFirstWrite) {
+          isFirstWrite = false;
+          await Filesystem.writeFile({ path: filePath, data, directory: Directory.Data, recursive: true });
+        } else {
+          await Filesystem.appendFile({ path: filePath, data, directory: Directory.Data });
+        }
       };
 
       while (true) {

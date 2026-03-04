@@ -722,7 +722,7 @@ async function handleDownload() {
         });
         await offlineStore.loadDownloads();
     } catch (error: any) {
-        alert('Download failed');
+        alert(`Download failed: ${error?.message ?? error}`);
     } finally {
         isDownloading.value = false;
         downloadProgress.value = 0;

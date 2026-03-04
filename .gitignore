@@ -23,6 +23,9 @@ dist-ssr
 *.sln
 *.sw?
 
+# Gradle
+.gradle/
+
 # Capacitor
 android/app/build/
 android/.gradle/

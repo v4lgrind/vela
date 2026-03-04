@@ -262,6 +262,8 @@ import { useRoute, useRouter } from 'vue-router';
 import { useJellyfinStore } from '@/store/jellyfin-store';
 import { useAudioPlayerStore } from '@/store/audio-player-store';
 import { usePreferencesStore } from '@/store/preferences-store';
+import { useOfflineStore } from '@/store/offline-store';
+import { downloadService } from '@/services/downloadService';
 import Hls from 'hls.js';
 import { Capacitor } from '@capacitor/core';
 import { NativeVideo } from '@/plugins/NativeVideoPlugin';
@@ -277,6 +279,7 @@ const router = useRouter();
 const store = useJellyfinStore();
 const audioPlayerStore = useAudioPlayerStore();
 const preferencesStore = usePreferencesStore();
+const offlineStore = useOfflineStore();
 
 const itemId = route.params.id as string;
 const accessToken = store.accessToken || '';
@@ -1005,6 +1008,77 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
     }
 }
 
+// ── Offline player init (local downloaded file) ────────────────────────────────
+
+async function initOfflinePlayer(resumeSeconds?: number, itemTitle?: string) {
+    isLoading.value = true;
+    try {
+        const localUrl = await downloadService.getLocalFile(itemId);
+        if (!localUrl) {
+            error.value = 'Downloaded file not found on device';
+            isLoading.value = false;
+            return;
+        }
+
+        hlsUrl.value = localUrl;
+        playMethod.value = 'DirectPlay';
+        const startPositionMs = resumeSeconds && resumeSeconds > 0 ? Math.floor(resumeSeconds * 1000) : 0;
+
+        if (isNative) {
+            await NativeVideo.addListener('progress', (data) => {
+                currentTime.value = data.positionMs / 1000;
+                duration.value = data.durationMs / 1000;
+                if (duration.value > 0) progressPct.value = (currentTime.value / duration.value) * 100;
+                reportPlaybackProgress();
+            });
+            await NativeVideo.addListener('stopped', async (data) => {
+                currentTime.value = data.positionMs / 1000;
+                await reportPlaybackStopped();
+                router.back();
+            });
+            await NativeVideo.addListener('ended', async () => {
+                await reportPlaybackStopped();
+                router.back();
+            });
+            await NativeVideo.addListener('error', (data) => {
+                error.value = data.message;
+                isLoading.value = false;
+            });
+
+            await NativeVideo.start({
+                url: localUrl,
+                authHeader: '',
+                startPositionMs,
+                title: itemTitle || '',
+                playMethod: 'DirectPlay',
+                subtitleTracks: [],
+            });
+        } else {
+            const video = videoEl.value;
+            if (!video) return;
+            if (resumeSeconds && resumeSeconds > 0) {
+                const seekOnce = () => {
+                    video.removeEventListener('loadedmetadata', seekOnce);
+                    video.currentTime = resumeSeconds;
+                    video.play().catch(() => {});
+                    startProgressReporting();
+                };
+                video.addEventListener('loadedmetadata', seekOnce);
+            } else {
+                video.play().catch(() => {});
+                startProgressReporting();
+            }
+            video.src = localUrl;
+        }
+
+        isLoading.value = false;
+    } catch (e: any) {
+        console.error('[initOfflinePlayer] error:', e);
+        error.value = 'Failed to play downloaded file';
+        isLoading.value = false;
+    }
+}
+
 // ── Player init ────────────────────────────────────────────────────────────────
 
 async function initPlayer(resumeSeconds?: number, preferredAudioIndex?: number) {
@@ -1290,6 +1364,22 @@ async function switchQuality(bitrate: number) {
 onMounted(async () => {
     if (audioPlayerStore.isPlaying) audioPlayerStore.stop();
     lockLandscape();
+
+    // If offline and item is downloaded, bypass all Jellyfin network calls.
+    const cachedDownload = offlineStore.getDownload(itemId);
+    if (!offlineStore.isFullyOnline && cachedDownload) {
+        const routeStartTicks = route.query.startTicks ? Number(route.query.startTicks) : null;
+        const resumeTicks = routeStartTicks ?? cachedDownload.jellyfinItem?.UserData?.PlaybackPositionTicks;
+        const resumeSeconds = resumeTicks ? resumeTicks / 10_000_000 : undefined;
+        await initOfflinePlayer(resumeSeconds, cachedDownload.jellyfinItem?.Name);
+        if (!isNative) {
+            document.addEventListener('click', handleClickOutside);
+            document.addEventListener('fullscreenchange', () => { isFullscreen.value = !!getFullscreenElement(); });
+            document.addEventListener('webkitfullscreenchange', () => { isFullscreen.value = !!getFullscreenElement(); });
+            document.addEventListener('keydown', handleKeyDown);
+        }
+        return;
+    }
 
     // Always fetch fresh details — cached currentItem may have stale PlaybackPositionTicks
     let details: any = null;

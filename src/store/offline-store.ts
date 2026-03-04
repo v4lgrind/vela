@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import { offlineDetection } from '../services/offlineDetection';
+import { usePreferencesStore } from './preferences-store';
 import { offlineDatabase, type DownloadedMedia } from '../services/offlineDatabase';
 import { syncService } from '../services/syncService';
 import { useJellyfinStore } from './jellyfin-store';
@@ -37,7 +38,12 @@ export const useOfflineStore = defineStore('offline', {
     /**
      * Get fully online status (browser online AND server reachable)
      */
-    isFullyOnline: (state) => state.initialized ? offlineDetection.isFullyOnline : true,
+    isFullyOnline: (state) => {
+      if (!state.initialized) return true;
+      const prefs = usePreferencesStore();
+      if (prefs.forceOfflineMode) return false;
+      return offlineDetection.isFullyOnline;
+    },
 
     /**
      * Get downloads count

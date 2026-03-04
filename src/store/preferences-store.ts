@@ -7,6 +7,7 @@ export const usePreferencesStore = defineStore('preferences', {
     libraryOrder: [] as string[], // ordered library IDs; empty = server default order
     preferredBitrate: 0 as number, // 0 = Auto; otherwise max bitrate in bps (e.g. 8_000_000 for 720p)
     colorScheme: 'dark' as 'dark' | 'light' | 'system',
+    forceOfflineMode: false as boolean,
   }),
   persist: true,
 });

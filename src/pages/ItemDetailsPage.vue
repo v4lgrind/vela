@@ -439,6 +439,13 @@ async function load() {
     similarItems.value = [];
 
     try {
+        // If offline and item is downloaded, use jellyfinItem cached in IndexedDB.
+        const cached = offlineStore.getDownload(itemId.value);
+        if (!offlineStore.isFullyOnline && cached) {
+            item.value = cached.jellyfinItem;
+            return;
+        }
+
         const data = await store.fetchItemDetails(itemId.value);
         item.value = data;
 
@@ -455,7 +462,13 @@ async function load() {
             similarItems.value = await store.fetchSimilarItems(itemId.value);
         }
     } catch (e) {
-        error.value = 'Failed to load details';
+        // Network failed — fall back to cached download data if available.
+        const cached = offlineStore.getDownload(itemId.value);
+        if (cached) {
+            item.value = cached.jellyfinItem;
+        } else {
+            error.value = 'Failed to load details';
+        }
     } finally {
         loading.value = false;
     }

@@ -27,6 +27,31 @@
           </div>
         </div>
       </section>
+
+      <section class="mt-8">
+        <h2 class="text-base font-semibold text-text-heading mb-1">Connectivity</h2>
+        <p class="text-sm text-text-muted mb-4">Force the app to behave as if offline, using downloaded content only.</p>
+        <div class="flex flex-col gap-0 rounded-xl overflow-hidden border border-border-input divide-y divide-border-input">
+          <div class="flex items-center justify-between px-4 py-3 bg-surface-raised">
+            <div>
+              <span class="text-sm font-medium text-text-heading">Force Offline Mode</span>
+              <p class="text-xs text-text-muted mt-0.5">Disable all Jellyfin network requests</p>
+            </div>
+            <button
+              role="switch"
+              :aria-checked="preferencesStore.forceOfflineMode"
+              @click="preferencesStore.forceOfflineMode = !preferencesStore.forceOfflineMode"
+              :class="preferencesStore.forceOfflineMode ? 'bg-accent-purple' : 'bg-surface-muted'"
+              class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none"
+            >
+              <span
+                :class="preferencesStore.forceOfflineMode ? 'translate-x-6' : 'translate-x-1'"
+                class="inline-block h-4 w-4 rounded-full bg-white transition-transform"
+              />
+            </button>
+          </div>
+        </div>
+      </section>
     </div>
   </div>
 </template>

@@ -39,6 +39,7 @@ export interface WatchProgress {
 class OfflineDatabase {
   private static instance: OfflineDatabase;
   private db: IDBDatabase | null = null;
+  private _initPromise: Promise<void> | null = null;
   private readonly DB_NAME = "JellyfinOffline";
   private readonly DB_VERSION = 1;
 
@@ -52,14 +53,19 @@ class OfflineDatabase {
   }
 
   /**
-   * Initialize the database
+   * Initialize the database. Idempotent — safe to call multiple times or
+   * concurrently; the underlying IDBDatabase is only opened once.
    */
   public async init(): Promise<void> {
+    if (this.db) return;
+    if (this._initPromise) return this._initPromise;
+
     if (typeof indexedDB === "undefined") {
       console.warn("[OfflineDB] IndexedDB not available on this platform");
       return;
     }
-    return new Promise((resolve, reject) => {
+
+    this._initPromise = new Promise((resolve, reject) => {
       const request = indexedDB.open(this.DB_NAME, this.DB_VERSION);
 
       request.onerror = () => {
@@ -76,7 +82,6 @@ class OfflineDatabase {
       request.onupgradeneeded = (event) => {
         const db = (event.target as IDBOpenDBRequest).result;
 
-        // Create downloads object store
         if (!db.objectStoreNames.contains("downloads")) {
           const downloadsStore = db.createObjectStore("downloads", {
             keyPath: "itemId",
@@ -91,7 +96,6 @@ class OfflineDatabase {
           console.log("[OfflineDB] Created downloads object store");
         }
 
-        // Create watchProgress object store
         if (!db.objectStoreNames.contains("watchProgress")) {
           const progressStore = db.createObjectStore("watchProgress", {
             keyPath: "itemId",
@@ -104,15 +108,17 @@ class OfflineDatabase {
         }
       };
     });
+
+    return this._initPromise;
   }
 
   /**
-   * Ensure database is initialized
+   * Lazily initialises the database and returns it.
+   * Every public method calls this — no explicit init() needed by callers.
    */
-  private ensureDB(): IDBDatabase {
-    if (!this.db) {
-      throw new Error("Database not initialized. Call init() first.");
-    }
+  private async ensureDB(): Promise<IDBDatabase> {
+    await this.init();
+    if (!this.db) throw new Error("IndexedDB unavailable");
     return this.db;
   }
 
@@ -123,7 +129,7 @@ class OfflineDatabase {
    */
   public async addDownload(media: DownloadedMedia): Promise<void> {
     return new Promise((resolve, reject) => {
-      const db = this.ensureDB();
+      const db = await this.ensureDB();
       const transaction = db.transaction(["downloads"], "readwrite");
       const store = transaction.objectStore("downloads");
 
@@ -147,7 +153,7 @@ class OfflineDatabase {
    */
   public async getDownload(itemId: string): Promise<DownloadedMedia | null> {
     return new Promise((resolve, reject) => {
-      const db = this.ensureDB();
+      const db = await this.ensureDB();
       const transaction = db.transaction(["downloads"], "readonly");
       const store = transaction.objectStore("downloads");
 
@@ -168,9 +174,8 @@ class OfflineDatabase {
    * Get all downloaded media items
    */
   public async getAllDownloads(): Promise<DownloadedMedia[]> {
-    if (!this.db) return [];
-    return new Promise((resolve, reject) => {
-      const db = this.ensureDB();
+    return new Promise(async (resolve, reject) => {
+      const db = await this.ensureDB();
       const transaction = db.transaction(["downloads"], "readonly");
       const store = transaction.objectStore("downloads");
 
@@ -197,7 +202,7 @@ class OfflineDatabase {
     type: DownloadedMedia["type"],
   ): Promise<DownloadedMedia[]> {
     return new Promise((resolve, reject) => {
-      const db = this.ensureDB();
+      const db = await this.ensureDB();
       const transaction = db.transaction(["downloads"], "readonly");
       const store = transaction.objectStore("downloads");
       const index = store.index("type");
@@ -225,7 +230,7 @@ class OfflineDatabase {
     seriesId: string,
   ): Promise<DownloadedMedia[]> {
     return new Promise((resolve, reject) => {
-      const db = this.ensureDB();
+      const db = await this.ensureDB();
       const transaction = db.transaction(["downloads"], "readonly");
       const store = transaction.objectStore("downloads");
       const index = store.index("seriesId");
@@ -253,7 +258,7 @@ class OfflineDatabase {
     seasonId: string,
   ): Promise<DownloadedMedia[]> {
     return new Promise((resolve, reject) => {
-      const db = this.ensureDB();
+      const db = await this.ensureDB();
       const transaction = db.transaction(["downloads"], "readonly");
       const store = transaction.objectStore("downloads");
       const index = store.index("seasonId");
@@ -281,7 +286,7 @@ class OfflineDatabase {
     albumId: string,
   ): Promise<DownloadedMedia[]> {
     return new Promise((resolve, reject) => {
-      const db = this.ensureDB();
+      const db = await this.ensureDB();
       const transaction = db.transaction(["downloads"], "readonly");
       const store = transaction.objectStore("downloads");
       const index = store.index("albumId");
@@ -315,7 +320,7 @@ class OfflineDatabase {
    */
   public async deleteDownload(itemId: string): Promise<void> {
     return new Promise((resolve, reject) => {
-      const db = this.ensureDB();
+      const db = await this.ensureDB();
       const transaction = db.transaction(["downloads"], "readwrite");
       const store = transaction.objectStore("downloads");
 
@@ -340,7 +345,7 @@ class OfflineDatabase {
    */
   public async saveWatchProgress(progress: WatchProgress): Promise<void> {
     return new Promise((resolve, reject) => {
-      const db = this.ensureDB();
+      const db = await this.ensureDB();
       const transaction = db.transaction(["watchProgress"], "readwrite");
       const store = transaction.objectStore("watchProgress");
 
@@ -366,7 +371,7 @@ class OfflineDatabase {
    */
   public async getWatchProgress(itemId: string): Promise<WatchProgress | null> {
     return new Promise((resolve, reject) => {
-      const db = this.ensureDB();
+      const db = await this.ensureDB();
       const transaction = db.transaction(["watchProgress"], "readonly");
       const store = transaction.objectStore("watchProgress");
 
@@ -391,7 +396,7 @@ class OfflineDatabase {
    */
   public async getUnsyncedProgress(): Promise<WatchProgress[]> {
     return new Promise((resolve, reject) => {
-      const db = this.ensureDB();
+      const db = await this.ensureDB();
       const transaction = db.transaction(["watchProgress"], "readonly");
       const store = transaction.objectStore("watchProgress");
       const index = store.index("synced");
@@ -427,7 +432,7 @@ class OfflineDatabase {
    */
   public async deleteWatchProgress(itemId: string): Promise<void> {
     return new Promise((resolve, reject) => {
-      const db = this.ensureDB();
+      const db = await this.ensureDB();
       const transaction = db.transaction(["watchProgress"], "readwrite");
       const store = transaction.objectStore("watchProgress");
 
@@ -453,7 +458,7 @@ class OfflineDatabase {
    */
   public async clearAll(): Promise<void> {
     return new Promise((resolve, reject) => {
-      const db = this.ensureDB();
+      const db = await this.ensureDB();
       const transaction = db.transaction(
         ["downloads", "watchProgress"],
         "readwrite",

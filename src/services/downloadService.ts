@@ -158,49 +158,60 @@ class DownloadService {
         recursive: true,
       });
 
-      // Stream chunks directly to disk instead of buffering the whole file in
-      // memory. Base64 encodes 3 bytes per character, so we must always write
-      // a multiple of 3 bytes per appendFile call — otherwise the segments
-      // won't concatenate correctly. Carry any leftover bytes into the next chunk.
+      // Batch network chunks into 4 MB writes to minimise Capacitor bridge
+      // crossings (each appendFile crosses the JS→native bridge with full
+      // serialisation overhead). Without batching a 1 GB file causes ~15 000
+      // bridge calls; with 4 MB batches it's ~250.
+      //
+      // Base64 encodes 3 bytes per character, so every batch written must be
+      // a multiple of 3 bytes — carry the ≤2 leftover bytes into the next batch.
+      const WRITE_BATCH = 4 * 1024 * 1024; // 4 MB
+
       let loaded = 0;
-      let remainder = new Uint8Array(0);
+      let remainder = new Uint8Array(0); // ≤ 2 bytes pending 3-byte alignment
+      let pendingChunks: Uint8Array[] = [];
+      let pendingSize = 0;
 
-      const flush = async (incoming: Uint8Array, isFinal: boolean) => {
-        const combined = new Uint8Array(remainder.length + incoming.length);
-        combined.set(remainder);
-        combined.set(incoming, remainder.length);
-
-        if (isFinal) {
-          if (combined.length > 0) {
-            await Filesystem.appendFile({
-              path: filePath,
-              data: this.arrayBufferToBase64(combined),
-              directory: Directory.Data,
-            });
-          }
-          remainder = new Uint8Array(0);
-        } else {
-          const writeLen = Math.floor(combined.length / 3) * 3;
-          if (writeLen > 0) {
-            await Filesystem.appendFile({
-              path: filePath,
-              data: this.arrayBufferToBase64(combined.subarray(0, writeLen)),
-              directory: Directory.Data,
-            });
-          }
-          remainder = combined.subarray(writeLen);
-        }
+      const writeBatch = async (chunks: Uint8Array[]) => {
+        const len = chunks.reduce((s, c) => s + c.length, 0);
+        if (len === 0) return;
+        const buf = new Uint8Array(len);
+        let off = 0;
+        for (const c of chunks) { buf.set(c, off); off += c.length; }
+        await Filesystem.appendFile({
+          path: filePath,
+          data: this.arrayBufferToBase64(buf),
+          directory: Directory.Data,
+        });
       };
 
       while (true) {
         const { done, value } = await reader.read();
+
         if (done) {
-          await flush(new Uint8Array(0), true);
+          if (remainder.length > 0) pendingChunks.push(remainder);
+          await writeBatch(pendingChunks);
           break;
         }
 
         loaded += value.length;
-        await flush(value, false);
+
+        const combined = new Uint8Array(remainder.length + value.length);
+        combined.set(remainder);
+        combined.set(value, remainder.length);
+
+        const alignedLen = Math.floor(combined.length / 3) * 3;
+        if (alignedLen > 0) {
+          pendingChunks.push(combined.subarray(0, alignedLen));
+          pendingSize += alignedLen;
+        }
+        remainder = combined.subarray(alignedLen).slice();
+
+        if (pendingSize >= WRITE_BATCH) {
+          await writeBatch(pendingChunks);
+          pendingChunks = [];
+          pendingSize = 0;
+        }
 
         if (onProgress && total > 0) {
           onProgress({ itemId, filename, loaded, total, percentage: Math.round((loaded / total) * 100) });

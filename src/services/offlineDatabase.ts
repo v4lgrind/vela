@@ -124,12 +124,9 @@ class OfflineDatabase {
 
   // ==================== Downloads ====================
 
-  /**
-   * Add a downloaded media item
-   */
   public async addDownload(media: DownloadedMedia): Promise<void> {
+    const db = await this.ensureDB();
     return new Promise((resolve, reject) => {
-      const db = await this.ensureDB();
       const transaction = db.transaction(["downloads"], "readwrite");
       const store = transaction.objectStore("downloads");
 
@@ -148,15 +145,11 @@ class OfflineDatabase {
     });
   }
 
-  /**
-   * Get a specific downloaded media item
-   */
   public async getDownload(itemId: string): Promise<DownloadedMedia | null> {
+    const db = await this.ensureDB();
     return new Promise((resolve, reject) => {
-      const db = await this.ensureDB();
       const transaction = db.transaction(["downloads"], "readonly");
       const store = transaction.objectStore("downloads");
-
       const request = store.get(itemId);
 
       request.onsuccess = () => {
@@ -170,15 +163,11 @@ class OfflineDatabase {
     });
   }
 
-  /**
-   * Get all downloaded media items
-   */
   public async getAllDownloads(): Promise<DownloadedMedia[]> {
-    return new Promise(async (resolve, reject) => {
-      const db = await this.ensureDB();
+    const db = await this.ensureDB();
+    return new Promise((resolve, reject) => {
       const transaction = db.transaction(["downloads"], "readonly");
       const store = transaction.objectStore("downloads");
-
       const request = store.getAll();
 
       request.onsuccess = () => {
@@ -186,144 +175,102 @@ class OfflineDatabase {
       };
 
       request.onerror = () => {
-        console.error(
-          "[OfflineDB] Failed to get all downloads:",
-          request.error,
-        );
+        console.error("[OfflineDB] Failed to get all downloads:", request.error);
         reject(request.error);
       };
     });
   }
 
-  /**
-   * Get downloads by type (Movie, Episode, etc.)
-   */
   public async getDownloadsByType(
     type: DownloadedMedia["type"],
   ): Promise<DownloadedMedia[]> {
+    const db = await this.ensureDB();
     return new Promise((resolve, reject) => {
-      const db = await this.ensureDB();
       const transaction = db.transaction(["downloads"], "readonly");
       const store = transaction.objectStore("downloads");
-      const index = store.index("type");
-
-      const request = index.getAll(type);
+      const request = store.index("type").getAll(type);
 
       request.onsuccess = () => {
         resolve(request.result || []);
       };
 
       request.onerror = () => {
-        console.error(
-          "[OfflineDB] Failed to get downloads by type:",
-          request.error,
-        );
+        console.error("[OfflineDB] Failed to get downloads by type:", request.error);
         reject(request.error);
       };
     });
   }
 
-  /**
-   * Get downloads for a specific series
-   */
   public async getDownloadsBySeries(
     seriesId: string,
   ): Promise<DownloadedMedia[]> {
+    const db = await this.ensureDB();
     return new Promise((resolve, reject) => {
-      const db = await this.ensureDB();
       const transaction = db.transaction(["downloads"], "readonly");
       const store = transaction.objectStore("downloads");
-      const index = store.index("seriesId");
-
-      const request = index.getAll(seriesId);
+      const request = store.index("seriesId").getAll(seriesId);
 
       request.onsuccess = () => {
         resolve(request.result || []);
       };
 
       request.onerror = () => {
-        console.error(
-          "[OfflineDB] Failed to get downloads by series:",
-          request.error,
-        );
+        console.error("[OfflineDB] Failed to get downloads by series:", request.error);
         reject(request.error);
       };
     });
   }
 
-  /**
-   * Get downloads for a specific season
-   */
   public async getDownloadsBySeason(
     seasonId: string,
   ): Promise<DownloadedMedia[]> {
+    const db = await this.ensureDB();
     return new Promise((resolve, reject) => {
-      const db = await this.ensureDB();
       const transaction = db.transaction(["downloads"], "readonly");
       const store = transaction.objectStore("downloads");
-      const index = store.index("seasonId");
-
-      const request = index.getAll(seasonId);
+      const request = store.index("seasonId").getAll(seasonId);
 
       request.onsuccess = () => {
         resolve(request.result || []);
       };
 
       request.onerror = () => {
-        console.error(
-          "[OfflineDB] Failed to get downloads by season:",
-          request.error,
-        );
+        console.error("[OfflineDB] Failed to get downloads by season:", request.error);
         reject(request.error);
       };
     });
   }
 
-  /**
-   * Get downloads for a specific album
-   */
   public async getDownloadsByAlbum(
     albumId: string,
   ): Promise<DownloadedMedia[]> {
+    const db = await this.ensureDB();
     return new Promise((resolve, reject) => {
-      const db = await this.ensureDB();
       const transaction = db.transaction(["downloads"], "readonly");
       const store = transaction.objectStore("downloads");
-      const index = store.index("albumId");
-
-      const request = index.getAll(albumId);
+      const request = store.index("albumId").getAll(albumId);
 
       request.onsuccess = () => {
         resolve(request.result || []);
       };
 
       request.onerror = () => {
-        console.error(
-          "[OfflineDB] Failed to get downloads by album:",
-          request.error,
-        );
+        console.error("[OfflineDB] Failed to get downloads by album:", request.error);
         reject(request.error);
       };
     });
   }
 
-  /**
-   * Check if an item is downloaded
-   */
   public async isDownloaded(itemId: string): Promise<boolean> {
     const download = await this.getDownload(itemId);
     return download !== null;
   }
 
-  /**
-   * Delete a downloaded media item
-   */
   public async deleteDownload(itemId: string): Promise<void> {
+    const db = await this.ensureDB();
     return new Promise((resolve, reject) => {
-      const db = await this.ensureDB();
       const transaction = db.transaction(["downloads"], "readwrite");
       const store = transaction.objectStore("downloads");
-
       const request = store.delete(itemId);
 
       request.onsuccess = () => {
@@ -340,15 +287,11 @@ class OfflineDatabase {
 
   // ==================== Watch Progress ====================
 
-  /**
-   * Save watch progress
-   */
   public async saveWatchProgress(progress: WatchProgress): Promise<void> {
+    const db = await this.ensureDB();
     return new Promise((resolve, reject) => {
-      const db = await this.ensureDB();
       const transaction = db.transaction(["watchProgress"], "readwrite");
       const store = transaction.objectStore("watchProgress");
-
       const request = store.put(progress);
 
       request.onsuccess = () => {
@@ -357,24 +300,17 @@ class OfflineDatabase {
       };
 
       request.onerror = () => {
-        console.error(
-          "[OfflineDB] Failed to save watch progress:",
-          request.error,
-        );
+        console.error("[OfflineDB] Failed to save watch progress:", request.error);
         reject(request.error);
       };
     });
   }
 
-  /**
-   * Get watch progress for an item
-   */
   public async getWatchProgress(itemId: string): Promise<WatchProgress | null> {
+    const db = await this.ensureDB();
     return new Promise((resolve, reject) => {
-      const db = await this.ensureDB();
       const transaction = db.transaction(["watchProgress"], "readonly");
       const store = transaction.objectStore("watchProgress");
-
       const request = store.get(itemId);
 
       request.onsuccess = () => {
@@ -382,43 +318,30 @@ class OfflineDatabase {
       };
 
       request.onerror = () => {
-        console.error(
-          "[OfflineDB] Failed to get watch progress:",
-          request.error,
-        );
+        console.error("[OfflineDB] Failed to get watch progress:", request.error);
         reject(request.error);
       };
     });
   }
 
-  /**
-   * Get all unsynced watch progress entries
-   */
   public async getUnsyncedProgress(): Promise<WatchProgress[]> {
+    const db = await this.ensureDB();
     return new Promise((resolve, reject) => {
-      const db = await this.ensureDB();
       const transaction = db.transaction(["watchProgress"], "readonly");
       const store = transaction.objectStore("watchProgress");
-      const index = store.index("synced");
-      const request = index.getAll();
+      const request = store.index("synced").getAll();
 
       request.onsuccess = () => {
         resolve(request.result || []);
       };
 
       request.onerror = () => {
-        console.error(
-          "[OfflineDB] Failed to get unsynced progress:",
-          request.error,
-        );
+        console.error("[OfflineDB] Failed to get unsynced progress:", request.error);
         reject(request.error);
       };
     });
   }
 
-  /**
-   * Mark watch progress as synced
-   */
   public async markProgressSynced(itemId: string): Promise<void> {
     const progress = await this.getWatchProgress(itemId);
     if (progress) {
@@ -427,15 +350,11 @@ class OfflineDatabase {
     }
   }
 
-  /**
-   * Delete watch progress
-   */
   public async deleteWatchProgress(itemId: string): Promise<void> {
+    const db = await this.ensureDB();
     return new Promise((resolve, reject) => {
-      const db = await this.ensureDB();
       const transaction = db.transaction(["watchProgress"], "readwrite");
       const store = transaction.objectStore("watchProgress");
-
       const request = store.delete(itemId);
 
       request.onsuccess = () => {
@@ -444,31 +363,22 @@ class OfflineDatabase {
       };
 
       request.onerror = () => {
-        console.error(
-          "[OfflineDB] Failed to delete watch progress:",
-          request.error,
-        );
+        console.error("[OfflineDB] Failed to delete watch progress:", request.error);
         reject(request.error);
       };
     });
   }
 
-  /**
-   * Clear all data (for testing/debugging)
-   */
   public async clearAll(): Promise<void> {
+    const db = await this.ensureDB();
     return new Promise((resolve, reject) => {
-      const db = await this.ensureDB();
       const transaction = db.transaction(
         ["downloads", "watchProgress"],
         "readwrite",
       );
 
-      const downloadsStore = transaction.objectStore("downloads");
-      const progressStore = transaction.objectStore("watchProgress");
-
-      downloadsStore.clear();
-      progressStore.clear();
+      transaction.objectStore("downloads").clear();
+      transaction.objectStore("watchProgress").clear();
 
       transaction.oncomplete = () => {
         console.log("[OfflineDB] Cleared all data");

@@ -1520,3 +1520,10 @@ onBeforeUnmount(() => {
     opacity: 0;
 }
 </style>
+
+<style>
+video::cue {
+    background-color: transparent;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9), 0 0 6px rgba(0, 0, 0, 0.7);
+}
+</style>

@@ -149,11 +149,15 @@ export const useOfflineStore = defineStore('offline', {
           console.error('[OfflineStore] Failed to load downloads:', loadError);
         }
 
-        // Initialize offline detection with server URL
+        // Initialize offline detection with server URL and await the first check
+        // so that serverReachable is accurate before we set initialized = true.
+        // Without this, the watcher in App.vue sees isFullyOnline=false immediately
+        // on page reload and incorrectly redirects to the offline library.
         try {
           const jellyfinStore = useJellyfinStore();
           if (jellyfinStore.serverUrl) {
             offlineDetection.init(jellyfinStore.serverUrl);
+            await offlineDetection.checkNow();
             console.log('[OfflineStore] Offline detection initialized');
           }
         } catch (detectionError) {

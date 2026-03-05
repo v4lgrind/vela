@@ -7,6 +7,7 @@ import PlayerPage from "@/pages/PlayerPage.vue";
 import OfflineLibraryPage from "@/pages/OfflineLibraryPage.vue";
 import { useJellyfinStore } from "@/store/jellyfin-store";
 import { useAudioPlayerStore } from "@/store/audio-player-store";
+import { useOfflineStore } from "@/store/offline-store";
 
 const routes = [
   {
@@ -74,6 +75,7 @@ router.beforeEach(async (to, _from, next) => {
 
   const isAuthenticated = store.isAuthenticated;
   const requiresAuth = to.meta.requiresAuth ?? true;
+  const offlineStore = useOfflineStore();
 
   // Si la page nécessite une auth et qu'on n'est pas connecté
   if (requiresAuth && !isAuthenticated) {
@@ -82,6 +84,10 @@ router.beforeEach(async (to, _from, next) => {
   // Si on est connecté et qu'on accède à la page login
   else if (to.name === "login" && isAuthenticated) {
     next({ name: "libraries" });
+  }
+  // Block server-browsing routes when offline — only downloaded content is accessible
+  else if (offlineStore.initialized && !offlineStore.isFullyOnline && (to.name === "libraries" || to.name === "libraryItem")) {
+    next({ name: "offline" });
   }
   // Redirect audio items away from the video player route
   else if (to.name === "Player" && to.params.id) {

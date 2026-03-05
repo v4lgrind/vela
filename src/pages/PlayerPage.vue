@@ -1056,6 +1056,7 @@ async function initOfflinePlayer(resumeSeconds?: number, itemTitle?: string) {
         } else {
             const video = videoEl.value;
             if (!video) return;
+            video.src = localUrl;
             if (resumeSeconds && resumeSeconds > 0) {
                 const seekOnce = () => {
                     video.removeEventListener('loadedmetadata', seekOnce);
@@ -1068,7 +1069,6 @@ async function initOfflinePlayer(resumeSeconds?: number, itemTitle?: string) {
                 video.play().catch(() => {});
                 startProgressReporting();
             }
-            video.src = localUrl;
         }
 
         isLoading.value = false;
@@ -1367,7 +1367,8 @@ onMounted(async () => {
 
     // If offline and item is downloaded, bypass all Jellyfin network calls.
     const cachedDownload = offlineStore.getDownload(itemId);
-    if (!offlineStore.isFullyOnline && cachedDownload) {
+    const isOffline = !offlineStore.isFullyOnline || preferencesStore.forceOfflineMode;
+    if (isOffline && cachedDownload) {
         const routeStartTicks = route.query.startTicks ? Number(route.query.startTicks) : null;
         const resumeTicks = routeStartTicks ?? cachedDownload.jellyfinItem?.UserData?.PlaybackPositionTicks;
         const resumeSeconds = resumeTicks ? resumeTicks / 10_000_000 : undefined;

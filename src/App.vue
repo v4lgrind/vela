@@ -1,14 +1,4 @@
 <template>
-  <div
-    v-if="isAuthenticated && offlineStore.initialized && !offlineStore.isFullyOnline"
-    class="bg-gradient-to-br from-accent-orange to-[#f7931e] text-white px-3 py-2.5 text-center font-semibold text-sm shadow-md flex items-center justify-center gap-3 sticky top-0 z-[1000]"
-  >
-    Offline mode - Downloaded content only
-    <span v-if="offlineStore.syncInProgress" class="bg-white/20 text-white border-none px-2.5 py-1 rounded-xl text-xs font-semibold flex items-center gap-1.5 cursor-default">
-      <Loader2 class="size-3 animate-spin" />
-      Syncing...
-    </span>
-  </div>
   <SearchBar v-if="isAuthenticated" />
   <router-view :key="route.fullPath" :style="routerViewStyle" />
   <MiniAudioPlayer
@@ -30,7 +20,7 @@ import { usePreferencesStore } from "@/store/preferences-store";
 import { App as CapacitorApp } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
 import { StatusBar, Style } from "@capacitor/status-bar";
-import { Loader2 } from "lucide-vue-next";
+
 
 const route = useRoute();
 const router = useRouter();
@@ -65,11 +55,24 @@ function applyTheme(scheme: 'dark' | 'light' | 'system') {
 watch(() => preferencesStore.colorScheme, (scheme) => applyTheme(scheme));
 
 // Redirect to offline library when going offline while on a server-browsing page
-watch(() => offlineStore.isFullyOnline, (online) => {
-  if (!online && (route.name === 'libraries' || route.name === 'libraryItem')) {
-    router.replace({ name: 'offline' });
-  }
-});
+watch(
+  () => [offlineStore.isFullyOnline, preferencesStore.forceOfflineMode] as const,
+  ([online, forceOffline]) => {
+    if ((!online || forceOffline) && (route.name === 'libraries' || route.name === 'libraryItem')) {
+      router.replace({ name: 'offline' });
+    }
+  },
+);
+
+// Sync offline watch progress when forceOfflineMode is disabled
+watch(
+  () => preferencesStore.forceOfflineMode,
+  (isForce, wasForce) => {
+    if (wasForce && !isForce && offlineStore.isFullyOnline) {
+      offlineStore.syncWatchProgress();
+    }
+  },
+);
 
 // Initialize offline store on app mount
 onMounted(async () => {

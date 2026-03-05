@@ -263,7 +263,8 @@ import { useJellyfinStore } from '@/store/jellyfin-store';
 import { useAudioPlayerStore } from '@/store/audio-player-store';
 import { usePreferencesStore } from '@/store/preferences-store';
 import { useOfflineStore } from '@/store/offline-store';
-import { downloadService } from '@/services/downloadService';
+import { offlineDatabase } from '@/services/offlineDatabase';
+import { Filesystem, Directory } from '@capacitor/filesystem';
 import Hls from 'hls.js';
 import { Capacitor } from '@capacitor/core';
 import { NativeVideo } from '@/plugins/NativeVideoPlugin';
@@ -377,7 +378,9 @@ const posterUrl = computed(() => store.getImageUrl(itemId, 'Primary') || '');
 let hls: Hls | null = null;
 let controlsTimeout: ReturnType<typeof setTimeout> | null = null;
 let progressInterval: ReturnType<typeof setInterval> | null = null;
+let offlineProgressInterval: ReturnType<typeof setInterval> | null = null;
 let isSwitching = false;
+let isOfflinePlayback = false;
 
 // ── Video event handlers ───────────────────────────────────────────────────────
 
@@ -442,10 +445,10 @@ function togglePlayPause() {
     const video = videoEl.value;
     if (!video) return;
     if (video.paused) {
-        video.play().then(() => { reportPlaybackProgress(); });
+        video.play().then(() => { if (!isOfflinePlayback) reportPlaybackProgress(); });
     } else {
         video.pause();
-        reportPlaybackProgress();
+        if (!isOfflinePlayback) reportPlaybackProgress();
     }
 }
 
@@ -463,7 +466,7 @@ function seek(e: MouseEvent) {
     const video = videoEl.value;
     if (!video || !duration.value) return;
     video.currentTime = Math.max(0, ratio * duration.value);
-    reportPlaybackProgress();
+    if (!isOfflinePlayback) reportPlaybackProgress();
 }
 
 function requestFS(el: HTMLElement) {
@@ -1008,36 +1011,76 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
     }
 }
 
+// ── Offline progress saving ─────────────────────────────────────────────────────
+
+async function saveOfflineProgress() {
+    if (!isOfflinePlayback || !duration.value) return;
+    const percentage = (currentTime.value / duration.value) * 100;
+    const completed = percentage >= 90;
+    await offlineDatabase.saveWatchProgress({
+        itemId,
+        position: currentTime.value,
+        duration: duration.value,
+        percentage,
+        completed,
+        lastWatched: Date.now(),
+        synced: false,
+    });
+}
+
 // ── Offline player init (local downloaded file) ────────────────────────────────
 
-async function initOfflinePlayer(resumeSeconds?: number, itemTitle?: string) {
+async function initOfflinePlayer(cachedDownload: any, resumeSeconds?: number, itemTitle?: string) {
+    isOfflinePlayback = true;
     isLoading.value = true;
     try {
-        const localUrl = await downloadService.getLocalFile(itemId);
-        if (!localUrl) {
+        // Native (ExoPlayer): raw file:// URI — ExoPlayer can't access
+        // Capacitor's https://localhost/_capacitor_file_/ WebView URLs.
+        // Web: read from IndexedDB (Capacitor's web Filesystem backend)
+        // and create a blob URL for the <video> element.
+        let playUrl: string | null = null;
+        if (isNative) {
+            const fileInfo = await Filesystem.getUri({
+                path: cachedDownload.filePath,
+                directory: Directory.Data,
+            });
+            playUrl = fileInfo.uri; // file:///data/user/0/...
+        } else {
+            const fileData = await Filesystem.readFile({
+                path: cachedDownload.filePath,
+                directory: Directory.Data,
+            });
+            const resp = await fetch(`data:video/mp4;base64,${fileData.data}`);
+            const blob = await resp.blob();
+            playUrl = URL.createObjectURL(blob);
+        }
+
+        if (!playUrl) {
             error.value = 'Downloaded file not found on device';
             isLoading.value = false;
             return;
         }
 
-        hlsUrl.value = localUrl;
+        hlsUrl.value = playUrl;
         playMethod.value = 'DirectPlay';
         const startPositionMs = resumeSeconds && resumeSeconds > 0 ? Math.floor(resumeSeconds * 1000) : 0;
 
+        // Offline mode: NO network calls — no reportPlaybackStart/Progress/Stopped,
+        // no startProgressReporting, no deleteActiveEncodings.
         if (isNative) {
+            let nativeProgressCount = 0;
             await NativeVideo.addListener('progress', (data) => {
                 currentTime.value = data.positionMs / 1000;
                 duration.value = data.durationMs / 1000;
                 if (duration.value > 0) progressPct.value = (currentTime.value / duration.value) * 100;
-                reportPlaybackProgress();
+                if (++nativeProgressCount % 10 === 0) saveOfflineProgress();
             });
-            await NativeVideo.addListener('stopped', async (data) => {
-                currentTime.value = data.positionMs / 1000;
-                await reportPlaybackStopped();
+            await NativeVideo.addListener('stopped', () => {
+                saveOfflineProgress();
                 router.back();
             });
-            await NativeVideo.addListener('ended', async () => {
-                await reportPlaybackStopped();
+            await NativeVideo.addListener('ended', () => {
+                saveOfflineProgress();
                 router.back();
             });
             await NativeVideo.addListener('error', (data) => {
@@ -1046,7 +1089,7 @@ async function initOfflinePlayer(resumeSeconds?: number, itemTitle?: string) {
             });
 
             await NativeVideo.start({
-                url: localUrl,
+                url: playUrl,
                 authHeader: '',
                 startPositionMs,
                 title: itemTitle || '',
@@ -1056,19 +1099,18 @@ async function initOfflinePlayer(resumeSeconds?: number, itemTitle?: string) {
         } else {
             const video = videoEl.value;
             if (!video) return;
-            video.src = localUrl;
+            video.src = playUrl;
             if (resumeSeconds && resumeSeconds > 0) {
                 const seekOnce = () => {
                     video.removeEventListener('loadedmetadata', seekOnce);
                     video.currentTime = resumeSeconds;
                     video.play().catch(() => {});
-                    startProgressReporting();
                 };
                 video.addEventListener('loadedmetadata', seekOnce);
             } else {
                 video.play().catch(() => {});
-                startProgressReporting();
             }
+            offlineProgressInterval = setInterval(saveOfflineProgress, 10_000);
         }
 
         isLoading.value = false;
@@ -1372,7 +1414,7 @@ onMounted(async () => {
         const routeStartTicks = route.query.startTicks ? Number(route.query.startTicks) : null;
         const resumeTicks = routeStartTicks ?? cachedDownload.jellyfinItem?.UserData?.PlaybackPositionTicks;
         const resumeSeconds = resumeTicks ? resumeTicks / 10_000_000 : undefined;
-        await initOfflinePlayer(resumeSeconds, cachedDownload.jellyfinItem?.Name);
+        await initOfflinePlayer(cachedDownload, resumeSeconds, cachedDownload.jellyfinItem?.Name);
         if (!isNative) {
             document.addEventListener('click', handleClickOutside);
             document.addEventListener('fullscreenchange', () => { isFullscreen.value = !!getFullscreenElement(); });
@@ -1423,12 +1465,12 @@ onBeforeUnmount(() => {
     unlockOrientation();
 
     if (isNative) {
-        // Native teardown — the Activity handles its own playback stop;
-        // we just clean up listeners and ensure session reporting fires.
         NativeVideo.removeAllListeners();
         NativeVideo.stop().catch(() => {});
-        reportPlaybackStopped();
-        deleteActiveEncodings();
+        if (!isOfflinePlayback) {
+            reportPlaybackStopped();
+            deleteActiveEncodings();
+        }
         return;
     }
 
@@ -1437,14 +1479,24 @@ onBeforeUnmount(() => {
 
     if (controlsTimeout) clearTimeout(controlsTimeout);
     if (infoPollingInterval) { clearInterval(infoPollingInterval); infoPollingInterval = null; }
-    stopProgressReporting();
-    deleteActiveEncodings();
+    if (offlineProgressInterval) { clearInterval(offlineProgressInterval); offlineProgressInterval = null; }
+    if (isOfflinePlayback) {
+        saveOfflineProgress();
+    } else {
+        stopProgressReporting();
+        deleteActiveEncodings();
+    }
 
     hls?.destroy();
     hls = null;
 
     subtitleBlobCache.forEach(url => URL.revokeObjectURL(url));
     subtitleBlobCache.clear();
+
+    // Revoke blob URL if offline playback created one
+    if (isOfflinePlayback && hlsUrl.value.startsWith('blob:')) {
+        URL.revokeObjectURL(hlsUrl.value);
+    }
 
     const video = videoEl.value;
     if (video) {

@@ -329,10 +329,11 @@ class OfflineDatabase {
     return new Promise((resolve, reject) => {
       const transaction = db.transaction(["watchProgress"], "readonly");
       const store = transaction.objectStore("watchProgress");
-      const request = store.index("synced").getAll();
+      const request = store.getAll();
 
       request.onsuccess = () => {
-        resolve(request.result || []);
+        const all: WatchProgress[] = request.result || [];
+        resolve(all.filter(p => !p.synced));
       };
 
       request.onerror = () => {

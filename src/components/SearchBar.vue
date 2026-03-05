@@ -119,10 +119,10 @@
       <ArrowLeft class="size-5 sm:size-4" />
     </Button>
 <Button v-if="offlineStore.initialized && offlineStore.downloadCount > 0" variant="ghost"
-      class="bg-accent-purple/20 text-white shrink-0 px-2 sm:px-3" aria-label="Downloads"
+      :class="!offlineStore.isFullyOnline ? 'bg-[#b45309] hover:bg-[#92400e] text-white shrink-0 px-2 sm:px-3' : 'bg-accent-purple/20 text-white shrink-0 px-2 sm:px-3'" aria-label="Downloads"
       @click="$router.push('/offline')">
       <Download class="size-5 sm:size-4 sm:mr-1" /><span class="hidden sm:inline">Offline</span>
-      <Badge class="ml-1 bg-accent-purple text-white text-xs">{{ offlineStore.downloadCount }}</Badge>
+      <Badge :class="!offlineStore.isFullyOnline ? 'ml-1 bg-white/20 text-white text-xs' : 'ml-1 bg-accent-purple text-white text-xs'">{{ offlineStore.downloadCount }}</Badge>
     </Button>
 
     <div ref="searchContainerEl" class="relative flex-1 min-w-0" role="combobox" aria-expanded="true" aria-owns="search-listbox"

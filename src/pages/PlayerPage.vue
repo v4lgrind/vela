@@ -42,6 +42,15 @@
                 />
             </video>
 
+            <!-- Skip Intro button -->
+            <Transition name="skip-intro">
+                <button v-if="showSkipIntroButton"
+                    class="absolute bottom-32 right-4 z-[60] px-5 py-2.5 bg-black/60 hover:bg-black/80 active:bg-black/90 backdrop-blur-sm border border-white/30 hover:border-white/60 text-white text-sm font-semibold rounded-lg transition-all cursor-pointer select-none"
+                    @click="skipIntro">
+                    Skip Intro
+                </button>
+            </Transition>
+
             <!-- Controls overlay (auto-hide, web only) -->
             <div v-if="!isNative" class="absolute inset-0 flex flex-col justify-end player-gradient transition-opacity duration-300"
                 :class="controlsVisible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'"
@@ -374,6 +383,25 @@ const activeAudioStream = computed(() =>
 );
 
 const posterUrl = computed(() => store.getImageUrl(itemId, 'Primary') || '');
+
+// Intro skip
+const introEnd = ref<number | null>(null);
+const skipPromptStart = ref<number | null>(null);
+const skipPromptEnd = ref<number | null>(null);
+const introSkipped = ref(false);
+const nativeResumeOffsetMs = ref(0);
+const showSkipIntroButton = computed(() => {
+    if (introSkipped.value) return false;
+    if (skipPromptStart.value === null || skipPromptEnd.value === null) return false;
+    return currentTime.value >= skipPromptStart.value && currentTime.value <= skipPromptEnd.value;
+});
+
+// Reset introSkipped when user seeks back into or before the intro window
+watch(currentTime, (t) => {
+    if (introSkipped.value && skipPromptEnd.value !== null && t < skipPromptEnd.value) {
+        introSkipped.value = false;
+    }
+});
 
 let hls: Hls | null = null;
 let controlsTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -765,6 +793,51 @@ function determinePlaybackMethod(ms: any) {
     }
 }
 
+// ── Skip Intro ─────────────────────────────────────────────────────────────────
+
+async function fetchIntroTimestamps() {
+    try {
+        const res = await fetch(
+            `${serverUrl}/MediaSegments/${itemId}?includeSegmentTypes=Intro&includeSegmentTypes=Outro`,
+            { headers: { Authorization: embyAuthHeader } },
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        const intro = (data.Items ?? []).find((s: any) => s.Type === 'Intro');
+        if (intro) {
+            // Timestamps are in ticks (100ns units)
+            const start = intro.StartTicks / 10_000_000;
+            const end = intro.EndTicks / 10_000_000;
+            introEnd.value = end;
+            skipPromptStart.value = start;
+            skipPromptEnd.value = end + 10;
+            if (isNative) {
+                // Send timestamps to the native Activity so it can show its own Skip Intro button
+                NativeVideo.setIntroTimestamps({
+                    introStartMs: Math.floor(start * 1000),
+                    introEndMs: Math.floor(end * 1000),
+                }).catch(() => {});
+            }
+        }
+    } catch { /* plugin not available or item has no segments */ }
+}
+
+function skipIntro() {
+    if (introEnd.value === null) return;
+    // Immediately hide the button
+    introSkipped.value = true;
+    if (isNative) {
+        // Native position is stream-relative for HLS transcode — subtract resume offset
+        const streamMs = Math.max(0, Math.floor(introEnd.value * 1000) - nativeResumeOffsetMs.value);
+        NativeVideo.seek({ positionMs: streamMs }).catch(() => {});
+    } else {
+        const video = videoEl.value;
+        if (!video) return;
+        video.currentTime = introEnd.value;
+        reportPlaybackProgress();
+    }
+}
+
 // ── HLS.js init ────────────────────────────────────────────────────────────────
 
 // Jellyfin copies StartTimeTicks from the manifest URL into every segment URL it
@@ -883,6 +956,7 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
         // (because seekTo(startMs) was called), so no offset is needed.
         const isDirectPlayRaw = playMethod.value === 'DirectPlay' && !hlsUrl.value.includes('.m3u8');
         const resumeOffsetMs = isDirectPlayRaw ? 0 : startPositionMs;
+        nativeResumeOffsetMs.value = resumeOffsetMs;
 
         // Register event listeners before starting
         await NativeVideo.addListener('progress', (data) => {
@@ -1459,6 +1533,8 @@ onMounted(async () => {
         document.addEventListener('webkitfullscreenchange', () => { isFullscreen.value = !!getFullscreenElement(); });
         document.addEventListener('keydown', handleKeyDown);
     }
+
+    fetchIntroTimestamps();
 });
 
 onBeforeUnmount(() => {
@@ -1518,6 +1594,18 @@ onBeforeUnmount(() => {
 .info-fade-enter-from,
 .info-fade-leave-to {
     opacity: 0;
+}
+</style>
+
+<style scoped>
+.skip-intro-enter-active,
+.skip-intro-leave-active {
+    transition: opacity 300ms ease, transform 300ms ease;
+}
+.skip-intro-enter-from,
+.skip-intro-leave-to {
+    opacity: 0;
+    transform: translateY(8px);
 }
 </style>
 

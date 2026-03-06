@@ -10,6 +10,7 @@ import android.os.Handler
 import android.os.Looper
 import android.view.View
 import android.view.WindowManager
+import android.widget.Button
 import android.widget.ImageButton
 import android.widget.SeekBar
 import android.widget.TextView
@@ -61,6 +62,7 @@ class NativePlayerActivity : AppCompatActivity() {
         const val CMD_SEEK = "seek"
         const val CMD_SELECT_AUDIO = "selectAudio"
         const val CMD_SELECT_SUBTITLE = "selectSubtitle"
+        const val CMD_SET_INTRO = "setIntro"
     }
 
     private var player: ExoPlayer? = null
@@ -71,6 +73,7 @@ class NativePlayerActivity : AppCompatActivity() {
     private lateinit var btnAudio: ImageButton
     private lateinit var btnSubtitle: ImageButton
     private lateinit var btnFullscreen: ImageButton
+    private lateinit var btnSkipIntro: Button
     private lateinit var seekBar: SeekBar
     private lateinit var tvCurrentTime: TextView
     private lateinit var tvTotalTime: TextView
@@ -106,6 +109,12 @@ class NativePlayerActivity : AppCompatActivity() {
                     val groupIdx = intent.getIntExtra("groupIndex", -1)
                     selectSubtitleTrack(groupIdx)
                 }
+                CMD_SET_INTRO -> {
+                    introStartMs = intent.getLongExtra("introStartMs", -1L)
+                    introEndMs = intent.getLongExtra("introEndMs", -1L)
+                    introSkipped = false
+                    android.util.Log.d("NativePlayer", "Intro set: $introStartMs-$introEndMs ms")
+                }
             }
         }
     }
@@ -137,11 +146,22 @@ class NativePlayerActivity : AppCompatActivity() {
             if (!isUserSeeking) seekBar.progress = progress
             tvCurrentTime.text = formatTime(pos)
             tvTotalTime.text = formatTime(dur)
+
+            // Show/hide Skip Intro button
+            if (introStartMs >= 0 && introEndMs >= 0) {
+                if (introSkipped && pos < introEndMs) introSkipped = false
+                val showSkip = !introSkipped && pos >= introStartMs && pos <= introEndMs + 10_000L
+                btnSkipIntro.visibility = if (showSkip) View.VISIBLE else View.GONE
+            }
+
             handler.postDelayed(this, 500)
         }
     }
 
     private var isUserSeeking = false
+    private var introStartMs = -1L
+    private var introEndMs = -1L
+    private var introSkipped = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -173,6 +193,7 @@ class NativePlayerActivity : AppCompatActivity() {
         tvCurrentTime = findViewById(R.id.tv_current_time)
         tvTotalTime = findViewById(R.id.tv_total_time)
         tvTitle = findViewById(R.id.tv_title)
+        btnSkipIntro = findViewById(R.id.btn_skip_intro)
 
         val url = intent.getStringExtra(EXTRA_URL) ?: run {
             finish()
@@ -278,6 +299,13 @@ class NativePlayerActivity : AppCompatActivity() {
         btnFullscreen.setOnClickListener {
             toggleFullscreen()
             scheduleHideControls()
+        }
+
+        btnSkipIntro.setOnClickListener {
+            val p = player ?: return@setOnClickListener
+            introSkipped = true
+            btnSkipIntro.visibility = View.GONE
+            p.seekTo(introEndMs)
         }
     }
 

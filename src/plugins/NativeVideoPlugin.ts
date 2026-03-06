@@ -50,6 +50,7 @@ export interface NativeVideoPlugin {
     pause(): Promise<void>;
     resume(): Promise<void>;
     seek(options: { positionMs: number }): Promise<void>;
+    setIntroTimestamps(options: { introStartMs: number; introEndMs: number }): Promise<void>;
     selectAudioTrack(options: { groupIndex: number }): Promise<void>;
     selectSubtitleTrack(options: { groupIndex: number }): Promise<void>;
     nativeLog(options: { message: string }): Promise<void>;

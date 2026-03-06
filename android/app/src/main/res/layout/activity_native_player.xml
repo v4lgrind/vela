@@ -159,4 +159,22 @@
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
+    <!-- Skip Intro button — outside controls overlay so it stays visible when controls are hidden -->
+    <Button
+        android:id="@+id/btn_skip_intro"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="80dp"
+        android:text="Skip Intro"
+        android:textColor="#FFFFFF"
+        android:textSize="14sp"
+        android:backgroundTint="#CC000000"
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp"
+        android:visibility="gone" />
+
 </FrameLayout>

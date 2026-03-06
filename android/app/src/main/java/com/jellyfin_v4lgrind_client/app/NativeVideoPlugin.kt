@@ -95,6 +95,19 @@ class NativeVideoPlugin : Plugin() {
     }
 
     @PluginMethod
+    fun setIntroTimestamps(call: PluginCall) {
+        val introStartMs = call.getLong("introStartMs") ?: -1L
+        val introEndMs = call.getLong("introEndMs") ?: -1L
+        val intent = Intent(NativePlayerActivity.ACTION_COMMAND)
+        intent.putExtra("command", NativePlayerActivity.CMD_SET_INTRO)
+        intent.putExtra("introStartMs", introStartMs)
+        intent.putExtra("introEndMs", introEndMs)
+        intent.setPackage(context.packageName)
+        context.sendBroadcast(intent)
+        call.resolve()
+    }
+
+    @PluginMethod
     fun nativeLog(call: PluginCall) {
         val message = call.getString("message") ?: return
         android.util.Log.d("NativePlayer", message)

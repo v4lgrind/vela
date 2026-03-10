@@ -1088,9 +1088,17 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
 // ── Offline progress saving ─────────────────────────────────────────────────────
 
 async function saveOfflineProgress() {
-    if (!isOfflinePlayback || !duration.value) return;
+    if (!isOfflinePlayback) {
+        console.log('[OfflineProgress] Skip save: not offline playback');
+        return;
+    }
+    if (!duration.value) {
+        console.log('[OfflineProgress] Skip save: no duration');
+        return;
+    }
     const percentage = (currentTime.value / duration.value) * 100;
     const completed = percentage >= 90;
+    console.log(`[OfflineProgress] Saving: position=${currentTime.value}s, duration=${duration.value}s, pct=${percentage.toFixed(1)}%`);
     await offlineDatabase.saveWatchProgress({
         itemId,
         position: currentTime.value,
@@ -1100,6 +1108,7 @@ async function saveOfflineProgress() {
         lastWatched: Date.now(),
         synced: false,
     });
+    console.log('[OfflineProgress] Saved successfully');
 }
 
 // ── Offline player init (local downloaded file) ────────────────────────────────
@@ -1149,12 +1158,14 @@ async function initOfflinePlayer(cachedDownload: any, resumeSeconds?: number, it
                 if (duration.value > 0) progressPct.value = (currentTime.value / duration.value) * 100;
                 if (++nativeProgressCount % 10 === 0) saveOfflineProgress();
             });
-            await NativeVideo.addListener('stopped', () => {
-                saveOfflineProgress();
+            await NativeVideo.addListener('stopped', async () => {
+                console.log('[NativeOffline] stopped event fired');
+                await saveOfflineProgress();
                 router.back();
             });
-            await NativeVideo.addListener('ended', () => {
-                saveOfflineProgress();
+            await NativeVideo.addListener('ended', async () => {
+                console.log('[NativeOffline] ended event fired');
+                await saveOfflineProgress();
                 router.back();
             });
             await NativeVideo.addListener('error', (data) => {
@@ -1492,13 +1503,17 @@ onMounted(async () => {
         let resumeSeconds: number | undefined;
         if (routeStartTicks) {
             resumeSeconds = routeStartTicks / 10_000_000;
+            console.log(`[OfflineResume] Using route startTicks: ${resumeSeconds}s`);
         } else {
             const offlineProgress = await offlineDatabase.getWatchProgress(itemId);
+            console.log('[OfflineResume] Fetched offline progress:', offlineProgress);
             if (offlineProgress && offlineProgress.position > 0 && !offlineProgress.completed) {
                 resumeSeconds = offlineProgress.position;
+                console.log(`[OfflineResume] Using offline progress: ${resumeSeconds}s`);
             } else {
                 const cachedTicks = cachedDownload.jellyfinItem?.UserData?.PlaybackPositionTicks;
                 resumeSeconds = cachedTicks ? cachedTicks / 10_000_000 : undefined;
+                console.log(`[OfflineResume] Using cached Jellyfin ticks: ${resumeSeconds}s`);
             }
         }
 
@@ -1553,16 +1568,19 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
     unlockOrientation();
+    console.log(`[PlayerPage] onBeforeUnmount: isNative=${isNative}, isOfflinePlayback=${isOfflinePlayback}`);
 
     if (isNative) {
-        NativeVideo.removeAllListeners();
-        NativeVideo.stop().catch(() => {});
+        // Save progress BEFORE removing listeners or stopping
         if (isOfflinePlayback) {
+            console.log('[PlayerPage] Saving offline progress in onBeforeUnmount');
             saveOfflineProgress();
         } else {
             reportPlaybackStopped();
             deleteActiveEncodings();
         }
+        NativeVideo.removeAllListeners();
+        NativeVideo.stop().catch(() => {});
         return;
     }
 

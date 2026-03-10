@@ -74,7 +74,7 @@ async function handleDownload(url: string, itemId: string) {
       throw new Error('Cannot read response stream');
     }
 
-    const WRITE_BATCH = 8 * 1024 * 1024; // 8 MB batches
+    const WRITE_BATCH = 2 * 1024 * 1024; // 2 MB batches - smaller for smoother UI
 
     let loaded = 0;
     let isFirstChunk = true;

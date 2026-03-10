@@ -18,11 +18,63 @@ interface ActiveDownload {
   filename: string;
   isFirstWrite: boolean;
   loaded: number;
+  writeQueue: string[];
+  isWriting: boolean;
 }
 
 class DownloadService {
   private downloads: Map<string, ActiveDownload> = new Map();
   private progressCallbacks: Map<string, (progress: DownloadProgress) => void> = new Map();
+
+  /**
+   * Schedule work during idle time or with minimal delay
+   */
+  private scheduleIdle(callback: () => void): void {
+    if ('requestIdleCallback' in window) {
+      (window as any).requestIdleCallback(callback, { timeout: 100 });
+    } else {
+      setTimeout(callback, 10);
+    }
+  }
+
+  /**
+   * Process write queue for a download - one write at a time with idle scheduling
+   */
+  private async processWriteQueue(itemId: string): Promise<void> {
+    const download = this.downloads.get(itemId);
+    if (!download || download.isWriting || download.writeQueue.length === 0) return;
+
+    download.isWriting = true;
+
+    const data = download.writeQueue.shift()!;
+
+    try {
+      if (download.isFirstWrite) {
+        download.isFirstWrite = false;
+        await Filesystem.writeFile({
+          path: download.filePath,
+          data,
+          directory: Directory.Data,
+          recursive: true,
+        });
+      } else {
+        await Filesystem.appendFile({
+          path: download.filePath,
+          data,
+          directory: Directory.Data,
+        });
+      }
+    } catch (err) {
+      console.error('Write error:', err);
+    }
+
+    download.isWriting = false;
+
+    // Schedule next write during idle time
+    if (download.writeQueue.length > 0) {
+      this.scheduleIdle(() => this.processWriteQueue(itemId));
+    }
+  }
 
   /**
    * Télécharge un fichier pour usage hors ligne using Web Worker
@@ -59,6 +111,8 @@ class DownloadService {
         filename,
         isFirstWrite: true,
         loaded: 0,
+        writeQueue: [],
+        isWriting: false,
       };
 
       this.downloads.set(itemId, activeDownload);
@@ -80,23 +134,14 @@ class DownloadService {
               });
             }
           } else if (msg.type === 'chunk') {
-            // Write chunk to filesystem (this is the only main-thread work)
-            if (activeDownload.isFirstWrite) {
-              activeDownload.isFirstWrite = false;
-              await Filesystem.writeFile({
-                path: filePath,
-                data: msg.data,
-                directory: Directory.Data,
-                recursive: true,
-              });
-            } else {
-              await Filesystem.appendFile({
-                path: filePath,
-                data: msg.data,
-                directory: Directory.Data,
-              });
-            }
+            // Queue chunk for writing during idle time
+            activeDownload.writeQueue.push(msg.data);
+            this.scheduleIdle(() => this.processWriteQueue(itemId));
           } else if (msg.type === 'complete') {
+            // Wait for all queued writes to complete
+            while (activeDownload.writeQueue.length > 0 || activeDownload.isWriting) {
+              await new Promise(r => setTimeout(r, 50));
+            }
             console.log("💾 Fichier sauvegardé:", filePath);
 
             const downloadedMedia: DownloadedMedia = {

@@ -1557,7 +1557,9 @@ onBeforeUnmount(() => {
     if (isNative) {
         NativeVideo.removeAllListeners();
         NativeVideo.stop().catch(() => {});
-        if (!isOfflinePlayback) {
+        if (isOfflinePlayback) {
+            saveOfflineProgress();
+        } else {
             reportPlaybackStopped();
             deleteActiveEncodings();
         }

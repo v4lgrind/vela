@@ -1,7 +1,7 @@
 import { offlineDatabase, type DownloadedMedia } from './offlineDatabase';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Capacitor } from '@capacitor/core';
-import { Http } from '@capacitor-community/http';
+import DownloadWorker from '@/workers/downloadWorker?worker';
 
 interface DownloadProgress {
   itemId: string;
@@ -12,10 +12,15 @@ interface DownloadProgress {
 }
 
 interface ActiveDownload {
-  aborted: boolean;
+  worker: Worker;
   filePath: string;
   metadata: any;
   filename: string;
+  isFirstWrite: boolean;
+  loaded: number;
+  writeQueue: string[];
+  isWriting: boolean;
+  isPaused: boolean;
 }
 
 class DownloadService {
@@ -23,7 +28,45 @@ class DownloadService {
   private progressCallbacks: Map<string, (progress: DownloadProgress) => void> = new Map();
 
   /**
-   * Download file for offline use - uses native HTTP on Android, falls back to fetch on web
+   * Process write queue with delays between writes to keep UI responsive
+   */
+  private async processWriteQueue(itemId: string): Promise<void> {
+    const download = this.downloads.get(itemId);
+    if (!download || download.isWriting || download.writeQueue.length === 0) return;
+
+    download.isWriting = true;
+    const data = download.writeQueue.shift()!;
+
+    try {
+      if (download.isFirstWrite) {
+        download.isFirstWrite = false;
+        await Filesystem.writeFile({
+          path: download.filePath,
+          data,
+          directory: Directory.Data,
+          recursive: true,
+        });
+      } else {
+        await Filesystem.appendFile({
+          path: download.filePath,
+          data,
+          directory: Directory.Data,
+        });
+      }
+    } catch (err) {
+      console.error('Write error:', err);
+    }
+
+    download.isWriting = false;
+
+    // Schedule next write with a delay to let UI breathe
+    if (download.writeQueue.length > 0) {
+      setTimeout(() => this.processWriteQueue(itemId), 50);
+    }
+  }
+
+  /**
+   * Download file for offline use using Web Worker
    */
   async downloadForOffline(
     serverUrl: string,
@@ -46,239 +89,127 @@ class DownloadService {
 
     if (onProgress) this.progressCallbacks.set(itemId, onProgress);
 
-    const activeDownload: ActiveDownload = {
-      aborted: false,
-      filePath,
-      metadata,
-      filename,
-    };
-    this.downloads.set(itemId, activeDownload);
+    return new Promise((resolve, reject) => {
+      const worker = new DownloadWorker();
 
-    try {
-      if (Capacitor.isNativePlatform()) {
-        await this.downloadNative(itemId, downloadUrl, filePath, filename, onProgress);
-      } else {
-        await this.downloadWeb(itemId, downloadUrl, filePath, filename, onProgress);
-      }
-
-      if (activeDownload.aborted) {
-        throw new Error('AbortError');
-      }
-
-      console.log("💾 Fichier sauvegardé:", filePath);
-
-      // Get actual file size
-      let fileSize = 0;
-      try {
-        const stat = await Filesystem.stat({ path: filePath, directory: Directory.Data });
-        fileSize = stat.size;
-      } catch { /* ignore */ }
-
-      const downloadedMedia: DownloadedMedia = {
-        itemId: metadata.Id,
-        type: this.getMediaType(metadata.Type),
-        name: metadata.Name || 'Unknown',
+      const activeDownload: ActiveDownload = {
+        worker,
         filePath,
-        fileSize,
-        downloadDate: Date.now(),
-        jellyfinItem: metadata,
+        metadata,
+        filename,
+        isFirstWrite: true,
+        loaded: 0,
+        writeQueue: [],
+        isWriting: false,
+        isPaused: false,
       };
 
-      if (metadata.Type === 'Episode') {
-        downloadedMedia.seriesId = metadata.SeriesId;
-        downloadedMedia.seriesName = metadata.SeriesName;
-        downloadedMedia.seasonId = metadata.SeasonId;
-        downloadedMedia.seasonNumber = metadata.ParentIndexNumber;
-        downloadedMedia.episodeNumber = metadata.IndexNumber;
-      } else if (metadata.Type === 'Audio') {
-        downloadedMedia.albumId = metadata.AlbumId;
-        downloadedMedia.albumName = metadata.Album;
-      }
+      this.downloads.set(itemId, activeDownload);
 
-      await offlineDatabase.addDownload(downloadedMedia);
-      console.log("✅ Téléchargement offline terminé:", filename);
+      worker.onmessage = async (event) => {
+        const msg = event.data;
 
-    } catch (error: any) {
-      if (error.message === 'AbortError' || activeDownload.aborted) {
-        console.log("🚫 Téléchargement annulé:", metadata.Name);
         try {
-          await Filesystem.deleteFile({ path: filePath, directory: Directory.Data });
-        } catch { /* ignore */ }
-        const err = new Error('AbortError');
-        (err as any).name = 'AbortError';
-        throw err;
-      } else {
-        console.error("❌ Erreur téléchargement offline:", error);
-        throw error;
-      }
-    } finally {
-      this.downloads.delete(itemId);
-      this.progressCallbacks.delete(itemId);
-    }
-  }
+          if (msg.type === 'progress') {
+            activeDownload.loaded = msg.loaded;
+            const callback = this.progressCallbacks.get(itemId);
+            if (callback) {
+              callback({
+                itemId,
+                filename,
+                loaded: msg.loaded,
+                total: msg.total,
+                percentage: msg.percentage,
+              });
+            }
+          } else if (msg.type === 'chunk') {
+            // Queue chunk for writing
+            activeDownload.writeQueue.push(msg.data);
+            // Start processing if not already
+            if (!activeDownload.isWriting) {
+              this.processWriteQueue(itemId);
+            }
+          } else if (msg.type === 'complete') {
+            // Wait for all writes to complete
+            while (activeDownload.writeQueue.length > 0 || activeDownload.isWriting) {
+              await new Promise(r => setTimeout(r, 100));
+            }
 
-  /**
-   * Native download using Capacitor HTTP plugin - runs entirely in native code
-   */
-  private async downloadNative(
-    itemId: string,
-    url: string,
-    filePath: string,
-    filename: string,
-    onProgress?: (progress: DownloadProgress) => void
-  ): Promise<void> {
-    // Get the full native path for the file
-    const fullPath = `${Directory.Data}/${filePath}`;
+            console.log("💾 Fichier sauvegardé:", filePath);
 
-    // Ensure directory exists
-    const dirPath = filePath.substring(0, filePath.lastIndexOf('/'));
-    try {
-      await Filesystem.mkdir({
-        path: dirPath,
-        directory: Directory.Data,
-        recursive: true,
-      });
-    } catch { /* directory may already exist */ }
+            // Get file size
+            let fileSize = msg.loaded;
+            try {
+              const stat = await Filesystem.stat({ path: filePath, directory: Directory.Data });
+              fileSize = stat.size;
+            } catch { /* use loaded */ }
 
-    // Use native HTTP download - this happens entirely in native code
-    // No WebView involvement = no UI jank
-    const response = await Http.downloadFile({
-      url,
-      filePath: filePath,
-      fileDirectory: Directory.Data,
-      progress: true,
+            const downloadedMedia: DownloadedMedia = {
+              itemId: metadata.Id,
+              type: this.getMediaType(metadata.Type),
+              name: metadata.Name || 'Unknown',
+              filePath,
+              fileSize,
+              downloadDate: Date.now(),
+              jellyfinItem: metadata,
+            };
+
+            if (metadata.Type === 'Episode') {
+              downloadedMedia.seriesId = metadata.SeriesId;
+              downloadedMedia.seriesName = metadata.SeriesName;
+              downloadedMedia.seasonId = metadata.SeasonId;
+              downloadedMedia.seasonNumber = metadata.ParentIndexNumber;
+              downloadedMedia.episodeNumber = metadata.IndexNumber;
+            } else if (metadata.Type === 'Audio') {
+              downloadedMedia.albumId = metadata.AlbumId;
+              downloadedMedia.albumName = metadata.Album;
+            }
+
+            await offlineDatabase.addDownload(downloadedMedia);
+            console.log("✅ Téléchargement offline terminé:", filename);
+
+            this.cleanup(itemId);
+            resolve();
+          } else if (msg.type === 'error') {
+            const error = new Error(msg.message);
+            if (msg.message === 'AbortError') {
+              (error as any).name = 'AbortError';
+              console.log("🚫 Téléchargement annulé:", metadata.Name);
+              try {
+                await Filesystem.deleteFile({ path: filePath, directory: Directory.Data });
+              } catch { /* ignore */ }
+            } else {
+              console.error("❌ Erreur téléchargement:", msg.message);
+            }
+            this.cleanup(itemId);
+            reject(error);
+          }
+        } catch (err) {
+          console.error("❌ Error handling message:", err);
+          this.cleanup(itemId);
+          reject(err);
+        }
+      };
+
+      worker.onerror = (error) => {
+        console.error("❌ Worker error:", error);
+        this.cleanup(itemId);
+        reject(new Error('Worker error'));
+      };
+
+      worker.postMessage({ type: 'start', url: downloadUrl, itemId });
     });
-
-    // Progress events are handled by the plugin internally
-    // Final progress update
-    if (onProgress && response.path) {
-      try {
-        const stat = await Filesystem.stat({ path: filePath, directory: Directory.Data });
-        onProgress({
-          itemId,
-          filename,
-          loaded: stat.size,
-          total: stat.size,
-          percentage: 100,
-        });
-      } catch { /* ignore */ }
-    }
   }
 
-  /**
-   * Web fallback using fetch + streaming writes
-   */
-  private async downloadWeb(
-    itemId: string,
-    url: string,
-    filePath: string,
-    filename: string,
-    onProgress?: (progress: DownloadProgress) => void
-  ): Promise<void> {
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-
-    const contentLength = response.headers.get('Content-Length');
-    const total = contentLength ? parseInt(contentLength, 10) : 0;
-
-    const reader = response.body?.getReader();
-    if (!reader) throw new Error('Cannot read response stream');
-
-    const BATCH_SIZE = 2 * 1024 * 1024; // 2 MB
-    let loaded = 0;
-    let isFirstWrite = true;
-    let pendingData: Uint8Array[] = [];
-    let pendingSize = 0;
-    let lastProgressTime = 0;
-
-    const writeBatch = async (chunks: Uint8Array[]) => {
-      const len = chunks.reduce((s, c) => s + c.length, 0);
-      if (len === 0) return;
-
-      const buf = new Uint8Array(len);
-      let off = 0;
-      for (const c of chunks) {
-        buf.set(c, off);
-        off += c.length;
-      }
-
-      const data = this.arrayBufferToBase64(buf);
-
-      if (isFirstWrite) {
-        isFirstWrite = false;
-        await Filesystem.writeFile({
-          path: filePath,
-          data,
-          directory: Directory.Data,
-          recursive: true,
-        });
-      } else {
-        await Filesystem.appendFile({
-          path: filePath,
-          data,
-          directory: Directory.Data,
-        });
-      }
-
-      // Small delay to let UI breathe
-      await new Promise(r => setTimeout(r, 10));
-    };
-
-    while (true) {
-      const download = this.downloads.get(itemId);
-      if (download?.aborted) break;
-
-      const { done, value } = await reader.read();
-
-      if (done) {
-        await writeBatch(pendingData);
-        break;
-      }
-
-      loaded += value.length;
-      pendingData.push(value);
-      pendingSize += value.length;
-
-      if (pendingSize >= BATCH_SIZE) {
-        await writeBatch(pendingData);
-        pendingData = [];
-        pendingSize = 0;
-      }
-
-      const now = Date.now();
-      if (onProgress && total > 0 && now - lastProgressTime >= 500) {
-        lastProgressTime = now;
-        onProgress({
-          itemId,
-          filename,
-          loaded,
-          total,
-          percentage: Math.round((loaded / total) * 100),
-        });
-      }
+  private cleanup(itemId: string) {
+    const download = this.downloads.get(itemId);
+    if (download) {
+      download.worker.terminate();
     }
-
-    if (onProgress && total > 0) {
-      onProgress({ itemId, filename, loaded, total, percentage: 100 });
-    }
+    this.downloads.delete(itemId);
+    this.progressCallbacks.delete(itemId);
   }
 
-  /**
-   * Convert Uint8Array to base64
-   */
-  private arrayBufferToBase64(buffer: Uint8Array): string {
-    const CHUNK_SIZE = 0x8000;
-    let binary = '';
-    for (let i = 0; i < buffer.length; i += CHUNK_SIZE) {
-      const chunk = buffer.subarray(i, Math.min(i + CHUNK_SIZE, buffer.length));
-      binary += String.fromCharCode.apply(null, Array.from(chunk));
-    }
-    return btoa(binary);
-  }
-
-  /**
-   * Get local file for playback
-   */
   async getLocalFile(itemId: string): Promise<string | null> {
     try {
       const download = await offlineDatabase.getDownload(itemId);
@@ -295,14 +226,11 @@ class DownloadService {
     }
   }
 
-  /**
-   * Delete offline file
-   */
   async deleteOfflineFile(itemId: string): Promise<void> {
     try {
       const download = await offlineDatabase.getDownload(itemId);
       if (!download) {
-        console.warn("Fichier déjà supprimé ou inexistant:", itemId);
+        console.warn("Fichier déjà supprimé:", itemId);
         return;
       }
 
@@ -313,9 +241,9 @@ class DownloadService {
       } catch { /* file doesn't exist */ }
 
       await offlineDatabase.deleteDownload(itemId);
-      console.log("✅ Téléchargement offline supprimé:", itemId);
+      console.log("✅ Téléchargement supprimé:", itemId);
     } catch (error) {
-      console.error("❌ Erreur suppression fichier offline:", error);
+      console.error("❌ Erreur suppression:", error);
       throw error;
     }
   }
@@ -324,12 +252,9 @@ class DownloadService {
     if (metadata.Container) return metadata.Container;
     switch (metadata.Type) {
       case 'Movie':
-      case 'Episode':
-        return 'mkv';
-      case 'Audio':
-        return 'mp3';
-      default:
-        return 'bin';
+      case 'Episode': return 'mkv';
+      case 'Audio': return 'mp3';
+      default: return 'bin';
     }
   }
 
@@ -374,8 +299,8 @@ class DownloadService {
   cancelDownload(itemId: string): void {
     const download = this.downloads.get(itemId);
     if (download) {
-      download.aborted = true;
-      console.log("🚫 Téléchargement annulé:", itemId);
+      download.worker.postMessage({ type: 'cancel' });
+      console.log("🚫 Annulation:", itemId);
     }
   }
 

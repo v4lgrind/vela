@@ -25,8 +25,38 @@
       </Card>
     </div>
 
+    <!-- Active Downloads Section -->
+    <section v-if="activeDownloads.length > 0" class="mb-8">
+      <h2 class="text-xl font-semibold mb-4 text-accent-purple-light flex items-center gap-2">
+        <Loader2 class="size-5 animate-spin" />
+        Downloading ({{ activeDownloads.length }})
+      </h2>
+      <div class="space-y-3">
+        <Card v-for="task in activeDownloads" :key="task.itemId" class="bg-surface-raised border-border-default p-4">
+          <div class="flex items-center justify-between gap-4 mb-2">
+            <div class="flex-1 min-w-0">
+              <div class="font-medium text-text-heading truncate">{{ task.name }}</div>
+              <div class="text-xs text-text-muted">
+                {{ formatSize(task.loaded) }} / {{ formatSize(task.total) }}
+              </div>
+            </div>
+            <Button variant="ghost" size="sm" @click="cancelDownload(task.itemId)" class="text-red-400 hover:text-red-300 hover:bg-red-500/10">
+              <X class="size-4" />
+            </Button>
+          </div>
+          <div class="h-2 bg-white/10 rounded-full overflow-hidden">
+            <div
+              class="h-full bg-accent-purple transition-all duration-300"
+              :style="{ width: `${task.progress}%` }"
+            />
+          </div>
+          <div class="text-right text-xs text-accent-purple-light mt-1">{{ task.progress }}%</div>
+        </Card>
+      </div>
+    </section>
+
     <!-- Empty state -->
-    <div v-if="offlineStore.downloadCount === 0" class="text-center py-15">
+    <div v-if="offlineStore.downloadCount === 0 && activeDownloads.length === 0" class="text-center py-15">
       <div class="text-6xl mb-5">📭</div>
       <h2 class="text-xl mb-2.5">No offline content</h2>
       <p class="text-text-muted mb-5">Download content from detail pages to watch without a connection.</p>
@@ -116,19 +146,27 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue';
+import { onMounted, computed } from 'vue';
 import { useOfflineStore } from '@/store/offline-store';
 import { useJellyfinStore } from '@/store/jellyfin-store';
+import { useDownloadStore } from '@/store/download-store';
 import { downloadService } from '@/services/downloadService';
 import LazyImg from '@/components/LazyImg.vue';
 import { isAudioType } from '@/utils/helpers';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Trash2 } from 'lucide-vue-next';
+import { ArrowLeft, Trash2, X, Loader2 } from 'lucide-vue-next';
 
 const offlineStore = useOfflineStore();
 const jellyfinStore = useJellyfinStore();
+const downloadStore = useDownloadStore();
+
+const activeDownloads = computed(() => downloadStore.activeDownloads);
+
+function cancelDownload(itemId: string) {
+  downloadStore.cancelDownload(itemId);
+}
 
 function getImageUrl(id: string, itemType?: string) {
   const isAudio = itemType && isAudioType(itemType);

@@ -397,6 +397,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { useJellyfinStore } from '@/store/jellyfin-store';
 import { useOfflineStore } from '@/store/offline-store';
 import { useAudioPlayerStore, type AudioTrack } from '@/store/audio-player-store';
+import { useDownloadStore } from '@/store/download-store';
 import { downloadService } from '@/services/downloadService';
 import { offlineDatabase } from '@/services/offlineDatabase';
 import LazyImg from '@/components/LazyImg.vue';
@@ -409,6 +410,7 @@ import { Play, Check, Download as DownloadIcon, X, ArrowLeft, ArrowRight, Loader
 const store = useJellyfinStore();
 const offlineStore = useOfflineStore();
 const audioPlayerStore = useAudioPlayerStore();
+const downloadStore = useDownloadStore();
 const route = useRoute();
 const router = useRouter();
 
@@ -425,8 +427,6 @@ const itemId = computed(() => route.params.id as string);
 const accessToken = store.accessToken;
 
 const showMediaInfo = ref(false);
-const isDownloading = ref(false);
-const downloadProgress = ref(0);
 const playingSeasonId = ref<string | null>(null);
 const watchingEpId = ref<string | null>(null);
 const togglingWatched = ref(false);
@@ -738,21 +738,23 @@ const isItemDownloaded = computed(() => {
     return offlineStore.isItemDownloaded(itemId.value);
 });
 
+const isDownloading = computed(() => {
+    return downloadStore.isDownloading(itemId.value);
+});
+
+const downloadProgress = computed(() => {
+    const task = downloadStore.getTask(itemId.value);
+    return task?.progress ?? 0;
+});
+
 async function handleDownload() {
     if (!item.value) return;
-    try {
-        isDownloading.value = true;
-        downloadProgress.value = 0;
-        await store.downloadItemForOffline(itemId.value, (progress) => {
-            downloadProgress.value = progress.percentage;
-        });
-        await offlineStore.loadDownloads();
-    } catch (error: any) {
-        alert(`Download failed: ${error?.message ?? error}`);
-    } finally {
-        isDownloading.value = false;
-        downloadProgress.value = 0;
-    }
+    // Start download in background - don't await, let it run
+    downloadStore.startDownload(itemId.value, item.value).catch((error: any) => {
+        if (error.name !== 'AbortError') {
+            console.error('Download failed:', error);
+        }
+    });
 }
 
 async function deleteDownload() {
@@ -768,8 +770,6 @@ async function deleteDownload() {
 
 function cancelDownload() {
     if (!item.value) return;
-    store.cancelDownload(itemId.value);
-    isDownloading.value = false;
-    downloadProgress.value = 0;
+    downloadStore.cancelDownload(itemId.value);
 }
 </script>

@@ -1088,17 +1088,9 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
 // ── Offline progress saving ─────────────────────────────────────────────────────
 
 async function saveOfflineProgress() {
-    if (!isOfflinePlayback) {
-        console.log('[OfflineProgress] Skip save: not offline playback');
-        return;
-    }
-    if (!duration.value) {
-        console.log('[OfflineProgress] Skip save: no duration');
-        return;
-    }
+    if (!isOfflinePlayback || !duration.value) return;
     const percentage = (currentTime.value / duration.value) * 100;
     const completed = percentage >= 90;
-    console.log(`[OfflineProgress] Saving: position=${currentTime.value}s, duration=${duration.value}s, pct=${percentage.toFixed(1)}%`);
     await offlineDatabase.saveWatchProgress({
         itemId,
         position: currentTime.value,
@@ -1108,13 +1100,11 @@ async function saveOfflineProgress() {
         lastWatched: Date.now(),
         synced: false,
     });
-    console.log('[OfflineProgress] Saved successfully');
 }
 
 // ── Offline player init (local downloaded file) ────────────────────────────────
 
 async function initOfflinePlayer(cachedDownload: any, resumeSeconds?: number, itemTitle?: string) {
-    console.log(`[initOfflinePlayer] Starting: isNative=${isNative}, resumeSeconds=${resumeSeconds}`);
     isOfflinePlayback = true;
     isLoading.value = true;
     try {
@@ -1152,25 +1142,18 @@ async function initOfflinePlayer(cachedDownload: any, resumeSeconds?: number, it
         // Offline mode: NO network calls — no reportPlaybackStart/Progress/Stopped,
         // no startProgressReporting, no deleteActiveEncodings.
         if (isNative) {
-            console.log('[NativeOffline] Setting up native offline player');
             let nativeProgressCount = 0;
             await NativeVideo.addListener('progress', (data) => {
                 currentTime.value = data.positionMs / 1000;
                 duration.value = data.durationMs / 1000;
                 if (duration.value > 0) progressPct.value = (currentTime.value / duration.value) * 100;
-                nativeProgressCount++;
-                if (nativeProgressCount % 10 === 0) {
-                    console.log(`[NativeOffline] Progress #${nativeProgressCount}: ${currentTime.value}s / ${duration.value}s`);
-                    saveOfflineProgress();
-                }
+                if (++nativeProgressCount % 10 === 0) saveOfflineProgress();
             });
             await NativeVideo.addListener('stopped', async () => {
-                console.log('[NativeOffline] stopped event fired');
                 await saveOfflineProgress();
                 router.back();
             });
             await NativeVideo.addListener('ended', async () => {
-                console.log('[NativeOffline] ended event fired');
                 await saveOfflineProgress();
                 router.back();
             });
@@ -1508,17 +1491,13 @@ onMounted(async () => {
         // then fall back to route startTicks or cached Jellyfin position.
         let resumeSeconds: number | undefined;
         const offlineProgress = await offlineDatabase.getWatchProgress(itemId);
-        console.log('[OfflineResume] Fetched offline progress:', offlineProgress);
         if (offlineProgress && offlineProgress.position > 0 && !offlineProgress.completed) {
             resumeSeconds = offlineProgress.position;
-            console.log(`[OfflineResume] Using offline progress: ${resumeSeconds}s`);
         } else if (routeStartTicks) {
             resumeSeconds = routeStartTicks / 10_000_000;
-            console.log(`[OfflineResume] Using route startTicks: ${resumeSeconds}s`);
         } else {
             const cachedTicks = cachedDownload.jellyfinItem?.UserData?.PlaybackPositionTicks;
             resumeSeconds = cachedTicks ? cachedTicks / 10_000_000 : undefined;
-            console.log(`[OfflineResume] Using cached Jellyfin ticks: ${resumeSeconds}s`);
         }
 
         await initOfflinePlayer(cachedDownload, resumeSeconds, cachedDownload.jellyfinItem?.Name);
@@ -1572,12 +1551,10 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
     unlockOrientation();
-    console.log(`[PlayerPage] onBeforeUnmount: isNative=${isNative}, isOfflinePlayback=${isOfflinePlayback}`);
 
     if (isNative) {
         // Save progress BEFORE removing listeners or stopping
         if (isOfflinePlayback) {
-            console.log('[PlayerPage] Saving offline progress in onBeforeUnmount');
             saveOfflineProgress();
         } else {
             reportPlaybackStopped();

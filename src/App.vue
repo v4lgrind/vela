@@ -5,6 +5,7 @@
     v-if="isAuthenticated && audioStore.isMiniPlayerVisible && !audioStore.isExpanded"
   />
   <ExpandedAudioPlayer v-if="isAuthenticated && audioStore.isExpanded" />
+  <DownloadIndicator v-if="isAuthenticated" />
 </template>
 
 <script setup lang="ts">
@@ -13,6 +14,7 @@ import { useRoute, useRouter } from "vue-router";
 import SearchBar from "@/components/SearchBar.vue";
 import MiniAudioPlayer from "@/components/MiniAudioPlayer.vue";
 import ExpandedAudioPlayer from "@/components/ExpandedAudioPlayer.vue";
+import DownloadIndicator from "@/components/DownloadIndicator.vue";
 import { useJellyfinStore } from "@/store/jellyfin-store";
 import { useAudioPlayerStore } from "@/store/audio-player-store";
 import { useOfflineStore } from "@/store/offline-store";

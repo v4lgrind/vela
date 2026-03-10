@@ -119,6 +119,13 @@ class DownloadService {
   }
 
   /**
+   * Yield to the main thread to keep UI responsive
+   */
+  private yieldToMain(): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, 0));
+  }
+
+  /**
    * Télécharge un fichier pour usage hors ligne (nouvelle méthode)
    */
   async downloadForOffline(
@@ -149,19 +156,17 @@ class DownloadService {
       const reader = response.body?.getReader();
       if (!reader) throw new Error("Impossible de lire le stream");
 
-      // Batch network chunks into 4 MB writes to minimise Capacitor bridge
-      // crossings (each appendFile crosses the JS→native bridge with full
-      // serialisation overhead). Without batching a 1 GB file causes ~15 000
-      // bridge calls; with 4 MB batches it's ~250.
+      // Batch network chunks into 8 MB writes to minimise Capacitor bridge
+      // crossings and base64 encoding overhead. Larger batches = fewer
+      // main-thread-blocking encoding operations.
       //
       // Base64 encodes 3 bytes per character, so every batch written must be
       // a multiple of 3 bytes — carry the ≤2 leftover bytes into the next batch.
       //
       // The first batch uses writeFile (recursive: true) so it creates the
       // full directory tree and the file in one operation. Subsequent batches
-      // use appendFile. This avoids writing an empty placeholder file which
-      // some Capacitor/Android versions reject.
-      const WRITE_BATCH = 4 * 1024 * 1024; // 4 MB
+      // use appendFile.
+      const WRITE_BATCH = 8 * 1024 * 1024; // 8 MB
 
       let loaded = 0;
       let isFirstWrite = true;
@@ -169,19 +174,32 @@ class DownloadService {
       let pendingChunks: Uint8Array[] = [];
       let pendingSize = 0;
 
+      // Throttle progress updates to max once per 500ms
+      let lastProgressTime = 0;
+      const PROGRESS_THROTTLE = 500;
+
       const writeBatch = async (chunks: Uint8Array[]) => {
         const len = chunks.reduce((s, c) => s + c.length, 0);
         if (len === 0) return;
         const buf = new Uint8Array(len);
         let off = 0;
         for (const c of chunks) { buf.set(c, off); off += c.length; }
+
+        // Yield before heavy base64 encoding
+        await this.yieldToMain();
         const data = this.arrayBufferToBase64(buf);
+
+        // Yield before filesystem write
+        await this.yieldToMain();
         if (isFirstWrite) {
           isFirstWrite = false;
           await Filesystem.writeFile({ path: filePath, data, directory: Directory.Data, recursive: true });
         } else {
           await Filesystem.appendFile({ path: filePath, data, directory: Directory.Data });
         }
+
+        // Yield after write to let UI catch up
+        await this.yieldToMain();
       };
 
       while (true) {
@@ -212,9 +230,17 @@ class DownloadService {
           pendingSize = 0;
         }
 
-        if (onProgress && total > 0) {
+        // Throttled progress callback
+        const now = Date.now();
+        if (onProgress && total > 0 && now - lastProgressTime >= PROGRESS_THROTTLE) {
+          lastProgressTime = now;
           onProgress({ itemId, filename, loaded, total, percentage: Math.round((loaded / total) * 100) });
         }
+      }
+
+      // Final progress update
+      if (onProgress && total > 0) {
+        onProgress({ itemId, filename, loaded, total, percentage: 100 });
       }
 
       console.log("💾 Fichier sauvegardé:", filePath);

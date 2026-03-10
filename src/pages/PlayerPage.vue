@@ -1114,6 +1114,7 @@ async function saveOfflineProgress() {
 // ── Offline player init (local downloaded file) ────────────────────────────────
 
 async function initOfflinePlayer(cachedDownload: any, resumeSeconds?: number, itemTitle?: string) {
+    console.log(`[initOfflinePlayer] Starting: isNative=${isNative}, resumeSeconds=${resumeSeconds}`);
     isOfflinePlayback = true;
     isLoading.value = true;
     try {
@@ -1151,12 +1152,17 @@ async function initOfflinePlayer(cachedDownload: any, resumeSeconds?: number, it
         // Offline mode: NO network calls — no reportPlaybackStart/Progress/Stopped,
         // no startProgressReporting, no deleteActiveEncodings.
         if (isNative) {
+            console.log('[NativeOffline] Setting up native offline player');
             let nativeProgressCount = 0;
             await NativeVideo.addListener('progress', (data) => {
                 currentTime.value = data.positionMs / 1000;
                 duration.value = data.durationMs / 1000;
                 if (duration.value > 0) progressPct.value = (currentTime.value / duration.value) * 100;
-                if (++nativeProgressCount % 10 === 0) saveOfflineProgress();
+                nativeProgressCount++;
+                if (nativeProgressCount % 10 === 0) {
+                    console.log(`[NativeOffline] Progress #${nativeProgressCount}: ${currentTime.value}s / ${duration.value}s`);
+                    saveOfflineProgress();
+                }
             });
             await NativeVideo.addListener('stopped', async () => {
                 console.log('[NativeOffline] stopped event fired');

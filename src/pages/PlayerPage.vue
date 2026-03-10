@@ -1486,8 +1486,22 @@ onMounted(async () => {
     const isOffline = !offlineStore.isFullyOnline || preferencesStore.forceOfflineMode;
     if (isOffline && cachedDownload) {
         const routeStartTicks = route.query.startTicks ? Number(route.query.startTicks) : null;
-        const resumeTicks = routeStartTicks ?? cachedDownload.jellyfinItem?.UserData?.PlaybackPositionTicks;
-        const resumeSeconds = resumeTicks ? resumeTicks / 10_000_000 : undefined;
+
+        // Check offline progress first (saved during previous offline playback),
+        // then fall back to the cached Jellyfin item's position.
+        let resumeSeconds: number | undefined;
+        if (routeStartTicks) {
+            resumeSeconds = routeStartTicks / 10_000_000;
+        } else {
+            const offlineProgress = await offlineDatabase.getWatchProgress(itemId);
+            if (offlineProgress && offlineProgress.position > 0 && !offlineProgress.completed) {
+                resumeSeconds = offlineProgress.position;
+            } else {
+                const cachedTicks = cachedDownload.jellyfinItem?.UserData?.PlaybackPositionTicks;
+                resumeSeconds = cachedTicks ? cachedTicks / 10_000_000 : undefined;
+            }
+        }
+
         await initOfflinePlayer(cachedDownload, resumeSeconds, cachedDownload.jellyfinItem?.Name);
         if (!isNative) {
             document.addEventListener('click', handleClickOutside);

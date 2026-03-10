@@ -398,6 +398,7 @@ import { useJellyfinStore } from '@/store/jellyfin-store';
 import { useOfflineStore } from '@/store/offline-store';
 import { useAudioPlayerStore, type AudioTrack } from '@/store/audio-player-store';
 import { downloadService } from '@/services/downloadService';
+import { offlineDatabase } from '@/services/offlineDatabase';
 import LazyImg from '@/components/LazyImg.vue';
 import { isAudioType, formatTicksDuration, formatTicksHuman, formatBytes } from '@/utils/helpers';
 import { Button } from '@/components/ui/button';
@@ -429,6 +430,7 @@ const downloadProgress = ref(0);
 const playingSeasonId = ref<string | null>(null);
 const watchingEpId = ref<string | null>(null);
 const togglingWatched = ref(false);
+const offlineProgressSeconds = ref<number | null>(null);
 
 async function load() {
     loading.value = true;
@@ -437,12 +439,18 @@ async function load() {
     episodes.value = [];
     audioTracks.value = [];
     similarItems.value = [];
+    offlineProgressSeconds.value = null;
 
     try {
         // If offline and item is downloaded, use jellyfinItem cached in IndexedDB.
         const cached = offlineStore.getDownload(itemId.value);
         if (!offlineStore.isFullyOnline && cached) {
             item.value = cached.jellyfinItem;
+            // Fetch offline progress for accurate resume label
+            const progress = await offlineDatabase.getWatchProgress(itemId.value);
+            if (progress && progress.position > 0 && !progress.completed) {
+                offlineProgressSeconds.value = progress.position;
+            }
             return;
         }
 
@@ -499,6 +507,11 @@ const backdropUrl = computed(() => {
 });
 
 const resumePositionLabel = computed(() => {
+    // Prefer offline progress (most recent) over cached Jellyfin position
+    if (offlineProgressSeconds.value && offlineProgressSeconds.value > 0) {
+        const ticks = Math.floor(offlineProgressSeconds.value * 10_000_000);
+        return formatTicksHuman(ticks);
+    }
     const ticks = item.value?.UserData?.PlaybackPositionTicks;
     if (!ticks || ticks <= 0) return null;
     return formatTicksHuman(ticks);

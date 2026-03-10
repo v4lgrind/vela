@@ -1504,23 +1504,21 @@ onMounted(async () => {
     if (isOffline && cachedDownload) {
         const routeStartTicks = route.query.startTicks ? Number(route.query.startTicks) : null;
 
-        // Check offline progress first (saved during previous offline playback),
-        // then fall back to the cached Jellyfin item's position.
+        // For offline playback, always check offline database first (most recent progress),
+        // then fall back to route startTicks or cached Jellyfin position.
         let resumeSeconds: number | undefined;
-        if (routeStartTicks) {
+        const offlineProgress = await offlineDatabase.getWatchProgress(itemId);
+        console.log('[OfflineResume] Fetched offline progress:', offlineProgress);
+        if (offlineProgress && offlineProgress.position > 0 && !offlineProgress.completed) {
+            resumeSeconds = offlineProgress.position;
+            console.log(`[OfflineResume] Using offline progress: ${resumeSeconds}s`);
+        } else if (routeStartTicks) {
             resumeSeconds = routeStartTicks / 10_000_000;
             console.log(`[OfflineResume] Using route startTicks: ${resumeSeconds}s`);
         } else {
-            const offlineProgress = await offlineDatabase.getWatchProgress(itemId);
-            console.log('[OfflineResume] Fetched offline progress:', offlineProgress);
-            if (offlineProgress && offlineProgress.position > 0 && !offlineProgress.completed) {
-                resumeSeconds = offlineProgress.position;
-                console.log(`[OfflineResume] Using offline progress: ${resumeSeconds}s`);
-            } else {
-                const cachedTicks = cachedDownload.jellyfinItem?.UserData?.PlaybackPositionTicks;
-                resumeSeconds = cachedTicks ? cachedTicks / 10_000_000 : undefined;
-                console.log(`[OfflineResume] Using cached Jellyfin ticks: ${resumeSeconds}s`);
-            }
+            const cachedTicks = cachedDownload.jellyfinItem?.UserData?.PlaybackPositionTicks;
+            resumeSeconds = cachedTicks ? cachedTicks / 10_000_000 : undefined;
+            console.log(`[OfflineResume] Using cached Jellyfin ticks: ${resumeSeconds}s`);
         }
 
         await initOfflinePlayer(cachedDownload, resumeSeconds, cachedDownload.jellyfinItem?.Name);

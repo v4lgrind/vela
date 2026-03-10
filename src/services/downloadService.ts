@@ -1,6 +1,7 @@
 import { offlineDatabase, type DownloadedMedia } from './offlineDatabase';
-import { Filesystem, Directory } from '@capacitor/filesystem';
+import { Filesystem, Directory, type ProgressListener } from '@capacitor/filesystem';
 import { Capacitor } from '@capacitor/core';
+import type { PluginListenerHandle } from '@capacitor/core';
 
 interface DownloadProgress {
   itemId: string;
@@ -45,6 +46,8 @@ class DownloadService {
     const activeDownload: ActiveDownload = { aborted: false };
     this.downloads.set(itemId, activeDownload);
 
+    let progressListener: PluginListenerHandle | null = null;
+
     try {
       // Ensure directory exists
       const dirPath = filePath.substring(0, filePath.lastIndexOf('/'));
@@ -56,14 +59,8 @@ class DownloadService {
         });
       } catch { /* directory may exist */ }
 
-      // Use native downloadFile - runs entirely in native code!
-      const result = await Filesystem.downloadFile({
-        url: downloadUrl,
-        path: filePath,
-        directory: Directory.Data,
-        progress: true,
-      }, (progress) => {
-        // Native progress callback
+      // Add progress listener before starting download
+      progressListener = await Filesystem.addListener('progress', (progress) => {
         const callback = this.progressCallbacks.get(itemId);
         if (callback && progress.contentLength > 0) {
           callback({
@@ -74,6 +71,14 @@ class DownloadService {
             percentage: Math.round((progress.bytes / progress.contentLength) * 100),
           });
         }
+      });
+
+      // Use native downloadFile - runs entirely in native code!
+      const result = await Filesystem.downloadFile({
+        url: downloadUrl,
+        path: filePath,
+        directory: Directory.Data,
+        progress: true,
       });
 
       if (activeDownload.aborted) {
@@ -133,6 +138,10 @@ class DownloadService {
         throw error;
       }
     } finally {
+      // Remove progress listener
+      if (progressListener) {
+        await progressListener.remove();
+      }
       this.downloads.delete(itemId);
       this.progressCallbacks.delete(itemId);
     }

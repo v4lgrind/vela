@@ -122,6 +122,19 @@
                                     <DownloadIcon class="size-4" /> Download Series
                                 </button>
 
+                                <!-- Mark all watched for Series / Season -->
+                                <button v-if="item.Type === 'Series' || item.Type === 'Season'"
+                                    :disabled="togglingWatched" @click="toggleWatched"
+                                    :title="item.UserData?.Played ? 'Mark all as unwatched' : 'Mark all as watched'"
+                                    class="flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-medium transition-all cursor-pointer"
+                                    :class="item.UserData?.Played
+                                        ? 'bg-accent-purple/20 border-accent-purple/50 text-accent-purple hover:bg-accent-purple/30'
+                                        : 'bg-white/10 border-white/10 text-white/90 hover:bg-white/15'">
+                                    <Loader2 v-if="togglingWatched" class="size-4 animate-spin" />
+                                    <Check v-else class="size-4" />
+                                    {{ item.UserData?.Played ? 'All watched' : 'Mark all watched' }}
+                                </button>
+
                                 <button
                                     v-if="item.Type !== 'Series' && item.Type !== 'Season' && item.Type !== 'MusicAlbum' && item.Type !== 'BoxSet'"
                                     :disabled="togglingWatched" @click="toggleWatched"
@@ -261,7 +274,19 @@
                 <!-- Episodes -->
                 <section v-if="item.Type === 'Season' && episodes.length"
                     class="bg-surface-raised border border-border-default rounded-2xl p-5 backdrop-blur-sm">
-                    <h3 class="text-xs font-semibold text-text-muted uppercase tracking-widest mb-4">Episodes</h3>
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-xs font-semibold text-text-muted uppercase tracking-widest">Episodes</h3>
+                        <button :disabled="togglingWatched" @click="toggleWatched"
+                            :title="item.UserData?.Played ? 'Mark all as unwatched' : 'Mark all as watched'"
+                            class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all cursor-pointer"
+                            :class="item.UserData?.Played
+                                ? 'bg-accent-purple/15 border-accent-purple/40 text-accent-purple hover:bg-accent-purple/25'
+                                : 'bg-surface-hover border-border-input text-text-muted hover:text-text-heading hover:border-border-hover'">
+                            <Loader2 v-if="togglingWatched" class="size-3 animate-spin" />
+                            <Check v-else class="size-3" />
+                            {{ item.UserData?.Played ? 'All watched' : 'Mark all watched' }}
+                        </button>
+                    </div>
                     <div class="flex flex-col gap-2">
                         <div v-for="ep in episodes" :key="ep.Id"
                             class="flex gap-3 sm:gap-4 p-2.5 rounded-xl cursor-pointer transition-all duration-200 border border-transparent hover:bg-surface-raised hover:border-border-default"

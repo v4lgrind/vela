@@ -275,6 +275,7 @@ function cancelDownload(itemId: string) {
 }
 
 function cancelAll() {
+  if (!confirm('Cancel all downloads?')) return;
   downloadStore.cancelAll();
 }
 

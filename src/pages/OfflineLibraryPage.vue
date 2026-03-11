@@ -13,25 +13,37 @@
 
     <!-- Active Downloads -->
     <section v-if="activeDownloads.length > 0 && view === 'root'" class="mb-8">
-      <h2 class="text-xl font-semibold mb-4 text-accent-purple-light flex items-center gap-2">
-        <Loader2 class="size-5 animate-spin" />
-        Downloading ({{ activeDownloads.length }})
-      </h2>
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-semibold text-accent-purple-light flex items-center gap-2">
+          <Loader2 class="size-5 animate-spin" />
+          Downloading ({{ activeDownloads.length }})
+        </h2>
+        <Button variant="ghost" size="sm" class="text-red-400 hover:text-red-300 hover:bg-red-500/10" @click="cancelAll">
+          <X class="size-4 mr-1" /> Cancel all
+        </Button>
+      </div>
       <div class="space-y-3">
         <Card v-for="task in activeDownloads" :key="task.itemId" class="bg-surface-raised border-border-default p-4">
           <div class="flex items-center justify-between gap-4 mb-2">
             <div class="flex-1 min-w-0">
               <div class="font-medium text-text-heading truncate">{{ task.name }}</div>
-              <div class="text-xs text-text-muted">{{ formatSize(task.loaded) }} / {{ formatSize(task.total) }}</div>
+              <div class="text-xs text-text-muted">
+                <template v-if="task.status === 'queued'">Queued…</template>
+                <template v-else>{{ formatSize(task.loaded) }} / {{ formatSize(task.total) }}</template>
+              </div>
             </div>
             <Button variant="ghost" size="sm" @click="cancelDownload(task.itemId)" class="text-red-400 hover:text-red-300 hover:bg-red-500/10">
               <X class="size-4" />
             </Button>
           </div>
           <div class="h-2 bg-white/10 rounded-full overflow-hidden">
-            <div class="h-full bg-accent-purple transition-all duration-300" :style="{ width: `${task.progress}%` }" />
+            <div class="h-full transition-all duration-300"
+              :class="task.status === 'queued' ? 'bg-white/20' : 'bg-accent-purple'"
+              :style="{ width: task.status === 'queued' ? '100%' : `${task.progress}%` }" />
           </div>
-          <div class="text-right text-xs text-accent-purple-light mt-1">{{ task.progress }}%</div>
+          <div class="text-right text-xs mt-1" :class="task.status === 'queued' ? 'text-text-muted' : 'text-accent-purple-light'">
+            {{ task.status === 'queued' ? 'Waiting' : `${task.progress}%` }}
+          </div>
         </Card>
       </div>
     </section>
@@ -260,6 +272,10 @@ function totalEpisodes(series: any): number {
 
 function cancelDownload(itemId: string) {
   downloadStore.cancelDownload(itemId);
+}
+
+function cancelAll() {
+  downloadStore.cancelAll();
 }
 
 function getImageUrl(id: string, itemType?: string) {

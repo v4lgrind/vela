@@ -3,6 +3,8 @@ import { downloadService } from '@/services/downloadService';
 import { useOfflineStore } from './offline-store';
 import { useJellyfinStore } from './jellyfin-store';
 
+const MAX_CONCURRENT = 3;
+
 export interface DownloadTask {
   itemId: string;
   name: string;
@@ -17,12 +19,15 @@ export interface DownloadTask {
 
 interface DownloadStoreState {
   tasks: Map<string, DownloadTask>;
+  // Metadata kept separately — not reactive, just for queue execution
+  _metadataQueue: Map<string, any>;
   showIndicator: boolean;
 }
 
 export const useDownloadStore = defineStore('downloads', {
   state: (): DownloadStoreState => ({
     tasks: new Map(),
+    _metadataQueue: new Map(),
     showIndicator: false,
   }),
 
@@ -68,10 +73,11 @@ export const useDownloadStore = defineStore('downloads', {
   },
 
   actions: {
+    /** Enqueue a download. Starts immediately if a slot is free, otherwise waits. */
     async startDownload(itemId: string, metadata: any) {
-      // Check if already downloading
-      if (this.tasks.get(itemId)?.status === 'downloading') {
-        console.log('[DownloadStore] Already downloading:', itemId);
+      const existing = this.tasks.get(itemId);
+      if (existing?.status === 'downloading' || existing?.status === 'queued') {
+        console.log('[DownloadStore] Already queued/downloading:', itemId);
         return;
       }
 
@@ -80,7 +86,6 @@ export const useDownloadStore = defineStore('downloads', {
         throw new Error('Not connected to server');
       }
 
-      // Create task
       const task: DownloadTask = {
         itemId,
         name: metadata.Name || 'Unknown',
@@ -88,18 +93,50 @@ export const useDownloadStore = defineStore('downloads', {
         progress: 0,
         loaded: 0,
         total: 0,
-        status: 'downloading',
+        status: 'queued',
         startedAt: Date.now(),
       };
 
       this.tasks.set(itemId, task);
+      this._metadataQueue.set(itemId, metadata);
       this.showIndicator = true;
+
+      this._processQueue();
+    },
+
+    /** Process the queue: start up to MAX_CONCURRENT downloads. */
+    _processQueue() {
+      const downloading = Array.from(this.tasks.values()).filter(
+        (t) => t.status === 'downloading'
+      ).length;
+
+      const slots = MAX_CONCURRENT - downloading;
+      if (slots <= 0) return;
+
+      const queued = Array.from(this.tasks.values())
+        .filter((t) => t.status === 'queued')
+        .slice(0, slots);
+
+      for (const task of queued) {
+        this._executeDownload(task.itemId);
+      }
+    },
+
+    /** Actually run a single download. Called internally when a slot is free. */
+    async _executeDownload(itemId: string) {
+      const task = this.tasks.get(itemId);
+      const metadata = this._metadataQueue.get(itemId);
+      if (!task || !metadata) return;
+
+      const jellyfinStore = useJellyfinStore();
+
+      task.status = 'downloading';
 
       try {
         await downloadService.downloadForOffline(
-          jellyfinStore.serverUrl,
+          jellyfinStore.serverUrl!,
           itemId,
-          jellyfinStore.accessToken,
+          jellyfinStore.accessToken!,
           metadata,
           (progress) => {
             const t = this.tasks.get(itemId);
@@ -111,45 +148,56 @@ export const useDownloadStore = defineStore('downloads', {
           }
         );
 
-        // Mark as completed
         const t = this.tasks.get(itemId);
-        if (t) {
-          t.status = 'completed';
-          t.progress = 100;
-        }
+        if (t) { t.status = 'completed'; t.progress = 100; }
 
-        // Refresh offline store
         const offlineStore = useOfflineStore();
         await offlineStore.loadDownloads();
 
-        console.log('[DownloadStore] Download completed:', metadata.Name);
+        console.log('[DownloadStore] Completed:', metadata.Name);
       } catch (error: any) {
         const t = this.tasks.get(itemId);
         if (t) {
-          if (error.name === 'AbortError') {
-            t.status = 'cancelled';
-          } else {
-            t.status = 'failed';
-            t.error = error.message || 'Download failed';
-          }
+          t.status = error?.name === 'AbortError' ? 'cancelled' : 'failed';
+          if (t.status === 'failed') t.error = error.message || 'Download failed';
         }
-        throw error;
+      } finally {
+        this._metadataQueue.delete(itemId);
+        // Start next queued item regardless of outcome
+        this._processQueue();
       }
     },
 
     cancelDownload(itemId: string) {
-      downloadService.cancelDownload(itemId);
       const task = this.tasks.get(itemId);
-      if (task) {
+      if (!task) return;
+      if (task.status === 'queued') {
+        // Never started — just mark cancelled and remove from metadata queue
         task.status = 'cancelled';
+        this._metadataQueue.delete(itemId);
+        this._processQueue();
+      } else {
+        downloadService.cancelDownload(itemId);
+        task.status = 'cancelled';
+      }
+    },
+
+    cancelAll() {
+      for (const task of this.tasks.values()) {
+        if (task.status === 'queued') {
+          task.status = 'cancelled';
+          this._metadataQueue.delete(task.itemId);
+        } else if (task.status === 'downloading') {
+          downloadService.cancelDownload(task.itemId);
+          task.status = 'cancelled';
+        }
       }
     },
 
     removeTask(itemId: string) {
       this.tasks.delete(itemId);
-      if (this.tasks.size === 0) {
-        this.showIndicator = false;
-      }
+      this._metadataQueue.delete(itemId);
+      if (this.tasks.size === 0) this.showIndicator = false;
     },
 
     clearCompleted() {
@@ -158,13 +206,7 @@ export const useDownloadStore = defineStore('downloads', {
           this.tasks.delete(id);
         }
       }
-      if (this.tasks.size === 0) {
-        this.showIndicator = false;
-      }
-    },
-
-    toggleIndicator() {
-      this.showIndicator = !this.showIndicator;
+      if (this.tasks.size === 0) this.showIndicator = false;
     },
   },
 });

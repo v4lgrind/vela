@@ -254,10 +254,13 @@
                             <div class="relative w-full aspect-[2/3] overflow-hidden">
                                 <LazyImg :src="getImageUrl(season.Id, 'Primary', 300, 450)" :alt="season.Name"
                                     item-type="Season" class="w-full h-full object-cover" />
-                                <div v-if="season.UserData?.UnplayedItemCount === 0 && season.UserData?.PlayCount > 0"
-                                    class="absolute top-1.5 right-1.5 bg-accent-purple rounded-full p-0.5 shadow pointer-events-none">
-                                    <Check class="size-3 text-white" />
-                                </div>
+                                <button @click.stop="toggleWatchedSeason(season)" :disabled="watchingSeasonId === season.Id"
+                                    class="absolute top-1.5 right-1.5 p-1.5 rounded-full transition-all duration-200 cursor-pointer pointer-events-auto opacity-100 sm:opacity-0 sm:group-hover:opacity-100 disabled:opacity-50"
+                                    :class="season.UserData?.Played ? 'bg-accent-purple text-white shadow' : 'bg-black/50 text-white/70 hover:bg-black/80 hover:text-white'"
+                                    :title="season.UserData?.Played ? 'Mark as unwatched' : 'Mark as watched'">
+                                    <Loader2 v-if="watchingSeasonId === season.Id" class="size-3 animate-spin" />
+                                    <Check v-else class="size-3" />
+                                </button>
                                 <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent flex items-end justify-center pb-2 transition-opacity duration-200 sm:opacity-0 sm:group-hover:opacity-100 pointer-events-none">
                                     <button @click.stop="playNextInSeason(season)" :disabled="playingSeasonId === season.Id"
                                         class="bg-white/90 hover:bg-white text-black rounded-full p-1.5 shadow-lg transition-all disabled:opacity-60 pointer-events-auto cursor-pointer">
@@ -495,6 +498,7 @@ const showMediaInfo = ref(false);
 const showBulkDialog = ref(false);
 const bulkDownloadTarget = ref<'season' | 'series'>('season');
 const playingSeasonId = ref<string | null>(null);
+const watchingSeasonId = ref<string | null>(null);
 const watchingEpId = ref<string | null>(null);
 const togglingWatched = ref(false);
 const offlineProgressSeconds = ref<number | null>(null);
@@ -699,6 +703,23 @@ async function toggleWatched() {
         }
     } finally {
         togglingWatched.value = false;
+    }
+}
+
+async function toggleWatchedSeason(season: any) {
+    if (watchingSeasonId.value) return;
+    watchingSeasonId.value = season.Id;
+    try {
+        if (season.UserData?.Played) {
+            await store.markUnplayed(season.Id);
+            if (season.UserData) season.UserData.Played = false;
+        } else {
+            await store.markPlayed(season.Id);
+            if (!season.UserData) season.UserData = {};
+            season.UserData.Played = true;
+        }
+    } finally {
+        watchingSeasonId.value = null;
     }
 }
 

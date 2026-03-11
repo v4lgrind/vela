@@ -93,10 +93,28 @@
       <!-- TV Shows Section -->
       <section v-if="offlineStore.tvShowsGrouped.length > 0" class="mb-10">
         <h2 class="text-xl font-semibold mb-5 text-accent-purple-light">TV Shows ({{ offlineStore.tvShowsGrouped.length }})</h2>
-        <div v-for="series in offlineStore.tvShowsGrouped" :key="series.seriesId" class="mb-8">
-          <h3 class="text-lg font-semibold mb-4 text-text-heading">{{ series.seriesName }}</h3>
-          <div v-for="season in series.seasons" :key="season.seasonId" class="mb-5">
-            <h4 class="text-base font-medium mb-4 text-text-muted">Season {{ season.seasonNumber }} ({{ season.episodes.length }} episodes)</h4>
+        <div v-for="series in offlineStore.tvShowsGrouped" :key="series.seriesId" class="mb-10">
+          <!-- Series header -->
+          <div class="flex items-center gap-4 mb-5">
+            <div class="w-14 h-20 rounded-xl overflow-hidden bg-black/40 shadow-lg shrink-0">
+              <LazyImg :src="getImageUrl(series.seriesId, 'Series')" :alt="series.seriesName"
+                item-type="Series" class="w-full h-full object-cover block" />
+            </div>
+            <div>
+              <h3 class="text-lg font-semibold text-text-heading">{{ series.seriesName }}</h3>
+              <p class="text-sm text-text-muted">
+                {{ series.seasons.length }} season{{ series.seasons.length !== 1 ? 's' : '' }} ·
+                {{ series.seasons.reduce((n, s) => n + s.episodes.length, 0) }} episodes downloaded
+              </p>
+            </div>
+          </div>
+          <!-- Seasons -->
+          <div v-for="season in series.seasons" :key="season.seasonId" class="mb-6 pl-0">
+            <h4 class="text-sm font-semibold text-text-muted uppercase tracking-widest mb-3 flex items-center gap-2">
+              <span class="h-px flex-1 bg-border-input"></span>
+              Season {{ season.seasonNumber }}
+              <span class="h-px flex-1 bg-border-input"></span>
+            </h4>
             <ul class="list-none p-0 m-0 grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-3 sm:grid-cols-[repeat(auto-fill,minmax(150px,1fr))] sm:gap-4">
               <li v-for="episode in season.episodes" :key="episode.itemId">
                 <Card class="bg-surface-raised border-border-default hover:-translate-y-1 hover:bg-surface-hover hover:border-border-hover hover:shadow-xl transition-all duration-200 flex flex-col items-center p-2.5 pb-3 overflow-hidden">
@@ -104,9 +122,12 @@
                     <LazyImg :src="getImageUrl(episode.itemId, episode.jellyfinItem.Type)" :alt="episode.name"
                       :item-type="episode.jellyfinItem.Type" class="w-full h-full object-cover block" />
                     <Badge class="absolute top-2 right-2 bg-accent-purple text-white size-6 rounded-full flex items-center justify-center p-0 text-xs font-bold shadow-lg">✓</Badge>
+                    <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-1.5 pb-1.5 pt-4">
+                      <span class="text-[0.65rem] text-white/80 font-medium">E{{ episode.episodeNumber }}</span>
+                    </div>
                   </router-link>
                   <div class="w-full text-center mt-2.5">
-                    <div class="text-[0.95rem] font-semibold text-text-heading truncate" :title="episode.name">Ep {{ episode.episodeNumber }}: {{ episode.name }}</div>
+                    <div class="text-[0.85rem] font-semibold text-text-heading truncate leading-tight" :title="episode.name">{{ episode.name }}</div>
                     <div class="text-xs text-text-muted mb-2">{{ formatSize(episode.fileSize) }}</div>
                     <Button variant="destructive" size="sm" class="w-full" @click="deleteDownload(episode.itemId, episode.name)">
                       <Trash2 class="size-3.5 mr-1" /> Delete

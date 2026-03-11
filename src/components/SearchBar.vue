@@ -118,11 +118,12 @@
       @click="router.back()">
       <ArrowLeft class="size-5 sm:size-4" />
     </Button>
-<Button v-if="offlineStore.initialized && offlineStore.downloadCount > 0" variant="ghost"
+<Button v-if="offlineStore.initialized && (offlineStore.downloadCount > 0 || downloadStore.hasActiveDownloads)" variant="ghost"
       :class="!offlineStore.isFullyOnline ? 'bg-[#b45309] hover:bg-[#92400e] text-white shrink-0 px-2 sm:px-3' : 'bg-accent-purple/20 text-white shrink-0 px-2 sm:px-3'" aria-label="Downloads"
       @click="$router.push('/offline')">
-      <Download class="size-5 sm:size-4 sm:mr-1" /><span class="hidden sm:inline">Offline</span>
-      <Badge :class="!offlineStore.isFullyOnline ? 'ml-1 bg-white/20 text-white text-xs' : 'ml-1 bg-accent-purple text-white text-xs'">{{ offlineStore.downloadCount }}</Badge>
+      <Download class="size-5 sm:size-4 sm:mr-1" :class="downloadStore.hasActiveDownloads ? 'animate-pulse' : ''" /><span class="hidden sm:inline">Offline</span>
+      <Badge v-if="offlineStore.downloadCount > 0" :class="!offlineStore.isFullyOnline ? 'ml-1 bg-white/20 text-white text-xs' : 'ml-1 bg-accent-purple text-white text-xs'">{{ offlineStore.downloadCount }}</Badge>
+      <Badge v-else-if="downloadStore.hasActiveDownloads" class="ml-1 bg-white/20 text-white text-xs">↓</Badge>
     </Button>
 
     <div ref="searchContainerEl" class="relative flex-1 min-w-0" role="combobox" aria-expanded="true" aria-owns="search-listbox"
@@ -234,6 +235,7 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useJellyfinStore } from '@/store/jellyfin-store';
 import { useOfflineStore } from '@/store/offline-store';
+import { useDownloadStore } from '@/store/download-store';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -247,6 +249,7 @@ const router = useRouter();
 const canGoBack = computed(() => route.path !== '/libraries' && route.path !== '/');
 const store = useJellyfinStore();
 const offlineStore = useOfflineStore();
+const downloadStore = useDownloadStore();
 const preferencesStore = usePreferencesStore();
 
 // ── Theme ──────────────────────────────────────────────────────────────────────

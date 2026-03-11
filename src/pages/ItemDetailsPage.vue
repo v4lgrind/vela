@@ -110,6 +110,18 @@
                                     <X class="size-4" /> Cancel
                                 </button>
 
+                                <!-- Bulk download buttons for Season / Series -->
+                                <button v-if="item.Type === 'Season'"
+                                    @click="openBulkDialog('season')"
+                                    class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 border border-white/10 text-white/90 text-sm font-medium hover:bg-white/15 transition-all cursor-pointer">
+                                    <DownloadIcon class="size-4" /> Download Season
+                                </button>
+                                <button v-if="item.Type === 'Series'"
+                                    @click="openBulkDialog('series')"
+                                    class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 border border-white/10 text-white/90 text-sm font-medium hover:bg-white/15 transition-all cursor-pointer">
+                                    <DownloadIcon class="size-4" /> Download Series
+                                </button>
+
                                 <button
                                     v-if="item.Type !== 'Series' && item.Type !== 'Season' && item.Type !== 'MusicAlbum' && item.Type !== 'BoxSet'"
                                     :disabled="togglingWatched" @click="toggleWatched"
@@ -387,8 +399,34 @@
                 </section>
 
             </div>
+
         </template>
     </div>
+
+    <!-- Bulk Download Confirmation Dialog -->
+    <Dialog v-model:open="showBulkDialog">
+        <DialogContent class="max-w-sm bg-surface-raised border-border-default">
+            <DialogHeader>
+                <DialogTitle class="text-text-heading">
+                    Download {{ bulkDownloadTarget === 'series' ? item?.Name : (item?.Type === 'Season' ? item?.Name : item?.SeasonName) }}
+                </DialogTitle>
+                <DialogDescription class="text-text-muted text-sm">
+                    Which episodes would you like to download?
+                </DialogDescription>
+            </DialogHeader>
+            <div class="flex flex-col gap-3 mt-2">
+                <Button @click="startBulkDownload('unwatched')" class="w-full justify-center gap-2">
+                    <DownloadIcon class="size-4" /> Unwatched only
+                </Button>
+                <Button variant="outline" @click="startBulkDownload('all')" class="w-full justify-center gap-2">
+                    <DownloadIcon class="size-4" /> All episodes
+                </Button>
+                <DialogClose as-child>
+                    <Button variant="ghost" class="w-full">Cancel</Button>
+                </DialogClose>
+            </div>
+        </DialogContent>
+    </Dialog>
 </template>
 
 <script setup lang="ts">
@@ -427,6 +465,8 @@ const itemId = computed(() => route.params.id as string);
 const accessToken = store.accessToken;
 
 const showMediaInfo = ref(false);
+const showBulkDialog = ref(false);
+const bulkDownloadTarget = ref<'season' | 'series'>('season');
 const playingSeasonId = ref<string | null>(null);
 const watchingEpId = ref<string | null>(null);
 const togglingWatched = ref(false);
@@ -771,5 +811,50 @@ async function deleteDownload() {
 function cancelDownload() {
     if (!item.value) return;
     downloadStore.cancelDownload(itemId.value);
+}
+
+function openBulkDialog(target: 'season' | 'series') {
+    bulkDownloadTarget.value = target;
+    showBulkDialog.value = true;
+}
+
+async function startBulkDownload(mode: 'all' | 'unwatched') {
+    showBulkDialog.value = false;
+    if (!item.value) return;
+
+    let candidates: any[] = [];
+
+    if (bulkDownloadTarget.value === 'season') {
+        // Episodes already loaded for Season pages
+        candidates = [...episodes.value];
+    } else {
+        // Fetch all episodes for the series in one API call
+        try {
+            candidates = await store.fetchAllSeriesEpisodes(item.value.Id);
+        } catch (e) {
+            console.error('[BulkDownload] Failed to fetch series episodes:', e);
+            return;
+        }
+    }
+
+    // Filter by watched state
+    if (mode === 'unwatched') {
+        candidates = candidates.filter(ep => !ep.UserData?.Played);
+    }
+
+    // Skip already-downloaded episodes
+    candidates = candidates.filter(ep => !offlineStore.isItemDownloaded(ep.Id));
+
+    if (candidates.length === 0) return;
+
+    console.log(`[BulkDownload] Queueing ${candidates.length} episodes (mode: ${mode})`);
+
+    for (const ep of candidates) {
+        downloadStore.startDownload(ep.Id, ep).catch((err: any) => {
+            if (err?.name !== 'AbortError') {
+                console.error('[BulkDownload] Failed:', ep.Name, err);
+            }
+        });
+    }
 }
 </script>

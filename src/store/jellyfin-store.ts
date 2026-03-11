@@ -222,6 +222,20 @@ export const useJellyfinStore = defineStore("jellyfin", {
       return resp.data.Items ?? [];
     },
 
+    async fetchAllSeriesEpisodes(seriesId: string) {
+      this.initializeApi();
+      const resp = await getItemsApi(this.api).getItems({
+        userId: this.userId,
+        seriesId,
+        includeItemTypes: ["Episode"] as any,
+        sortBy: ["ParentIndexNumber", "IndexNumber"],
+        sortOrder: ["Ascending"],
+        fields: ["Overview", "UserData", "MediaSources"] as any,
+        recursive: true,
+      });
+      return resp.data.Items ?? [];
+    },
+
     async markPlayed(itemId: string) {
       this.initializeApi();
       await getPlaystateApi(this.api).markPlayedItem({

@@ -41,7 +41,7 @@
               role="switch"
               :aria-checked="preferencesStore.forceOfflineMode"
               @click="preferencesStore.forceOfflineMode = !preferencesStore.forceOfflineMode"
-              :class="preferencesStore.forceOfflineMode ? 'bg-accent-purple' : 'bg-surface-muted'"
+              :class="preferencesStore.forceOfflineMode ? 'bg-accent-purple' : 'bg-border-default'"
               class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none"
             >
               <span

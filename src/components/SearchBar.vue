@@ -153,7 +153,7 @@
               Movies ({{ groupedResults.movies.length }})</div>
             <div class="flex flex-col gap-1">
               <div v-for="r in groupedResults.movies" :key="r.Id"
-                class="grid grid-cols-[100px_1fr] max-md:grid-cols-[60px_1fr] gap-3 max-md:gap-2.5 items-center px-2.5 py-2.5 max-md:px-2 max-md:py-2 rounded-lg cursor-pointer transition-all duration-200"
+                class="grid grid-cols-[100px_1fr] max-md:grid-cols-[60px_1fr] gap-3 max-md:gap-2.5 items-center px-2.5 py-2.5 max-md:px-2 max-md:py-2 rounded-lg cursor-pointer transition-all duration-200 active:opacity-75"
                 :class="flatIndex(r) === activeIndex ? 'bg-surface-hover translate-x-0.5' : ''"
                 role="option" @mouseenter="activeIndex = flatIndex(r)" @click="goToResult(r)">
                 <img :src="thumb(r)" alt=""
@@ -178,7 +178,7 @@
               TV Shows ({{ groupedResults.series.length }})</div>
             <div class="flex flex-col gap-1">
               <div v-for="r in groupedResults.series" :key="r.Id"
-                class="grid grid-cols-[100px_1fr] max-md:grid-cols-[60px_1fr] gap-3 max-md:gap-2.5 items-center px-2.5 py-2.5 max-md:px-2 max-md:py-2 rounded-lg cursor-pointer transition-all duration-200"
+                class="grid grid-cols-[100px_1fr] max-md:grid-cols-[60px_1fr] gap-3 max-md:gap-2.5 items-center px-2.5 py-2.5 max-md:px-2 max-md:py-2 rounded-lg cursor-pointer transition-all duration-200 active:opacity-75"
                 :class="flatIndex(r) === activeIndex ? 'bg-surface-hover translate-x-0.5' : ''"
                 role="option" @mouseenter="activeIndex = flatIndex(r)" @click="goToResult(r)">
                 <img :src="thumb(r)" alt=""
@@ -203,7 +203,7 @@
               Albums ({{ groupedResults.albums.length }})</div>
             <div class="flex flex-col gap-1">
               <div v-for="r in groupedResults.albums" :key="r.Id"
-                class="grid grid-cols-[100px_1fr] max-md:grid-cols-[60px_1fr] gap-3 max-md:gap-2.5 items-center px-2.5 py-2.5 max-md:px-2 max-md:py-2 rounded-lg cursor-pointer transition-all duration-200"
+                class="grid grid-cols-[100px_1fr] max-md:grid-cols-[60px_1fr] gap-3 max-md:gap-2.5 items-center px-2.5 py-2.5 max-md:px-2 max-md:py-2 rounded-lg cursor-pointer transition-all duration-200 active:opacity-75"
                 :class="flatIndex(r) === activeIndex ? 'bg-surface-hover translate-x-0.5' : ''"
                 role="option" @mouseenter="activeIndex = flatIndex(r)" @click="goToResult(r)">
                 <img :src="thumb(r)" alt=""

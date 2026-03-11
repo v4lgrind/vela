@@ -249,7 +249,7 @@
                     <h3 class="text-xs font-semibold text-text-muted uppercase tracking-widest mb-4">Seasons</h3>
                     <div class="grid grid-cols-3 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(150px,1fr))] sm:gap-4">
                         <div v-for="season in seasons" :key="season.Id"
-                            class="cursor-pointer group rounded-xl overflow-hidden bg-surface-raised border border-border-default hover:-translate-y-1 hover:border-border-hover transition-all duration-200"
+                            class="cursor-pointer group rounded-xl overflow-hidden bg-surface-raised border border-border-default hover:-translate-y-1 hover:border-border-hover transition-all duration-200 active:scale-[0.97] active:opacity-75"
                             @click="goToItem(season.Id)">
                             <div class="relative w-full aspect-[2/3] overflow-hidden">
                                 <LazyImg :src="getImageUrl(season.Id, 'Primary', 300, 450)" :alt="season.Name"
@@ -289,7 +289,7 @@
                     </div>
                     <div class="flex flex-col gap-2">
                         <div v-for="ep in episodes" :key="ep.Id"
-                            class="flex gap-3 sm:gap-4 p-2.5 rounded-xl cursor-pointer transition-all duration-200 border border-transparent hover:bg-surface-raised hover:border-border-default"
+                            class="flex gap-3 sm:gap-4 p-2.5 rounded-xl cursor-pointer transition-all duration-200 border border-transparent hover:bg-surface-raised hover:border-border-default active:opacity-75"
                             :class="ep.UserData?.Played ? 'opacity-50 hover:opacity-80' : ''"
                             @click="goToItem(ep.Id)">
                             <!-- Thumbnail -->
@@ -409,7 +409,7 @@
                         class="grid grid-flow-col auto-cols-[minmax(120px,140px)] gap-3 overflow-x-auto overflow-y-hidden snap-x snap-proximity scroll-smooth scrollbar-hide"
                         role="list">
                         <div v-for="sim in similarItems" :key="sim.Id"
-                            class="snap-center cursor-pointer group rounded-xl overflow-hidden bg-surface-raised border border-border-default hover:-translate-y-1 hover:border-border-hover transition-all duration-200"
+                            class="snap-center cursor-pointer group rounded-xl overflow-hidden bg-surface-raised border border-border-default hover:-translate-y-1 hover:border-border-hover transition-all duration-200 active:scale-[0.97] active:opacity-75"
                             role="listitem" @click="goToItem(sim.Id)">
                             <div class="w-full aspect-[2/3] overflow-hidden">
                                 <LazyImg :src="getImageUrl(sim.Id, 'Primary', 300, 450)" :alt="sim.Name"

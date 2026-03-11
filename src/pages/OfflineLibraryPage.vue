@@ -95,7 +95,7 @@
           <h2 class="text-lg font-semibold mb-4 text-accent-purple-light">TV Shows ({{ offlineStore.tvShowsGrouped.length }})</h2>
           <ul class="list-none p-0 m-0 grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-3 sm:grid-cols-[repeat(auto-fill,minmax(150px,1fr))] sm:gap-4">
             <li v-for="series in offlineStore.tvShowsGrouped" :key="series.seriesId">
-              <div class="cursor-pointer group" @click="openSeries(series)">
+              <div class="cursor-pointer group active:scale-[0.97] active:opacity-75 transition-all duration-200" @click="openSeries(series)">
                 <div class="w-full aspect-[2/3] rounded-[10px] overflow-hidden bg-black/60 shadow-lg relative
                             group-hover:-translate-y-1 group-hover:shadow-xl transition-all duration-200">
                   <LazyImg :src="getImageUrl(series.seriesId, 'Series')" :alt="series.seriesName"
@@ -142,7 +142,7 @@
       <template v-else-if="view === 'seasons' && selectedSeries">
         <ul class="list-none p-0 m-0 grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-3 sm:grid-cols-[repeat(auto-fill,minmax(150px,1fr))] sm:gap-4">
           <li v-for="season in selectedSeries.seasons" :key="season.seasonId">
-            <div class="cursor-pointer group" @click="openSeason(season)">
+            <div class="cursor-pointer group active:scale-[0.97] active:opacity-75 transition-all duration-200" @click="openSeason(season)">
               <div class="w-full aspect-[2/3] rounded-[10px] overflow-hidden bg-black/60 shadow-lg relative
                           group-hover:-translate-y-1 group-hover:shadow-xl transition-all duration-200">
                 <LazyImg :src="getImageUrl(season.seasonId, 'Season')" :alt="`Season ${season.seasonNumber}`"

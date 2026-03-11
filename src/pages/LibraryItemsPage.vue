@@ -51,7 +51,7 @@
     <section class="flex-1">
       <ul class="list-none p-0 m-0 grid grid-cols-3 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(150px,1fr))] sm:gap-4">
         <li v-for="item in items" :key="item.Id">
-          <Card class="bg-surface-raised border-border-default hover:-translate-y-1 hover:bg-surface-hover hover:border-border-hover hover:shadow-xl transition-all duration-200 flex flex-col items-center p-2.5 pb-3 overflow-hidden">
+          <Card class="bg-surface-raised border-border-default hover:-translate-y-1 hover:bg-surface-hover hover:border-border-hover hover:shadow-xl transition-all duration-200 flex flex-col items-center p-2.5 pb-3 overflow-hidden active:scale-[0.97] active:opacity-80">
             <!-- Poster with overlay -->
             <div class="relative group w-full rounded-[10px] overflow-hidden bg-black/60 shadow-lg"
               :class="isAudioType(item.Type) ? 'aspect-square' : 'aspect-[2/3]'">

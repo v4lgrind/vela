@@ -58,7 +58,7 @@
                 @click.self="handleVideoTap">
 
                 <!-- Progress bar -->
-                <div class="w-full h-6 flex items-center cursor-pointer mb-3 group" @click="seek">
+                <div class="w-full h-6 flex items-center cursor-pointer mb-3 group active:brightness-90" @click="seek">
                     <div
                         class="w-full h-1 bg-white/30 rounded-sm relative transition-[height] duration-200 group-hover:h-1.5">
                         <div class="h-full bg-accent-purple rounded-sm transition-[width] duration-100 ease-linear"
@@ -101,7 +101,7 @@
                             <div class="absolute bottom-full right-0 mb-2 bg-[rgba(28,28,28,0.98)] rounded-lg min-w-[250px] max-h-[400px] overflow-y-auto shadow-[0_8px_24px_rgba(0,0,0,0.5)] backdrop-blur-[10px] transition-all duration-200 scrollbar-hide"
                                 :class="audioMenuOpen ? 'opacity-100 pointer-events-auto translate-y-0' : 'opacity-0 pointer-events-none translate-y-2.5'">
                                 <div v-for="opt in audioList" :key="opt.index"
-                                    class="flex items-center gap-2.5 px-4 py-3 cursor-pointer text-[0.9rem] transition-colors hover:bg-white/10"
+                                    class="flex items-center gap-2.5 px-4 py-3 cursor-pointer text-[0.9rem] transition-colors hover:bg-white/10 active:opacity-75"
                                     :class="opt.index === selectedAudioIndex ? 'bg-accent-purple/20' : ''"
                                     @click="switchAudio(opt.index)">
                                     <Check class="size-4 shrink-0"
@@ -122,7 +122,7 @@
                                 :class="subtitleMenuOpen ? 'opacity-100 pointer-events-auto translate-y-0' : 'opacity-0 pointer-events-none translate-y-2.5'">
                                 <!-- Off -->
                                 <div
-                                    class="flex items-center gap-2.5 px-4 py-3 cursor-pointer text-[0.9rem] transition-colors hover:bg-white/10"
+                                    class="flex items-center gap-2.5 px-4 py-3 cursor-pointer text-[0.9rem] transition-colors hover:bg-white/10 active:opacity-75"
                                     :class="selectedSubtitleIndex === null ? 'bg-accent-purple/20' : ''"
                                     @click="switchSubtitle(null)">
                                     <Check class="size-4 shrink-0"
@@ -130,7 +130,7 @@
                                     Off
                                 </div>
                                 <div v-for="sub in subtitleList" :key="sub.index"
-                                    class="flex items-center gap-2.5 px-4 py-3 cursor-pointer text-[0.9rem] transition-colors hover:bg-white/10"
+                                    class="flex items-center gap-2.5 px-4 py-3 cursor-pointer text-[0.9rem] transition-colors hover:bg-white/10 active:opacity-75"
                                     :class="sub.index === selectedSubtitleIndex ? 'bg-accent-purple/20' : ''"
                                     @click="switchSubtitle(sub.index)">
                                     <Check class="size-4 shrink-0"
@@ -151,7 +151,7 @@
                             <div class="absolute bottom-full right-0 mb-2 bg-[rgba(28,28,28,0.98)] rounded-lg min-w-[160px] overflow-y-auto shadow-[0_8px_24px_rgba(0,0,0,0.5)] backdrop-blur-[10px] transition-all duration-200"
                                 :class="qualityMenuOpen ? 'opacity-100 pointer-events-auto translate-y-0' : 'opacity-0 pointer-events-none translate-y-2.5'">
                                 <div v-for="preset in availablePresets" :key="preset.bitrate"
-                                    class="flex items-center gap-2.5 px-4 py-3 cursor-pointer text-[0.9rem] transition-colors hover:bg-white/10"
+                                    class="flex items-center gap-2.5 px-4 py-3 cursor-pointer text-[0.9rem] transition-colors hover:bg-white/10 active:opacity-75"
                                     :class="preset.bitrate === selectedBitrate ? 'bg-accent-purple/20' : ''"
                                     @click="switchQuality(preset.bitrate)">
                                     <Check class="size-4 shrink-0"

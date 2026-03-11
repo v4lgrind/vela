@@ -8,7 +8,7 @@
         <div v-for="item in resumeItems" :key="item.Id" class="shrink-0 w-44 sm:w-52 group">
           <!-- Thumbnail -->
           <div class="relative rounded-xl overflow-hidden aspect-video mb-1.5
-                      group-hover:-translate-y-1 group-hover:shadow-xl transition-all duration-200 cursor-pointer"
+                      group-hover:-translate-y-1 group-hover:shadow-xl transition-all duration-200 cursor-pointer active:scale-[0.97] active:opacity-75"
                @click="playResume(item)">
             <LazyImg :src="getResumeImageUrl(item)" :alt="item.Name" :item-type="item.Type"
               class="block w-full h-full object-cover" />
@@ -62,7 +62,7 @@
         <div v-for="item in nextUpItems" :key="item.Id" class="shrink-0 w-44 sm:w-52 group">
           <!-- Thumbnail -->
           <div class="relative rounded-xl overflow-hidden aspect-video mb-1.5
-                      group-hover:-translate-y-1 group-hover:shadow-xl transition-all duration-200 cursor-pointer"
+                      group-hover:-translate-y-1 group-hover:shadow-xl transition-all duration-200 cursor-pointer active:scale-[0.97] active:opacity-75"
                @click="playResume(item)">
             <LazyImg :src="getResumeImageUrl(item)" :alt="item.Name" :item-type="item.Type"
               class="block w-full h-full object-cover" />
@@ -118,7 +118,7 @@
         </h2>
         <div class="flex gap-3 overflow-x-auto pt-2 pb-1 scrollbar-hide">
           <div v-for="item in latestByLibrary[lib.Id]" :key="item.Id"
-            class="shrink-0 w-32 sm:w-36 group cursor-pointer"
+            class="shrink-0 w-32 sm:w-36 group cursor-pointer active:scale-[0.97] active:opacity-75 transition-all duration-200"
             @click="goToItem(item)">
             <div class="relative rounded-xl overflow-hidden mb-1.5
                         group-hover:-translate-y-1 group-hover:shadow-xl transition-all duration-200"
@@ -168,7 +168,7 @@
       <!-- Library row -->
       <div v-else class="flex gap-3 overflow-x-auto pt-2 pb-1 scrollbar-hide">
         <router-link v-for="item in mediaItems" :key="item.Id"
-          class="shrink-0 w-44 sm:w-52 group"
+          class="shrink-0 w-44 sm:w-52 group active:scale-[0.97] active:opacity-75 transition-all duration-200"
           :to="{ name: 'libraryItem', params: { id: item.Id, name: item.Name } }">
           <div class="relative rounded-xl overflow-hidden aspect-video mb-1.5
                       group-hover:-translate-y-1 group-hover:shadow-xl transition-all duration-200">

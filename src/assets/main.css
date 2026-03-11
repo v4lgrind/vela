@@ -195,3 +195,21 @@ html.light {
     display: none;
   }
 }
+
+@layer base {
+  /* Remove native tap highlight flash on Android WebView */
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Remove 300ms tap delay on interactive elements */
+  button, a, input, select, [role="button"] {
+    touch-action: manipulation;
+  }
+
+  /* Press feedback fallback for any <button> not already styled with active: */
+  button:not(:disabled):active {
+    opacity: 0.75;
+    transition: opacity 80ms ease;
+  }
+}

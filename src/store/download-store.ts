@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { downloadService } from '@/services/downloadService';
 import { useOfflineStore } from './offline-store';
 import { useJellyfinStore } from './jellyfin-store';
+import { useMetadataCacheStore } from './metadata-cache-store';
 
 const MAX_CONCURRENT = 3;
 
@@ -154,6 +155,11 @@ export const useDownloadStore = defineStore('downloads', {
         const offlineStore = useOfflineStore();
         await offlineStore.loadDownloads();
 
+        // Cache series and season metadata so their detail pages work offline
+        if (metadata.Type === 'Episode') {
+          this._cacheParentMetadata(metadata, jellyfinStore);
+        }
+
         console.log('[DownloadStore] Completed:', metadata.Name);
       } catch (error: any) {
         const t = this.tasks.get(itemId);
@@ -166,6 +172,24 @@ export const useDownloadStore = defineStore('downloads', {
         // Start next queued item regardless of outcome
         this._processQueue();
       }
+    },
+
+    /** Fetch and cache Series + Season metadata in the background (fire-and-forget). */
+    async _cacheParentMetadata(episodeMetadata: any, jellyfinStore: ReturnType<typeof useJellyfinStore>) {
+      const metaCache = useMetadataCacheStore();
+      const toFetch: string[] = [];
+      if (episodeMetadata.SeriesId && !metaCache.has(episodeMetadata.SeriesId)) {
+        toFetch.push(episodeMetadata.SeriesId);
+      }
+      if (episodeMetadata.SeasonId && !metaCache.has(episodeMetadata.SeasonId)) {
+        toFetch.push(episodeMetadata.SeasonId);
+      }
+      if (toFetch.length === 0) return;
+      await Promise.allSettled(
+        toFetch.map(id =>
+          jellyfinStore.fetchItemDetails(id).then(item => { if (item) metaCache.set(item); }).catch(() => {})
+        )
+      );
     },
 
     cancelDownload(itemId: string) {

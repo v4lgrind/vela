@@ -436,6 +436,7 @@ import { useJellyfinStore } from '@/store/jellyfin-store';
 import { useOfflineStore } from '@/store/offline-store';
 import { useAudioPlayerStore, type AudioTrack } from '@/store/audio-player-store';
 import { useDownloadStore } from '@/store/download-store';
+import { useMetadataCacheStore } from '@/store/metadata-cache-store';
 import { downloadService } from '@/services/downloadService';
 import { offlineDatabase } from '@/services/offlineDatabase';
 import LazyImg from '@/components/LazyImg.vue';
@@ -449,6 +450,7 @@ const store = useJellyfinStore();
 const offlineStore = useOfflineStore();
 const audioPlayerStore = useAudioPlayerStore();
 const downloadStore = useDownloadStore();
+const metadataCache = useMetadataCacheStore();
 const route = useRoute();
 const router = useRouter();
 
@@ -482,16 +484,59 @@ async function load() {
     offlineProgressSeconds.value = null;
 
     try {
-        // If offline and item is downloaded, use jellyfinItem cached in IndexedDB.
+        const isOffline = !offlineStore.isFullyOnline;
+
+        // ── Offline: downloaded episode/movie ────────────────────────────────
         const cached = offlineStore.getDownload(itemId.value);
-        if (!offlineStore.isFullyOnline && cached) {
+        if (isOffline && cached) {
             item.value = cached.jellyfinItem;
-            // Fetch offline progress for accurate resume label
             const progress = await offlineDatabase.getWatchProgress(itemId.value);
             if (progress && progress.position > 0 && !progress.completed) {
                 offlineProgressSeconds.value = progress.position;
             }
             return;
+        }
+
+        // ── Offline: Series page (has downloaded episodes) ──────────────────
+        if (isOffline) {
+            const seriesGroup = offlineStore.tvShowsGrouped.find(
+                (s: any) => s.seriesId === itemId.value
+            );
+            if (seriesGroup) {
+                item.value = metadataCache.get(itemId.value) ?? {
+                    Id: seriesGroup.seriesId,
+                    Name: seriesGroup.seriesName,
+                    Type: 'Series',
+                };
+                seasons.value = seriesGroup.seasons.map((s: any) => ({
+                    Id: s.seasonId,
+                    Name: `Season ${s.seasonNumber}`,
+                    Type: 'Season',
+                    IndexNumber: s.seasonNumber,
+                    UserData: { UnplayedItemCount: null, PlayCount: 0 },
+                }));
+                return;
+            }
+
+            // ── Offline: Season page (has downloaded episodes) ────────────────
+            for (const sg of offlineStore.tvShowsGrouped) {
+                const seasonGroup = sg.seasons.find((s: any) => s.seasonId === itemId.value);
+                if (seasonGroup) {
+                    item.value = metadataCache.get(itemId.value) ?? {
+                        Id: seasonGroup.seasonId,
+                        Name: `Season ${seasonGroup.seasonNumber}`,
+                        Type: 'Season',
+                        IndexNumber: seasonGroup.seasonNumber,
+                        SeriesId: sg.seriesId,
+                        SeriesName: sg.seriesName,
+                    };
+                    episodes.value = seasonGroup.episodes.map((ep: any) => ({
+                        ...ep.jellyfinItem,
+                        Id: ep.itemId,
+                    }));
+                    return;
+                }
+            }
         }
 
         const data = await store.fetchItemDetails(itemId.value);

@@ -1,7 +1,6 @@
 import { offlineDatabase, type DownloadedMedia } from './offlineDatabase';
-import { Filesystem, Directory, type ProgressListener } from '@capacitor/filesystem';
+import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Capacitor } from '@capacitor/core';
-import type { PluginListenerHandle } from '@capacitor/core';
 
 interface DownloadProgress {
   itemId: string;
@@ -13,6 +12,7 @@ interface DownloadProgress {
 
 interface ActiveDownload {
   aborted: boolean;
+  pollInterval: ReturnType<typeof setInterval> | null;
 }
 
 class DownloadService {
@@ -20,7 +20,10 @@ class DownloadService {
   private progressCallbacks: Map<string, (progress: DownloadProgress) => void> = new Map();
 
   /**
-   * Download file for offline use - uses native Filesystem.downloadFile
+   * Download file for offline use.
+   * Progress is tracked by polling the file size on disk every 500 ms — this avoids
+   * the global Filesystem 'progress' event channel which cannot distinguish between
+   * concurrent downloads and causes flickering when multiple run at once.
    */
   async downloadForOffline(
     serverUrl: string,
@@ -39,59 +42,62 @@ class DownloadService {
     const filePath = this.buildFilePath(metadata, filename);
     const downloadUrl = `${serverUrl}/Items/${itemId}/Download?api_key=${accessToken}`;
 
-    console.log("📥 Native download:", filename);
+    console.log('📥 Native download:', filename);
 
     if (onProgress) this.progressCallbacks.set(itemId, onProgress);
 
-    const activeDownload: ActiveDownload = { aborted: false };
+    const activeDownload: ActiveDownload = { aborted: false, pollInterval: null };
     this.downloads.set(itemId, activeDownload);
 
-    let progressListener: PluginListenerHandle | null = null;
+    // Fetch total size in background so we can show accurate percentage
+    let totalBytes = 0;
+    fetch(downloadUrl, { method: 'HEAD' })
+      .then(r => {
+        const cl = r.headers.get('content-length');
+        if (cl) totalBytes = parseInt(cl, 10);
+      })
+      .catch(() => {});
+
+    // Poll file size on disk every 500 ms — one interval per download, fully isolated
+    activeDownload.pollInterval = setInterval(async () => {
+      if (!this.downloads.has(itemId)) return;
+      try {
+        const stat = await Filesystem.stat({ path: filePath, directory: Directory.Data });
+        const callback = this.progressCallbacks.get(itemId);
+        if (callback) {
+          const loaded = stat.size ?? 0;
+          const total = totalBytes || 0;
+          const percentage = total > 0 ? Math.min(99, Math.round((loaded / total) * 100)) : 0;
+          callback({ itemId, filename, loaded, total, percentage });
+        }
+      } catch { /* file not created yet — fine */ }
+    }, 500);
 
     try {
       // Ensure directory exists
       const dirPath = filePath.substring(0, filePath.lastIndexOf('/'));
       try {
-        await Filesystem.mkdir({
-          path: dirPath,
-          directory: Directory.Data,
-          recursive: true,
-        });
-      } catch { /* directory may exist */ }
+        await Filesystem.mkdir({ path: dirPath, directory: Directory.Data, recursive: true });
+      } catch { /* may already exist */ }
 
-      // Add progress listener before starting download
-      progressListener = await Filesystem.addListener('progress', (progress) => {
-        const callback = this.progressCallbacks.get(itemId);
-        if (callback && progress.contentLength > 0) {
-          callback({
-            itemId,
-            filename,
-            loaded: progress.bytes,
-            total: progress.contentLength,
-            percentage: Math.round((progress.bytes / progress.contentLength) * 100),
-          });
-        }
-      });
-
-      // Use native downloadFile - runs entirely in native code!
-      const result = await Filesystem.downloadFile({
+      await Filesystem.downloadFile({
         url: downloadUrl,
         path: filePath,
         directory: Directory.Data,
-        progress: true,
+        progress: false,
       });
 
       if (activeDownload.aborted) {
-        throw new Error('AbortError');
+        throw Object.assign(new Error('AbortError'), { name: 'AbortError' });
       }
 
-      console.log("💾 Native download complete:", filePath);
+      console.log('💾 Native download complete:', filePath);
 
-      // Get file size
-      let fileSize = 0;
+      // Actual file size after completion
+      let fileSize = totalBytes;
       try {
         const stat = await Filesystem.stat({ path: filePath, directory: Directory.Data });
-        fileSize = stat.size;
+        fileSize = stat.size ?? totalBytes;
       } catch { /* ignore */ }
 
       const downloadedMedia: DownloadedMedia = {
@@ -116,31 +122,25 @@ class DownloadService {
       }
 
       await offlineDatabase.addDownload(downloadedMedia);
-      console.log("✅ Download complete:", filename);
+      console.log('✅ Download complete:', filename);
 
-      // Final progress
+      // Final 100% callback
       const callback = this.progressCallbacks.get(itemId);
-      if (callback) {
-        callback({ itemId, filename, loaded: fileSize, total: fileSize, percentage: 100 });
-      }
+      if (callback) callback({ itemId, filename, loaded: fileSize, total: fileSize, percentage: 100 });
 
     } catch (error: any) {
-      if (error.message === 'AbortError' || activeDownload.aborted) {
-        console.log("🚫 Download cancelled:", metadata.Name);
-        try {
-          await Filesystem.deleteFile({ path: filePath, directory: Directory.Data });
-        } catch { /* ignore */ }
-        const err = new Error('AbortError');
-        (err as any).name = 'AbortError';
+      if (error.name === 'AbortError' || activeDownload.aborted) {
+        console.log('🚫 Download cancelled:', metadata.Name);
+        try { await Filesystem.deleteFile({ path: filePath, directory: Directory.Data }); } catch { /* ignore */ }
+        const err = Object.assign(new Error('AbortError'), { name: 'AbortError' });
         throw err;
-      } else {
-        console.error("❌ Download error:", error);
-        throw error;
       }
+      console.error('❌ Download error:', error);
+      throw error;
     } finally {
-      // Remove progress listener
-      if (progressListener) {
-        await progressListener.remove();
+      if (activeDownload.pollInterval !== null) {
+        clearInterval(activeDownload.pollInterval);
+        activeDownload.pollInterval = null;
       }
       this.downloads.delete(itemId);
       this.progressCallbacks.delete(itemId);
@@ -151,14 +151,10 @@ class DownloadService {
     try {
       const download = await offlineDatabase.getDownload(itemId);
       if (!download) return null;
-
-      const fileInfo = await Filesystem.getUri({
-        path: download.filePath,
-        directory: Directory.Data,
-      });
+      const fileInfo = await Filesystem.getUri({ path: download.filePath, directory: Directory.Data });
       return Capacitor.convertFileSrc(fileInfo.uri);
     } catch (error) {
-      console.error("❌ Error getting local file:", error);
+      console.error('❌ Error getting local file:', error);
       return null;
     }
   }
@@ -166,21 +162,16 @@ class DownloadService {
   async deleteOfflineFile(itemId: string): Promise<void> {
     try {
       const download = await offlineDatabase.getDownload(itemId);
-      if (!download) {
-        console.warn("File already deleted:", itemId);
-        return;
-      }
-
+      if (!download) { console.warn('File already deleted:', itemId); return; }
       try {
         await Filesystem.stat({ path: download.filePath, directory: Directory.Data });
         await Filesystem.deleteFile({ path: download.filePath, directory: Directory.Data });
-        console.log("🗑️ File deleted:", download.filePath);
+        console.log('🗑️ File deleted:', download.filePath);
       } catch { /* file doesn't exist */ }
-
       await offlineDatabase.deleteDownload(itemId);
-      console.log("✅ Download removed:", itemId);
+      console.log('✅ Download removed:', itemId);
     } catch (error) {
-      console.error("❌ Delete error:", error);
+      console.error('❌ Delete error:', error);
       throw error;
     }
   }
@@ -212,9 +203,7 @@ class DownloadService {
   private buildFilePath(metadata: any, filename: string): string {
     const s = (v: string | undefined | null, fallback: string) =>
       this.sanitizeFilename(v || fallback);
-
     const root = 'Jellyfin V4lgrind';
-
     switch (metadata.Type) {
       case 'Movie':
         return `${root}/Movies/${s(metadata.Name, 'Unknown')}/${filename}`;
@@ -237,9 +226,7 @@ class DownloadService {
     const download = this.downloads.get(itemId);
     if (download) {
       download.aborted = true;
-      // Note: Filesystem.downloadFile doesn't support cancellation yet
-      // The download will complete but we'll delete the file
-      console.log("🚫 Cancelling:", itemId);
+      console.log('🚫 Cancelling:', itemId);
     }
   }
 

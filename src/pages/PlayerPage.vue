@@ -180,6 +180,40 @@
             </div>
         </div>
 
+        <!-- Native player quality & info controls (next to ExoPlayer's audio/subtitle buttons) -->
+        <div v-if="isNative && !isLoading"
+            class="absolute z-[60] flex items-center gap-1"
+            style="bottom: calc(16px + env(safe-area-inset-bottom, 0px)); right: calc(16px + env(safe-area-inset-right, 0px));">
+
+            <!-- Quality selector -->
+            <div class="relative" ref="qualityDropdownNative">
+                <button
+                    class="bg-black/50 text-white border-none cursor-pointer p-2 rounded-lg flex items-center gap-1.5 transition-colors hover:bg-white/15 active:opacity-75"
+                    @click="toggleQualityMenu">
+                    <Gauge class="size-5" />
+                    <span class="text-[0.85rem] font-medium">{{ currentQualityLabel }}</span>
+                </button>
+                <div class="absolute bottom-full right-0 mb-2 bg-[rgba(28,28,28,0.98)] rounded-lg min-w-[160px] overflow-y-auto shadow-[0_8px_24px_rgba(0,0,0,0.5)] backdrop-blur-[10px] transition-all duration-200"
+                    :class="qualityMenuOpen ? 'opacity-100 pointer-events-auto translate-y-0' : 'opacity-0 pointer-events-none translate-y-2.5'">
+                    <div v-for="preset in availablePresets" :key="preset.bitrate"
+                        class="flex items-center gap-2.5 px-4 py-3 cursor-pointer text-[0.9rem] transition-colors hover:bg-white/10 active:opacity-75"
+                        :class="preset.bitrate === selectedBitrate ? 'bg-accent-purple/20' : ''"
+                        @click="switchQualityNative(preset.bitrate)">
+                        <Check class="size-4 shrink-0"
+                            :class="preset.bitrate === selectedBitrate ? 'opacity-100' : 'opacity-0'" />
+                        {{ preset.label }}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stream info -->
+            <button
+                class="bg-black/50 text-white border-none cursor-pointer p-2 rounded-lg flex items-center transition-colors hover:bg-white/15 active:opacity-75"
+                @click="openInfoModal" title="Stream info">
+                <Info class="size-5" />
+            </button>
+        </div>
+
         <!-- Stream info modal -->
         <Transition name="info-fade">
             <div v-if="infoModalOpen"
@@ -358,7 +392,9 @@ const ALL_QUALITY_PRESETS = [
 ];
 const selectedBitrate = ref(preferencesStore.preferredBitrate); // 0 = Auto (unlimited)
 const qualityMenuOpen = ref(false);
+let nativeSwitchingQuality = false; // suppress 'stopped' → router.back() during native quality switch
 const qualityDropdown = ref<HTMLElement | null>(null);
+const qualityDropdownNative = ref<HTMLElement | null>(null);
 // Only show presets that make sense for the source resolution
 const availablePresets = computed(() => {
     const sourceHeight = videoStream.value?.Height ?? 0;
@@ -551,7 +587,8 @@ function handleClickOutside(e: MouseEvent) {
         audioMenuOpen.value = false;
     if (subtitleDropdown.value && !subtitleDropdown.value.contains(e.target as Node))
         subtitleMenuOpen.value = false;
-    if (qualityDropdown.value && !qualityDropdown.value.contains(e.target as Node))
+    const qEl = qualityDropdown.value ?? qualityDropdownNative.value;
+    if (qEl && !qEl.contains(e.target as Node))
         qualityMenuOpen.value = false;
 }
 
@@ -968,6 +1005,7 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
 
         await NativeVideo.addListener('stopped', async (data) => {
             currentTime.value = (data.positionMs + resumeOffsetMs) / 1000;
+            if (nativeSwitchingQuality) return; // quality switch in progress — don't navigate away
             await reportPlaybackStopped();
             await deleteActiveEncodings();
             router.back();
@@ -1471,6 +1509,38 @@ async function switchQuality(bitrate: number) {
         error.value = 'Failed to switch quality';
         isLoading.value = false;
     } finally {
+        isSwitching = false;
+    }
+}
+
+async function switchQualityNative(bitrate: number) {
+    if (bitrate === selectedBitrate.value || isSwitching) return;
+    isSwitching = true;
+    qualityMenuOpen.value = false;
+    isLoading.value = true;
+
+    const resumeSeconds = currentTime.value;
+    const previousBitrate = selectedBitrate.value;
+
+    try {
+        // Stop the native player without navigating away
+        nativeSwitchingQuality = true;
+        await NativeVideo.stop();
+        await NativeVideo.removeAllListeners();
+        await deleteActiveEncodings();
+
+        selectedBitrate.value = bitrate;
+        preferencesStore.preferredBitrate = bitrate;
+
+        // Re-init native player with the new bitrate
+        await initNativePlayer(resumeSeconds, selectedAudioIndex.value ?? undefined);
+    } catch (e: any) {
+        console.error('[switchQualityNative] error:', e);
+        selectedBitrate.value = previousBitrate;
+        error.value = 'Failed to switch quality';
+        isLoading.value = false;
+    } finally {
+        nativeSwitchingQuality = false;
         isSwitching = false;
     }
 }

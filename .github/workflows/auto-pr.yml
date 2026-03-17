@@ -1,0 +1,48 @@
+name: Auto-create PR
+
+on:
+  push:
+    branches-ignore:
+      - main
+
+# Debounce: if multiple pushes happen in quick succession, cancel prior runs
+concurrency:
+  group: auto-pr-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  create-pr:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Debounce (wait 5s for rapid pushes)
+        run: sleep 5
+
+      - name: Create PR if none exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH="${GITHUB_REF#refs/heads/}"
+          # Check if a PR already exists for this branch
+          EXISTING=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')
+          if [ -n "$EXISTING" ]; then
+            echo "PR #$EXISTING already exists for branch $BRANCH — skipping"
+            exit 0
+          fi
+          # Build title from branch name: feat/foo-bar → foo bar
+          TITLE=$(echo "$BRANCH" | sed 's|^[a-z]*/||; s/-/ /g')
+          gh pr create \
+            --title "$TITLE" \
+            --body "$(cat <<'EOF'
+          Auto-created from branch push.
+
+          🤖 Generated with [Claude Code](https://claude.com/claude-code)
+          EOF
+          )" \
+            --base main \
+            --head "$BRANCH"

@@ -14,6 +14,9 @@ export interface NativeVideoStartOptions {
     title?: string;
     playMethod?: 'DirectPlay' | 'DirectStream' | 'Transcode';
     subtitleTracks?: SubtitleTrack[];
+    qualityPresets?: string;
+    selectedBitrate?: number;
+    streamInfo?: string;
 }
 
 export interface NativeVideoProgressEvent {
@@ -44,6 +47,10 @@ export interface NativeVideoSubtitleSelectedEvent {
     label: string;
 }
 
+export interface NativeVideoQualitySelectedEvent {
+    bitrate: number;
+}
+
 export interface NativeVideoPlugin {
     start(options: NativeVideoStartOptions): Promise<void>;
     stop(): Promise<void>;
@@ -54,6 +61,8 @@ export interface NativeVideoPlugin {
     selectAudioTrack(options: { groupIndex: number }): Promise<void>;
     selectSubtitleTrack(options: { groupIndex: number }): Promise<void>;
     nativeLog(options: { message: string }): Promise<void>;
+    updateStreamInfo(options: { streamInfo: string }): Promise<void>;
+    updateQualityPresets(options: { presets: string; selectedBitrate: number }): Promise<void>;
 
     addListener(event: 'progress', handler: (data: NativeVideoProgressEvent) => void): Promise<PluginListenerHandle>;
     addListener(event: 'ended', handler: () => void): Promise<PluginListenerHandle>;
@@ -62,6 +71,7 @@ export interface NativeVideoPlugin {
     addListener(event: 'tracksReady', handler: (data: NativeVideoTracksReadyEvent) => void): Promise<PluginListenerHandle>;
     addListener(event: 'audioSelected', handler: (data: NativeVideoAudioSelectedEvent) => void): Promise<PluginListenerHandle>;
     addListener(event: 'subtitleSelected', handler: (data: NativeVideoSubtitleSelectedEvent) => void): Promise<PluginListenerHandle>;
+    addListener(event: 'qualitySelected', handler: (data: NativeVideoQualitySelectedEvent) => void): Promise<PluginListenerHandle>;
 
     removeAllListeners(): Promise<void>;
 }

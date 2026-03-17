@@ -46,9 +46,37 @@
             app:layout_constraintTop_toTopOf="@id/btn_back"
             app:layout_constraintBottom_toBottomOf="@id/btn_back"
             app:layout_constraintStart_toEndOf="@id/btn_back"
-            app:layout_constraintEnd_toStartOf="@id/btn_audio"
+            app:layout_constraintEnd_toStartOf="@id/btn_info"
             android:layout_marginStart="8dp"
             android:layout_marginEnd="8dp" />
+
+        <ImageButton
+            android:id="@+id/btn_info"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:src="@drawable/ic_info"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:tint="#FFFFFF"
+            android:contentDescription="Stream info"
+            android:visibility="gone"
+            app:layout_constraintTop_toTopOf="@id/btn_back"
+            app:layout_constraintBottom_toBottomOf="@id/btn_back"
+            app:layout_constraintEnd_toStartOf="@id/btn_quality"
+            android:layout_marginEnd="4dp" />
+
+        <ImageButton
+            android:id="@+id/btn_quality"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:src="@drawable/ic_quality"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:tint="#FFFFFF"
+            android:contentDescription="Quality"
+            android:visibility="gone"
+            app:layout_constraintTop_toTopOf="@id/btn_back"
+            app:layout_constraintBottom_toBottomOf="@id/btn_back"
+            app:layout_constraintEnd_toStartOf="@id/btn_audio"
+            android:layout_marginEnd="4dp" />
 
         <ImageButton
             android:id="@+id/btn_audio"

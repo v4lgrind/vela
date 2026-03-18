@@ -180,7 +180,7 @@
             </div>
         </div>
 
-        <!-- Native player quality & info controls (next to ExoPlayer's audio/subtitle buttons) -->
+        <!-- Native player audio/subtitle selectors (quality & info are in the native Kotlin UI) -->
         <div v-if="isNative && !isLoading"
             class="absolute z-[60] flex items-center gap-1"
             style="bottom: calc(16px + env(safe-area-inset-bottom, 0px)); right: calc(16px + env(safe-area-inset-right, 0px));">
@@ -229,35 +229,8 @@
                     </div>
                 </div>
             </div>
-
-            <!-- Quality selector -->
-            <div class="relative" ref="qualityDropdownNative">
-                <button
-                    class="bg-black/50 text-white border-none cursor-pointer p-2 rounded-lg flex items-center gap-1.5 transition-colors hover:bg-white/15 active:opacity-75"
-                    @click="toggleQualityMenu">
-                    <Gauge class="size-5" />
-                    <span class="text-[0.85rem] font-medium">{{ currentQualityLabel }}</span>
-                </button>
-                <div class="absolute bottom-full right-0 mb-2 bg-[rgba(28,28,28,0.98)] rounded-lg min-w-[160px] overflow-y-auto shadow-[0_8px_24px_rgba(0,0,0,0.5)] backdrop-blur-[10px] transition-all duration-200"
-                    :class="qualityMenuOpen ? 'opacity-100 pointer-events-auto translate-y-0' : 'opacity-0 pointer-events-none translate-y-2.5'">
-                    <div v-for="preset in availablePresets" :key="preset.bitrate"
-                        class="flex items-center gap-2.5 px-4 py-3 cursor-pointer text-[0.9rem] transition-colors hover:bg-white/10 active:opacity-75"
-                        :class="preset.bitrate === selectedBitrate ? 'bg-accent-purple/20' : ''"
-                        @click="switchQualityNative(preset.bitrate)">
-                        <Check class="size-4 shrink-0"
-                            :class="preset.bitrate === selectedBitrate ? 'opacity-100' : 'opacity-0'" />
-                        {{ preset.label }}
-                    </div>
-                </div>
-            </div>
-
-            <!-- Stream info -->
-            <button
-                class="bg-black/50 text-white border-none cursor-pointer p-2 rounded-lg flex items-center transition-colors hover:bg-white/15 active:opacity-75"
-                @click="openInfoModal" title="Stream info">
-                <Info class="size-5" />
-            </button>
         </div>
+
 
         <!-- Stream info modal -->
         <Transition name="info-fade">
@@ -1181,6 +1154,10 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
             NativeVideo.nativeLog({ message: `[Subtitles] saved to localStorage: ${localStorage.getItem(`msplayer-subtitle-native-${itemId}`)}` });
         });
 
+        await NativeVideo.addListener('qualitySelected', (data) => {
+            switchQualityNative(data.bitrate);
+        });
+
         await NativeVideo.start({
             url: hlsUrl.value,
             authHeader: embyAuthHeader,
@@ -1188,6 +1165,9 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
             title: (mediaSource.value as any)?.Name || '',
             playMethod: playMethod.value,
             subtitleTracks,
+            qualityPresets: JSON.stringify(availablePresets.value.map(p => ({ bitrate: p.bitrate, label: p.label }))),
+            selectedBitrate: selectedBitrate.value,
+            streamInfo: buildStreamInfoJson(),
         });
 
         isLoading.value = false;
@@ -1508,6 +1488,27 @@ async function fetchTranscodingInfo() {
     } catch { liveTranscodingInfo.value = null; }
 }
 
+function buildStreamInfoJson(): string {
+    const vs = videoStream.value;
+    const as_ = activeAudioStream.value;
+    const ti = liveTranscodingInfo.value;
+    const info: Record<string, any> = { playMethod: playMethod.value };
+    if (ti?.TranscodeReasons?.length) info.transcodeReason = ti.TranscodeReasons[0];
+    if (ti?.Width != null) info.resolution = `${ti.Width}×${ti.Height}`;
+    else if (vs?.Width) info.resolution = `${vs.Width}×${vs.Height}`;
+    info.videoCodec = ti?.VideoCodec ?? vs?.Codec ?? '';
+    info.isVideoDirect = ti ? !!ti.IsVideoDirect : true;
+    if (ti?.Bitrate) info.videoBitrate = ti.Bitrate;
+    else if (vs?.BitRate) info.videoBitrate = vs.BitRate;
+    if (ti && !ti.IsVideoDirect) info.framerate = ti.Framerate ?? 0;
+    else info.framerate = vs?.RealFrameRate ?? vs?.AverageFrameRate ?? 0;
+    info.audioCodec = ti?.AudioCodec ?? as_?.Codec ?? '';
+    info.isAudioDirect = ti ? !!ti.IsAudioDirect : true;
+    info.audioChannels = as_?.ChannelLayout ?? (as_?.Channels ? `${as_.Channels}ch` : '');
+    if (as_?.BitRate) info.audioBitrate = as_.BitRate;
+    return JSON.stringify(info);
+}
+
 function openInfoModal() {
     infoModalOpen.value = true;
     showControls();
@@ -1624,6 +1625,14 @@ async function switchQualityNative(bitrate: number) {
 
         // Re-init native player with the new bitrate
         await initNativePlayer(resumeSeconds, selectedAudioIndex.value ?? undefined);
+
+        // Push updated stream info & presets to native after the switch
+        await fetchTranscodingInfo();
+        await NativeVideo.updateStreamInfo({ streamInfo: buildStreamInfoJson() });
+        await NativeVideo.updateQualityPresets({
+            presets: JSON.stringify(availablePresets.value.map(p => ({ bitrate: p.bitrate, label: p.label }))),
+            selectedBitrate: selectedBitrate.value,
+        });
     } catch (e: any) {
         console.error('[switchQualityNative] error:', e);
         selectedBitrate.value = previousBitrate;

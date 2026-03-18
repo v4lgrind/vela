@@ -39,6 +39,11 @@ class NativeVideoPlugin : Plugin() {
         unregisterEventReceiver()
         registerEventReceiver()
 
+        // Quality presets & stream info
+        val qualityPresetsJson = call.getString("qualityPresets") ?: "[]"
+        val selectedBitrate = call.data.optInt("selectedBitrate", 0)
+        val streamInfo = call.getString("streamInfo") ?: ""
+
         val intent = Intent(activity, NativePlayerActivity::class.java).apply {
             putExtra(NativePlayerActivity.EXTRA_URL, url)
             putExtra(NativePlayerActivity.EXTRA_AUTH_HEADER, authHeader)
@@ -46,6 +51,9 @@ class NativeVideoPlugin : Plugin() {
             putExtra(NativePlayerActivity.EXTRA_TITLE, title)
             putExtra(NativePlayerActivity.EXTRA_PLAY_METHOD, playMethod)
             putExtra(NativePlayerActivity.EXTRA_SUBTITLE_TRACKS, subtitleTracksJson)
+            putExtra(NativePlayerActivity.EXTRA_QUALITY_PRESETS, qualityPresetsJson)
+            putExtra(NativePlayerActivity.EXTRA_SELECTED_BITRATE, selectedBitrate)
+            putExtra(NativePlayerActivity.EXTRA_STREAM_INFO, streamInfo)
         }
         activity.startActivity(intent)
         call.resolve()
@@ -129,6 +137,30 @@ class NativeVideoPlugin : Plugin() {
         call.resolve()
     }
 
+    @PluginMethod
+    fun updateStreamInfo(call: PluginCall) {
+        val streamInfo = call.getString("streamInfo") ?: ""
+        val intent = Intent(NativePlayerActivity.ACTION_COMMAND)
+        intent.putExtra("command", NativePlayerActivity.CMD_UPDATE_STREAM_INFO)
+        intent.putExtra("streamInfo", streamInfo)
+        intent.setPackage(context.packageName)
+        context.sendBroadcast(intent)
+        call.resolve()
+    }
+
+    @PluginMethod
+    fun updateQualityPresets(call: PluginCall) {
+        val presets = call.getString("presets") ?: "[]"
+        val selectedBitrate = call.data.optInt("selectedBitrate", 0)
+        val intent = Intent(NativePlayerActivity.ACTION_COMMAND)
+        intent.putExtra("command", NativePlayerActivity.CMD_UPDATE_QUALITY_PRESETS)
+        intent.putExtra("presets", presets)
+        intent.putExtra("selectedBitrate", selectedBitrate)
+        intent.setPackage(context.packageName)
+        context.sendBroadcast(intent)
+        call.resolve()
+    }
+
     // ── Private helpers ────────────────────────────────────────────────────────
 
     private fun sendCommand(command: String) {
@@ -193,6 +225,12 @@ class NativeVideoPlugin : Plugin() {
                         data.put("label", label)
                         notifyListeners("subtitleSelected", data)
                     }
+                    NativePlayerActivity.ACTION_QUALITY_SELECTED -> {
+                        val bitrate = intent.getIntExtra("bitrate", 0)
+                        val data = JSObject()
+                        data.put("bitrate", bitrate)
+                        notifyListeners("qualitySelected", data)
+                    }
                 }
             }
         }
@@ -205,6 +243,7 @@ class NativeVideoPlugin : Plugin() {
             addAction(NativePlayerActivity.ACTION_TRACKS)
             addAction(NativePlayerActivity.ACTION_AUDIO_SELECTED)
             addAction(NativePlayerActivity.ACTION_SUBTITLE_SELECTED)
+            addAction(NativePlayerActivity.ACTION_QUALITY_SELECTED)
         }
         ContextCompat.registerReceiver(context, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
         eventReceiver = receiver

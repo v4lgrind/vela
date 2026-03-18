@@ -55,6 +55,7 @@ class NativePlayerActivity : AppCompatActivity() {
         const val ACTION_TRACKS = "com.jellyfin_v4lgrind_client.app.PLAYER_TRACKS"
         const val ACTION_AUDIO_SELECTED = "com.jellyfin_v4lgrind_client.app.AUDIO_SELECTED"
         const val ACTION_SUBTITLE_SELECTED = "com.jellyfin_v4lgrind_client.app.SUBTITLE_SELECTED"
+        const val ACTION_QUALITY_SELECTED = "com.jellyfin_v4lgrind_client.app.QUALITY_SELECTED"
 
         const val CMD_STOP = "stop"
         const val CMD_PAUSE = "pause"
@@ -63,6 +64,12 @@ class NativePlayerActivity : AppCompatActivity() {
         const val CMD_SELECT_AUDIO = "selectAudio"
         const val CMD_SELECT_SUBTITLE = "selectSubtitle"
         const val CMD_SET_INTRO = "setIntro"
+        const val CMD_UPDATE_QUALITY_PRESETS = "updateQualityPresets"
+        const val CMD_UPDATE_STREAM_INFO = "updateStreamInfo"
+
+        const val EXTRA_QUALITY_PRESETS = "qualityPresets"
+        const val EXTRA_SELECTED_BITRATE = "selectedBitrate"
+        const val EXTRA_STREAM_INFO = "streamInfo"
     }
 
     private var player: ExoPlayer? = null
@@ -73,6 +80,8 @@ class NativePlayerActivity : AppCompatActivity() {
     private lateinit var btnAudio: ImageButton
     private lateinit var btnSubtitle: ImageButton
     private lateinit var btnFullscreen: ImageButton
+    private lateinit var btnQuality: ImageButton
+    private lateinit var btnInfo: ImageButton
     private lateinit var btnSkipIntro: Button
     private lateinit var seekBar: SeekBar
     private lateinit var tvCurrentTime: TextView
@@ -90,6 +99,11 @@ class NativePlayerActivity : AppCompatActivity() {
     private val subtitleTrackGroups = mutableListOf<Pair<Int, TrackGroup>>()
     private var selectedAudioGroupIndex = -1
     private var selectedSubtitleGroupIndex = -1
+
+    // Quality presets & stream info (passed from Vue)
+    private var qualityPresets = mutableListOf<Pair<Int, String>>() // (bitrate, label)
+    private var selectedBitrate = 0
+    private var streamInfoJson = ""
 
     private val commandReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -114,6 +128,16 @@ class NativePlayerActivity : AppCompatActivity() {
                     introEndMs = intent.getLongExtra("introEndMs", -1L)
                     introSkipped = false
                     android.util.Log.d("NativePlayer", "Intro set: $introStartMs-$introEndMs ms")
+                }
+                CMD_UPDATE_QUALITY_PRESETS -> {
+                    val json = intent.getStringExtra("presets") ?: return
+                    selectedBitrate = intent.getIntExtra("selectedBitrate", 0)
+                    parseQualityPresets(json)
+                    btnQuality.visibility = if (qualityPresets.size > 1) View.VISIBLE else View.GONE
+                }
+                CMD_UPDATE_STREAM_INFO -> {
+                    streamInfoJson = intent.getStringExtra("streamInfo") ?: ""
+                    btnInfo.visibility = if (streamInfoJson.isNotEmpty()) View.VISIBLE else View.GONE
                 }
             }
         }
@@ -194,6 +218,8 @@ class NativePlayerActivity : AppCompatActivity() {
         tvTotalTime = findViewById(R.id.tv_total_time)
         tvTitle = findViewById(R.id.tv_title)
         btnSkipIntro = findViewById(R.id.btn_skip_intro)
+        btnQuality = findViewById(R.id.btn_quality)
+        btnInfo = findViewById(R.id.btn_info)
 
         val url = intent.getStringExtra(EXTRA_URL) ?: run {
             finish()
@@ -204,6 +230,14 @@ class NativePlayerActivity : AppCompatActivity() {
         val title = intent.getStringExtra(EXTRA_TITLE) ?: ""
         val playMethod = intent.getStringExtra(EXTRA_PLAY_METHOD) ?: "Transcode"
         val subtitleTracksJson = intent.getStringExtra(EXTRA_SUBTITLE_TRACKS) ?: "[]"
+
+        // Quality presets & stream info
+        val qualityPresetsJson = intent.getStringExtra(EXTRA_QUALITY_PRESETS) ?: "[]"
+        selectedBitrate = intent.getIntExtra(EXTRA_SELECTED_BITRATE, 0)
+        streamInfoJson = intent.getStringExtra(EXTRA_STREAM_INFO) ?: ""
+        parseQualityPresets(qualityPresetsJson)
+        if (qualityPresets.size > 1) btnQuality.visibility = View.VISIBLE
+        if (streamInfoJson.isNotEmpty()) btnInfo.visibility = View.VISIBLE
 
         tvTitle.text = title
 
@@ -284,6 +318,16 @@ class NativePlayerActivity : AppCompatActivity() {
         // Tap on player view toggles controls
         playerView.setOnClickListener { toggleControls() }
         controlsOverlay.setOnClickListener { toggleControls() }
+
+        // Quality picker
+        btnQuality.setOnClickListener {
+            showQualityPicker()
+        }
+
+        // Stream info
+        btnInfo.setOnClickListener {
+            showStreamInfoDialog()
+        }
 
         // Audio track picker
         btnAudio.setOnClickListener {
@@ -587,6 +631,89 @@ class NativePlayerActivity : AppCompatActivity() {
             }
             .setNegativeButton("Cancel", null)
             .show()
+    }
+
+    private fun parseQualityPresets(json: String) {
+        qualityPresets.clear()
+        try {
+            val arr = JSONArray(json)
+            for (i in 0 until arr.length()) {
+                val obj = arr.getJSONObject(i)
+                qualityPresets.add(Pair(obj.getInt("bitrate"), obj.getString("label")))
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("NativePlayer", "parseQualityPresets error", e)
+        }
+    }
+
+    private fun showQualityPicker() {
+        if (qualityPresets.isEmpty()) return
+        val labels = qualityPresets.map { it.second }.toTypedArray()
+        val checkedItem = qualityPresets.indexOfFirst { it.first == selectedBitrate }
+
+        androidx.appcompat.app.AlertDialog.Builder(this, androidx.appcompat.R.style.Theme_AppCompat_Dialog)
+            .setTitle("Quality")
+            .setSingleChoiceItems(labels, checkedItem) { dialog, which ->
+                val bitrate = qualityPresets[which].first
+                selectedBitrate = bitrate
+                dialog.dismiss()
+                // Broadcast back to Vue so it can do the actual quality switch
+                val broadcastIntent = Intent(ACTION_QUALITY_SELECTED)
+                broadcastIntent.putExtra("bitrate", bitrate)
+                broadcastIntent.setPackage(packageName)
+                sendBroadcast(broadcastIntent)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun showStreamInfoDialog() {
+        if (streamInfoJson.isEmpty()) return
+        try {
+            val info = JSONObject(streamInfoJson)
+            val sb = StringBuilder()
+
+            val method = info.optString("playMethod", "")
+            if (method.isNotEmpty()) sb.append("Play Method: $method\n")
+
+            val reason = info.optString("transcodeReason", "")
+            if (reason.isNotEmpty()) sb.append("Reason: $reason\n")
+
+            // Video
+            val vCodec = info.optString("videoCodec", "")
+            val vRes = info.optString("resolution", "")
+            val vBitrate = info.optInt("videoBitrate", 0)
+            val vDirect = info.optBoolean("isVideoDirect", true)
+            if (vCodec.isNotEmpty() || vRes.isNotEmpty()) {
+                sb.append("\n— Video —\n")
+                if (vRes.isNotEmpty()) sb.append("Resolution: $vRes\n")
+                if (vCodec.isNotEmpty()) sb.append("Codec: ${vCodec.uppercase()}${if (!vDirect) " (transcoding)" else " (copy)"}\n")
+                if (vBitrate > 0) sb.append("Bitrate: ${vBitrate / 1000} kbps\n")
+            }
+
+            val fps = info.optDouble("framerate", 0.0)
+            if (fps > 0) sb.append("Frame rate: ${"%.1f".format(fps)} fps\n")
+
+            // Audio
+            val aCodec = info.optString("audioCodec", "")
+            val aChannels = info.optString("audioChannels", "")
+            val aBitrate = info.optInt("audioBitrate", 0)
+            val aDirect = info.optBoolean("isAudioDirect", true)
+            if (aCodec.isNotEmpty() || aChannels.isNotEmpty()) {
+                sb.append("\n— Audio —\n")
+                if (aCodec.isNotEmpty()) sb.append("Codec: ${aCodec.uppercase()}${if (!aDirect) " (transcoding)" else " (copy)"}\n")
+                if (aChannels.isNotEmpty()) sb.append("Channels: $aChannels\n")
+                if (aBitrate > 0) sb.append("Bitrate: ${aBitrate / 1000} kbps\n")
+            }
+
+            androidx.appcompat.app.AlertDialog.Builder(this, androidx.appcompat.R.style.Theme_AppCompat_Dialog)
+                .setTitle("Stream Info")
+                .setMessage(sb.toString().trimEnd())
+                .setPositiveButton("OK", null)
+                .show()
+        } catch (e: Exception) {
+            android.util.Log.e("NativePlayer", "showStreamInfoDialog error", e)
+        }
     }
 
     private fun toggleControls() {

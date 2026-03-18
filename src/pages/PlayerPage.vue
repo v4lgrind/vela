@@ -680,6 +680,9 @@ async function fetchPlaybackInfo(startTimeTicks?: number, audioStreamIndex?: num
         ...(audioStreamIndex !== undefined ? { AudioStreamIndex: audioStreamIndex } : {}),
     };
 
+    console.log(`[AudioCrash] fetchPlaybackInfo: forceTranscode=${forceTranscode} transcodeAudio=${transcodeAudio} shouldForce=${shouldForce} stripDirectPlay=${stripDirectPlay} audioStreamIndex=${audioStreamIndex}`);
+    console.log(`[AudioCrash]   DirectPlayProfiles count=${baseProfile.DirectPlayProfiles?.length ?? 'N/A'} AllowAudioStreamCopy=${transcodeAudio ? false : 'unset'} AllowVideoStreamCopy=${shouldForce ? false : 'unset'}`);
+
     const response = await fetch(
         `${serverUrl}/Items/${itemId}/PlaybackInfo?userId=${store.userId}`,
         {
@@ -689,7 +692,14 @@ async function fetchPlaybackInfo(startTimeTicks?: number, audioStreamIndex?: num
         }
     );
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    return await response.json();
+    const result = await response.json();
+    const ms0 = result.MediaSources?.[0];
+    if (ms0) {
+        console.log(`[AudioCrash] PlaybackInfo response: SupportsDirectPlay=${ms0.SupportsDirectPlay} SupportsDirectStream=${ms0.SupportsDirectStream} TranscodingUrl=${ms0.TranscodingUrl ? 'YES' : 'NO'}`);
+        const audioStreams = (ms0.MediaStreams || []).filter((s: any) => s.Type === 'Audio');
+        audioStreams.forEach((s: any) => console.log(`[AudioCrash]   Audio stream: idx=${s.Index} lang=${s.Language} codec=${s.Codec} channels=${s.Channels} displayTitle="${s.DisplayTitle}"`));
+    }
+    return result;
 }
 
 function parseAudioStreams(ms: any, preferredIndex?: number) {
@@ -801,6 +811,7 @@ function determinePlaybackMethod(ms: any) {
             hlsUrl.value = `${serverUrl}/Videos/${itemId}/master.m3u8?mediaSourceId=${ms.Id || itemId}&api_key=${accessToken}&PlaySessionId=${playSessionId.value}`;
         }
     }
+    console.log(`[AudioCrash] determinePlaybackMethod: ${playMethod.value} url=${hlsUrl.value.substring(0, 120)}...`);
 }
 
 // ── Skip Intro ─────────────────────────────────────────────────────────────────
@@ -920,6 +931,7 @@ function initHls(url: string, video: HTMLVideoElement, startSeconds?: number, on
 }
 
 async function restartWithAudio(resumeSeconds: number, jellyfinAudioIndex: number | undefined, title?: string) {
+    console.log(`[AudioCrash] restartWithAudio: resumeSeconds=${resumeSeconds} jellyfinAudioIndex=${jellyfinAudioIndex} title="${title}"`);
     nativeSwitchingQuality = true;
     isLoading.value = true;
     try {
@@ -927,8 +939,9 @@ async function restartWithAudio(resumeSeconds: number, jellyfinAudioIndex: numbe
         await NativeVideo.stop();
         await deleteActiveEncodings();
         await initNativePlayer(resumeSeconds, jellyfinAudioIndex, title, true);
+        console.log(`[AudioCrash] restartWithAudio: initNativePlayer completed successfully`);
     } catch (e) {
-        console.error('[restartWithAudio] failed:', e);
+        console.error('[AudioCrash] restartWithAudio FAILED:', e);
         error.value = 'Failed to switch audio track';
         isLoading.value = false;
     } finally {
@@ -1023,6 +1036,7 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
         });
 
         await NativeVideo.addListener('error', (data) => {
+            console.error(`[AudioCrash] error listener (NO audio fallback): ${data.message}`);
             error.value = data.message;
             isLoading.value = false;
         });
@@ -1043,12 +1057,17 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
                     // Apply saved audio preference to ExoPlayer
                     const savedLang = localStorage.getItem(`msplayer-audio-${itemId}`);
                     const globalLang = preferencesStore.preferredAudioLanguage;
+                    console.log(`[AudioCrash] tracksReady: ${nativeAudio.length} audio tracks, savedLang="${savedLang}" globalLang="${globalLang}"`);
+                    nativeAudio.forEach((t: any) => console.log(`[AudioCrash]   ExoPlayer track: groupIndex=${t.groupIndex} lang="${t.language}" codec="${t.codec}" ch=${t.channelCount}`));
                     const preferredAudio =
                         (savedLang ? nativeAudio.find((t: any) => t.language === savedLang) : null) ||
                         (globalLang ? nativeAudio.find((t: any) => t.language === globalLang) : null);
                     if (preferredAudio) {
+                        console.log(`[AudioCrash] tracksReady: auto-switching to groupIndex=${preferredAudio.groupIndex} lang="${preferredAudio.language}"`);
                         NativeVideo.selectAudioTrack({ groupIndex: preferredAudio.groupIndex });
                         selectedAudioIndex.value = preferredAudio.groupIndex;
+                    } else {
+                        console.log(`[AudioCrash] tracksReady: no preference match, keeping default`);
                     }
                 }
 
@@ -1119,9 +1138,13 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
         await NativeVideo.addListener('audioError', async (data) => {
             // Capture position immediately — ExoPlayer resets to 0 after a fatal error
             const savedPosition = currentTime.value;
-            const jellyfinIndex = (mediaSource.value?.MediaStreams ?? [])
-                .find((s: any) => s.Type === 'Audio' && s.Language === data.language)?.Index
+            const audioStreams = (mediaSource.value?.MediaStreams ?? []).filter((s: any) => s.Type === 'Audio');
+            console.log(`[AudioCrash] audioError received: groupIndex=${data.groupIndex} language="${data.language}" savedPosition=${savedPosition}`);
+            console.log(`[AudioCrash]   Jellyfin audio streams: ${audioStreams.map((s: any) => `idx=${s.Index} lang="${s.Language}" codec=${s.Codec}`).join(' | ')}`);
+            const jellyfinIndex = audioStreams
+                .find((s: any) => s.Language === data.language)?.Index
                 ?? undefined;
+            console.log(`[AudioCrash]   matched jellyfinIndex=${jellyfinIndex}`);
             await restartWithAudio(savedPosition, jellyfinIndex, title);
         });
 

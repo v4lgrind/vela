@@ -463,6 +463,15 @@ class NativePlayerActivity : AppCompatActivity() {
             }
 
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                android.util.Log.e("NativePlayer", "[AudioCrash] onPlayerError: code=${error.errorCode} msg=${error.message}")
+                android.util.Log.e("NativePlayer", "[AudioCrash]   pendingIdx=$audioSwitchPendingGroupIndex pendingLang=$audioSwitchPendingLanguage selectedAudioGroupIndex=$selectedAudioGroupIndex")
+                android.util.Log.e("NativePlayer", "[AudioCrash]   isAudioPlaybackError=${isAudioPlaybackError(error)}")
+                var c: Throwable? = error.cause
+                var depth = 0
+                while (c != null) {
+                    android.util.Log.e("NativePlayer", "[AudioCrash]   cause[$depth]: ${c.javaClass.name}: ${c.message}")
+                    c = c.cause; depth++
+                }
                 handler.removeCallbacks(clearAudioSwitchPending)
                 val pendingIdx = audioSwitchPendingGroupIndex
                 val pendingLang = audioSwitchPendingLanguage
@@ -470,18 +479,19 @@ class NativePlayerActivity : AppCompatActivity() {
                 audioSwitchPendingLanguage = ""
                 when {
                     pendingIdx >= 0 -> {
-                        // Decoder failed after user-triggered audio track switch
+                        android.util.Log.d("NativePlayer", "[AudioCrash] → branch: pendingSwitch (idx=$pendingIdx lang=$pendingLang)")
                         sendAudioErrorBroadcast(pendingIdx, pendingLang)
                     }
                     selectedAudioGroupIndex >= 0 && isAudioPlaybackError(error) -> {
-                        // Audio renderer crashed on the auto-selected track (no pending switch).
-                        // Happens when ExoPlayer picks a bad codec (e.g. eac3+Atmos) via device
-                        // locale before Vue's selectAudioTrack call sets the pending flag.
                         val group = audioTrackGroups.firstOrNull { it.first == selectedAudioGroupIndex }
                         val language = group?.second?.getFormat(0)?.language ?: "und"
+                        android.util.Log.d("NativePlayer", "[AudioCrash] → branch: autoSelected (selectedIdx=$selectedAudioGroupIndex lang=$language)")
                         sendAudioErrorBroadcast(selectedAudioGroupIndex, language)
                     }
-                    else -> sendErrorBroadcast(error.message ?: "Playback error")
+                    else -> {
+                        android.util.Log.d("NativePlayer", "[AudioCrash] → branch: genericError (no audio fallback)")
+                        sendErrorBroadcast(error.message ?: "Playback error")
+                    }
                 }
             }
         })
@@ -546,7 +556,10 @@ class NativePlayerActivity : AppCompatActivity() {
                 obj.put("codec", format.codecs ?: "")
                 audioArr.put(obj)
                 audioTrackGroups.add(Pair(groupIndex, trackGroup))
-                if (group.isSelected) selectedAudioGroupIndex = groupIndex
+                if (group.isSelected) {
+                    selectedAudioGroupIndex = groupIndex
+                    android.util.Log.d("NativePlayer", "[AudioCrash] reportTracks: auto-selected audio groupIndex=$groupIndex lang=${format.language} codec=${format.codecs}")
+                }
             } else if (type == C.TRACK_TYPE_TEXT) {
                 val obj = JSONObject()
                 val format = trackGroup.getFormat(0)
@@ -585,6 +598,7 @@ class NativePlayerActivity : AppCompatActivity() {
 
         // Mark pending — onPlayerError will check this if the decoder fails on the new track.
         // Auto-cleared after 4 s (success path); cancelled and handled immediately on error.
+        android.util.Log.d("NativePlayer", "[AudioCrash] selectAudioTrack: groupIndex=$groupIndex lang=$language codec=${group.second.getFormat(0).codecs}")
         handler.removeCallbacks(clearAudioSwitchPending)
         audioSwitchPendingGroupIndex = groupIndex
         audioSwitchPendingLanguage = language

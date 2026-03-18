@@ -22,13 +22,18 @@
 
           <div class="flex flex-col gap-1.5">
             <Label for="password">Password</Label>
-            <Input id="password" v-model="password" :type="showPassword ? 'text' : 'password'"
-              placeholder="Password"
-              :disabled="loading" required autocomplete="current-password" />
-            <label class="flex items-center gap-2 text-sm text-text-muted mt-1 cursor-pointer">
-              <Checkbox v-model:checked="showPassword" :disabled="loading" />
-              Show
-            </label>
+            <div class="relative">
+              <Input id="password" v-model="password" :type="showPassword ? 'text' : 'password'"
+                placeholder="Password" class="pr-10"
+                :disabled="loading" required autocomplete="current-password" />
+              <button type="button"
+                class="absolute inset-y-0 right-0 flex items-center px-3 text-text-muted hover:text-text-default transition-colors"
+                :disabled="loading"
+                @click="showPassword = !showPassword">
+                <Eye v-if="!showPassword" class="size-4" />
+                <EyeOff v-else class="size-4" />
+              </button>
+            </div>
           </div>
 
           <Button type="submit" :disabled="loading" class="w-full">
@@ -50,7 +55,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
+import { Eye, EyeOff } from 'lucide-vue-next'
 
 const jellyfin = useJellyfinStore()
 const router = useRouter()

@@ -34,6 +34,9 @@ class NativeVideoPlugin : Plugin() {
         val subtitleTracksJs = call.getArray("subtitleTracks")
         val subtitleTracksJson = subtitleTracksJs?.toString() ?: "[]"
 
+        // Always start with a clean receiver so a stale one from a previous session
+        // (e.g. quality switch) can never prevent the new receiver from being registered.
+        unregisterEventReceiver()
         registerEventReceiver()
 
         val intent = Intent(activity, NativePlayerActivity::class.java).apply {

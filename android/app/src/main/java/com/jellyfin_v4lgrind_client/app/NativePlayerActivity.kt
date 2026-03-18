@@ -405,6 +405,19 @@ class NativePlayerActivity : AppCompatActivity() {
         playerView.player = exo
         player = exo
 
+        // Remove the black background box behind subtitles; keep white text with a
+        // dark outline so they remain readable on any content.
+        playerView.subtitleView?.setStyle(
+            androidx.media3.ui.CaptionStyleCompat(
+                android.graphics.Color.WHITE,
+                android.graphics.Color.TRANSPARENT,
+                android.graphics.Color.TRANSPARENT,
+                androidx.media3.ui.CaptionStyleCompat.EDGE_TYPE_OUTLINE,
+                android.graphics.Color.BLACK,
+                null
+            )
+        )
+
         scheduleHideControls()
     }
 

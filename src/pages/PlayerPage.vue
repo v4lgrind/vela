@@ -185,6 +185,51 @@
             class="absolute z-[60] flex items-center gap-1"
             style="bottom: calc(16px + env(safe-area-inset-bottom, 0px)); right: calc(16px + env(safe-area-inset-right, 0px));">
 
+            <!-- Audio track selector -->
+            <div v-if="audioList.length > 1" class="relative">
+                <button
+                    class="bg-black/50 text-white border-none cursor-pointer p-2 rounded-lg flex items-center gap-1.5 transition-colors hover:bg-white/15 active:opacity-75"
+                    @click="nativeAudioMenuOpen = !nativeAudioMenuOpen; nativeSubtitleMenuOpen = false">
+                    <AudioLines class="size-5" />
+                </button>
+                <div class="absolute bottom-full right-0 mb-2 bg-[rgba(28,28,28,0.98)] rounded-lg min-w-[200px] max-h-[400px] overflow-y-auto shadow-[0_8px_24px_rgba(0,0,0,0.5)] backdrop-blur-[10px] transition-all duration-200 scrollbar-hide"
+                    :class="nativeAudioMenuOpen ? 'opacity-100 pointer-events-auto translate-y-0' : 'opacity-0 pointer-events-none translate-y-2.5'">
+                    <div v-for="track in audioList" :key="track.index"
+                        class="flex items-center gap-2.5 px-4 py-3 cursor-pointer text-[0.9rem] transition-colors hover:bg-white/10 active:opacity-75"
+                        :class="track.index === selectedAudioIndex ? 'bg-accent-purple/20' : ''"
+                        @click="switchAudioNative(track.index)">
+                        <Check class="size-4 shrink-0" :class="track.index === selectedAudioIndex ? 'opacity-100' : 'opacity-0'" />
+                        {{ track.label }}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Subtitle track selector -->
+            <div v-if="nativeSubtitleList.length > 0" class="relative">
+                <button
+                    class="bg-black/50 text-white border-none cursor-pointer p-2 rounded-lg flex items-center gap-1.5 transition-colors hover:bg-white/15 active:opacity-75"
+                    @click="nativeSubtitleMenuOpen = !nativeSubtitleMenuOpen; nativeAudioMenuOpen = false">
+                    <Captions class="size-5" />
+                </button>
+                <div class="absolute bottom-full right-0 mb-2 bg-[rgba(28,28,28,0.98)] rounded-lg min-w-[200px] max-h-[400px] overflow-y-auto shadow-[0_8px_24px_rgba(0,0,0,0.5)] backdrop-blur-[10px] transition-all duration-200 scrollbar-hide"
+                    :class="nativeSubtitleMenuOpen ? 'opacity-100 pointer-events-auto translate-y-0' : 'opacity-0 pointer-events-none translate-y-2.5'">
+                    <div
+                        class="flex items-center gap-2.5 px-4 py-3 cursor-pointer text-[0.9rem] transition-colors hover:bg-white/10 active:opacity-75"
+                        :class="selectedSubtitleIndex === null ? 'bg-accent-purple/20' : ''"
+                        @click="switchSubtitleNative(null)">
+                        <Check class="size-4 shrink-0" :class="selectedSubtitleIndex === null ? 'opacity-100' : 'opacity-0'" />
+                        Off
+                    </div>
+                    <div v-for="sub in nativeSubtitleList" :key="sub.groupIndex"
+                        class="flex items-center gap-2.5 px-4 py-3 cursor-pointer text-[0.9rem] transition-colors hover:bg-white/10 active:opacity-75"
+                        :class="sub.groupIndex === selectedSubtitleIndex ? 'bg-accent-purple/20' : ''"
+                        @click="switchSubtitleNative(sub.groupIndex)">
+                        <Check class="size-4 shrink-0" :class="sub.groupIndex === selectedSubtitleIndex ? 'opacity-100' : 'opacity-0'" />
+                        {{ sub.label }}
+                    </div>
+                </div>
+            </div>
+
             <!-- Quality selector -->
             <div class="relative" ref="qualityDropdownNative">
                 <button
@@ -375,6 +420,11 @@ const audioMenuOpen = ref(false);
 const subtitleList = ref<Array<{ index: number; label: string; language: string; deliveryUrl: string }>>([]);
 const selectedSubtitleIndex = ref<number | null>(null); // null = off
 const subtitleMenuOpen = ref(false);
+
+// Native-only: ExoPlayer track lists (populated from tracksReady event)
+const nativeSubtitleList = ref<Array<{ groupIndex: number; label: string; language: string }>>([]);
+const nativeAudioMenuOpen = ref(false);
+const nativeSubtitleMenuOpen = ref(false);
 // Active track — blob: URL so the browser never hits the cross-origin <track> restriction
 const activeTrackBlobUrl = ref<string | null>(null);
 const activeTrackLang = ref('und');
@@ -574,6 +624,23 @@ function toggleAudioMenu() {
 function toggleSubtitleMenu() {
     subtitleMenuOpen.value = !subtitleMenuOpen.value;
     showControls();
+}
+
+function switchAudioNative(groupIndex: number) {
+    if (groupIndex === selectedAudioIndex.value) { nativeAudioMenuOpen.value = false; return; }
+    NativeVideo.selectAudioTrack({ groupIndex });
+    selectedAudioIndex.value = groupIndex;
+    const lang = audioList.value.find(a => a.index === groupIndex)?.language;
+    if (lang) localStorage.setItem(`msplayer-audio-${itemId}`, lang);
+    nativeAudioMenuOpen.value = false;
+}
+
+function switchSubtitleNative(groupIndex: number | null) {
+    NativeVideo.selectSubtitleTrack({ groupIndex: groupIndex ?? -1 });
+    selectedSubtitleIndex.value = groupIndex;
+    const label = groupIndex !== null ? (nativeSubtitleList.value.find(s => s.groupIndex === groupIndex)?.label ?? 'off') : 'off';
+    localStorage.setItem(`msplayer-subtitle-native-${itemId}`, label);
+    nativeSubtitleMenuOpen.value = false;
 }
 
 function handleKeyDown(e: KeyboardEvent) {
@@ -1006,15 +1073,15 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
         await NativeVideo.addListener('stopped', async (data) => {
             currentTime.value = (data.positionMs + resumeOffsetMs) / 1000;
             if (nativeSwitchingQuality) return; // quality switch in progress — don't navigate away
-            await reportPlaybackStopped();
-            await deleteActiveEncodings();
             router.back();
+            reportPlaybackStopped();
+            deleteActiveEncodings();
         });
 
         await NativeVideo.addListener('ended', async () => {
-            await reportPlaybackStopped();
-            await deleteActiveEncodings();
             router.back();
+            reportPlaybackStopped();
+            deleteActiveEncodings();
         });
 
         await NativeVideo.addListener('error', (data) => {
@@ -1027,6 +1094,14 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
                 const parsed = JSON.parse(data.tracks);
                 const nativeAudio: any[] = parsed.audioTracks ?? [];
                 const nativeSubtitle: any[] = parsed.subtitleTracks ?? [];
+
+                if (nativeSubtitle.length > 0) {
+                    nativeSubtitleList.value = nativeSubtitle.map((t: any) => ({
+                        groupIndex: t.groupIndex,
+                        label: t.label || (t.language || 'und').toUpperCase(),
+                        language: t.language || 'und',
+                    }));
+                }
 
                 if (nativeAudio.length > 0) {
                     audioList.value = nativeAudio.map((t: any) => ({
@@ -1519,13 +1594,28 @@ async function switchQualityNative(bitrate: number) {
     qualityMenuOpen.value = false;
     isLoading.value = true;
 
-    const resumeSeconds = currentTime.value;
     const previousBitrate = selectedBitrate.value;
 
     try {
-        // Stop the native player without navigating away
         nativeSwitchingQuality = true;
+
+        // Register a stopped listener *before* calling stop so we capture the exact
+        // ExoPlayer position at the moment the Activity finishes — more accurate than
+        // the last 5-second progress tick stored in currentTime.value.
+        let resolveStopPos!: (v: number) => void;
+        const stopPosPromise = new Promise<number>(r => { resolveStopPos = r; });
+        await NativeVideo.addListener('stopped', (data) => {
+            resolveStopPos((data.positionMs + nativeResumeOffsetMs.value) / 1000);
+        });
+
         await NativeVideo.stop();
+
+        // Wait up to 2 s for the stopped event; fall back to last known position.
+        const resumeSeconds = await Promise.race([
+            stopPosPromise,
+            new Promise<number>(r => setTimeout(() => r(currentTime.value), 2000)),
+        ]);
+
         await NativeVideo.removeAllListeners();
         await deleteActiveEncodings();
 

@@ -43,6 +43,7 @@ class NativeVideoPlugin : Plugin() {
         val qualityPresetsJson = call.getString("qualityPresets") ?: "[]"
         val selectedBitrate = call.data.optInt("selectedBitrate", 0)
         val streamInfo = call.getString("streamInfo") ?: ""
+        val audioTracksJson = call.getString("audioTracksJson") ?: "[]"
 
         val intent = Intent(activity, NativePlayerActivity::class.java).apply {
             putExtra(NativePlayerActivity.EXTRA_URL, url)
@@ -54,6 +55,7 @@ class NativeVideoPlugin : Plugin() {
             putExtra(NativePlayerActivity.EXTRA_QUALITY_PRESETS, qualityPresetsJson)
             putExtra(NativePlayerActivity.EXTRA_SELECTED_BITRATE, selectedBitrate)
             putExtra(NativePlayerActivity.EXTRA_STREAM_INFO, streamInfo)
+            putExtra(NativePlayerActivity.EXTRA_AUDIO_TRACKS, audioTracksJson)
         }
         activity.startActivity(intent)
         call.resolve()
@@ -214,6 +216,7 @@ class NativeVideoPlugin : Plugin() {
                         val language = intent.getStringExtra("language") ?: "und"
                         val data = JSObject()
                         data.put("language", language)
+                        data.put("groupIndex", intent.getIntExtra("groupIndex", -1))
                         notifyListeners("audioSelected", data)
                     }
                     NativePlayerActivity.ACTION_SUBTITLE_SELECTED -> {
@@ -231,6 +234,17 @@ class NativeVideoPlugin : Plugin() {
                         data.put("bitrate", bitrate)
                         notifyListeners("qualitySelected", data)
                     }
+                    NativePlayerActivity.ACTION_AUDIO_ERROR -> {
+                        val data = JSObject()
+                        data.put("groupIndex", intent.getIntExtra("groupIndex", -1))
+                        data.put("language", intent.getStringExtra("language") ?: "und")
+                        notifyListeners("audioError", data)
+                    }
+                    NativePlayerActivity.ACTION_AUDIO_SWITCH_JELLYFIN -> {
+                        val data = JSObject()
+                        data.put("jellyfinIndex", intent.getIntExtra("jellyfinIndex", -1))
+                        notifyListeners("audioSwitchJellyfin", data)
+                    }
                 }
             }
         }
@@ -244,6 +258,8 @@ class NativeVideoPlugin : Plugin() {
             addAction(NativePlayerActivity.ACTION_AUDIO_SELECTED)
             addAction(NativePlayerActivity.ACTION_SUBTITLE_SELECTED)
             addAction(NativePlayerActivity.ACTION_QUALITY_SELECTED)
+            addAction(NativePlayerActivity.ACTION_AUDIO_ERROR)
+            addAction(NativePlayerActivity.ACTION_AUDIO_SWITCH_JELLYFIN)
         }
         ContextCompat.registerReceiver(context, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
         eventReceiver = receiver

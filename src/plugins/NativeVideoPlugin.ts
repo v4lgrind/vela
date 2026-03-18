@@ -17,6 +17,7 @@ export interface NativeVideoStartOptions {
     qualityPresets?: string;
     selectedBitrate?: number;
     streamInfo?: string;
+    audioTracksJson?: string;
 }
 
 export interface NativeVideoProgressEvent {
@@ -40,6 +41,7 @@ export interface NativeVideoTracksReadyEvent {
 
 export interface NativeVideoAudioSelectedEvent {
     language: string;
+    groupIndex: number;
 }
 
 export interface NativeVideoSubtitleSelectedEvent {
@@ -49,6 +51,15 @@ export interface NativeVideoSubtitleSelectedEvent {
 
 export interface NativeVideoQualitySelectedEvent {
     bitrate: number;
+}
+
+export interface NativeVideoAudioErrorEvent {
+    groupIndex: number;
+    language: string;
+}
+
+export interface NativeVideoAudioSwitchJellyfinEvent {
+    jellyfinIndex: number;
 }
 
 export interface NativeVideoPlugin {
@@ -72,6 +83,8 @@ export interface NativeVideoPlugin {
     addListener(event: 'audioSelected', handler: (data: NativeVideoAudioSelectedEvent) => void): Promise<PluginListenerHandle>;
     addListener(event: 'subtitleSelected', handler: (data: NativeVideoSubtitleSelectedEvent) => void): Promise<PluginListenerHandle>;
     addListener(event: 'qualitySelected', handler: (data: NativeVideoQualitySelectedEvent) => void): Promise<PluginListenerHandle>;
+    addListener(event: 'audioError', handler: (data: NativeVideoAudioErrorEvent) => void): Promise<PluginListenerHandle>;
+    addListener(event: 'audioSwitchJellyfin', handler: (data: NativeVideoAudioSwitchJellyfinEvent) => void): Promise<PluginListenerHandle>;
 
     removeAllListeners(): Promise<void>;
 }

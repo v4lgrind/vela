@@ -180,56 +180,6 @@
             </div>
         </div>
 
-        <!-- Native player audio/subtitle selectors (quality & info are in the native Kotlin UI) -->
-        <div v-if="isNative && !isLoading"
-            class="absolute z-[60] flex items-center gap-1"
-            style="bottom: calc(16px + env(safe-area-inset-bottom, 0px)); right: calc(16px + env(safe-area-inset-right, 0px));">
-
-            <!-- Audio track selector -->
-            <div v-if="audioList.length > 1" class="relative">
-                <button
-                    class="bg-black/50 text-white border-none cursor-pointer p-2 rounded-lg flex items-center gap-1.5 transition-colors hover:bg-white/15 active:opacity-75"
-                    @click="nativeAudioMenuOpen = !nativeAudioMenuOpen; nativeSubtitleMenuOpen = false">
-                    <AudioLines class="size-5" />
-                </button>
-                <div class="absolute bottom-full right-0 mb-2 bg-[rgba(28,28,28,0.98)] rounded-lg min-w-[200px] max-h-[400px] overflow-y-auto shadow-[0_8px_24px_rgba(0,0,0,0.5)] backdrop-blur-[10px] transition-all duration-200 scrollbar-hide"
-                    :class="nativeAudioMenuOpen ? 'opacity-100 pointer-events-auto translate-y-0' : 'opacity-0 pointer-events-none translate-y-2.5'">
-                    <div v-for="track in audioList" :key="track.index"
-                        class="flex items-center gap-2.5 px-4 py-3 cursor-pointer text-[0.9rem] transition-colors hover:bg-white/10 active:opacity-75"
-                        :class="track.index === selectedAudioIndex ? 'bg-accent-purple/20' : ''"
-                        @click="switchAudioNative(track.index)">
-                        <Check class="size-4 shrink-0" :class="track.index === selectedAudioIndex ? 'opacity-100' : 'opacity-0'" />
-                        {{ track.label }}
-                    </div>
-                </div>
-            </div>
-
-            <!-- Subtitle track selector -->
-            <div v-if="nativeSubtitleList.length > 0" class="relative">
-                <button
-                    class="bg-black/50 text-white border-none cursor-pointer p-2 rounded-lg flex items-center gap-1.5 transition-colors hover:bg-white/15 active:opacity-75"
-                    @click="nativeSubtitleMenuOpen = !nativeSubtitleMenuOpen; nativeAudioMenuOpen = false">
-                    <Captions class="size-5" />
-                </button>
-                <div class="absolute bottom-full right-0 mb-2 bg-[rgba(28,28,28,0.98)] rounded-lg min-w-[200px] max-h-[400px] overflow-y-auto shadow-[0_8px_24px_rgba(0,0,0,0.5)] backdrop-blur-[10px] transition-all duration-200 scrollbar-hide"
-                    :class="nativeSubtitleMenuOpen ? 'opacity-100 pointer-events-auto translate-y-0' : 'opacity-0 pointer-events-none translate-y-2.5'">
-                    <div
-                        class="flex items-center gap-2.5 px-4 py-3 cursor-pointer text-[0.9rem] transition-colors hover:bg-white/10 active:opacity-75"
-                        :class="selectedSubtitleIndex === null ? 'bg-accent-purple/20' : ''"
-                        @click="switchSubtitleNative(null)">
-                        <Check class="size-4 shrink-0" :class="selectedSubtitleIndex === null ? 'opacity-100' : 'opacity-0'" />
-                        Off
-                    </div>
-                    <div v-for="sub in nativeSubtitleList" :key="sub.groupIndex"
-                        class="flex items-center gap-2.5 px-4 py-3 cursor-pointer text-[0.9rem] transition-colors hover:bg-white/10 active:opacity-75"
-                        :class="sub.groupIndex === selectedSubtitleIndex ? 'bg-accent-purple/20' : ''"
-                        @click="switchSubtitleNative(sub.groupIndex)">
-                        <Check class="size-4 shrink-0" :class="sub.groupIndex === selectedSubtitleIndex ? 'opacity-100' : 'opacity-0'" />
-                        {{ sub.label }}
-                    </div>
-                </div>
-            </div>
-        </div>
 
 
         <!-- Stream info modal -->
@@ -394,10 +344,6 @@ const subtitleList = ref<Array<{ index: number; label: string; language: string;
 const selectedSubtitleIndex = ref<number | null>(null); // null = off
 const subtitleMenuOpen = ref(false);
 
-// Native-only: ExoPlayer track lists (populated from tracksReady event)
-const nativeSubtitleList = ref<Array<{ groupIndex: number; label: string; language: string }>>([]);
-const nativeAudioMenuOpen = ref(false);
-const nativeSubtitleMenuOpen = ref(false);
 // Active track — blob: URL so the browser never hits the cross-origin <track> restriction
 const activeTrackBlobUrl = ref<string | null>(null);
 const activeTrackLang = ref('und');
@@ -599,23 +545,6 @@ function toggleSubtitleMenu() {
     showControls();
 }
 
-function switchAudioNative(groupIndex: number) {
-    if (groupIndex === selectedAudioIndex.value) { nativeAudioMenuOpen.value = false; return; }
-    NativeVideo.selectAudioTrack({ groupIndex });
-    selectedAudioIndex.value = groupIndex;
-    const lang = audioList.value.find(a => a.index === groupIndex)?.language;
-    if (lang) localStorage.setItem(`msplayer-audio-${itemId}`, lang);
-    nativeAudioMenuOpen.value = false;
-}
-
-function switchSubtitleNative(groupIndex: number | null) {
-    NativeVideo.selectSubtitleTrack({ groupIndex: groupIndex ?? -1 });
-    selectedSubtitleIndex.value = groupIndex;
-    const label = groupIndex !== null ? (nativeSubtitleList.value.find(s => s.groupIndex === groupIndex)?.label ?? 'off') : 'off';
-    localStorage.setItem(`msplayer-subtitle-native-${itemId}`, label);
-    nativeSubtitleMenuOpen.value = false;
-}
-
 function handleKeyDown(e: KeyboardEvent) {
     const tag = (e.target as HTMLElement)?.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
@@ -723,7 +652,7 @@ function stopProgressReporting() {
 
 // ── Jellyfin API ───────────────────────────────────────────────────────────────
 
-async function fetchPlaybackInfo(startTimeTicks?: number, audioStreamIndex?: number, forceTranscode = false, useNativeProfile = false) {
+async function fetchPlaybackInfo(startTimeTicks?: number, audioStreamIndex?: number, forceTranscode = false, useNativeProfile = false, transcodeAudio = false) {
     const bitrateCap = selectedBitrate.value || 1_000_000_000;
     // When a quality cap is active we must force a real video re-encode.
     // Stripping DirectPlayProfiles prevents DirectPlay, but Jellyfin can still
@@ -733,7 +662,8 @@ async function fetchPlaybackInfo(startTimeTicks?: number, audioStreamIndex?: num
     const shouldForce = forceTranscode || selectedBitrate.value > 0;
 
     const baseDeviceProfile = useNativeProfile ? nativeAndroidDeviceProfile : deviceProfile;
-    const baseProfile = shouldForce
+    const stripDirectPlay = shouldForce || transcodeAudio;
+    const baseProfile = stripDirectPlay
         ? { ...baseDeviceProfile.DeviceProfile, DirectPlayProfiles: [], MaxStreamingBitrate: bitrateCap }
         : baseDeviceProfile.DeviceProfile;
 
@@ -741,6 +671,9 @@ async function fetchPlaybackInfo(startTimeTicks?: number, audioStreamIndex?: num
         ...baseDeviceProfile,
         MaxStreamingBitrate: bitrateCap,
         ...(shouldForce ? { AllowVideoStreamCopy: false } : {}),
+        // transcodeAudio: keep video copy (DirectStream) but force Jellyfin to re-encode audio
+        // (used when the device can't decode a specific audio format like E-AC3+Atmos)
+        ...(transcodeAudio ? { AllowAudioStreamCopy: false } : {}),
         DeviceProfile: baseProfile,
         MediaSourceId: itemId,
         ...(startTimeTicks !== undefined ? { StartTimeTicks: startTimeTicks } : {}),
@@ -986,9 +919,41 @@ function initHls(url: string, video: HTMLVideoElement, startSeconds?: number, on
     }
 }
 
+async function restartWithAudio(resumeSeconds: number, jellyfinAudioIndex: number | undefined, title?: string) {
+    nativeSwitchingQuality = true;
+    isLoading.value = true;
+    try {
+        await NativeVideo.removeAllListeners();
+        await NativeVideo.stop();
+        await deleteActiveEncodings();
+        await initNativePlayer(resumeSeconds, jellyfinAudioIndex, title, true);
+    } catch (e) {
+        console.error('[restartWithAudio] failed:', e);
+        error.value = 'Failed to switch audio track';
+        isLoading.value = false;
+    } finally {
+        nativeSwitchingQuality = false;
+    }
+}
+
+function buildMediaTitle(item: any): string {
+    if (!item) return '';
+    if (item.Type === 'Episode') {
+        const series = item.SeriesName || '';
+        const season = item.ParentIndexNumber != null ? item.ParentIndexNumber : null;
+        const episode = item.IndexNumber != null ? item.IndexNumber : null;
+        const epName = item.Name || '';
+        const code = season != null && episode != null
+            ? `S${String(season).padStart(2, '0')}E${String(episode).padStart(2, '0')}`
+            : null;
+        return [series, code, epName].filter(Boolean).join(' · ');
+    }
+    return item.Name || '';
+}
+
 // ── Native player init (Android ExoPlayer) ─────────────────────────────────────
 
-async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: number) {
+async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: number, title?: string, transcodeAudio = false) {
     isLoading.value = true;
 
     try {
@@ -996,7 +961,7 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
             ? Math.floor(resumeSeconds * 10_000_000)
             : undefined;
 
-        const data = await fetchPlaybackInfo(startTicks, preferredAudioIndex, false, true);
+        const data = await fetchPlaybackInfo(startTicks, preferredAudioIndex, false, true, transcodeAudio);
         mediaSource.value = data.MediaSources?.[0];
         if (!mediaSource.value) throw new Error('No media source available');
 
@@ -1068,14 +1033,6 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
                 const nativeAudio: any[] = parsed.audioTracks ?? [];
                 const nativeSubtitle: any[] = parsed.subtitleTracks ?? [];
 
-                if (nativeSubtitle.length > 0) {
-                    nativeSubtitleList.value = nativeSubtitle.map((t: any) => ({
-                        groupIndex: t.groupIndex,
-                        label: t.label || (t.language || 'und').toUpperCase(),
-                        language: t.language || 'und',
-                    }));
-                }
-
                 if (nativeAudio.length > 0) {
                     audioList.value = nativeAudio.map((t: any) => ({
                         index: t.groupIndex,
@@ -1133,6 +1090,7 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
 
         await NativeVideo.addListener('audioSelected', (data) => {
             localStorage.setItem(`msplayer-audio-${itemId}`, data.language);
+            selectedAudioIndex.value = data.groupIndex;
         });
 
         await NativeVideo.addListener('subtitleSelected', (data) => {
@@ -1158,16 +1116,36 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
             switchQualityNative(data.bitrate);
         });
 
+        await NativeVideo.addListener('audioError', async (data) => {
+            // Capture position immediately — ExoPlayer resets to 0 after a fatal error
+            const savedPosition = currentTime.value;
+            const jellyfinIndex = (mediaSource.value?.MediaStreams ?? [])
+                .find((s: any) => s.Type === 'Audio' && s.Language === data.language)?.Index
+                ?? undefined;
+            await restartWithAudio(savedPosition, jellyfinIndex, title);
+        });
+
+        await NativeVideo.addListener('audioSwitchJellyfin', async (data) => {
+            // Transcoded stream: ExoPlayer only has 1 track, native picker sends Jellyfin index
+            const savedPosition = currentTime.value;
+            await restartWithAudio(savedPosition, data.jellyfinIndex, title);
+        });
+
         await NativeVideo.start({
             url: hlsUrl.value,
             authHeader: embyAuthHeader,
             startPositionMs,
-            title: (mediaSource.value as any)?.Name || '',
+            title: title || (mediaSource.value as any)?.Name || '',
             playMethod: playMethod.value,
             subtitleTracks,
             qualityPresets: JSON.stringify(availablePresets.value.map(p => ({ bitrate: p.bitrate, label: p.label }))),
             selectedBitrate: selectedBitrate.value,
             streamInfo: buildStreamInfoJson(),
+            audioTracksJson: JSON.stringify(audioList.value.map(a => ({
+                index: a.index,
+                label: a.label,
+                language: a.language,
+            }))),
         });
 
         isLoading.value = false;
@@ -1669,7 +1647,7 @@ onMounted(async () => {
             resumeSeconds = cachedTicks ? cachedTicks / 10_000_000 : undefined;
         }
 
-        await initOfflinePlayer(cachedDownload, resumeSeconds, cachedDownload.jellyfinItem?.Name);
+        await initOfflinePlayer(cachedDownload, resumeSeconds, buildMediaTitle(cachedDownload.jellyfinItem));
         if (!isNative) {
             document.addEventListener('click', handleClickOutside);
             document.addEventListener('fullscreenchange', () => { isFullscreen.value = !!getFullscreenElement(); });
@@ -1706,7 +1684,7 @@ onMounted(async () => {
     const preferredAudioIndex: number | undefined = preferred?.Index;
 
     if (isNative) {
-        await initNativePlayer(resumeSeconds, preferredAudioIndex);
+        await initNativePlayer(resumeSeconds, preferredAudioIndex, buildMediaTitle(details));
     } else {
         await initPlayer(resumeSeconds, preferredAudioIndex);
         document.addEventListener('click', handleClickOutside);

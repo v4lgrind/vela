@@ -56,6 +56,10 @@ class NativePlayerActivity : AppCompatActivity() {
         const val ACTION_AUDIO_SELECTED = "com.jellyfin_v4lgrind_client.app.AUDIO_SELECTED"
         const val ACTION_SUBTITLE_SELECTED = "com.jellyfin_v4lgrind_client.app.SUBTITLE_SELECTED"
         const val ACTION_QUALITY_SELECTED = "com.jellyfin_v4lgrind_client.app.QUALITY_SELECTED"
+        const val ACTION_AUDIO_ERROR = "com.jellyfin_v4lgrind_client.app.AUDIO_ERROR"
+        const val ACTION_AUDIO_SWITCH_JELLYFIN = "com.jellyfin_v4lgrind_client.app.AUDIO_SWITCH_JELLYFIN"
+
+        const val EXTRA_AUDIO_TRACKS = "audioTracks"
 
         const val CMD_STOP = "stop"
         const val CMD_PAUSE = "pause"
@@ -104,6 +108,10 @@ class NativePlayerActivity : AppCompatActivity() {
     private var qualityPresets = mutableListOf<Pair<Int, String>>() // (bitrate, label)
     private var selectedBitrate = 0
     private var streamInfoJson = ""
+
+    // Jellyfin audio tracks passed from Vue — used when ExoPlayer only has 1 track (transcoded stream)
+    // Triple: (jellyfinIndex, label, language)
+    private val jellyfinAudioTracks = mutableListOf<Triple<Int, String, String>>()
 
     private val commandReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -187,6 +195,15 @@ class NativePlayerActivity : AppCompatActivity() {
     private var introEndMs = -1L
     private var introSkipped = false
 
+    // Audio switch fallback — set when user picks a new audio track; cleared on error or after a
+    // short window (decoder errors surface within ~1 s; 4 s gives ample margin).
+    private var audioSwitchPendingGroupIndex = -1
+    private var audioSwitchPendingLanguage = ""
+    private val clearAudioSwitchPending = Runnable {
+        audioSwitchPendingGroupIndex = -1
+        audioSwitchPendingLanguage = ""
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -238,6 +255,10 @@ class NativePlayerActivity : AppCompatActivity() {
         parseQualityPresets(qualityPresetsJson)
         if (qualityPresets.size > 1) btnQuality.visibility = View.VISIBLE
         if (streamInfoJson.isNotEmpty()) btnInfo.visibility = View.VISIBLE
+
+        // Jellyfin audio tracks (used for picker when stream is transcoded)
+        parseJellyfinAudioTracks(intent.getStringExtra(EXTRA_AUDIO_TRACKS) ?: "[]")
+        if (jellyfinAudioTracks.size > 1) btnAudio.visibility = View.VISIBLE
 
         tvTitle.text = title
 
@@ -442,7 +463,26 @@ class NativePlayerActivity : AppCompatActivity() {
             }
 
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                sendErrorBroadcast(error.message ?: "Playback error")
+                handler.removeCallbacks(clearAudioSwitchPending)
+                val pendingIdx = audioSwitchPendingGroupIndex
+                val pendingLang = audioSwitchPendingLanguage
+                audioSwitchPendingGroupIndex = -1
+                audioSwitchPendingLanguage = ""
+                when {
+                    pendingIdx >= 0 -> {
+                        // Decoder failed after user-triggered audio track switch
+                        sendAudioErrorBroadcast(pendingIdx, pendingLang)
+                    }
+                    selectedAudioGroupIndex >= 0 && isAudioPlaybackError(error) -> {
+                        // Audio renderer crashed on the auto-selected track (no pending switch).
+                        // Happens when ExoPlayer picks a bad codec (e.g. eac3+Atmos) via device
+                        // locale before Vue's selectAudioTrack call sets the pending flag.
+                        val group = audioTrackGroups.firstOrNull { it.first == selectedAudioGroupIndex }
+                        val language = group?.second?.getFormat(0)?.language ?: "und"
+                        sendAudioErrorBroadcast(selectedAudioGroupIndex, language)
+                    }
+                    else -> sendErrorBroadcast(error.message ?: "Playback error")
+                }
             }
         })
 
@@ -519,7 +559,7 @@ class NativePlayerActivity : AppCompatActivity() {
         }
 
         // Show/hide buttons based on track availability
-        if (audioTrackGroups.size > 1) btnAudio.visibility = View.VISIBLE
+        if (audioTrackGroups.size > 1 || jellyfinAudioTracks.size > 1) btnAudio.visibility = View.VISIBLE
         if (subtitleTrackGroups.isNotEmpty()) btnSubtitle.visibility = View.VISIBLE
 
         android.util.Log.d("NativePlayer", "[Subtitles] reportTracks: ${audioTrackGroups.size} audio, ${subtitleTrackGroups.size} subtitle")
@@ -541,17 +581,32 @@ class NativePlayerActivity : AppCompatActivity() {
     private fun selectAudioTrack(groupIndex: Int) {
         val p = player ?: return
         val group = audioTrackGroups.firstOrNull { it.first == groupIndex } ?: return
+        val language = group.second.getFormat(0).language ?: "und"
+
+        // Mark pending — onPlayerError will check this if the decoder fails on the new track.
+        // Auto-cleared after 4 s (success path); cancelled and handled immediately on error.
+        handler.removeCallbacks(clearAudioSwitchPending)
+        audioSwitchPendingGroupIndex = groupIndex
+        audioSwitchPendingLanguage = language
+        handler.postDelayed(clearAudioSwitchPending, 4000)
+
         p.trackSelectionParameters = p.trackSelectionParameters
             .buildUpon()
             .setOverrideForType(TrackSelectionOverride(group.second, 0))
             .build()
         selectedAudioGroupIndex = groupIndex
 
-        val language = group.second.getFormat(0).language ?: "und"
         val broadcastIntent = Intent(ACTION_AUDIO_SELECTED)
         broadcastIntent.putExtra("language", language)
+        broadcastIntent.putExtra("groupIndex", groupIndex)
         broadcastIntent.setPackage(packageName)
         sendBroadcast(broadcastIntent)
+
+        // Show selected state on button when a non-default track is active
+        val isDefault = audioTrackGroups.firstOrNull()?.first == groupIndex
+        btnAudio.setBackgroundResource(
+            if (isDefault) R.drawable.bg_player_button else R.drawable.bg_player_button_selected
+        )
     }
 
     private fun selectSubtitleTrack(groupIndex: Int) {
@@ -567,7 +622,8 @@ class NativePlayerActivity : AppCompatActivity() {
             broadcastIntent.putExtra("groupIndex", -1)
             broadcastIntent.putExtra("label", "")
             broadcastIntent.setPackage(packageName)
-        sendBroadcast(broadcastIntent)
+            sendBroadcast(broadcastIntent)
+            btnSubtitle.setBackgroundResource(R.drawable.bg_player_button)
         } else {
             val group = subtitleTrackGroups.firstOrNull { it.first == groupIndex } ?: return
             p.trackSelectionParameters = p.trackSelectionParameters
@@ -585,26 +641,64 @@ class NativePlayerActivity : AppCompatActivity() {
             // Use same fallback as reportTracks so save and restore labels always match.
             broadcastIntent.putExtra("label", label)
             broadcastIntent.setPackage(packageName)
-        sendBroadcast(broadcastIntent)
+            sendBroadcast(broadcastIntent)
+            btnSubtitle.setBackgroundResource(R.drawable.bg_player_button_selected)
         }
     }
 
     private fun showAudioPicker() {
-        if (audioTrackGroups.isEmpty()) return
-        val labels = audioTrackGroups.map { (idx, group) ->
-            val format = group.getFormat(0)
-            "${format.language ?: "und"} ${if (format.channelCount > 0) "(${format.channelCount}ch)" else ""} ${if (!format.codecs.isNullOrEmpty()) "- ${format.codecs!!.uppercase()}" else ""}".trim()
-        }.toTypedArray()
-        val checkedItem = audioTrackGroups.indexOfFirst { it.first == selectedAudioGroupIndex }
+        // If ExoPlayer has multiple tracks (DirectPlay), use them directly.
+        // Otherwise fall back to the Jellyfin track list and trigger a Vue-side restart.
+        if (audioTrackGroups.size > 1) {
+            val labels = audioTrackGroups.map { (_, group) ->
+                val format = group.getFormat(0)
+                "${format.language ?: "und"} ${if (format.channelCount > 0) "(${format.channelCount}ch)" else ""} ${if (!format.codecs.isNullOrEmpty()) "- ${format.codecs!!.uppercase()}" else ""}".trim()
+            }.toTypedArray()
+            val checkedItem = audioTrackGroups.indexOfFirst { it.first == selectedAudioGroupIndex }
+            androidx.appcompat.app.AlertDialog.Builder(this, androidx.appcompat.R.style.Theme_AppCompat_Dialog)
+                .setTitle("Audio Track")
+                .setSingleChoiceItems(labels, checkedItem) { dialog, which ->
+                    selectAudioTrack(audioTrackGroups[which].first)
+                    dialog.dismiss()
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
+        } else if (jellyfinAudioTracks.isNotEmpty()) {
+            val labels = jellyfinAudioTracks.map { it.second }.toTypedArray()
+            // Determine current selection by matching language to the active ExoPlayer track
+            val currentLang = audioTrackGroups.firstOrNull { it.first == selectedAudioGroupIndex }
+                ?.second?.getFormat(0)?.language ?: ""
+            val checkedItem = jellyfinAudioTracks.indexOfFirst { it.third == currentLang }
+            androidx.appcompat.app.AlertDialog.Builder(this, androidx.appcompat.R.style.Theme_AppCompat_Dialog)
+                .setTitle("Audio Track")
+                .setSingleChoiceItems(labels, checkedItem) { dialog, which ->
+                    val (jellyfinIndex, _, _) = jellyfinAudioTracks[which]
+                    dialog.dismiss()
+                    val broadcastIntent = Intent(ACTION_AUDIO_SWITCH_JELLYFIN)
+                    broadcastIntent.putExtra("jellyfinIndex", jellyfinIndex)
+                    broadcastIntent.setPackage(packageName)
+                    sendBroadcast(broadcastIntent)
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
+        }
+    }
 
-        androidx.appcompat.app.AlertDialog.Builder(this, androidx.appcompat.R.style.Theme_AppCompat_Dialog)
-            .setTitle("Audio Track")
-            .setSingleChoiceItems(labels, checkedItem) { dialog, which ->
-                selectAudioTrack(audioTrackGroups[which].first)
-                dialog.dismiss()
+    private fun parseJellyfinAudioTracks(json: String) {
+        jellyfinAudioTracks.clear()
+        try {
+            val arr = JSONArray(json)
+            for (i in 0 until arr.length()) {
+                val obj = arr.getJSONObject(i)
+                jellyfinAudioTracks.add(Triple(
+                    obj.getInt("index"),
+                    obj.getString("label"),
+                    obj.optString("language", "und")
+                ))
             }
-            .setNegativeButton("Cancel", null)
-            .show()
+        } catch (e: Exception) {
+            android.util.Log.e("NativePlayer", "parseJellyfinAudioTracks error", e)
+        }
     }
 
     private fun showSubtitlePicker() {
@@ -771,6 +865,33 @@ class NativePlayerActivity : AppCompatActivity() {
         sendBroadcast(Intent(ACTION_ENDED).also { it.setPackage(packageName) })
     }
 
+    private fun sendAudioErrorBroadcast(groupIndex: Int, language: String) {
+        val intent = Intent(ACTION_AUDIO_ERROR)
+        intent.putExtra("groupIndex", groupIndex)
+        intent.putExtra("language", language)
+        intent.setPackage(packageName)
+        sendBroadcast(intent)
+    }
+
+    /** Returns true when the error is identifiable as an audio renderer/sink failure. */
+    private fun isAudioPlaybackError(error: androidx.media3.common.PlaybackException): Boolean {
+        // Definitive audio-track error codes
+        if (error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_AUDIO_TRACK_INIT_FAILED ||
+            error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_AUDIO_TRACK_WRITE_FAILED ||
+            error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_AUDIO_TRACK_OFFLOAD_INIT_FAILED) {
+            return true
+        }
+        // Walk the cause chain looking for audio renderer class/message fingerprints
+        val msg = buildString {
+            append(error.message ?: "")
+            var c: Throwable? = error.cause
+            while (c != null) { append(' ').append(c.message ?: ""); c = c.cause }
+        }
+        return msg.contains("AudioRenderer", ignoreCase = true) ||
+               msg.contains("AudioSink", ignoreCase = true) ||
+               msg.contains("AudioTrack", ignoreCase = true)
+    }
+
     fun sendStoppedBroadcast() {
         if (stoppedSent) return
         stoppedSent = true
@@ -807,6 +928,7 @@ class NativePlayerActivity : AppCompatActivity() {
         super.onDestroy()
         sendStoppedBroadcast()
         handler.removeCallbacksAndMessages(null)
+        audioSwitchPendingGroupIndex = -1
         unregisterReceiver(commandReceiver)
         player?.release()
         player = null

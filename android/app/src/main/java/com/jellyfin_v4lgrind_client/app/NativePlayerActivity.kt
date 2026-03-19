@@ -494,6 +494,12 @@ class NativePlayerActivity : AppCompatActivity() {
                         debugLog("[AudioCrash] → branch: autoSelected (selectedIdx=$selectedAudioGroupIndex lang=$language)")
                         sendAudioErrorBroadcast(selectedAudioGroupIndex, language)
                     }
+                    isAudioPlaybackError(error) -> {
+                        // Audio decoder crash before reportTracks (e.g. single eac3+Atmos track).
+                        // Send groupIndex=-1 so Vue falls back to the default audio stream.
+                        debugLog("[AudioCrash] → branch: earlyAudioError (tracks not yet reported)")
+                        sendAudioErrorBroadcast(-1, "und")
+                    }
                     else -> {
                         debugLog("[AudioCrash] → branch: genericError (no audio fallback)")
                         sendErrorBroadcast(error.message ?: "Playback error")

@@ -1144,9 +1144,12 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
             debugLog(`[AudioCrash]   Jellyfin audio streams: ${audioStreams.map((s: any) => `idx=${s.Index} lang="${s.Language}" codec=${s.Codec}`).join(' | ')}`);
             // ExoPlayer sends 2-letter codes ("en"), Jellyfin uses 3-letter ("eng").
             // Match by position: groupIndex is 1-based among audio tracks.
-            const jellyfinIndex = audioStreams[data.groupIndex - 1]?.Index
-                ?? audioStreams.find((s: any) => s.Language?.startsWith(data.language))?.Index
-                ?? undefined;
+            // groupIndex=-1 means crash before tracks reported — use first/default stream.
+            const jellyfinIndex = data.groupIndex >= 1
+                ? (audioStreams[data.groupIndex - 1]?.Index
+                    ?? audioStreams.find((s: any) => s.Language?.startsWith(data.language))?.Index
+                    ?? audioStreams[0]?.Index)
+                : audioStreams[0]?.Index;
             debugLog(`[AudioCrash]   matched jellyfinIndex=${jellyfinIndex}`);
             await restartWithAudio(savedPosition, jellyfinIndex, title);
         });

@@ -105,6 +105,8 @@ class NativePlayerActivity : AppCompatActivity() {
     private var selectedAudioGroupIndex = -1
     private var selectedSubtitleGroupIndex = -1
     private var sidecarSubtitleCount = 0
+    // Fallback subtitle info from Vue when ExoPlayer doesn't expose sidecar tracks
+    private val sidecarSubtitles = mutableListOf<Pair<String, String>>() // (label, language)
 
     // Quality presets & stream info (passed from Vue)
     private var qualityPresets = mutableListOf<Pair<Int, String>>() // (bitrate, label)
@@ -415,6 +417,10 @@ class NativePlayerActivity : AppCompatActivity() {
         // Parse subtitle configurations from JSON
         val subtitleConfigs = parseSubtitleConfigs(subtitleTracksJson)
         sidecarSubtitleCount = subtitleConfigs.size
+        sidecarSubtitles.clear()
+        subtitleConfigs.forEach { cfg ->
+            sidecarSubtitles.add(Pair(cfg.label?.toString() ?: (cfg.language?.toString() ?: "und"), cfg.language?.toString() ?: "und"))
+        }
 
         val mediaItem = MediaItem.Builder()
             .setUri(url)
@@ -730,29 +736,62 @@ class NativePlayerActivity : AppCompatActivity() {
     }
 
     private fun showSubtitlePicker() {
-        if (subtitleTrackGroups.isEmpty()) return
-        val labels = buildList {
-            add("Off")
-            addAll(subtitleTrackGroups.map { (_, group) ->
-                val format = group.getFormat(0)
-                format.label ?: (format.language ?: "und")
-            })
-        }.toTypedArray()
-        val checkedItem = if (selectedSubtitleGroupIndex < 0) 0
-            else (subtitleTrackGroups.indexOfFirst { it.first == selectedSubtitleGroupIndex } + 1)
+        if (subtitleTrackGroups.isEmpty() && sidecarSubtitles.isEmpty()) return
 
-        androidx.appcompat.app.AlertDialog.Builder(this, androidx.appcompat.R.style.Theme_AppCompat_Dialog)
-            .setTitle("Subtitles")
-            .setSingleChoiceItems(labels, checkedItem) { dialog, which ->
-                if (which == 0) {
-                    selectSubtitleTrack(-1)
-                } else {
-                    selectSubtitleTrack(subtitleTrackGroups[which - 1].first)
+        if (subtitleTrackGroups.isNotEmpty()) {
+            // ExoPlayer has track groups — use them directly
+            val labels = buildList {
+                add("Off")
+                addAll(subtitleTrackGroups.map { (_, group) ->
+                    val format = group.getFormat(0)
+                    format.label ?: (format.language ?: "und")
+                })
+            }.toTypedArray()
+            val checkedItem = if (selectedSubtitleGroupIndex < 0) 0
+                else (subtitleTrackGroups.indexOfFirst { it.first == selectedSubtitleGroupIndex } + 1)
+
+            androidx.appcompat.app.AlertDialog.Builder(this, androidx.appcompat.R.style.Theme_AppCompat_Dialog)
+                .setTitle("Subtitles")
+                .setSingleChoiceItems(labels, checkedItem) { dialog, which ->
+                    if (which == 0) {
+                        selectSubtitleTrack(-1)
+                    } else {
+                        selectSubtitleTrack(subtitleTrackGroups[which - 1].first)
+                    }
+                    dialog.dismiss()
                 }
-                dialog.dismiss()
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
+                .setNegativeButton("Cancel", null)
+                .show()
+        } else {
+            // Transcoded stream: ExoPlayer didn't report text tracks.
+            // Show sidecar labels and broadcast selection to Vue for server-side burn-in.
+            val labels = buildList {
+                add("Off")
+                addAll(sidecarSubtitles.map { it.first })
+            }.toTypedArray()
+            val checkedItem = 0 // default to Off for now
+
+            androidx.appcompat.app.AlertDialog.Builder(this, androidx.appcompat.R.style.Theme_AppCompat_Dialog)
+                .setTitle("Subtitles")
+                .setSingleChoiceItems(labels, checkedItem) { dialog, which ->
+                    if (which == 0) {
+                        selectSubtitleTrack(-1)
+                    } else {
+                        // Broadcast the sidecar subtitle selection to Vue
+                        val sub = sidecarSubtitles[which - 1]
+                        val broadcastIntent = Intent(ACTION_SUBTITLE_SELECTED)
+                        broadcastIntent.putExtra("groupIndex", which - 1)
+                        broadcastIntent.putExtra("label", sub.first)
+                        broadcastIntent.setPackage(packageName)
+                        sendBroadcast(broadcastIntent)
+                        selectedSubtitleGroupIndex = which - 1
+                        btnSubtitle.setBackgroundResource(R.drawable.bg_player_button_active)
+                    }
+                    dialog.dismiss()
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
+        }
     }
 
     private fun parseQualityPresets(json: String) {

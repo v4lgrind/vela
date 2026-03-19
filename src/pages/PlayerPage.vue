@@ -1048,7 +1048,11 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
                 const nativeAudio: any[] = parsed.audioTracks ?? [];
                 const nativeSubtitle: any[] = parsed.subtitleTracks ?? [];
 
-                if (nativeAudio.length > 0) {
+                // For transcoded streams ExoPlayer only has 1 audio track (the
+                // transcoded AAC). Keep the Jellyfin-sourced audioList so the
+                // picker button stays visible and the user can switch via Jellyfin.
+                const isTranscoded = playMethod.value === 'Transcode' || playMethod.value === 'DirectStream';
+                if (nativeAudio.length > 0 && !isTranscoded) {
                     audioList.value = nativeAudio.map((t: any) => ({
                         index: t.groupIndex,
                         language: t.language || 'und',
@@ -1070,6 +1074,8 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
                     } else {
                         debugLog(`[AudioCrash] tracksReady: no preference match, keeping default`);
                     }
+                } else if (isTranscoded) {
+                    debugLog(`[AudioCrash] tracksReady: transcoded stream, keeping Jellyfin audioList (${audioList.value.length} tracks)`);
                 }
 
                 // Apply saved subtitle preference to ExoPlayer.

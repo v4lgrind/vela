@@ -245,6 +245,11 @@ class NativeVideoPlugin : Plugin() {
                         data.put("jellyfinIndex", intent.getIntExtra("jellyfinIndex", -1))
                         notifyListeners("audioSwitchJellyfin", data)
                     }
+                    NativePlayerActivity.ACTION_DEBUG_LOG -> {
+                        val data = JSObject()
+                        data.put("message", intent.getStringExtra("message") ?: "")
+                        notifyListeners("debugLog", data)
+                    }
                 }
             }
         }
@@ -260,6 +265,7 @@ class NativeVideoPlugin : Plugin() {
             addAction(NativePlayerActivity.ACTION_QUALITY_SELECTED)
             addAction(NativePlayerActivity.ACTION_AUDIO_ERROR)
             addAction(NativePlayerActivity.ACTION_AUDIO_SWITCH_JELLYFIN)
+            addAction(NativePlayerActivity.ACTION_DEBUG_LOG)
         }
         ContextCompat.registerReceiver(context, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
         eventReceiver = receiver

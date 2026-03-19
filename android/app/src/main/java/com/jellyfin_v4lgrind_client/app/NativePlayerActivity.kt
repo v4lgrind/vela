@@ -58,6 +58,7 @@ class NativePlayerActivity : AppCompatActivity() {
         const val ACTION_QUALITY_SELECTED = "com.jellyfin_v4lgrind_client.app.QUALITY_SELECTED"
         const val ACTION_AUDIO_ERROR = "com.jellyfin_v4lgrind_client.app.AUDIO_ERROR"
         const val ACTION_AUDIO_SWITCH_JELLYFIN = "com.jellyfin_v4lgrind_client.app.AUDIO_SWITCH_JELLYFIN"
+        const val ACTION_DEBUG_LOG = "com.jellyfin_v4lgrind_client.app.DEBUG_LOG"
 
         const val EXTRA_AUDIO_TRACKS = "audioTracks"
 
@@ -463,13 +464,13 @@ class NativePlayerActivity : AppCompatActivity() {
             }
 
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                android.util.Log.e("NativePlayer", "[AudioCrash] onPlayerError: code=${error.errorCode} msg=${error.message}")
-                android.util.Log.e("NativePlayer", "[AudioCrash]   pendingIdx=$audioSwitchPendingGroupIndex pendingLang=$audioSwitchPendingLanguage selectedAudioGroupIndex=$selectedAudioGroupIndex")
-                android.util.Log.e("NativePlayer", "[AudioCrash]   isAudioPlaybackError=${isAudioPlaybackError(error)}")
+                debugLog("[AudioCrash] onPlayerError: code=${error.errorCode} msg=${error.message}")
+                debugLog("[AudioCrash]   pendingIdx=$audioSwitchPendingGroupIndex pendingLang=$audioSwitchPendingLanguage selectedAudioGroupIndex=$selectedAudioGroupIndex")
+                debugLog("[AudioCrash]   isAudioPlaybackError=${isAudioPlaybackError(error)}")
                 var c: Throwable? = error.cause
                 var depth = 0
                 while (c != null) {
-                    android.util.Log.e("NativePlayer", "[AudioCrash]   cause[$depth]: ${c.javaClass.name}: ${c.message}")
+                    debugLog("[AudioCrash]   cause[$depth]: ${c.javaClass.name}: ${c.message}")
                     c = c.cause; depth++
                 }
                 handler.removeCallbacks(clearAudioSwitchPending)
@@ -479,17 +480,17 @@ class NativePlayerActivity : AppCompatActivity() {
                 audioSwitchPendingLanguage = ""
                 when {
                     pendingIdx >= 0 -> {
-                        android.util.Log.d("NativePlayer", "[AudioCrash] → branch: pendingSwitch (idx=$pendingIdx lang=$pendingLang)")
+                        debugLog("[AudioCrash] → branch: pendingSwitch (idx=$pendingIdx lang=$pendingLang)")
                         sendAudioErrorBroadcast(pendingIdx, pendingLang)
                     }
                     selectedAudioGroupIndex >= 0 && isAudioPlaybackError(error) -> {
                         val group = audioTrackGroups.firstOrNull { it.first == selectedAudioGroupIndex }
                         val language = group?.second?.getFormat(0)?.language ?: "und"
-                        android.util.Log.d("NativePlayer", "[AudioCrash] → branch: autoSelected (selectedIdx=$selectedAudioGroupIndex lang=$language)")
+                        debugLog("[AudioCrash] → branch: autoSelected (selectedIdx=$selectedAudioGroupIndex lang=$language)")
                         sendAudioErrorBroadcast(selectedAudioGroupIndex, language)
                     }
                     else -> {
-                        android.util.Log.d("NativePlayer", "[AudioCrash] → branch: genericError (no audio fallback)")
+                        debugLog("[AudioCrash] → branch: genericError (no audio fallback)")
                         sendErrorBroadcast(error.message ?: "Playback error")
                     }
                 }
@@ -558,7 +559,7 @@ class NativePlayerActivity : AppCompatActivity() {
                 audioTrackGroups.add(Pair(groupIndex, trackGroup))
                 if (group.isSelected) {
                     selectedAudioGroupIndex = groupIndex
-                    android.util.Log.d("NativePlayer", "[AudioCrash] reportTracks: auto-selected audio groupIndex=$groupIndex lang=${format.language} codec=${format.codecs}")
+                    debugLog("[AudioCrash] reportTracks: auto-selected audio groupIndex=$groupIndex lang=${format.language} codec=${format.codecs}")
                 }
             } else if (type == C.TRACK_TYPE_TEXT) {
                 val obj = JSONObject()
@@ -598,7 +599,7 @@ class NativePlayerActivity : AppCompatActivity() {
 
         // Mark pending — onPlayerError will check this if the decoder fails on the new track.
         // Auto-cleared after 4 s (success path); cancelled and handled immediately on error.
-        android.util.Log.d("NativePlayer", "[AudioCrash] selectAudioTrack: groupIndex=$groupIndex lang=$language codec=${group.second.getFormat(0).codecs}")
+        debugLog("[AudioCrash] selectAudioTrack: groupIndex=$groupIndex lang=$language codec=${group.second.getFormat(0).codecs}")
         handler.removeCallbacks(clearAudioSwitchPending)
         audioSwitchPendingGroupIndex = groupIndex
         audioSwitchPendingLanguage = language
@@ -883,6 +884,15 @@ class NativePlayerActivity : AppCompatActivity() {
         val intent = Intent(ACTION_AUDIO_ERROR)
         intent.putExtra("groupIndex", groupIndex)
         intent.putExtra("language", language)
+        intent.setPackage(packageName)
+        sendBroadcast(intent)
+    }
+
+    /** Log to both logcat and Vue (via broadcast) for in-app log viewer. */
+    private fun debugLog(msg: String) {
+        android.util.Log.d("NativePlayer", msg)
+        val intent = Intent(ACTION_DEBUG_LOG)
+        intent.putExtra("message", msg)
         intent.setPackage(packageName)
         sendBroadcast(intent)
     }

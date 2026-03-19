@@ -85,6 +85,7 @@ export interface NativeVideoPlugin {
     addListener(event: 'qualitySelected', handler: (data: NativeVideoQualitySelectedEvent) => void): Promise<PluginListenerHandle>;
     addListener(event: 'audioError', handler: (data: NativeVideoAudioErrorEvent) => void): Promise<PluginListenerHandle>;
     addListener(event: 'audioSwitchJellyfin', handler: (data: NativeVideoAudioSwitchJellyfinEvent) => void): Promise<PluginListenerHandle>;
+    addListener(event: 'debugLog', handler: (data: { message: string }) => void): Promise<PluginListenerHandle>;
 
     removeAllListeners(): Promise<void>;
 }

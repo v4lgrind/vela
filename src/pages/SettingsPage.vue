@@ -52,11 +52,25 @@
           </div>
         </div>
       </section>
+      <section class="mt-8">
+        <h2 class="text-base font-semibold text-text-heading mb-1">Diagnostics</h2>
+        <p class="text-sm text-text-muted mb-4">View player debug logs for troubleshooting playback issues.</p>
+        <div class="flex flex-col gap-0 rounded-xl overflow-hidden border border-border-input divide-y divide-border-input">
+          <router-link to="/logs" class="flex items-center justify-between px-4 py-3 bg-surface-raised hover:bg-surface-hover">
+            <div>
+              <span class="text-sm font-medium text-text-heading">Debug Logs</span>
+              <p class="text-xs text-text-muted mt-0.5">View and export playback diagnostic logs</p>
+            </div>
+            <ChevronRight class="w-4 h-4 text-text-muted" />
+          </router-link>
+        </div>
+      </section>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { ChevronRight } from 'lucide-vue-next';
 import { usePreferencesStore } from '@/store/preferences-store';
 
 const preferencesStore = usePreferencesStore();

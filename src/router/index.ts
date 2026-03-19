@@ -59,6 +59,12 @@ const routes = [
     component: () => import("@/pages/SettingsPage.vue"),
     meta: { requiresAuth: true },
   },
+  {
+    path: "/logs",
+    name: "logs",
+    component: () => import("@/pages/LogViewerPage.vue"),
+    meta: { requiresAuth: true },
+  },
 ];
 
 export const router = createRouter({

@@ -785,7 +785,7 @@ class NativePlayerActivity : AppCompatActivity() {
                         broadcastIntent.setPackage(packageName)
                         sendBroadcast(broadcastIntent)
                         selectedSubtitleGroupIndex = which - 1
-                        btnSubtitle.setBackgroundResource(R.drawable.bg_player_button_active)
+                        btnSubtitle.setBackgroundResource(R.drawable.bg_player_button_selected)
                     }
                     dialog.dismiss()
                 }

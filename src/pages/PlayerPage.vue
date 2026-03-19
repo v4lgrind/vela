@@ -1014,9 +1014,14 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
         const resumeOffsetMs = isDirectPlayRaw ? 0 : startPositionMs;
         nativeResumeOffsetMs.value = resumeOffsetMs;
 
+        // Track the last known good position so audio error handlers can resume
+        // even if the crash happens before a progress event fires.
+        let lastGoodPositionSec = resumeSeconds || 0;
+
         // Register event listeners before starting
         await NativeVideo.addListener('progress', (data) => {
             currentTime.value = (data.positionMs + resumeOffsetMs) / 1000;
+            lastGoodPositionSec = currentTime.value;
             duration.value = data.durationMs / 1000;
             if (duration.value > 0) progressPct.value = (currentTime.value / duration.value) * 100;
             reportPlaybackProgress();
@@ -1143,8 +1148,9 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
         });
 
         await NativeVideo.addListener('audioError', async (data) => {
-            // Capture position immediately — ExoPlayer resets to 0 after a fatal error
-            const savedPosition = currentTime.value;
+            // Use lastGoodPositionSec because ExoPlayer may reset currentTime to 0
+            // before this handler fires, or the crash may occur before any progress event.
+            const savedPosition = lastGoodPositionSec;
             const audioStreams = (mediaSource.value?.MediaStreams ?? []).filter((s: any) => s.Type === 'Audio');
             debugLog(`[AudioCrash] audioError received: groupIndex=${data.groupIndex} language="${data.language}" savedPosition=${savedPosition}`);
             debugLog(`[AudioCrash]   Jellyfin audio streams: ${audioStreams.map((s: any) => `idx=${s.Index} lang="${s.Language}" codec=${s.Codec}`).join(' | ')}`);
@@ -1162,8 +1168,7 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
 
         await NativeVideo.addListener('audioSwitchJellyfin', async (data) => {
             // Transcoded stream: ExoPlayer only has 1 track, native picker sends Jellyfin index
-            const savedPosition = currentTime.value;
-            await restartWithAudio(savedPosition, data.jellyfinIndex, title);
+            await restartWithAudio(lastGoodPositionSec, data.jellyfinIndex, title);
         });
 
         await NativeVideo.addListener('debugLog', (data) => {

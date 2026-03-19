@@ -104,6 +104,7 @@ class NativePlayerActivity : AppCompatActivity() {
     private val subtitleTrackGroups = mutableListOf<Pair<Int, TrackGroup>>()
     private var selectedAudioGroupIndex = -1
     private var selectedSubtitleGroupIndex = -1
+    private var sidecarSubtitleCount = 0
 
     // Quality presets & stream info (passed from Vue)
     private var qualityPresets = mutableListOf<Pair<Int, String>>() // (bitrate, label)
@@ -413,6 +414,7 @@ class NativePlayerActivity : AppCompatActivity() {
 
         // Parse subtitle configurations from JSON
         val subtitleConfigs = parseSubtitleConfigs(subtitleTracksJson)
+        sidecarSubtitleCount = subtitleConfigs.size
 
         val mediaItem = MediaItem.Builder()
             .setUri(url)
@@ -585,7 +587,7 @@ class NativePlayerActivity : AppCompatActivity() {
 
         // Show/hide buttons based on track availability
         if (audioTrackGroups.size > 1 || jellyfinAudioTracks.size > 1) btnAudio.visibility = View.VISIBLE
-        if (subtitleTrackGroups.isNotEmpty()) btnSubtitle.visibility = View.VISIBLE
+        if (subtitleTrackGroups.isNotEmpty() || sidecarSubtitleCount > 0) btnSubtitle.visibility = View.VISIBLE
 
         android.util.Log.d("NativePlayer", "[Subtitles] reportTracks: ${audioTrackGroups.size} audio, ${subtitleTrackGroups.size} subtitle")
         subtitleTrackGroups.forEach { (idx, group) ->

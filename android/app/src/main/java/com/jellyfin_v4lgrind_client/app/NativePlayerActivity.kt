@@ -117,7 +117,12 @@ class NativePlayerActivity : AppCompatActivity() {
     private val commandReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.getStringExtra("command")) {
-                CMD_STOP -> finish()
+                CMD_STOP -> {
+                    // Suppress the stopped broadcast so the Vue stopped listener
+                    // doesn't fire when the activity is being replaced (audio fallback).
+                    stoppedSent = true
+                    finish()
+                }
                 CMD_PAUSE -> player?.pause()
                 CMD_RESUME -> player?.play()
                 CMD_SEEK -> {

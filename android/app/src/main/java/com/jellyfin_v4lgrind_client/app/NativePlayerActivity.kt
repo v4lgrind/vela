@@ -61,6 +61,7 @@ class NativePlayerActivity : AppCompatActivity() {
         const val ACTION_DEBUG_LOG = "com.jellyfin_v4lgrind_client.app.DEBUG_LOG"
 
         const val EXTRA_AUDIO_TRACKS = "audioTracks"
+        const val EXTRA_SELECTED_AUDIO_INDEX = "selectedAudioIndex"
 
         const val CMD_STOP = "stop"
         const val CMD_PAUSE = "pause"
@@ -116,6 +117,9 @@ class NativePlayerActivity : AppCompatActivity() {
     // Jellyfin audio tracks passed from Vue — used when ExoPlayer only has 1 track (transcoded stream)
     // Triple: (jellyfinIndex, label, language)
     private val jellyfinAudioTracks = mutableListOf<Triple<Int, String, String>>()
+    // The Jellyfin audio stream index that was requested for this playback session.
+    // Used to pre-select the correct item in the audio picker for transcoded streams.
+    private var selectedJellyfinAudioIndex = -1
 
     private val commandReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -267,6 +271,8 @@ class NativePlayerActivity : AppCompatActivity() {
 
         // Jellyfin audio tracks (used for picker when stream is transcoded)
         parseJellyfinAudioTracks(intent.getStringExtra(EXTRA_AUDIO_TRACKS) ?: "[]")
+        selectedJellyfinAudioIndex = intent.getIntExtra(EXTRA_SELECTED_AUDIO_INDEX, -1)
+        android.util.Log.d("NativePlayer", "selectedJellyfinAudioIndex=$selectedJellyfinAudioIndex jellyfinAudioTracks=${jellyfinAudioTracks.map { "(${it.first},${it.third})" }}")
         if (jellyfinAudioTracks.size > 1) btnAudio.visibility = View.VISIBLE
 
         tvTitle.text = title
@@ -427,47 +433,37 @@ class NativePlayerActivity : AppCompatActivity() {
             .setSubtitleConfigurations(subtitleConfigs)
             .build()
 
-        val mediaSource = if (playMethod == "DirectPlay" && !url.contains(".m3u8")) {
-            ProgressiveMediaSource.Factory(dataFactory).createMediaSource(mediaItem)
+        val mediaSourceFactory = if (playMethod == "DirectPlay" && !url.contains(".m3u8")) {
+            ProgressiveMediaSource.Factory(dataFactory)
         } else {
-            HlsMediaSource.Factory(dataFactory).createMediaSource(mediaItem)
+            HlsMediaSource.Factory(dataFactory)
         }
 
         val exo = ExoPlayer.Builder(this)
+            .setMediaSourceFactory(mediaSourceFactory)
             .setAudioAttributes(audioAttr, true)
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
 
         android.util.Log.d("NativePlayer", "buildPlayer: startMs=$startMs playMethod=$playMethod isHls=${url.contains(".m3u8")}")
 
-        exo.setMediaSource(mediaSource)
-        // Always seek when a resume position is provided. Jellyfin's HLS transcode
-        // serves the full VOD manifest starting from t=0 (StartTimeTicks is NOT
-        // included in the TranscodingUrl), so the player must seek for both raw
-        // DirectPlay and HLS streams.
-        if (startMs > 0) exo.seekTo(startMs)
-        android.util.Log.d("NativePlayer", "buildPlayer seekTo=${if (startMs > 0) startMs else -1L}")
-
-        // Hide the surface until ExoPlayer has buffered at the target position.
-        // Without this, ExoPlayer renders a frame at t=0 before the seek completes,
-        // causing a visible flash/reload when resuming.
+        // Use setMediaItem with startPositionMs so ExoPlayer knows the initial
+        // position BEFORE loading any data. This avoids the double-load where
+        // ExoPlayer would fetch segments at t=0, render a frame, then seek.
         if (startMs > 0) {
-            playerView.alpha = 0f
-            exo.playWhenReady = false
+            exo.setMediaItem(mediaItem, startMs)
+            android.util.Log.d("NativePlayer", "buildPlayer setMediaItem with startMs=$startMs")
+        } else {
+            exo.setMediaItem(mediaItem)
+            android.util.Log.d("NativePlayer", "buildPlayer setMediaItem from beginning")
         }
         exo.prepare()
-        if (startMs <= 0) exo.playWhenReady = true
+        exo.playWhenReady = true
 
         exo.addListener(object : Player.Listener {
             override fun onPlaybackStateChanged(state: Int) {
                 when (state) {
                     Player.STATE_READY -> {
-                        // Reveal the surface and start playback once buffered
-                        // at the seek target (avoids t=0 frame flash on resume).
-                        if (playerView.alpha == 0f) {
-                            playerView.animate().alpha(1f).setDuration(120).start()
-                            exo.playWhenReady = true
-                        }
                         if (!tracksReported) {
                             tracksReported = true
                             reportTracks(exo)
@@ -726,17 +722,16 @@ class NativePlayerActivity : AppCompatActivity() {
                 .show()
         } else if (jellyfinAudioTracks.isNotEmpty()) {
             val labels = jellyfinAudioTracks.map { it.second }.toTypedArray()
-            // Determine current selection by matching language to the active ExoPlayer track.
-            // Normalize codes because ExoPlayer may use ISO 639-1 ("fr") while Jellyfin uses
-            // ISO 639-2 ("fra"/"fre").
-            val currentLang = audioTrackGroups.firstOrNull { it.first == selectedAudioGroupIndex }
-                ?.second?.getFormat(0)?.language ?: ""
-            val normalizedCurrent = normalizeLang(currentLang)
-            val checkedItem = jellyfinAudioTracks.indexOfFirst { normalizeLang(it.third) == normalizedCurrent }
+            // Use the Jellyfin audio index that was requested for this session.
+            // Language matching is unreliable here because the transcoded stream
+            // has only one ExoPlayer track whose language may not match.
+            val checkedItem = jellyfinAudioTracks.indexOfFirst { it.first == selectedJellyfinAudioIndex }
+            android.util.Log.d("NativePlayer", "showAudioPicker: jellyfin branch, selectedJellyfinAudioIndex=$selectedJellyfinAudioIndex checkedItem=$checkedItem")
             androidx.appcompat.app.AlertDialog.Builder(this, androidx.appcompat.R.style.Theme_AppCompat_Dialog)
                 .setTitle("Audio Track")
                 .setSingleChoiceItems(labels, checkedItem) { dialog, which ->
                     val (jellyfinIndex, _, _) = jellyfinAudioTracks[which]
+                    selectedJellyfinAudioIndex = jellyfinIndex
                     dialog.dismiss()
                     val broadcastIntent = Intent(ACTION_AUDIO_SWITCH_JELLYFIN)
                     broadcastIntent.putExtra("jellyfinIndex", jellyfinIndex)

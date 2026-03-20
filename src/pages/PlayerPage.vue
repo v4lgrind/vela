@@ -1215,6 +1215,7 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
                 label: a.label,
                 language: a.language,
             }))),
+            selectedAudioIndex: selectedAudioIndex.value ?? -1,
         });
 
         isLoading.value = false;

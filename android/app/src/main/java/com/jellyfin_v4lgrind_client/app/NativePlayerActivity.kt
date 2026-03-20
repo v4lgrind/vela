@@ -31,8 +31,7 @@ import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.hls.HlsMediaSource
-import androidx.media3.exoplayer.source.ProgressiveMediaSource
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.PlayerView
 import org.json.JSONArray
 import org.json.JSONObject
@@ -61,6 +60,7 @@ class NativePlayerActivity : AppCompatActivity() {
         const val ACTION_DEBUG_LOG = "com.jellyfin_v4lgrind_client.app.DEBUG_LOG"
 
         const val EXTRA_AUDIO_TRACKS = "audioTracks"
+        const val EXTRA_SELECTED_AUDIO_INDEX = "selectedAudioIndex"
 
         const val CMD_STOP = "stop"
         const val CMD_PAUSE = "pause"
@@ -88,6 +88,7 @@ class NativePlayerActivity : AppCompatActivity() {
     private lateinit var btnQuality: ImageButton
     private lateinit var btnInfo: ImageButton
     private lateinit var btnSkipIntro: Button
+    private lateinit var loadingSpinner: View
     private lateinit var seekBar: SeekBar
     private lateinit var tvCurrentTime: TextView
     private lateinit var tvTotalTime: TextView
@@ -116,6 +117,9 @@ class NativePlayerActivity : AppCompatActivity() {
     // Jellyfin audio tracks passed from Vue — used when ExoPlayer only has 1 track (transcoded stream)
     // Triple: (jellyfinIndex, label, language)
     private val jellyfinAudioTracks = mutableListOf<Triple<Int, String, String>>()
+    // The Jellyfin audio stream index that was requested for this playback session.
+    // Used to pre-select the correct item in the audio picker for transcoded streams.
+    private var selectedJellyfinAudioIndex = -1
 
     private val commandReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -244,6 +248,7 @@ class NativePlayerActivity : AppCompatActivity() {
         tvTotalTime = findViewById(R.id.tv_total_time)
         tvTitle = findViewById(R.id.tv_title)
         btnSkipIntro = findViewById(R.id.btn_skip_intro)
+        loadingSpinner = findViewById(R.id.loading_spinner)
         btnQuality = findViewById(R.id.btn_quality)
         btnInfo = findViewById(R.id.btn_info)
 
@@ -267,6 +272,8 @@ class NativePlayerActivity : AppCompatActivity() {
 
         // Jellyfin audio tracks (used for picker when stream is transcoded)
         parseJellyfinAudioTracks(intent.getStringExtra(EXTRA_AUDIO_TRACKS) ?: "[]")
+        selectedJellyfinAudioIndex = intent.getIntExtra(EXTRA_SELECTED_AUDIO_INDEX, -1)
+        android.util.Log.d("NativePlayer", "selectedJellyfinAudioIndex=$selectedJellyfinAudioIndex jellyfinAudioTracks=${jellyfinAudioTracks.map { "(${it.first},${it.third})" }}")
         if (jellyfinAudioTracks.size > 1) btnAudio.visibility = View.VISIBLE
 
         tvTitle.text = title
@@ -427,33 +434,48 @@ class NativePlayerActivity : AppCompatActivity() {
             .setSubtitleConfigurations(subtitleConfigs)
             .build()
 
-        val mediaSource = if (playMethod == "DirectPlay" && !url.contains(".m3u8")) {
-            ProgressiveMediaSource.Factory(dataFactory).createMediaSource(mediaItem)
-        } else {
-            HlsMediaSource.Factory(dataFactory).createMediaSource(mediaItem)
-        }
+        // Use DefaultMediaSourceFactory instead of raw HlsMediaSource.Factory /
+        // ProgressiveMediaSource.Factory.  DefaultMediaSourceFactory:
+        //   1. auto-detects HLS (.m3u8) vs Progressive from the URI
+        //   2. processes SubtitleConfigurations — creates SingleSampleMediaSources
+        //      with the new subtitle-parsing pipeline (text/vtt → x-media3-cues)
+        //   3. merges sidecar subtitle sources via MergingMediaSource
+        // Raw child factories ignore SubtitleConfigurations entirely and the new
+        // Media3 1.5 text renderer rejects raw text/vtt samples.
+        @Suppress("DEPRECATION")
+        val defaultFactory = DefaultMediaSourceFactory(dataFactory)
 
         val exo = ExoPlayer.Builder(this)
+            .setMediaSourceFactory(defaultFactory)
             .setAudioAttributes(audioAttr, true)
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
 
-        android.util.Log.d("NativePlayer", "buildPlayer: startMs=$startMs playMethod=$playMethod isHls=${url.contains(".m3u8")}")
+        android.util.Log.d("NativePlayer", "buildPlayer: startMs=$startMs playMethod=$playMethod isHls=${url.contains(".m3u8")} sidecarSubs=${subtitleConfigs.size}")
 
-        exo.setMediaSource(mediaSource)
-        // For HLS (transcode / direct-stream), Jellyfin already starts the stream at
-        // the requested position via StartTimeTicks in the URL — no additional seek needed.
-        // For raw-file DirectPlay the stream always starts at byte 0, so we must seek.
-        val isRawDirectPlay = playMethod == "DirectPlay" && !url.contains(".m3u8")
-        if (startMs > 0 && isRawDirectPlay) exo.seekTo(startMs)
-        android.util.Log.d("NativePlayer", "isRawDirectPlay=$isRawDirectPlay seekTo=${if (startMs > 0 && isRawDirectPlay) startMs else -1L}")
+        if (startMs > 0) {
+            exo.setMediaItem(mediaItem, startMs)
+            android.util.Log.d("NativePlayer", "buildPlayer setMediaItem with startMs=$startMs")
+        } else {
+            exo.setMediaItem(mediaItem)
+            android.util.Log.d("NativePlayer", "buildPlayer setMediaItem from beginning")
+        }
         exo.prepare()
         exo.playWhenReady = true
 
         exo.addListener(object : Player.Listener {
             override fun onPlaybackStateChanged(state: Int) {
+                val stateName = when (state) {
+                    Player.STATE_IDLE -> "IDLE"
+                    Player.STATE_BUFFERING -> "BUFFERING"
+                    Player.STATE_READY -> "READY"
+                    Player.STATE_ENDED -> "ENDED"
+                    else -> "UNKNOWN($state)"
+                }
+                android.util.Log.d("NativePlayer", "onPlaybackStateChanged: $stateName pos=${exo.currentPosition}ms dur=${exo.duration}ms")
                 when (state) {
                     Player.STATE_READY -> {
+                        loadingSpinner.visibility = View.GONE
                         if (!tracksReported) {
                             tracksReported = true
                             reportTracks(exo)
@@ -462,12 +484,13 @@ class NativePlayerActivity : AppCompatActivity() {
                         handler.post(progressRunnable)
                     }
                     Player.STATE_ENDED -> {
+                        loadingSpinner.visibility = View.GONE
                         handler.removeCallbacks(progressRunnable)
                         handler.removeCallbacks(seekBarUpdateRunnable)
                         sendProgressBroadcast(exo.duration.coerceAtLeast(0L), exo.duration.coerceAtLeast(0L))
                         sendEndedBroadcast()
                     }
-                    Player.STATE_BUFFERING -> { /* loading */ }
+                    Player.STATE_BUFFERING -> { loadingSpinner.visibility = View.VISIBLE }
                     Player.STATE_IDLE -> { /* idle */ }
                 }
             }
@@ -680,6 +703,19 @@ class NativePlayerActivity : AppCompatActivity() {
         }
     }
 
+    /** Normalize a language code to ISO 639-1 (2-letter) for comparison.
+     *  Handles ISO 639-2/T ("fra"), ISO 639-2/B ("fre"), and BCP 47 ("fr"). */
+    private fun normalizeLang(code: String): String {
+        if (code.isBlank() || code == "und") return code
+        if (code.length == 2) return code.lowercase()
+        // 3-letter → 2-letter: find a Locale whose ISO 639-2 code matches
+        val lower = code.lowercase()
+        return java.util.Locale.getAvailableLocales()
+            .firstOrNull { it.language.length == 2 && it.getISO3Language() == lower }
+            ?.language?.lowercase()
+            ?: lower
+    }
+
     private fun showAudioPicker() {
         // If ExoPlayer has multiple tracks (DirectPlay), use them directly.
         // Otherwise fall back to the Jellyfin track list and trigger a Vue-side restart.
@@ -699,14 +735,16 @@ class NativePlayerActivity : AppCompatActivity() {
                 .show()
         } else if (jellyfinAudioTracks.isNotEmpty()) {
             val labels = jellyfinAudioTracks.map { it.second }.toTypedArray()
-            // Determine current selection by matching language to the active ExoPlayer track
-            val currentLang = audioTrackGroups.firstOrNull { it.first == selectedAudioGroupIndex }
-                ?.second?.getFormat(0)?.language ?: ""
-            val checkedItem = jellyfinAudioTracks.indexOfFirst { it.third == currentLang }
+            // Use the Jellyfin audio index that was requested for this session.
+            // Language matching is unreliable here because the transcoded stream
+            // has only one ExoPlayer track whose language may not match.
+            val checkedItem = jellyfinAudioTracks.indexOfFirst { it.first == selectedJellyfinAudioIndex }
+            android.util.Log.d("NativePlayer", "showAudioPicker: jellyfin branch, selectedJellyfinAudioIndex=$selectedJellyfinAudioIndex checkedItem=$checkedItem")
             androidx.appcompat.app.AlertDialog.Builder(this, androidx.appcompat.R.style.Theme_AppCompat_Dialog)
                 .setTitle("Audio Track")
                 .setSingleChoiceItems(labels, checkedItem) { dialog, which ->
                     val (jellyfinIndex, _, _) = jellyfinAudioTracks[which]
+                    selectedJellyfinAudioIndex = jellyfinIndex
                     dialog.dismiss()
                     val broadcastIntent = Intent(ACTION_AUDIO_SWITCH_JELLYFIN)
                     broadcastIntent.putExtra("jellyfinIndex", jellyfinIndex)

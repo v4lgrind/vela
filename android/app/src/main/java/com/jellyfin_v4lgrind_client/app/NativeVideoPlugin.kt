@@ -44,6 +44,7 @@ class NativeVideoPlugin : Plugin() {
         val selectedBitrate = call.data.optInt("selectedBitrate", 0)
         val streamInfo = call.getString("streamInfo") ?: ""
         val audioTracksJson = call.getString("audioTracksJson") ?: "[]"
+        val selectedAudioIndex = call.data.optInt("selectedAudioIndex", -1)
 
         val intent = Intent(activity, NativePlayerActivity::class.java).apply {
             putExtra(NativePlayerActivity.EXTRA_URL, url)
@@ -56,6 +57,7 @@ class NativeVideoPlugin : Plugin() {
             putExtra(NativePlayerActivity.EXTRA_SELECTED_BITRATE, selectedBitrate)
             putExtra(NativePlayerActivity.EXTRA_STREAM_INFO, streamInfo)
             putExtra(NativePlayerActivity.EXTRA_AUDIO_TRACKS, audioTracksJson)
+            putExtra(NativePlayerActivity.EXTRA_SELECTED_AUDIO_INDEX, selectedAudioIndex)
         }
         activity.startActivity(intent)
         call.resolve()

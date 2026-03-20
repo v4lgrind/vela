@@ -568,8 +568,14 @@ function goBack() { router.back(); }
 
 function buildReportingPayload(overrides: Record<string, any> = {}) {
     const video = videoEl.value;
-    // On native path, videoEl is not available — use currentTime ref updated from progress events
-    const positionSec = video?.currentTime ?? currentTime.value;
+    // On native path, videoEl is not available — use currentTime ref.
+    // Prefer video.currentTime when it has a real position; fall back to the
+    // pre-seeded currentTime ref so reportPlaybackStart sends the correct
+    // resume position before the seek has taken effect (video.currentTime is
+    // still 0, but currentTime.value was pre-seeded to resumeSeconds).
+    const positionSec = (video?.currentTime && video.currentTime > 0)
+        ? video.currentTime
+        : (currentTime.value || 0);
     return {
         ItemId: itemId,
         SessionId: playSessionId.value,
@@ -668,10 +674,17 @@ async function fetchPlaybackInfo(startTimeTicks?: number, audioStreamIndex?: num
         ? { ...baseDeviceProfile.DeviceProfile, DirectPlayProfiles: [], MaxStreamingBitrate: bitrateCap }
         : baseDeviceProfile.DeviceProfile;
 
+    // AllowVideoStreamCopy: false forces a real re-encode so the bitrate cap
+    // is honoured. BUT Jellyfin has a bug where it drops StartTimeTicks from the
+    // TranscodingUrl when AllowVideoStreamCopy=false. So when we have a resume
+    // position, skip the flag — MaxStreamingBitrate + stripped DirectPlayProfiles
+    // still force transcoding, and StartTimeTicks is preserved.
+    const blockVideoCopy = shouldForce && !startTimeTicks;
+
     const profile: any = {
         ...baseDeviceProfile,
         MaxStreamingBitrate: bitrateCap,
-        ...(shouldForce ? { AllowVideoStreamCopy: false } : {}),
+        ...(blockVideoCopy ? { AllowVideoStreamCopy: false } : {}),
         // transcodeAudio: keep video copy (DirectStream) but force Jellyfin to re-encode audio
         // (used when the device can't decode a specific audio format like E-AC3+Atmos)
         ...(transcodeAudio ? { AllowAudioStreamCopy: false } : {}),
@@ -684,8 +697,13 @@ async function fetchPlaybackInfo(startTimeTicks?: number, audioStreamIndex?: num
     debugLog(`[AudioCrash] fetchPlaybackInfo: forceTranscode=${forceTranscode} transcodeAudio=${transcodeAudio} shouldForce=${shouldForce} stripDirectPlay=${stripDirectPlay} audioStreamIndex=${audioStreamIndex}`);
     debugLog(`[AudioCrash]   DirectPlayProfiles count=${baseProfile.DirectPlayProfiles?.length ?? 'N/A'} AllowAudioStreamCopy=${transcodeAudio ? false : 'unset'} AllowVideoStreamCopy=${shouldForce ? false : 'unset'}`);
 
+    // Pass StartTimeTicks as both a query parameter and in the body.
+    // Some Jellyfin versions ignore it in the body when AllowVideoStreamCopy=false,
+    // but honour it from the query string.
+    const pbQuery = new URLSearchParams({ userId: store.userId! });
+    if (startTimeTicks !== undefined) pbQuery.set('StartTimeTicks', String(startTimeTicks));
     const response = await fetch(
-        `${serverUrl}/Items/${itemId}/PlaybackInfo?userId=${store.userId}`,
+        `${serverUrl}/Items/${itemId}/PlaybackInfo?${pbQuery}`,
         {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': embyAuthHeader },
@@ -696,7 +714,11 @@ async function fetchPlaybackInfo(startTimeTicks?: number, audioStreamIndex?: num
     const result = await response.json();
     const ms0 = result.MediaSources?.[0];
     if (ms0) {
-        debugLog(`[AudioCrash] PlaybackInfo response: SupportsDirectPlay=${ms0.SupportsDirectPlay} SupportsDirectStream=${ms0.SupportsDirectStream} TranscodingUrl=${ms0.TranscodingUrl ? 'YES' : 'NO'}`);
+        debugLog(`[NativePlayer] PlaybackInfo response: SupportsDirectPlay=${ms0.SupportsDirectPlay} SupportsDirectStream=${ms0.SupportsDirectStream} TranscodingUrl=${ms0.TranscodingUrl ? 'YES' : 'NO'}`);
+        if (ms0.TranscodingUrl) {
+            const hasStartTicks = ms0.TranscodingUrl.includes('StartTimeTicks');
+            debugLog(`[NativePlayer] TranscodingUrl hasStartTimeTicks=${hasStartTicks}: ${ms0.TranscodingUrl}`);
+        }
         const audioStreams = (ms0.MediaStreams || []).filter((s: any) => s.Type === 'Audio');
         audioStreams.forEach((s: any) => debugLog(`[AudioCrash]   Audio stream: idx=${s.Index} lang=${s.Language} codec=${s.Codec} channels=${s.Channels} displayTitle="${s.DisplayTitle}"`));
     }
@@ -730,14 +752,22 @@ function parseAudioStreams(ms: any, preferredIndex?: number) {
 
 function parseSubtitleStreams(ms: any) {
     const streams: any[] = ms.MediaStreams || [];
+    const msId = ms.Id || itemId;
     subtitleList.value = streams
-        .filter(s => s.Type === 'Subtitle' && s.DeliveryUrl)
-        .map(s => ({
-            index: s.Index as number,
-            language: s.Language || 'und',
-            label: s.DisplayTitle || `${(s.Language || 'und').toUpperCase()}${s.IsForced ? ' (Forced)' : ''}`,
-            deliveryUrl: `${serverUrl}${s.DeliveryUrl}`,
-        }));
+        .filter(s => s.Type === 'Subtitle' && (s.DeliveryUrl || (s.IsTextSubtitleStream && s.SupportsExternalStream)))
+        .map(s => {
+            // Jellyfin omits DeliveryUrl in DirectPlay mode. For text subtitles that
+            // support external delivery, construct the extraction URL ourselves.
+            const deliveryUrl = s.DeliveryUrl
+                ? `${serverUrl}${s.DeliveryUrl}`
+                : `${serverUrl}/Videos/${itemId}/${msId}/Subtitles/${s.Index}/0/Stream.vtt?api_key=${accessToken}`;
+            return {
+                index: s.Index as number,
+                language: s.Language || 'und',
+                label: s.DisplayTitle || `${(s.Language || 'und').toUpperCase()}${s.IsForced ? ' (Forced)' : ''}`,
+                deliveryUrl,
+            };
+        });
 
     // Per-item saved choice (null = never set) → global language preference → off
     // Stored value: 'off' = explicitly off, numeric string = exact stream index
@@ -812,7 +842,8 @@ function determinePlaybackMethod(ms: any) {
             hlsUrl.value = `${serverUrl}/Videos/${itemId}/master.m3u8?mediaSourceId=${ms.Id || itemId}&api_key=${accessToken}&PlaySessionId=${playSessionId.value}`;
         }
     }
-    debugLog(`[AudioCrash] determinePlaybackMethod: ${playMethod.value} url=${hlsUrl.value.substring(0, 120)}...`);
+    debugLog(`[NativePlayer] determinePlaybackMethod: ${playMethod.value}`);
+    debugLog(`[NativePlayer] TranscodingUrl from Jellyfin: ${ms.TranscodingUrl ? 'YES' : 'NO'}`);
 }
 
 // ── Skip Intro ─────────────────────────────────────────────────────────────────
@@ -931,14 +962,25 @@ function initHls(url: string, video: HTMLVideoElement, startSeconds?: number, on
     }
 }
 
+let restartInProgress = false;
+
 async function restartWithAudio(resumeSeconds: number, jellyfinAudioIndex: number | undefined, title?: string) {
+    if (restartInProgress) {
+        debugLog(`[AudioCrash] restartWithAudio: SKIPPED (already in progress)`);
+        return;
+    }
+    restartInProgress = true;
     debugLog(`[AudioCrash] restartWithAudio: resumeSeconds=${resumeSeconds} jellyfinAudioIndex=${jellyfinAudioIndex} title="${title}"`);
     nativeSwitchingQuality = true;
     isLoading.value = true;
     try {
+        debugLog(`[AudioCrash] restartWithAudio: removing listeners...`);
         await NativeVideo.removeAllListeners();
+        debugLog(`[AudioCrash] restartWithAudio: stopping native player...`);
         await NativeVideo.stop();
+        debugLog(`[AudioCrash] restartWithAudio: deleting active encodings...`);
         await deleteActiveEncodings();
+        debugLog(`[AudioCrash] restartWithAudio: calling initNativePlayer...`);
         await initNativePlayer(resumeSeconds, jellyfinAudioIndex, title, true);
         debugLog(`[AudioCrash] restartWithAudio: initNativePlayer completed successfully`);
     } catch (e) {
@@ -947,6 +989,7 @@ async function restartWithAudio(resumeSeconds: number, jellyfinAudioIndex: numbe
         isLoading.value = false;
     } finally {
         nativeSwitchingQuality = false;
+        restartInProgress = false;
     }
 }
 
@@ -991,28 +1034,40 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
 
         await reportPlaybackStart();
 
-        // Build subtitle tracks for ExoPlayer
-        const subtitleTracks = subtitleList.value.map(s => ({
-            url: s.deliveryUrl,
-            lang: s.language,
-            label: s.label,
-        }));
+        const isDirectPlayRaw = playMethod.value === 'DirectPlay' && !hlsUrl.value.includes('.m3u8');
 
-        const startPositionMs = resumeSeconds && resumeSeconds > 0 ? Math.floor(resumeSeconds * 1000) : 0;
+        // When the HLS URL contains StartTimeTicks the stream begins at the
+        // resume point and ExoPlayer positions are stream-relative.
+        // Otherwise (DirectPlay or no StartTimeTicks) ExoPlayer seeks itself.
+        const hlsHasStartTicks = hlsUrl.value.includes('StartTimeTicks');
+        const finalStartPositionMs = (isDirectPlayRaw || !hlsHasStartTicks)
+            ? (resumeSeconds && resumeSeconds > 0 ? Math.floor(resumeSeconds * 1000) : 0)
+            : 0;
+        const finalResumeOffsetMs = (isDirectPlayRaw || !hlsHasStartTicks)
+            ? 0
+            : (resumeSeconds && resumeSeconds > 0 ? Math.floor(resumeSeconds * 1000) : 0);
+        nativeResumeOffsetMs.value = finalResumeOffsetMs;
+
+        debugLog(`[NativePlayer] resumeSeconds=${resumeSeconds} startPositionMs=${finalStartPositionMs} resumeOffsetMs=${finalResumeOffsetMs} hlsHasStartTicks=${hlsHasStartTicks} playMethod=${playMethod.value}`);
+        debugLog(`[NativePlayer] hlsUrl=${hlsUrl.value}`);
+
+        // Build subtitle tracks for ExoPlayer.
+        // For raw DirectPlay, ExoPlayer extracts embedded text tracks from the MKV
+        // container directly — passing sidecar VTTs would create duplicates.
+        // For HLS (transcode / direct-stream), embedded subs are not in the HLS
+        // manifest, so we pass them as external sidecar tracks.
+        const subtitleTracks = isDirectPlayRaw
+            ? []
+            : subtitleList.value.map(s => ({
+                url: s.deliveryUrl,
+                lang: s.language,
+                label: s.label,
+            }));
 
         // Flag that suppresses localStorage writes in the subtitleSelected listener while
         // we are programmatically restoring a saved preference from tracksReady.
         // Without this, restore calls fire subtitleSelected which overwrites the saved value.
         let restoringSubtitle = false;
-
-        // For HLS transcode, ExoPlayer's position is relative to the stream start
-        // (position 0 = resume point T in the movie) so we add the resume offset
-        // to get the absolute movie position when reporting back to Jellyfin.
-        // For DirectPlay, ExoPlayer already reports the absolute file position
-        // (because seekTo(startMs) was called), so no offset is needed.
-        const isDirectPlayRaw = playMethod.value === 'DirectPlay' && !hlsUrl.value.includes('.m3u8');
-        const resumeOffsetMs = isDirectPlayRaw ? 0 : startPositionMs;
-        nativeResumeOffsetMs.value = resumeOffsetMs;
 
         // Track the last known good position so audio error handlers can resume
         // even if the crash happens before a progress event fires.
@@ -1020,7 +1075,7 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
 
         // Register event listeners before starting
         await NativeVideo.addListener('progress', (data) => {
-            currentTime.value = (data.positionMs + resumeOffsetMs) / 1000;
+            currentTime.value = (data.positionMs + finalResumeOffsetMs) / 1000;
             lastGoodPositionSec = currentTime.value;
             duration.value = data.durationMs / 1000;
             if (duration.value > 0) progressPct.value = (currentTime.value / duration.value) * 100;
@@ -1028,7 +1083,7 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
         });
 
         await NativeVideo.addListener('stopped', async (data) => {
-            currentTime.value = (data.positionMs + resumeOffsetMs) / 1000;
+            currentTime.value = (data.positionMs + finalResumeOffsetMs) / 1000;
             if (nativeSwitchingQuality) return; // quality switch in progress — don't navigate away
             router.back();
             reportPlaybackStopped();
@@ -1150,10 +1205,9 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
         await NativeVideo.addListener('audioError', async (data) => {
             // Use lastGoodPositionSec because ExoPlayer may reset currentTime to 0
             // before this handler fires, or the crash may occur before any progress event.
-            debugLog(`[AudioCrash] audioError: lastGoodPositionSec=${lastGoodPositionSec} currentTime=${currentTime.value}`);
+            debugLog(`[AudioCrash] >>> audioError EVENT: groupIndex=${data.groupIndex} language="${data.language}" lastGoodPos=${lastGoodPositionSec} currentTime=${currentTime.value} restartInProgress=${restartInProgress}`);
             const savedPosition = lastGoodPositionSec;
             const audioStreams = (mediaSource.value?.MediaStreams ?? []).filter((s: any) => s.Type === 'Audio');
-            debugLog(`[AudioCrash] audioError received: groupIndex=${data.groupIndex} language="${data.language}" savedPosition=${savedPosition}`);
             debugLog(`[AudioCrash]   Jellyfin audio streams: ${audioStreams.map((s: any) => `idx=${s.Index} lang="${s.Language}" codec=${s.Codec}`).join(' | ')}`);
             // ExoPlayer sends 2-letter codes ("en"), Jellyfin uses 3-letter ("eng").
             // Match by position: groupIndex is 1-based among audio tracks.
@@ -1169,7 +1223,7 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
 
         await NativeVideo.addListener('audioSwitchJellyfin', async (data) => {
             // Transcoded stream: ExoPlayer only has 1 track, native picker sends Jellyfin index
-            debugLog(`[AudioCrash] audioSwitchJellyfin: jellyfinIndex=${data.jellyfinIndex} lastGoodPositionSec=${lastGoodPositionSec} currentTime=${currentTime.value}`);
+            debugLog(`[AudioCrash] >>> audioSwitchJellyfin EVENT: jellyfinIndex=${data.jellyfinIndex} lastGoodPos=${lastGoodPositionSec} currentTime=${currentTime.value} restartInProgress=${restartInProgress}`);
             await restartWithAudio(lastGoodPositionSec, data.jellyfinIndex, title);
         });
 
@@ -1177,10 +1231,11 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
             debugLog(data.message, 'kotlin');
         });
 
+        debugLog(`[NativePlayer] calling NativeVideo.start: startPositionMs=${finalStartPositionMs} playMethod=${playMethod.value} subtitleTracks=${subtitleTracks.length}`);
         await NativeVideo.start({
             url: hlsUrl.value,
             authHeader: embyAuthHeader,
-            startPositionMs,
+            startPositionMs: finalStartPositionMs,
             title: title || (mediaSource.value as any)?.Name || '',
             playMethod: playMethod.value,
             subtitleTracks,
@@ -1192,6 +1247,7 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
                 label: a.label,
                 language: a.language,
             }))),
+            selectedAudioIndex: selectedAudioIndex.value ?? -1,
         });
 
         isLoading.value = false;

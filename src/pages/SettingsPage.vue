@@ -29,6 +29,22 @@
       </section>
 
       <section class="mt-8">
+        <h2 class="text-base font-semibold text-text-heading mb-1">Playback</h2>
+        <p class="text-sm text-text-muted mb-4">Default quality for all streams. Can be overridden per-item in the player.</p>
+        <div class="flex flex-col gap-0 rounded-xl overflow-hidden border border-border-input divide-y divide-border-input">
+          <div class="flex items-center justify-between px-4 py-3 bg-surface-raised">
+            <span class="text-sm font-medium text-text-heading">Max Resolution</span>
+            <select
+              v-model.number="preferencesStore.preferredBitrate"
+              class="bg-surface-raised border border-border-input rounded-lg px-3 py-2 text-sm text-text-heading focus:outline-none focus:border-accent-purple w-48"
+            >
+              <option v-for="q in QUALITY_PRESETS" :key="q.bitrate" :value="q.bitrate">{{ q.label }}</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <section class="mt-8">
         <h2 class="text-base font-semibold text-text-heading mb-1">Connectivity</h2>
         <p class="text-sm text-text-muted mb-4">Force the app to behave as if offline, using downloaded content only.</p>
         <div class="flex flex-col gap-0 rounded-xl overflow-hidden border border-border-input divide-y divide-border-input">
@@ -93,5 +109,14 @@ const LANGUAGES = [
 const SUBTITLE_LANGUAGES = [
   { code: '',    label: 'Off' },
   ...LANGUAGES.slice(1),
+];
+
+const QUALITY_PRESETS = [
+  { bitrate: 0,          label: 'Auto' },
+  { bitrate: 80_000_000, label: '4K' },
+  { bitrate: 20_000_000, label: '1080p' },
+  { bitrate:  8_000_000, label: '720p' },
+  { bitrate:  3_000_000, label: '480p' },
+  { bitrate:  1_500_000, label: '360p' },
 ];
 </script>

@@ -31,8 +31,7 @@ import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.hls.HlsMediaSource
-import androidx.media3.exoplayer.source.ProgressiveMediaSource
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.PlayerView
 import org.json.JSONArray
 import org.json.JSONObject
@@ -89,6 +88,7 @@ class NativePlayerActivity : AppCompatActivity() {
     private lateinit var btnQuality: ImageButton
     private lateinit var btnInfo: ImageButton
     private lateinit var btnSkipIntro: Button
+    private lateinit var loadingSpinner: View
     private lateinit var seekBar: SeekBar
     private lateinit var tvCurrentTime: TextView
     private lateinit var tvTotalTime: TextView
@@ -248,6 +248,7 @@ class NativePlayerActivity : AppCompatActivity() {
         tvTotalTime = findViewById(R.id.tv_total_time)
         tvTitle = findViewById(R.id.tv_title)
         btnSkipIntro = findViewById(R.id.btn_skip_intro)
+        loadingSpinner = findViewById(R.id.loading_spinner)
         btnQuality = findViewById(R.id.btn_quality)
         btnInfo = findViewById(R.id.btn_info)
 
@@ -433,23 +434,25 @@ class NativePlayerActivity : AppCompatActivity() {
             .setSubtitleConfigurations(subtitleConfigs)
             .build()
 
-        val mediaSourceFactory = if (playMethod == "DirectPlay" && !url.contains(".m3u8")) {
-            ProgressiveMediaSource.Factory(dataFactory)
-        } else {
-            HlsMediaSource.Factory(dataFactory)
-        }
+        // Use DefaultMediaSourceFactory instead of raw HlsMediaSource.Factory /
+        // ProgressiveMediaSource.Factory.  DefaultMediaSourceFactory:
+        //   1. auto-detects HLS (.m3u8) vs Progressive from the URI
+        //   2. processes SubtitleConfigurations — creates SingleSampleMediaSources
+        //      with the new subtitle-parsing pipeline (text/vtt → x-media3-cues)
+        //   3. merges sidecar subtitle sources via MergingMediaSource
+        // Raw child factories ignore SubtitleConfigurations entirely and the new
+        // Media3 1.5 text renderer rejects raw text/vtt samples.
+        @Suppress("DEPRECATION")
+        val defaultFactory = DefaultMediaSourceFactory(dataFactory)
 
         val exo = ExoPlayer.Builder(this)
-            .setMediaSourceFactory(mediaSourceFactory)
+            .setMediaSourceFactory(defaultFactory)
             .setAudioAttributes(audioAttr, true)
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
 
-        android.util.Log.d("NativePlayer", "buildPlayer: startMs=$startMs playMethod=$playMethod isHls=${url.contains(".m3u8")}")
+        android.util.Log.d("NativePlayer", "buildPlayer: startMs=$startMs playMethod=$playMethod isHls=${url.contains(".m3u8")} sidecarSubs=${subtitleConfigs.size}")
 
-        // Use setMediaItem with startPositionMs so ExoPlayer knows the initial
-        // position BEFORE loading any data. This avoids the double-load where
-        // ExoPlayer would fetch segments at t=0, render a frame, then seek.
         if (startMs > 0) {
             exo.setMediaItem(mediaItem, startMs)
             android.util.Log.d("NativePlayer", "buildPlayer setMediaItem with startMs=$startMs")
@@ -462,8 +465,17 @@ class NativePlayerActivity : AppCompatActivity() {
 
         exo.addListener(object : Player.Listener {
             override fun onPlaybackStateChanged(state: Int) {
+                val stateName = when (state) {
+                    Player.STATE_IDLE -> "IDLE"
+                    Player.STATE_BUFFERING -> "BUFFERING"
+                    Player.STATE_READY -> "READY"
+                    Player.STATE_ENDED -> "ENDED"
+                    else -> "UNKNOWN($state)"
+                }
+                android.util.Log.d("NativePlayer", "onPlaybackStateChanged: $stateName pos=${exo.currentPosition}ms dur=${exo.duration}ms")
                 when (state) {
                     Player.STATE_READY -> {
+                        loadingSpinner.visibility = View.GONE
                         if (!tracksReported) {
                             tracksReported = true
                             reportTracks(exo)
@@ -472,12 +484,13 @@ class NativePlayerActivity : AppCompatActivity() {
                         handler.post(progressRunnable)
                     }
                     Player.STATE_ENDED -> {
+                        loadingSpinner.visibility = View.GONE
                         handler.removeCallbacks(progressRunnable)
                         handler.removeCallbacks(seekBarUpdateRunnable)
                         sendProgressBroadcast(exo.duration.coerceAtLeast(0L), exo.duration.coerceAtLeast(0L))
                         sendEndedBroadcast()
                     }
-                    Player.STATE_BUFFERING -> { /* loading */ }
+                    Player.STATE_BUFFERING -> { loadingSpinner.visibility = View.VISIBLE }
                     Player.STATE_IDLE -> { /* idle */ }
                 }
             }

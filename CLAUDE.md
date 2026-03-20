@@ -51,3 +51,12 @@ For example:
 - The wednesday-dev skill enforces import ordering, complexity limits (max 8), and naming conventions.
 
 <!-- WEDNESDAY_SKILLS_END -->
+
+## Session Progress Tracking
+
+At the end of each session (or when work is paused), write a progress markdown file in `docs/session-progress/` summarizing:
+- What was investigated and found
+- Changes made
+- What's left to do / next steps
+
+Name the file with the date and a short topic slug, e.g. `2026-03-20-player-subtitle-fix.md`. This allows the user to resume context in future sessions.

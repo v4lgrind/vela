@@ -441,12 +441,12 @@ class NativePlayerActivity : AppCompatActivity() {
         android.util.Log.d("NativePlayer", "buildPlayer: startMs=$startMs playMethod=$playMethod isHls=${url.contains(".m3u8")}")
 
         exo.setMediaSource(mediaSource)
-        // For HLS (transcode / direct-stream), Jellyfin already starts the stream at
-        // the requested position via StartTimeTicks in the URL — no additional seek needed.
-        // For raw-file DirectPlay the stream always starts at byte 0, so we must seek.
-        val isRawDirectPlay = playMethod == "DirectPlay" && !url.contains(".m3u8")
-        if (startMs > 0 && isRawDirectPlay) exo.seekTo(startMs)
-        android.util.Log.d("NativePlayer", "isRawDirectPlay=$isRawDirectPlay seekTo=${if (startMs > 0 && isRawDirectPlay) startMs else -1L}")
+        // Always seek when a resume position is provided. Jellyfin's HLS transcode
+        // serves the full VOD manifest starting from t=0 (StartTimeTicks is NOT
+        // included in the TranscodingUrl), so the player must seek for both raw
+        // DirectPlay and HLS streams.
+        if (startMs > 0) exo.seekTo(startMs)
+        android.util.Log.d("NativePlayer", "buildPlayer seekTo=${if (startMs > 0) startMs else -1L}")
         exo.prepare()
         exo.playWhenReady = true
 
@@ -680,6 +680,19 @@ class NativePlayerActivity : AppCompatActivity() {
         }
     }
 
+    /** Normalize a language code to ISO 639-1 (2-letter) for comparison.
+     *  Handles ISO 639-2/T ("fra"), ISO 639-2/B ("fre"), and BCP 47 ("fr"). */
+    private fun normalizeLang(code: String): String {
+        if (code.isBlank() || code == "und") return code
+        if (code.length == 2) return code.lowercase()
+        // 3-letter → 2-letter: find a Locale whose ISO 639-2 code matches
+        val lower = code.lowercase()
+        return java.util.Locale.getAvailableLocales()
+            .firstOrNull { it.language.length == 2 && it.getISO3Language() == lower }
+            ?.language?.lowercase()
+            ?: lower
+    }
+
     private fun showAudioPicker() {
         // If ExoPlayer has multiple tracks (DirectPlay), use them directly.
         // Otherwise fall back to the Jellyfin track list and trigger a Vue-side restart.
@@ -699,10 +712,13 @@ class NativePlayerActivity : AppCompatActivity() {
                 .show()
         } else if (jellyfinAudioTracks.isNotEmpty()) {
             val labels = jellyfinAudioTracks.map { it.second }.toTypedArray()
-            // Determine current selection by matching language to the active ExoPlayer track
+            // Determine current selection by matching language to the active ExoPlayer track.
+            // Normalize codes because ExoPlayer may use ISO 639-1 ("fr") while Jellyfin uses
+            // ISO 639-2 ("fra"/"fre").
             val currentLang = audioTrackGroups.firstOrNull { it.first == selectedAudioGroupIndex }
                 ?.second?.getFormat(0)?.language ?: ""
-            val checkedItem = jellyfinAudioTracks.indexOfFirst { it.third == currentLang }
+            val normalizedCurrent = normalizeLang(currentLang)
+            val checkedItem = jellyfinAudioTracks.indexOfFirst { normalizeLang(it.third) == normalizedCurrent }
             androidx.appcompat.app.AlertDialog.Builder(this, androidx.appcompat.R.style.Theme_AppCompat_Dialog)
                 .setTitle("Audio Track")
                 .setSingleChoiceItems(labels, checkedItem) { dialog, which ->

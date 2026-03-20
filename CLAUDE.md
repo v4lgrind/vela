@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-This is a Jellyfin media client built with **Vue 3 + Capacitor v8**, targeting Android devices and desktop browsers. It uses Shaka Player for media playback, Pinia for state management, Reka UI for headless components, Tailwind CSS v4 for styling, and the official Jellyfin SDK for API calls.
+This is a Jellyfin media client built with **Vue 3 + Capacitor v8**, targeting **Android devices only**. It uses ExoPlayer (Media3) for native video playback on Android, HLS.js as a fallback for the dev-server web preview, Pinia for state management, Reka UI for headless components, Tailwind CSS v4 for styling, and the official Jellyfin SDK for API calls.
 
 ## Key Conventions
 

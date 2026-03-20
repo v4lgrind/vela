@@ -1,12 +1,12 @@
 # Jellyfin V4lgrind Client
 
-A modern Jellyfin media client built with Vue 3 + Capacitor. Stream your media library and download content for offline viewing on Android devices and desktop.
+A modern Jellyfin media client built with Vue 3 + Capacitor, targeting **Android only**. Stream your media library and download content for offline viewing on Android devices.
 
 ## Tech Stack
 
 - **Frontend:** Vue 3 + TypeScript + Vite
-- **Mobile/Desktop:** Capacitor v8
-- **Media Playback:** Shaka Player
+- **Mobile:** Capacitor v8 (Android)
+- **Media Playback:** ExoPlayer (Media3) for native Android, HLS.js for dev-server web preview
 - **State Management:** Pinia with persistence
 - **API Client:** Jellyfin SDK
 - **UI Components:** Reka UI (headless) + Lucide icons

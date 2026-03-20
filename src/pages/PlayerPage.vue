@@ -568,8 +568,14 @@ function goBack() { router.back(); }
 
 function buildReportingPayload(overrides: Record<string, any> = {}) {
     const video = videoEl.value;
-    // On native path, videoEl is not available — use currentTime ref updated from progress events
-    const positionSec = video?.currentTime ?? currentTime.value;
+    // On native path, videoEl is not available — use currentTime ref.
+    // Prefer video.currentTime when it has a real position; fall back to the
+    // pre-seeded currentTime ref so reportPlaybackStart sends the correct
+    // resume position before the seek has taken effect (video.currentTime is
+    // still 0, but currentTime.value was pre-seeded to resumeSeconds).
+    const positionSec = (video?.currentTime && video.currentTime > 0)
+        ? video.currentTime
+        : (currentTime.value || 0);
     return {
         ItemId: itemId,
         SessionId: playSessionId.value,
@@ -730,14 +736,22 @@ function parseAudioStreams(ms: any, preferredIndex?: number) {
 
 function parseSubtitleStreams(ms: any) {
     const streams: any[] = ms.MediaStreams || [];
+    const msId = ms.Id || itemId;
     subtitleList.value = streams
-        .filter(s => s.Type === 'Subtitle' && s.DeliveryUrl)
-        .map(s => ({
-            index: s.Index as number,
-            language: s.Language || 'und',
-            label: s.DisplayTitle || `${(s.Language || 'und').toUpperCase()}${s.IsForced ? ' (Forced)' : ''}`,
-            deliveryUrl: `${serverUrl}${s.DeliveryUrl}`,
-        }));
+        .filter(s => s.Type === 'Subtitle' && (s.DeliveryUrl || (s.IsTextSubtitleStream && s.SupportsExternalStream)))
+        .map(s => {
+            // Jellyfin omits DeliveryUrl in DirectPlay mode. For text subtitles that
+            // support external delivery, construct the extraction URL ourselves.
+            const deliveryUrl = s.DeliveryUrl
+                ? `${serverUrl}${s.DeliveryUrl}`
+                : `${serverUrl}/Videos/${itemId}/${msId}/Subtitles/${s.Index}/0/Stream.vtt?api_key=${accessToken}`;
+            return {
+                index: s.Index as number,
+                language: s.Language || 'und',
+                label: s.DisplayTitle || `${(s.Language || 'und').toUpperCase()}${s.IsForced ? ' (Forced)' : ''}`,
+                deliveryUrl,
+            };
+        });
 
     // Per-item saved choice (null = never set) → global language preference → off
     // Stored value: 'off' = explicitly off, numeric string = exact stream index
@@ -991,19 +1005,7 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
 
         await reportPlaybackStart();
 
-        // Build subtitle tracks for ExoPlayer
-        const subtitleTracks = subtitleList.value.map(s => ({
-            url: s.deliveryUrl,
-            lang: s.language,
-            label: s.label,
-        }));
-
         const startPositionMs = resumeSeconds && resumeSeconds > 0 ? Math.floor(resumeSeconds * 1000) : 0;
-
-        // Flag that suppresses localStorage writes in the subtitleSelected listener while
-        // we are programmatically restoring a saved preference from tracksReady.
-        // Without this, restore calls fire subtitleSelected which overwrites the saved value.
-        let restoringSubtitle = false;
 
         // For HLS transcode, ExoPlayer's position is relative to the stream start
         // (position 0 = resume point T in the movie) so we add the resume offset
@@ -1011,7 +1013,28 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
         // For DirectPlay, ExoPlayer already reports the absolute file position
         // (because seekTo(startMs) was called), so no offset is needed.
         const isDirectPlayRaw = playMethod.value === 'DirectPlay' && !hlsUrl.value.includes('.m3u8');
-        const resumeOffsetMs = isDirectPlayRaw ? 0 : startPositionMs;
+
+        // Build subtitle tracks for ExoPlayer.
+        // For raw DirectPlay, ExoPlayer extracts embedded text tracks from the MKV
+        // container directly — passing sidecar VTTs would create duplicates.
+        // For HLS (transcode / direct-stream), embedded subs are not in the HLS
+        // manifest, so we pass them as external sidecar tracks.
+        const subtitleTracks = isDirectPlayRaw
+            ? []
+            : subtitleList.value.map(s => ({
+                url: s.deliveryUrl,
+                lang: s.language,
+                label: s.label,
+            }));
+
+        // Flag that suppresses localStorage writes in the subtitleSelected listener while
+        // we are programmatically restoring a saved preference from tracksReady.
+        // Without this, restore calls fire subtitleSelected which overwrites the saved value.
+        let restoringSubtitle = false;
+
+        // ExoPlayer always seeks to startPositionMs (both DirectPlay and HLS), so its
+        // currentPosition is always the absolute movie position. No offset needed.
+        const resumeOffsetMs = 0;
         nativeResumeOffsetMs.value = resumeOffsetMs;
 
         // Track the last known good position so audio error handlers can resume

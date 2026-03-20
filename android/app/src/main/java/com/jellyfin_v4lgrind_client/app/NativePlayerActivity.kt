@@ -447,13 +447,27 @@ class NativePlayerActivity : AppCompatActivity() {
         // DirectPlay and HLS streams.
         if (startMs > 0) exo.seekTo(startMs)
         android.util.Log.d("NativePlayer", "buildPlayer seekTo=${if (startMs > 0) startMs else -1L}")
+
+        // Hide the surface until ExoPlayer has buffered at the target position.
+        // Without this, ExoPlayer renders a frame at t=0 before the seek completes,
+        // causing a visible flash/reload when resuming.
+        if (startMs > 0) {
+            playerView.alpha = 0f
+            exo.playWhenReady = false
+        }
         exo.prepare()
-        exo.playWhenReady = true
+        if (startMs <= 0) exo.playWhenReady = true
 
         exo.addListener(object : Player.Listener {
             override fun onPlaybackStateChanged(state: Int) {
                 when (state) {
                     Player.STATE_READY -> {
+                        // Reveal the surface and start playback once buffered
+                        // at the seek target (avoids t=0 frame flash on resume).
+                        if (playerView.alpha == 0f) {
+                            playerView.animate().alpha(1f).setDuration(120).start()
+                            exo.playWhenReady = true
+                        }
                         if (!tracksReported) {
                             tracksReported = true
                             reportTracks(exo)

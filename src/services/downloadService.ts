@@ -1,6 +1,7 @@
 import { offlineDatabase, type DownloadedMedia } from './offlineDatabase';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Capacitor } from '@capacitor/core';
+import type { PluginListenerHandle } from '@capacitor/core';
 
 interface DownloadProgress {
   itemId: string;
@@ -12,7 +13,7 @@ interface DownloadProgress {
 
 interface ActiveDownload {
   aborted: boolean;
-  pollInterval: ReturnType<typeof setInterval> | null;
+  progressListener: PluginListenerHandle | null;
 }
 
 class DownloadService {
@@ -21,9 +22,8 @@ class DownloadService {
 
   /**
    * Download file for offline use.
-   * Progress is tracked by polling the file size on disk every 500 ms — this avoids
-   * the global Filesystem 'progress' event channel which cannot distinguish between
-   * concurrent downloads and causes flickering when multiple run at once.
+   * Progress is tracked via Capacitor's built-in progress event, filtered by
+   * download URL so concurrent downloads report independently.
    */
   async downloadForOffline(
     serverUrl: string,
@@ -46,32 +46,22 @@ class DownloadService {
 
     if (onProgress) this.progressCallbacks.set(itemId, onProgress);
 
-    const activeDownload: ActiveDownload = { aborted: false, pollInterval: null };
+    const activeDownload: ActiveDownload = { aborted: false, progressListener: null };
     this.downloads.set(itemId, activeDownload);
 
-    // Fetch total size in background so we can show accurate percentage
-    let totalBytes = 0;
-    fetch(downloadUrl, { method: 'HEAD' })
-      .then(r => {
-        const cl = r.headers.get('content-length');
-        if (cl) totalBytes = parseInt(cl, 10);
-      })
-      .catch(() => {});
-
-    // Poll file size on disk every 500 ms — one interval per download, fully isolated
-    activeDownload.pollInterval = setInterval(async () => {
-      if (!this.downloads.has(itemId)) return;
-      try {
-        const stat = await Filesystem.stat({ path: filePath, directory: Directory.Data });
+    // Listen for Capacitor progress events, filtered by this download's URL
+    try {
+      activeDownload.progressListener = await Filesystem.addListener('progress', (event) => {
+        if (event.url !== downloadUrl) return;
         const callback = this.progressCallbacks.get(itemId);
         if (callback) {
-          const loaded = stat.size ?? 0;
-          const total = totalBytes || 0;
+          const loaded = event.bytes;
+          const total = event.contentLength;
           const percentage = total > 0 ? Math.min(99, Math.round((loaded / total) * 100)) : 0;
           callback({ itemId, filename, loaded, total, percentage });
         }
-      } catch { /* file not created yet — fine */ }
-    }, 500);
+      });
+    } catch { /* listener setup failed — progress just won't update */ }
 
     try {
       // Ensure directory exists
@@ -84,7 +74,7 @@ class DownloadService {
         url: downloadUrl,
         path: filePath,
         directory: Directory.Data,
-        progress: false,
+        progress: true,
       });
 
       if (activeDownload.aborted) {
@@ -94,10 +84,10 @@ class DownloadService {
       console.log('💾 Native download complete:', filePath);
 
       // Actual file size after completion
-      let fileSize = totalBytes;
+      let fileSize = 0;
       try {
         const stat = await Filesystem.stat({ path: filePath, directory: Directory.Data });
-        fileSize = stat.size ?? totalBytes;
+        fileSize = stat.size ?? 0;
       } catch { /* ignore */ }
 
       const downloadedMedia: DownloadedMedia = {
@@ -141,9 +131,9 @@ class DownloadService {
       console.error('❌ Download error:', error);
       throw error;
     } finally {
-      if (activeDownload.pollInterval !== null) {
-        clearInterval(activeDownload.pollInterval);
-        activeDownload.pollInterval = null;
+      if (activeDownload.progressListener) {
+        await activeDownload.progressListener.remove();
+        activeDownload.progressListener = null;
       }
       this.downloads.delete(itemId);
       this.progressCallbacks.delete(itemId);

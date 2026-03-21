@@ -140,6 +140,11 @@
 
       <!-- ── SEASONS VIEW ── -->
       <template v-else-if="view === 'seasons' && selectedSeries">
+        <div class="flex justify-end mb-4">
+          <Button variant="destructive" size="sm" @click="deleteAllSeries(selectedSeries)">
+            <Trash2 class="size-3.5 mr-1" /> Delete series
+          </Button>
+        </div>
         <ul class="list-none p-0 m-0 grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-3 sm:grid-cols-[repeat(auto-fill,minmax(150px,1fr))] sm:gap-4">
           <li v-for="season in selectedSeries.seasons" :key="season.seasonId">
             <div class="cursor-pointer group active:scale-[0.97] active:opacity-75 transition-all duration-200" @click="openSeason(season)">
@@ -163,6 +168,11 @@
 
       <!-- ── EPISODES VIEW ── -->
       <template v-else-if="view === 'episodes' && selectedSeason">
+        <div class="flex justify-end mb-4">
+          <Button variant="destructive" size="sm" @click="deleteAllSeason(selectedSeason)">
+            <Trash2 class="size-3.5 mr-1" /> Delete season
+          </Button>
+        </div>
         <div class="flex flex-col gap-2">
           <div v-for="ep in selectedSeason.episodes" :key="ep.itemId"
             class="flex gap-3 p-3 rounded-xl border border-border-default bg-surface-raised hover:border-border-hover hover:bg-surface-hover transition-all duration-200">
@@ -297,6 +307,46 @@ function formatSize(bytes: number): string {
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+}
+
+async function deleteAllSeries(series: any) {
+  const count = totalEpisodes(series);
+  if (!confirm(`Delete all ${count} episode${count !== 1 ? 's' : ''} of "${series.seriesName}"?`)) return;
+  try {
+    for (const season of series.seasons) {
+      for (const ep of season.episodes) {
+        await downloadService.deleteOfflineFile(ep.itemId);
+        await offlineStore.removeDownload(ep.itemId);
+      }
+    }
+    view.value = 'root';
+    selectedSeries.value = null;
+  } catch {
+    alert('Failed to delete some episodes');
+  }
+}
+
+async function deleteAllSeason(season: any) {
+  const count = season.episodes.length;
+  if (!confirm(`Delete all ${count} episode${count !== 1 ? 's' : ''} of Season ${season.seasonNumber}?`)) return;
+  try {
+    for (const ep of season.episodes) {
+      await downloadService.deleteOfflineFile(ep.itemId);
+      await offlineStore.removeDownload(ep.itemId);
+    }
+    // Go back to seasons view; if no seasons left, go to root
+    const updated = offlineStore.tvShowsGrouped.find(s => s.seriesId === selectedSeries.value?.seriesId);
+    if (!updated || updated.seasons.length === 0) {
+      view.value = 'root';
+      selectedSeries.value = null;
+    } else {
+      selectedSeries.value = updated;
+      view.value = 'seasons';
+      selectedSeason.value = null;
+    }
+  } catch {
+    alert('Failed to delete some episodes');
+  }
 }
 
 async function deleteDownload(itemId: string, name: string) {

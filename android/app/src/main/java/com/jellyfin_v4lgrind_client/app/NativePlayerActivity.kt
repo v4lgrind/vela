@@ -445,7 +445,13 @@ class NativePlayerActivity : AppCompatActivity() {
         @Suppress("DEPRECATION")
         val defaultFactory = DefaultMediaSourceFactory(dataFactory)
 
-        val exo = ExoPlayer.Builder(this)
+        // Use FFmpeg audio decoder as fallback when the platform MediaCodec
+        // doesn't support a codec (e.g. EAC3+Dolby Atmos on some devices).
+        val renderersFactory = androidx.media3.exoplayer.DefaultRenderersFactory(this)
+            .setExtensionRendererMode(
+                androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON
+            )
+        val exo = ExoPlayer.Builder(this, renderersFactory)
             .setMediaSourceFactory(defaultFactory)
             .setAudioAttributes(audioAttr, true)
             .setWakeMode(C.WAKE_MODE_NETWORK)

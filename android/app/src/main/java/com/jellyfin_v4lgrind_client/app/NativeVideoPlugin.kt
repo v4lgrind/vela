@@ -165,6 +165,20 @@ class NativeVideoPlugin : Plugin() {
         call.resolve()
     }
 
+    @PluginMethod
+    fun getDeviceCodecs(call: PluginCall) {
+        val codecList = android.media.MediaCodecList(android.media.MediaCodecList.ALL_CODECS)
+        val audioCodecs = codecList.codecInfos
+            .filter { !it.isEncoder }
+            .flatMap { it.supportedTypes.toList() }
+            .filter { it.startsWith("audio/") }
+            .distinct()
+            .sorted()
+        val result = JSObject()
+        result.put("codecs", com.getcapacitor.JSArray(audioCodecs))
+        call.resolve(result)
+    }
+
     // ── Private helpers ────────────────────────────────────────────────────────
 
     private fun sendCommand(command: String) {

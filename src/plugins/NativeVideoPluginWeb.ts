@@ -20,4 +20,5 @@ export class NativeVideoPluginWeb extends WebPlugin implements NativeVideoPlugin
     async nativeLog(_options: { message: string }): Promise<void> {}
     async updateStreamInfo(_options: { streamInfo: string }): Promise<void> {}
     async updateQualityPresets(_options: { presets: string; selectedBitrate: number }): Promise<void> {}
+    async getDeviceCodecs(): Promise<{ codecs: string[] }> { return { codecs: [] }; }
 }

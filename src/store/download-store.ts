@@ -254,6 +254,21 @@ export const useDownloadStore = defineStore('downloads', {
             needsTranscode = true;
             break;
           }
+
+          // MIME type supported — also check HEVC profile/level (e.g. Main 10 / Level 5.1
+          // may exceed hardware decoder capabilities even if video/hevc is listed).
+          if ((codec === 'hevc' || codec === 'h265') && stream.Type === 'Video') {
+            const streamProfile = (stream.Profile || '') as string;
+            const streamLevel = (stream.Level as number) || 0;
+            if (streamProfile && streamLevel) {
+              const { supported } = await NativeVideo.canDecodeHevc({ profile: streamProfile, level: streamLevel });
+              if (!supported) {
+                console.log(`[DownloadStore] HEVC profile "${streamProfile}" level ${streamLevel} not supported — will transcode`);
+                needsTranscode = true;
+                break;
+              }
+            }
+          }
         }
 
         if (!needsTranscode) return undefined;
@@ -273,25 +288,33 @@ export const useDownloadStore = defineStore('downloads', {
             },
             body: JSON.stringify({
               DeviceProfile: {
-                // Force transcoding by providing a narrow profile
                 DirectPlayProfiles: [],
                 TranscodingProfiles: [
                   {
-                    Container: 'mp4',
+                    Container: 'mkv',
                     Type: 'Video',
                     VideoCodec: 'h264',
-                    AudioCodec: 'aac',
+                    // Broad list — Jellyfin copies compatible tracks, transcodes the rest to aac
+                    AudioCodec: 'aac,mp3,ac3,eac3,dts,flac,opus,pcm',
                     Context: 'Static',
                     Protocol: 'http',
                     CopyTimestamps: true,
+                    MaxAudioChannels: '8',
                   },
                 ],
+                SubtitleProfiles: [
+                  { Format: 'srt',    Method: 'Embed' },
+                  { Format: 'subrip', Method: 'Embed' },
+                  { Format: 'ass',    Method: 'Embed' },
+                  { Format: 'ssa',    Method: 'Embed' },
+                  { Format: 'pgs',    Method: 'Embed' },
+                  { Format: 'pgssub', Method: 'Embed' },
+                ],
                 CodecProfiles: [],
-                SubtitleProfiles: [],
               },
               MediaSourceId: itemId,
-              AllowVideoStreamCopy: false,
-              AllowAudioStreamCopy: false,
+              AllowVideoStreamCopy: false,  // always re-encode video to h264
+              AllowAudioStreamCopy: true,   // preserve original audio where possible
             }),
           }
         );

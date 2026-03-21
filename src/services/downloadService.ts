@@ -40,8 +40,8 @@ class DownloadService {
       return;
     }
 
-    // When transcoding, the server outputs an MP4/MKV container — use .mp4 extension
-    const extension = transcodedUrl ? 'mp4' : this.getFileExtension(metadata);
+    // When transcoding, the server outputs an MKV container (multi-track + subtitle support)
+    const extension = transcodedUrl ? 'mkv' : this.getFileExtension(metadata);
     const filename = this.sanitizeFilename(`${metadata.Name || itemId}.${extension}`);
     const filePath = this.buildFilePath(metadata, filename);
     const downloadUrl = transcodedUrl || `${serverUrl}/Items/${itemId}/Download?api_key=${accessToken}`;

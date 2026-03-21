@@ -445,11 +445,13 @@ class NativePlayerActivity : AppCompatActivity() {
         @Suppress("DEPRECATION")
         val defaultFactory = DefaultMediaSourceFactory(dataFactory)
 
-        // Use FFmpeg audio decoder as fallback when the platform MediaCodec
-        // doesn't support a codec (e.g. EAC3+Dolby Atmos on some devices).
+        // Prefer FFmpeg audio decoder over platform MediaCodec. The platform
+        // renderer claims EAC3 support based on MIME type but fails on Dolby
+        // Atmos (JOC) profiles at decode time. PREFER mode lets FFmpeg handle
+        // all audio — CPU cost for audio software decoding is negligible.
         val renderersFactory = androidx.media3.exoplayer.DefaultRenderersFactory(this)
             .setExtensionRendererMode(
-                androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON
+                androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
             )
         val exo = ExoPlayer.Builder(this, renderersFactory)
             .setMediaSourceFactory(defaultFactory)

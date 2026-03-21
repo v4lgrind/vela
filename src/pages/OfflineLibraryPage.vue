@@ -3,10 +3,11 @@
 
     <!-- Header -->
     <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-3 mb-5">
-      <Button variant="outline" class="justify-self-start flex items-center gap-1" @click="navigateBack">
+      <Button v-if="showBackButton" variant="outline" class="justify-self-start flex items-center gap-1" @click="navigateBack">
         <ArrowLeft class="size-4" />
         {{ backLabel }}
       </Button>
+      <div v-else></div>
       <h1 class="text-2xl font-semibold m-0 text-center truncate">{{ pageTitle }}</h1>
       <div class="justify-self-end"></div>
     </div>
@@ -208,6 +209,7 @@
 
 <script setup lang="ts">
 import { onMounted, computed, ref } from 'vue';
+import { useRouter, onBeforeRouteLeave } from 'vue-router';
 import { useOfflineStore } from '@/store/offline-store';
 import { useJellyfinStore } from '@/store/jellyfin-store';
 import { useDownloadStore } from '@/store/download-store';
@@ -237,6 +239,7 @@ const MediaCard = defineComponent({
   },
 });
 
+const router = useRouter();
 const offlineStore = useOfflineStore();
 const jellyfinStore = useJellyfinStore();
 const downloadStore = useDownloadStore();
@@ -257,14 +260,41 @@ const pageTitle = computed(() => {
 const backLabel = computed(() => {
   if (view.value === 'seasons') return 'Downloads';
   if (view.value === 'episodes') return selectedSeries.value?.seriesName ?? 'Back';
-  return 'Back';
+  return 'Library';
+});
+
+const showBackButton = computed(() => {
+  // At root, only show back button when online (navigates to library)
+  if (view.value === 'root') return offlineStore.isFullyOnline;
+  return true;
 });
 
 function navigateBack() {
   if (view.value === 'episodes') { view.value = 'seasons'; selectedSeason.value = null; return; }
   if (view.value === 'seasons') { view.value = 'root'; selectedSeries.value = null; return; }
-  history.back();
+  // At root: go to online library if reachable, otherwise stay here
+  if (offlineStore.isFullyOnline) {
+    router.push({ name: 'libraries' });
+  }
+  // When offline, there's nowhere to go — stay on the downloads page
 }
+
+// Intercept device back button when in a sub-view — navigate within the component instead of leaving
+onBeforeRouteLeave((_to, _from, next) => {
+  if (view.value === 'episodes') {
+    view.value = 'seasons';
+    selectedSeason.value = null;
+    next(false);
+    return;
+  }
+  if (view.value === 'seasons') {
+    view.value = 'root';
+    selectedSeries.value = null;
+    next(false);
+    return;
+  }
+  next();
+});
 
 function openSeries(series: any) {
   selectedSeries.value = series;

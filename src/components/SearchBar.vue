@@ -13,7 +13,7 @@
         style="padding-top: calc(14px + env(safe-area-inset-top, 0px)); padding-bottom: 14px">
         <button
           class="flex items-center gap-2 text-sm font-semibold text-text-heading hover:text-accent-purple transition-colors cursor-pointer"
-          @click="sidebarOpen = false; $router.push('/libraries')">
+          @click="sidebarOpen = false; goHome()">
           <Home class="size-4" />
           Home
         </button>
@@ -110,7 +110,7 @@
     </Button>
 
     <!-- Home -->
-    <Button variant="ghost" class="shrink-0 px-2 sm:px-3" aria-label="Go home" @click="$router.push('/')">
+    <Button variant="ghost" class="shrink-0 px-2 sm:px-3" aria-label="Go home" @click="goHome">
       <Home class="size-5 sm:size-4" />
     </Button>
 
@@ -303,6 +303,11 @@ function moveLibrary(id: string, direction: -1 | 1) {
 function goToLibrary(lib: any) {
     sidebarOpen.value = false;
     router.push(`/libraryItem/${encodeURIComponent(lib.Name)}/${lib.Id}`);
+}
+
+function goHome() {
+    const isOffline = !offlineStore.isFullyOnline || preferencesStore.forceOfflineMode;
+    router.push(isOffline ? '/offline' : '/libraries');
 }
 
 function goToSettings() {

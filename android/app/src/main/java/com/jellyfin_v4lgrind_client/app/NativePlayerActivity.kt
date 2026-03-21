@@ -248,6 +248,7 @@ class NativePlayerActivity : AppCompatActivity() {
         setContentView(R.layout.activity_native_player)
 
         playerView = findViewById(R.id.player_view)
+        playerView.visibility = View.INVISIBLE  // Hide until playback is ready
         controlsOverlay = findViewById(R.id.controls_overlay)
         btnBack = findViewById(R.id.btn_back)
         btnPlayPause = findViewById(R.id.btn_play_pause)
@@ -501,6 +502,7 @@ class NativePlayerActivity : AppCompatActivity() {
                 android.util.Log.d("NativePlayer", "onPlaybackStateChanged: $stateName pos=${exo.currentPosition}ms dur=${exo.duration}ms")
                 when (state) {
                     Player.STATE_READY -> {
+                        playerView.visibility = View.VISIBLE
                         loadingSpinner.visibility = View.GONE
                         if (!tracksReported) {
                             tracksReported = true

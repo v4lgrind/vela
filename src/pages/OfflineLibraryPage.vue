@@ -30,20 +30,31 @@
               <div class="font-medium text-text-heading truncate">{{ task.name }}</div>
               <div class="text-xs text-text-muted">
                 <template v-if="task.status === 'queued'">Queued…</template>
+                <template v-else-if="task.transcoding && task.total <= 0">
+                  Transcoding &amp; downloading… {{ formatSize(task.loaded) }}
+                </template>
                 <template v-else>{{ formatSize(task.loaded) }} / {{ formatSize(task.total) }}</template>
               </div>
             </div>
-            <Button variant="ghost" size="sm" @click="cancelDownload(task.itemId)" class="text-red-400 hover:text-red-300 hover:bg-red-500/10">
-              <X class="size-4" />
-            </Button>
+            <div class="flex items-center gap-1">
+              <Badge v-if="task.transcoding" class="bg-amber-500/20 text-amber-400 text-[0.65rem]">Transcoding</Badge>
+              <Button variant="ghost" size="sm" @click="cancelDownload(task.itemId)" class="text-red-400 hover:text-red-300 hover:bg-red-500/10">
+                <X class="size-4" />
+              </Button>
+            </div>
           </div>
           <div class="h-2 bg-white/10 rounded-full overflow-hidden">
-            <div class="h-full transition-all duration-300"
+            <!-- Indeterminate animation for transcoded downloads with unknown total -->
+            <div v-if="task.transcoding && task.total <= 0 && task.status === 'downloading'"
+              class="h-full bg-amber-500 rounded-full animate-indeterminate" />
+            <div v-else class="h-full transition-all duration-300"
               :class="task.status === 'queued' ? 'bg-white/20' : 'bg-accent-purple'"
               :style="{ width: task.status === 'queued' ? '100%' : `${task.progress}%` }" />
           </div>
-          <div class="text-right text-xs mt-1" :class="task.status === 'queued' ? 'text-text-muted' : 'text-accent-purple-light'">
-            {{ task.status === 'queued' ? 'Waiting' : `${task.progress}%` }}
+          <div class="text-right text-xs mt-1" :class="task.transcoding && task.total <= 0 ? 'text-amber-400' : task.status === 'queued' ? 'text-text-muted' : 'text-accent-purple-light'">
+            <template v-if="task.status === 'queued'">Waiting</template>
+            <template v-else-if="task.transcoding && task.total <= 0">{{ formatSize(task.loaded) }} downloaded</template>
+            <template v-else>{{ task.progress }}%</template>
           </div>
         </Card>
       </div>
@@ -438,3 +449,14 @@ onMounted(async () => {
   }
 });
 </script>
+
+<style scoped>
+@keyframes indeterminate {
+  0% { width: 15%; margin-left: -15%; }
+  50% { width: 40%; }
+  100% { width: 15%; margin-left: 100%; }
+}
+.animate-indeterminate {
+  animation: indeterminate 1.5s ease-in-out infinite;
+}
+</style>

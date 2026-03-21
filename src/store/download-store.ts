@@ -17,6 +17,7 @@ export interface DownloadTask {
   status: 'queued' | 'downloading' | 'completed' | 'failed' | 'cancelled';
   error?: string;
   startedAt: number;
+  transcoding?: boolean;
 }
 
 interface DownloadStoreState {
@@ -139,6 +140,9 @@ export const useDownloadStore = defineStore('downloads', {
         let transcodedUrl: string | undefined;
         if (Capacitor.isNativePlatform()) {
           transcodedUrl = await this._getTranscodeUrlIfNeeded(itemId, metadata, jellyfinStore);
+          if (transcodedUrl) {
+            task.transcoding = true;
+          }
         }
 
         await downloadService.downloadForOffline(
@@ -149,7 +153,7 @@ export const useDownloadStore = defineStore('downloads', {
           (progress) => {
             const t = this.tasks.get(itemId);
             if (t) {
-              t.progress = progress.percentage;
+              t.progress = progress.percentage >= 0 ? progress.percentage : 0;
               t.loaded = progress.loaded;
               t.total = progress.total;
             }

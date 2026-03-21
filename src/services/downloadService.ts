@@ -50,8 +50,6 @@ class DownloadService {
       console.log('📥 Native download:', filename);
     }
 
-    console.log('📥 Native download:', filename);
-
     if (onProgress) this.progressCallbacks.set(itemId, onProgress);
 
     const activeDownload: ActiveDownload = { aborted: false, progressListener: null };
@@ -65,7 +63,9 @@ class DownloadService {
         if (callback) {
           const loaded = event.bytes;
           const total = event.contentLength;
-          const percentage = total > 0 ? Math.min(99, Math.round((loaded / total) * 100)) : 0;
+          // Transcoded streams use chunked transfer — no Content-Length.
+          // Report loaded bytes with percentage = -1 so the UI can show indeterminate progress.
+          const percentage = total > 0 ? Math.min(99, Math.round((loaded / total) * 100)) : -1;
           callback({ itemId, filename, loaded, total, percentage });
         }
       });

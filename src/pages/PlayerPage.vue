@@ -1959,16 +1959,24 @@ onMounted(async () => {
                 debugLog(`[Codec] Preferred audio codec "${preferred.Codec}" not natively supported — requesting server transcode`);
                 forceTranscodeAudio = true;
             }
-            // Dolby Vision video check — DV Profile 8 NAL units crash HEVC decoders
-            // on devices without DV support
+            // Video codec check — detect any unsupported video codec
             const videoStream = allStreams.find(s => s.Type === 'Video');
-            if (videoStream) {
+            if (videoStream && !forceTranscodeVideo) {
                 const videoCodec = (videoStream.Codec || '').toLowerCase();
                 const videoProfile = (videoStream.Profile || '').toLowerCase();
+                // DV detection: Jellyfin may report codec as "hevc" with DV profile
                 const isDV = videoCodec.includes('dvhe') || videoCodec.includes('dvh1') ||
-                             videoProfile.includes('dolby vision') || videoProfile.includes('dolby-vision');
-                if (isDV && !deviceCodecs.includes('video/dolby-vision')) {
-                    debugLog(`[Codec] Dolby Vision video not supported — requesting server transcode (codec=${videoStream.Codec} profile=${videoStream.Profile})`);
+                             videoProfile.includes('dolby vision');
+                const VIDEO_MIME: Record<string, string> = {
+                    dvhe: 'video/dolby-vision', dvh1: 'video/dolby-vision',
+                    hevc: 'video/hevc', h265: 'video/hevc',
+                    h264: 'video/avc', avc: 'video/avc',
+                    vp8: 'video/x-vnd.on2.vp8', vp9: 'video/x-vnd.on2.vp9',
+                    av1: 'video/av01',
+                };
+                const effectiveMime = isDV ? 'video/dolby-vision' : VIDEO_MIME[videoCodec];
+                if (effectiveMime && !deviceCodecs.includes(effectiveMime)) {
+                    debugLog(`[Codec] Video codec "${videoStream.Codec}" (${effectiveMime}) not supported — requesting server transcode`);
                     forceTranscodeVideo = true;
                 }
             }

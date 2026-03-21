@@ -30,17 +30,25 @@ class DownloadService {
     itemId: string,
     accessToken: string,
     metadata: any,
-    onProgress?: (progress: DownloadProgress) => void
+    onProgress?: (progress: DownloadProgress) => void,
+    transcodedUrl?: string
   ): Promise<void> {
     if (this.downloads.has(itemId)) {
       console.log('Already downloading:', itemId);
       return;
     }
 
-    const extension = this.getFileExtension(metadata);
+    // When transcoding, the server outputs an MP4/MKV container — use .mp4 extension
+    const extension = transcodedUrl ? 'mp4' : this.getFileExtension(metadata);
     const filename = this.sanitizeFilename(`${metadata.Name || itemId}.${extension}`);
     const filePath = this.buildFilePath(metadata, filename);
-    const downloadUrl = `${serverUrl}/Items/${itemId}/Download?api_key=${accessToken}`;
+    const downloadUrl = transcodedUrl || `${serverUrl}/Items/${itemId}/Download?api_key=${accessToken}`;
+
+    if (transcodedUrl) {
+      console.log('📥 Transcoded download:', filename);
+    } else {
+      console.log('📥 Native download:', filename);
+    }
 
     console.log('📥 Native download:', filename);
 

@@ -19,6 +19,8 @@ interface ActiveDownload {
 class DownloadService {
   private downloads: Map<string, ActiveDownload> = new Map();
   private progressCallbacks: Map<string, (progress: DownloadProgress) => void> = new Map();
+  /** Map download URLs to item IDs for progress event routing */
+  private urlToItemId: Map<string, string> = new Map();
 
   /**
    * Download file for offline use.
@@ -54,11 +56,26 @@ class DownloadService {
 
     const activeDownload: ActiveDownload = { aborted: false, progressListener: null };
     this.downloads.set(itemId, activeDownload);
+    this.urlToItemId.set(downloadUrl, itemId);
 
-    // Listen for Capacitor progress events, filtered by this download's URL
+    // Listen for Capacitor progress events.
+    // URL matching is lenient: we check if the event URL contains our itemId
+    // because Capacitor may encode/normalize URLs differently (especially transcoded ones).
     try {
       activeDownload.progressListener = await Filesystem.addListener('progress', (event) => {
-        if (event.url !== downloadUrl) return;
+        // Try exact match first, then check if event URL contains our download URL's path
+        let matchedId = this.urlToItemId.get(event.url);
+        if (!matchedId) {
+          // Fallback: match by itemId in URL (covers encoding differences)
+          for (const [url, id] of this.urlToItemId) {
+            if (event.url?.includes(itemId) || url === event.url) {
+              matchedId = id;
+              break;
+            }
+          }
+        }
+        if (matchedId !== itemId) return;
+
         const callback = this.progressCallbacks.get(itemId);
         if (callback) {
           const loaded = event.bytes;
@@ -70,6 +87,24 @@ class DownloadService {
         }
       });
     } catch { /* listener setup failed — progress just won't update */ }
+
+    // For transcoded downloads, poll file size as a fallback since
+    // Capacitor progress events may not fire for chunked responses.
+    let sizePollInterval: ReturnType<typeof setInterval> | null = null;
+    if (transcodedUrl && onProgress) {
+      sizePollInterval = setInterval(async () => {
+        try {
+          const stat = await Filesystem.stat({ path: filePath, directory: Directory.Data });
+          const size = stat.size ?? 0;
+          if (size > 0) {
+            const callback = this.progressCallbacks.get(itemId);
+            if (callback) {
+              callback({ itemId, filename, loaded: size, total: 0, percentage: -1 });
+            }
+          }
+        } catch { /* file may not exist yet */ }
+      }, 2000);
+    }
 
     try {
       // Ensure directory exists
@@ -139,12 +174,14 @@ class DownloadService {
       console.error('❌ Download error:', error);
       throw error;
     } finally {
+      if (sizePollInterval) clearInterval(sizePollInterval);
       if (activeDownload.progressListener) {
         await activeDownload.progressListener.remove();
         activeDownload.progressListener = null;
       }
       this.downloads.delete(itemId);
       this.progressCallbacks.delete(itemId);
+      this.urlToItemId.delete(downloadUrl);
     }
   }
 

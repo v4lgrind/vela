@@ -98,6 +98,7 @@ export const useDownloadStore = defineStore('downloads', {
         total: 0,
         status: 'queued',
         startedAt: Date.now(),
+        transcoding: false,
       };
 
       this.tasks.set(itemId, task);

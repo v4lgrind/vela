@@ -208,6 +208,16 @@ class NativePlayerActivity : AppCompatActivity() {
     private var introEndMs = -1L
     private var introSkipped = false
 
+    // Dolby Vision → HEVC fallback: when the device can't decode DV profile 8,
+    // restart with a codec selector that maps video/dolby-vision → video/hevc.
+    private var dvFallbackMode = false
+
+    // Store build parameters so we can rebuild the player for DV fallback.
+    private var buildUrl = ""
+    private var buildAuthHeader = ""
+    private var buildPlayMethod = ""
+    private var buildSubtitleTracksJson = "[]"
+
     // Audio switch fallback — set when user picks a new audio track; cleared on error or after a
     // short window (decoder errors surface within ~1 s; 4 s gives ample margin).
     private var audioSwitchPendingGroupIndex = -1
@@ -412,6 +422,12 @@ class NativePlayerActivity : AppCompatActivity() {
         playMethod: String,
         subtitleTracksJson: String
     ) {
+        // Store params for potential DV fallback rebuild
+        buildUrl = url
+        buildAuthHeader = authHeader
+        buildPlayMethod = playMethod
+        buildSubtitleTracksJson = subtitleTracksJson
+
         val httpFactory = DefaultHttpDataSource.Factory()
             .setDefaultRequestProperties(mapOf("Authorization" to authHeader))
         val dataFactory = DefaultDataSource.Factory(this, httpFactory)
@@ -453,6 +469,16 @@ class NativePlayerActivity : AppCompatActivity() {
             .setExtensionRendererMode(
                 androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
             )
+
+        // When DV fallback is active, remap video/dolby-vision → video/hevc so
+        // the platform HEVC decoder handles the base layer (DV Profile 8 is HEVC-based).
+        if (dvFallbackMode) {
+            debugLog("[DVFallback] Using HEVC codec selector for Dolby Vision content")
+            renderersFactory.setMediaCodecSelector { mimeType, requiresSecureDecoder, requiresTunnelingDecoder ->
+                val effectiveMime = if (mimeType == MimeTypes.VIDEO_DOLBY_VISION) MimeTypes.VIDEO_H265 else mimeType
+                androidx.media3.exoplayer.mediacodec.MediaCodecUtil.getDecoderInfos(effectiveMime, requiresSecureDecoder, requiresTunnelingDecoder)
+            }
+        }
         val exo = ExoPlayer.Builder(this, renderersFactory)
             .setMediaSourceFactory(defaultFactory)
             .setAudioAttributes(audioAttr, true)
@@ -517,6 +543,25 @@ class NativePlayerActivity : AppCompatActivity() {
                     debugLog("[AudioCrash]   cause[$depth]: ${c.javaClass.name}: ${c.message}")
                     c = c.cause; depth++
                 }
+                // Dolby Vision video decode failure → restart with HEVC fallback
+                if (!dvFallbackMode && isDolbyVisionVideoError(error)) {
+                    val resumeMs = player?.currentPosition ?: 0L
+                    debugLog("[DVFallback] DV video decode failed, restarting with HEVC fallback at ${resumeMs}ms")
+                    dvFallbackMode = true
+                    // Release current player and rebuild
+                    handler.removeCallbacks(progressRunnable)
+                    handler.removeCallbacks(seekBarUpdateRunnable)
+                    player?.release()
+                    player = null
+                    tracksReported = false
+                    audioTrackGroups.clear()
+                    subtitleTrackGroups.clear()
+                    selectedAudioGroupIndex = -1
+                    selectedSubtitleGroupIndex = -1
+                    buildPlayer(buildUrl, buildAuthHeader, resumeMs, buildPlayMethod, buildSubtitleTracksJson)
+                    return
+                }
+
                 handler.removeCallbacks(clearAudioSwitchPending)
                 val pendingIdx = audioSwitchPendingGroupIndex
                 val pendingLang = audioSwitchPendingLanguage
@@ -993,6 +1038,23 @@ class NativePlayerActivity : AppCompatActivity() {
         intent.putExtra("message", msg)
         intent.setPackage(packageName)
         sendBroadcast(intent)
+    }
+
+    /** Returns true when the error is a Dolby Vision video decode failure (e.g. DV Profile 8
+     *  on a device without DV support — the HEVC base layer can still be decoded). */
+    private fun isDolbyVisionVideoError(error: androidx.media3.common.PlaybackException): Boolean {
+        val msg = buildString {
+            append(error.message ?: "")
+            var c: Throwable? = error.cause
+            while (c != null) { append(' ').append(c.message ?: ""); c = c.cause }
+        }
+        return (msg.contains("VideoRenderer", ignoreCase = true) ||
+                msg.contains("VideoDecoder", ignoreCase = true) ||
+                msg.contains("MediaCodecVideoRenderer", ignoreCase = true) ||
+                msg.contains("MediaCodecVideoDecoder", ignoreCase = true)) &&
+               (msg.contains("dolby-vision", ignoreCase = true) ||
+                msg.contains("dolby_vision", ignoreCase = true) ||
+                msg.contains("dvhe", ignoreCase = true))
     }
 
     /** Returns true when the error is identifiable as an audio renderer/sink failure. */

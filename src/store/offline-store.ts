@@ -181,6 +181,14 @@ export const useOfflineStore = defineStore('offline', {
     },
 
     /**
+     * Re-check server reachability right now and return true if fully online.
+     */
+    async recheckOnline(): Promise<boolean> {
+      await offlineDetection.checkNow();
+      return offlineDetection.isFullyOnline;
+    },
+
+    /**
      * Load downloads from IndexedDB
      */
     async loadDownloads() {

@@ -279,6 +279,34 @@ class DownloadService {
     }
   }
 
+  /**
+   * Cache a single artwork image by item ID. Used to backfill artwork for
+   * downloads that were created before artwork caching was added.
+   */
+  async cacheArtworkById(serverUrl: string, accessToken: string, itemId: string): Promise<void> {
+    const imgPath = `Jellyfin V4lgrind/Images/${itemId}_Primary.jpg`;
+    try {
+      // Skip if already cached
+      await Filesystem.stat({ path: imgPath, directory: Directory.Data });
+      return;
+    } catch { /* not cached yet */ }
+
+    const imgUrl = `${serverUrl}/Items/${itemId}/Images/Primary?maxWidth=400&quality=80&api_key=${accessToken}`;
+    try {
+      const dirPath = imgPath.substring(0, imgPath.lastIndexOf('/'));
+      try {
+        await Filesystem.mkdir({ path: dirPath, directory: Directory.Data, recursive: true });
+      } catch { /* may exist */ }
+
+      await Filesystem.downloadFile({
+        url: imgUrl,
+        path: imgPath,
+        directory: Directory.Data,
+        progress: false,
+      });
+    } catch { /* non-critical */ }
+  }
+
   cancelDownload(itemId: string): void {
     const download = this.downloads.get(itemId);
     if (download) {

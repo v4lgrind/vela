@@ -320,20 +320,41 @@ async function deleteDownload(itemId: string, name: string) {
 onMounted(async () => {
   await offlineStore.loadDownloads();
 
-  // Preload cached artwork URLs for offline display
+  // Collect all image IDs we need (items + series + seasons)
   const imageIds = new Set<string>();
   for (const d of offlineStore.downloads) {
     imageIds.add(d.itemId);
     if (d.seriesId) imageIds.add(d.seriesId);
     if (d.seasonId) imageIds.add(d.seasonId);
   }
+
+  // Preload cached artwork URLs for offline display
   const urlMap = new Map<string, string>();
+  const missingIds: string[] = [];
   await Promise.all(
     Array.from(imageIds).map(async (id) => {
       const url = await downloadService.getCachedImageUrl(id);
       if (url) urlMap.set(id, url);
+      else missingIds.push(id);
     })
   );
   cachedImageUrls.value = urlMap;
+
+  // Backfill missing artwork when online (for downloads created before caching was added)
+  if (missingIds.length > 0 && offlineStore.isFullyOnline) {
+    const serverUrl = jellyfinStore.serverUrl;
+    const token = jellyfinStore.accessToken;
+    if (serverUrl && token) {
+      Promise.all(
+        missingIds.map(async (id) => {
+          await downloadService.cacheArtworkById(serverUrl, token, id);
+          const url = await downloadService.getCachedImageUrl(id);
+          if (url) {
+            cachedImageUrls.value = new Map([...cachedImageUrls.value, [id, url]]);
+          }
+        })
+      ).catch(() => {});
+    }
+  }
 });
 </script>

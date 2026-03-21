@@ -94,9 +94,15 @@ router.beforeEach(async (to, _from, next) => {
   else if (to.name === "login" && isAuthenticated) {
     next({ name: "libraries" });
   }
-  // Block server-browsing routes when offline — only downloaded content is accessible
+  // Block server-browsing routes when offline — only downloaded content is accessible.
+  // Do a fresh server check first to avoid stale state from the 30 s ping interval.
   else if (isOffline && (to.name === "libraries" || to.name === "libraryItem")) {
-    next({ name: "offline" });
+    const stillOffline = !(await offlineStore.recheckOnline());
+    if (stillOffline) {
+      next({ name: "offline" });
+    } else {
+      next();
+    }
   }
   // Redirect audio items away from the video player route (skip when offline to avoid server calls)
   else if (!isOffline && to.name === "Player" && to.params.id) {

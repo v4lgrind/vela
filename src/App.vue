@@ -86,6 +86,13 @@ onMounted(async () => {
 
   if (Capacitor.isNativePlatform()) {
     await CapacitorApp.addListener("backButton", ({ canGoBack }) => {
+      // On the offline library page in offline mode, back should exit the app
+      // (sub-view navigation is handled inside the component)
+      const isOffline = !offlineStore.isFullyOnline || preferencesStore.forceOfflineMode;
+      if (isOffline && route.name === 'offline') {
+        CapacitorApp.exitApp();
+        return;
+      }
       if (route.path === "/" || !canGoBack) {
         CapacitorApp.exitApp();
       } else {

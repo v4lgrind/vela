@@ -57,6 +57,7 @@ class NativePlayerActivity : AppCompatActivity() {
         const val ACTION_QUALITY_SELECTED = "com.jellyfin_v4lgrind_client.app.QUALITY_SELECTED"
         const val ACTION_AUDIO_ERROR = "com.jellyfin_v4lgrind_client.app.AUDIO_ERROR"
         const val ACTION_AUDIO_SWITCH_JELLYFIN = "com.jellyfin_v4lgrind_client.app.AUDIO_SWITCH_JELLYFIN"
+        const val ACTION_VIDEO_ERROR = "com.jellyfin_v4lgrind_client.app.VIDEO_ERROR"
         const val ACTION_DEBUG_LOG = "com.jellyfin_v4lgrind_client.app.DEBUG_LOG"
 
         const val EXTRA_AUDIO_TRACKS = "audioTracks"
@@ -208,6 +209,16 @@ class NativePlayerActivity : AppCompatActivity() {
     private var introEndMs = -1L
     private var introSkipped = false
 
+    // Dolby Vision → HEVC fallback: when the device can't decode DV profile 8,
+    // restart with a codec selector that maps video/dolby-vision → video/hevc.
+    private var dvFallbackMode = false
+
+    // Store build parameters so we can rebuild the player for DV fallback.
+    private var buildUrl = ""
+    private var buildAuthHeader = ""
+    private var buildPlayMethod = ""
+    private var buildSubtitleTracksJson = "[]"
+
     // Audio switch fallback — set when user picks a new audio track; cleared on error or after a
     // short window (decoder errors surface within ~1 s; 4 s gives ample margin).
     private var audioSwitchPendingGroupIndex = -1
@@ -237,6 +248,7 @@ class NativePlayerActivity : AppCompatActivity() {
         setContentView(R.layout.activity_native_player)
 
         playerView = findViewById(R.id.player_view)
+        playerView.visibility = View.INVISIBLE  // Hide until playback is ready
         controlsOverlay = findViewById(R.id.controls_overlay)
         btnBack = findViewById(R.id.btn_back)
         btnPlayPause = findViewById(R.id.btn_play_pause)
@@ -412,6 +424,12 @@ class NativePlayerActivity : AppCompatActivity() {
         playMethod: String,
         subtitleTracksJson: String
     ) {
+        // Store params for potential DV fallback rebuild
+        buildUrl = url
+        buildAuthHeader = authHeader
+        buildPlayMethod = playMethod
+        buildSubtitleTracksJson = subtitleTracksJson
+
         val httpFactory = DefaultHttpDataSource.Factory()
             .setDefaultRequestProperties(mapOf("Authorization" to authHeader))
         val dataFactory = DefaultDataSource.Factory(this, httpFactory)
@@ -445,7 +463,16 @@ class NativePlayerActivity : AppCompatActivity() {
         @Suppress("DEPRECATION")
         val defaultFactory = DefaultMediaSourceFactory(dataFactory)
 
-        val exo = ExoPlayer.Builder(this)
+        // Prefer FFmpeg audio decoder over platform MediaCodec. The platform
+        // renderer claims EAC3 support based on MIME type but fails on Dolby
+        // Atmos (JOC) profiles at decode time. PREFER mode lets FFmpeg handle
+        // all audio — CPU cost for audio software decoding is negligible.
+        val renderersFactory = androidx.media3.exoplayer.DefaultRenderersFactory(this)
+            .setExtensionRendererMode(
+                androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
+            )
+
+        val exo = ExoPlayer.Builder(this, renderersFactory)
             .setMediaSourceFactory(defaultFactory)
             .setAudioAttributes(audioAttr, true)
             .setWakeMode(C.WAKE_MODE_NETWORK)
@@ -475,6 +502,7 @@ class NativePlayerActivity : AppCompatActivity() {
                 android.util.Log.d("NativePlayer", "onPlaybackStateChanged: $stateName pos=${exo.currentPosition}ms dur=${exo.duration}ms")
                 when (state) {
                     Player.STATE_READY -> {
+                        playerView.visibility = View.VISIBLE
                         loadingSpinner.visibility = View.GONE
                         if (!tracksReported) {
                             tracksReported = true
@@ -509,6 +537,23 @@ class NativePlayerActivity : AppCompatActivity() {
                     debugLog("[AudioCrash]   cause[$depth]: ${c.javaClass.name}: ${c.message}")
                     c = c.cause; depth++
                 }
+                // Dolby Vision video decode failure → tell Vue to restart with
+                // server-side transcoding (online) or show error (offline).
+                // The device's HEVC decoder can't handle DV Profile 8 NAL units.
+                if (!dvFallbackMode && isDolbyVisionVideoError(error)) {
+                    dvFallbackMode = true
+                    val resumeMs = player?.currentPosition ?: 0L
+                    debugLog("[DVFallback] DV video decode failed, notifying Vue to transcode (resumeMs=$resumeMs)")
+                    stoppedSent = true // prevent the generic stopped broadcast
+                    val intent = Intent(ACTION_VIDEO_ERROR)
+                    intent.putExtra("reason", "dolby_vision_unsupported")
+                    intent.putExtra("positionMs", resumeMs)
+                    intent.setPackage(packageName)
+                    sendBroadcast(intent)
+                    finish()
+                    return
+                }
+
                 handler.removeCallbacks(clearAudioSwitchPending)
                 val pendingIdx = audioSwitchPendingGroupIndex
                 val pendingLang = audioSwitchPendingLanguage
@@ -985,6 +1030,23 @@ class NativePlayerActivity : AppCompatActivity() {
         intent.putExtra("message", msg)
         intent.setPackage(packageName)
         sendBroadcast(intent)
+    }
+
+    /** Returns true when the error is a Dolby Vision video decode failure (e.g. DV Profile 8
+     *  on a device without DV support — the HEVC base layer can still be decoded). */
+    private fun isDolbyVisionVideoError(error: androidx.media3.common.PlaybackException): Boolean {
+        val msg = buildString {
+            append(error.message ?: "")
+            var c: Throwable? = error.cause
+            while (c != null) { append(' ').append(c.message ?: ""); c = c.cause }
+        }
+        return (msg.contains("VideoRenderer", ignoreCase = true) ||
+                msg.contains("VideoDecoder", ignoreCase = true) ||
+                msg.contains("MediaCodecVideoRenderer", ignoreCase = true) ||
+                msg.contains("MediaCodecVideoDecoder", ignoreCase = true)) &&
+               (msg.contains("dolby-vision", ignoreCase = true) ||
+                msg.contains("dolby_vision", ignoreCase = true) ||
+                msg.contains("dvhe", ignoreCase = true))
     }
 
     /** Returns true when the error is identifiable as an audio renderer/sink failure. */

@@ -1,6 +1,7 @@
 import { offlineDatabase, type DownloadedMedia } from './offlineDatabase';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Capacitor } from '@capacitor/core';
+import type { PluginListenerHandle } from '@capacitor/core';
 
 interface DownloadProgress {
   itemId: string;
@@ -12,66 +13,98 @@ interface DownloadProgress {
 
 interface ActiveDownload {
   aborted: boolean;
-  pollInterval: ReturnType<typeof setInterval> | null;
+  progressListener: PluginListenerHandle | null;
 }
 
 class DownloadService {
   private downloads: Map<string, ActiveDownload> = new Map();
   private progressCallbacks: Map<string, (progress: DownloadProgress) => void> = new Map();
+  /** Map download URLs to item IDs for progress event routing */
+  private urlToItemId: Map<string, string> = new Map();
 
   /**
    * Download file for offline use.
-   * Progress is tracked by polling the file size on disk every 500 ms — this avoids
-   * the global Filesystem 'progress' event channel which cannot distinguish between
-   * concurrent downloads and causes flickering when multiple run at once.
+   * Progress is tracked via Capacitor's built-in progress event, filtered by
+   * download URL so concurrent downloads report independently.
    */
   async downloadForOffline(
     serverUrl: string,
     itemId: string,
     accessToken: string,
     metadata: any,
-    onProgress?: (progress: DownloadProgress) => void
+    onProgress?: (progress: DownloadProgress) => void,
+    transcodedUrl?: string
   ): Promise<void> {
     if (this.downloads.has(itemId)) {
       console.log('Already downloading:', itemId);
       return;
     }
 
-    const extension = this.getFileExtension(metadata);
+    // When transcoding, the server outputs an MP4/MKV container — use .mp4 extension
+    const extension = transcodedUrl ? 'mp4' : this.getFileExtension(metadata);
     const filename = this.sanitizeFilename(`${metadata.Name || itemId}.${extension}`);
     const filePath = this.buildFilePath(metadata, filename);
-    const downloadUrl = `${serverUrl}/Items/${itemId}/Download?api_key=${accessToken}`;
+    const downloadUrl = transcodedUrl || `${serverUrl}/Items/${itemId}/Download?api_key=${accessToken}`;
 
-    console.log('📥 Native download:', filename);
+    if (transcodedUrl) {
+      console.log('📥 Transcoded download:', filename);
+    } else {
+      console.log('📥 Native download:', filename);
+    }
 
     if (onProgress) this.progressCallbacks.set(itemId, onProgress);
 
-    const activeDownload: ActiveDownload = { aborted: false, pollInterval: null };
+    const activeDownload: ActiveDownload = { aborted: false, progressListener: null };
     this.downloads.set(itemId, activeDownload);
+    this.urlToItemId.set(downloadUrl, itemId);
 
-    // Fetch total size in background so we can show accurate percentage
-    let totalBytes = 0;
-    fetch(downloadUrl, { method: 'HEAD' })
-      .then(r => {
-        const cl = r.headers.get('content-length');
-        if (cl) totalBytes = parseInt(cl, 10);
-      })
-      .catch(() => {});
+    // Listen for Capacitor progress events.
+    // URL matching is lenient: we check if the event URL contains our itemId
+    // because Capacitor may encode/normalize URLs differently (especially transcoded ones).
+    try {
+      activeDownload.progressListener = await Filesystem.addListener('progress', (event) => {
+        // Try exact match first, then check if event URL contains our download URL's path
+        let matchedId = this.urlToItemId.get(event.url);
+        if (!matchedId) {
+          // Fallback: match by itemId in URL (covers encoding differences)
+          for (const [url, id] of this.urlToItemId) {
+            if (event.url?.includes(itemId) || url === event.url) {
+              matchedId = id;
+              break;
+            }
+          }
+        }
+        if (matchedId !== itemId) return;
 
-    // Poll file size on disk every 500 ms — one interval per download, fully isolated
-    activeDownload.pollInterval = setInterval(async () => {
-      if (!this.downloads.has(itemId)) return;
-      try {
-        const stat = await Filesystem.stat({ path: filePath, directory: Directory.Data });
         const callback = this.progressCallbacks.get(itemId);
         if (callback) {
-          const loaded = stat.size ?? 0;
-          const total = totalBytes || 0;
-          const percentage = total > 0 ? Math.min(99, Math.round((loaded / total) * 100)) : 0;
+          const loaded = event.bytes || 0;
+          const total = (event.contentLength && event.contentLength > 0) ? event.contentLength : 0;
+          // Transcoded streams use chunked transfer — no Content-Length.
+          // Report loaded bytes with percentage = -1 so the UI can show indeterminate progress.
+          const percentage = total > 0 ? Math.min(99, Math.round((loaded / total) * 100)) : -1;
           callback({ itemId, filename, loaded, total, percentage });
         }
-      } catch { /* file not created yet — fine */ }
-    }, 500);
+      });
+    } catch { /* listener setup failed — progress just won't update */ }
+
+    // For transcoded downloads, poll file size as a fallback since
+    // Capacitor progress events may not fire for chunked responses.
+    let sizePollInterval: ReturnType<typeof setInterval> | null = null;
+    if (transcodedUrl && onProgress) {
+      sizePollInterval = setInterval(async () => {
+        try {
+          const stat = await Filesystem.stat({ path: filePath, directory: Directory.Data });
+          const size = stat.size ?? 0;
+          if (size > 0) {
+            const callback = this.progressCallbacks.get(itemId);
+            if (callback) {
+              callback({ itemId, filename, loaded: size, total: 0, percentage: -1 });
+            }
+          }
+        } catch { /* file may not exist yet */ }
+      }, 2000);
+    }
 
     try {
       // Ensure directory exists
@@ -84,7 +117,7 @@ class DownloadService {
         url: downloadUrl,
         path: filePath,
         directory: Directory.Data,
-        progress: false,
+        progress: true,
       });
 
       if (activeDownload.aborted) {
@@ -94,10 +127,10 @@ class DownloadService {
       console.log('💾 Native download complete:', filePath);
 
       // Actual file size after completion
-      let fileSize = totalBytes;
+      let fileSize = 0;
       try {
         const stat = await Filesystem.stat({ path: filePath, directory: Directory.Data });
-        fileSize = stat.size ?? totalBytes;
+        fileSize = stat.size ?? 0;
       } catch { /* ignore */ }
 
       const downloadedMedia: DownloadedMedia = {
@@ -124,6 +157,9 @@ class DownloadService {
       await offlineDatabase.addDownload(downloadedMedia);
       console.log('✅ Download complete:', filename);
 
+      // Cache artwork images for offline display (fire-and-forget, don't block)
+      this.cacheArtwork(serverUrl, accessToken, metadata).catch(() => {});
+
       // Final 100% callback
       const callback = this.progressCallbacks.get(itemId);
       if (callback) callback({ itemId, filename, loaded: fileSize, total: fileSize, percentage: 100 });
@@ -138,12 +174,14 @@ class DownloadService {
       console.error('❌ Download error:', error);
       throw error;
     } finally {
-      if (activeDownload.pollInterval !== null) {
-        clearInterval(activeDownload.pollInterval);
-        activeDownload.pollInterval = null;
+      if (sizePollInterval) clearInterval(sizePollInterval);
+      if (activeDownload.progressListener) {
+        await activeDownload.progressListener.remove();
+        activeDownload.progressListener = null;
       }
       this.downloads.delete(itemId);
       this.progressCallbacks.delete(itemId);
+      this.urlToItemId.delete(downloadUrl);
     }
   }
 
@@ -220,6 +258,88 @@ class DownloadService {
       default:
         return `${root}/${filename}`;
     }
+  }
+
+  /**
+   * Download artwork images for offline display.
+   * Caches the primary image for the item, plus series/season images for episodes.
+   */
+  private async cacheArtwork(serverUrl: string, accessToken: string, metadata: any): Promise<void> {
+    const imageIds: string[] = [metadata.Id];
+
+    // For episodes, also cache series and season artwork
+    if (metadata.Type === 'Episode') {
+      if (metadata.SeriesId) imageIds.push(metadata.SeriesId);
+      if (metadata.SeasonId) imageIds.push(metadata.SeasonId);
+    }
+
+    for (const id of imageIds) {
+      const imgPath = `Jellyfin V4lgrind/Images/${id}_Primary.jpg`;
+      try {
+        // Skip if already cached
+        await Filesystem.stat({ path: imgPath, directory: Directory.Data });
+        continue;
+      } catch { /* not cached yet */ }
+
+      const imgUrl = `${serverUrl}/Items/${id}/Images/Primary?maxWidth=400&quality=80&api_key=${accessToken}`;
+      try {
+        const dirPath = imgPath.substring(0, imgPath.lastIndexOf('/'));
+        try {
+          await Filesystem.mkdir({ path: dirPath, directory: Directory.Data, recursive: true });
+        } catch { /* may exist */ }
+
+        await Filesystem.downloadFile({
+          url: imgUrl,
+          path: imgPath,
+          directory: Directory.Data,
+          progress: false,
+        });
+      } catch {
+        // Non-critical — artwork just won't be available offline
+      }
+    }
+  }
+
+  /**
+   * Get a WebView-accessible URL for a cached artwork image.
+   * Returns null if the image is not cached locally.
+   */
+  async getCachedImageUrl(itemId: string): Promise<string | null> {
+    const imgPath = `Jellyfin V4lgrind/Images/${itemId}_Primary.jpg`;
+    try {
+      const fileInfo = await Filesystem.getUri({ path: imgPath, directory: Directory.Data });
+      return Capacitor.convertFileSrc(fileInfo.uri);
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Cache a single artwork image by item ID. Used to backfill artwork for
+   * downloads that were created before artwork caching was added.
+   */
+  async cacheArtworkById(serverUrl: string, accessToken: string, itemId: string): Promise<void> {
+    const imgPath = `Jellyfin V4lgrind/Images/${itemId}_Primary.jpg`;
+    try {
+      // Skip if already cached
+      await Filesystem.stat({ path: imgPath, directory: Directory.Data });
+      return;
+    } catch { /* not cached yet */ }
+
+    const imgUrl = `${serverUrl}/Items/${itemId}/Images/Primary?maxWidth=400&quality=80&api_key=${accessToken}`;
+    try {
+      const dirPath = imgPath.substring(0, imgPath.lastIndexOf('/'));
+      try {
+        await Filesystem.mkdir({ path: dirPath, directory: Directory.Data, recursive: true });
+      } catch { /* may exist */ }
+
+      await Filesystem.downloadFile({
+        url: imgUrl,
+        path: imgPath,
+        directory: Directory.Data,
+        progress: false,
+      });
+    } catch { /* non-critical */ }
   }
 
   cancelDownload(itemId: string): void {

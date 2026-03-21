@@ -94,9 +94,17 @@ router.beforeEach(async (to, _from, next) => {
   else if (to.name === "login" && isAuthenticated) {
     next({ name: "libraries" });
   }
-  // Block server-browsing routes when offline — only downloaded content is accessible
-  else if (isOffline && (to.name === "libraries" || to.name === "libraryItem")) {
-    next({ name: "offline" });
+  // Block server-browsing routes when offline — only downloaded content is accessible.
+  // Do a fresh server check first to avoid stale state from the 30 s ping interval.
+  // Skip when the offline store hasn't initialized yet — it defaults to online, so
+  // the watcher in App.vue will redirect later if actually offline.
+  else if (offlineStore.initialized && isOffline && (to.name === "libraries" || to.name === "libraryItem")) {
+    const stillOffline = !(await offlineStore.recheckOnline());
+    if (stillOffline) {
+      next({ name: "offline" });
+    } else {
+      next();
+    }
   }
   // Redirect audio items away from the video player route (skip when offline to avoid server calls)
   else if (!isOffline && to.name === "Player" && to.params.id) {

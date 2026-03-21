@@ -3,6 +3,7 @@ import { downloadService } from '@/services/downloadService';
 import { useOfflineStore } from './offline-store';
 import { useJellyfinStore } from './jellyfin-store';
 import { useMetadataCacheStore } from './metadata-cache-store';
+import { Capacitor } from '@capacitor/core';
 
 const MAX_CONCURRENT = 3;
 
@@ -16,6 +17,7 @@ export interface DownloadTask {
   status: 'queued' | 'downloading' | 'completed' | 'failed' | 'cancelled';
   error?: string;
   startedAt: number;
+  transcoding?: boolean;
 }
 
 interface DownloadStoreState {
@@ -96,6 +98,7 @@ export const useDownloadStore = defineStore('downloads', {
         total: 0,
         status: 'queued',
         startedAt: Date.now(),
+        transcoding: false,
       };
 
       this.tasks.set(itemId, task);
@@ -134,6 +137,15 @@ export const useDownloadStore = defineStore('downloads', {
       task.status = 'downloading';
 
       try {
+        // Check if video codec needs transcoding before downloading
+        let transcodedUrl: string | undefined;
+        if (Capacitor.isNativePlatform()) {
+          transcodedUrl = await this._getTranscodeUrlIfNeeded(itemId, metadata, jellyfinStore);
+          if (transcodedUrl) {
+            task.transcoding = true;
+          }
+        }
+
         await downloadService.downloadForOffline(
           jellyfinStore.serverUrl!,
           itemId,
@@ -142,11 +154,12 @@ export const useDownloadStore = defineStore('downloads', {
           (progress) => {
             const t = this.tasks.get(itemId);
             if (t) {
-              t.progress = progress.percentage;
+              t.progress = progress.percentage >= 0 ? progress.percentage : 0;
               t.loaded = progress.loaded;
               t.total = progress.total;
             }
-          }
+          },
+          transcodedUrl
         );
 
         const t = this.tasks.get(itemId);
@@ -190,6 +203,114 @@ export const useDownloadStore = defineStore('downloads', {
           jellyfinStore.fetchItemDetails(id).then(item => { if (item) metaCache.set(item); }).catch(() => {})
         )
       );
+    },
+
+    /**
+     * Check if any video or audio codec in the media is unsupported by the device.
+     * If so, request a transcoding URL from Jellyfin's PlaybackInfo API.
+     */
+    async _getTranscodeUrlIfNeeded(
+      itemId: string,
+      metadata: any,
+      jellyfinStore: ReturnType<typeof useJellyfinStore>
+    ): Promise<string | undefined> {
+      try {
+        // Get device codec capabilities
+        const { NativeVideo } = await import('@/plugins/NativeVideoPlugin');
+        const { codecs: deviceCodecs } = await NativeVideo.getDeviceCodecs();
+        if (deviceCodecs.length === 0) return undefined;
+
+        // Check all media streams for unsupported codecs
+        const streams: any[] = metadata.MediaStreams || metadata.MediaSources?.[0]?.MediaStreams || [];
+        const CODEC_MIME_MAP: Record<string, string> = {
+          // Video
+          dvhe: 'video/dolby-vision', dvh1: 'video/dolby-vision',
+          hevc: 'video/hevc', h265: 'video/hevc',
+          h264: 'video/avc', avc: 'video/avc',
+          vp8: 'video/x-vnd.on2.vp8', vp9: 'video/x-vnd.on2.vp9',
+          av1: 'video/av01',
+          // Audio
+          ac3: 'audio/ac3', eac3: 'audio/eac3',
+          dts: 'audio/vnd.dts', truehd: 'audio/true-hd',
+          flac: 'audio/flac', opus: 'audio/opus',
+          vorbis: 'audio/vorbis', aac: 'audio/mp4a-latm',
+          mp3: 'audio/mpeg',
+        };
+
+        let needsTranscode = false;
+        for (const stream of streams) {
+          const codec = (stream.Codec || '').toLowerCase();
+          const profile = (stream.Profile || '').toLowerCase();
+          const mime = CODEC_MIME_MAP[codec];
+          if (!mime) continue; // Unknown codec — assume supported
+
+          // Special DV detection: Jellyfin may report codec as "hevc" with DV profile
+          const isDV = codec.includes('dvhe') || codec.includes('dvh1') ||
+                       profile.includes('dolby vision');
+          const effectiveMime = isDV ? 'video/dolby-vision' : mime;
+
+          if (!deviceCodecs.includes(effectiveMime)) {
+            console.log(`[DownloadStore] Unsupported codec: ${stream.Type} ${codec} (${effectiveMime}) — will transcode`);
+            needsTranscode = true;
+            break;
+          }
+        }
+
+        if (!needsTranscode) return undefined;
+
+        // Request a transcoding URL from Jellyfin
+        console.log(`[DownloadStore] Requesting transcoded download for ${itemId}`);
+        const serverUrl = jellyfinStore.serverUrl!;
+        const token = jellyfinStore.accessToken!;
+
+        const response = await fetch(
+          `${serverUrl}/Items/${itemId}/PlaybackInfo?userId=${jellyfinStore.userId}`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Emby-Token': token,
+            },
+            body: JSON.stringify({
+              DeviceProfile: {
+                // Force transcoding by providing a narrow profile
+                DirectPlayProfiles: [],
+                TranscodingProfiles: [
+                  {
+                    Container: 'mp4',
+                    Type: 'Video',
+                    VideoCodec: 'h264',
+                    AudioCodec: 'aac',
+                    Context: 'Static',
+                    Protocol: 'http',
+                    CopyTimestamps: true,
+                  },
+                ],
+                CodecProfiles: [],
+                SubtitleProfiles: [],
+              },
+              MediaSourceId: itemId,
+              AllowVideoStreamCopy: false,
+              AllowAudioStreamCopy: false,
+            }),
+          }
+        );
+
+        if (!response.ok) return undefined;
+        const result = await response.json();
+        const ms = result.MediaSources?.[0];
+
+        if (ms?.TranscodingUrl) {
+          const url = `${serverUrl}${ms.TranscodingUrl}`;
+          console.log(`[DownloadStore] Transcoded URL: ${url.substring(0, 80)}...`);
+          return url;
+        }
+
+        return undefined;
+      } catch (e) {
+        console.warn('[DownloadStore] Codec check failed, downloading raw:', e);
+        return undefined;
+      }
     },
 
     cancelDownload(itemId: string) {

@@ -18,6 +18,7 @@ export interface NativeVideoStartOptions {
     selectedBitrate?: number;
     streamInfo?: string;
     audioTracksJson?: string;
+    selectedAudioIndex?: number;
 }
 
 export interface NativeVideoProgressEvent {
@@ -58,6 +59,11 @@ export interface NativeVideoAudioErrorEvent {
     language: string;
 }
 
+export interface NativeVideoVideoErrorEvent {
+    reason: string;
+    positionMs: number;
+}
+
 export interface NativeVideoAudioSwitchJellyfinEvent {
     jellyfinIndex: number;
 }
@@ -74,6 +80,7 @@ export interface NativeVideoPlugin {
     nativeLog(options: { message: string }): Promise<void>;
     updateStreamInfo(options: { streamInfo: string }): Promise<void>;
     updateQualityPresets(options: { presets: string; selectedBitrate: number }): Promise<void>;
+    getDeviceCodecs(): Promise<{ codecs: string[] }>;
 
     addListener(event: 'progress', handler: (data: NativeVideoProgressEvent) => void): Promise<PluginListenerHandle>;
     addListener(event: 'ended', handler: () => void): Promise<PluginListenerHandle>;
@@ -84,6 +91,7 @@ export interface NativeVideoPlugin {
     addListener(event: 'subtitleSelected', handler: (data: NativeVideoSubtitleSelectedEvent) => void): Promise<PluginListenerHandle>;
     addListener(event: 'qualitySelected', handler: (data: NativeVideoQualitySelectedEvent) => void): Promise<PluginListenerHandle>;
     addListener(event: 'audioError', handler: (data: NativeVideoAudioErrorEvent) => void): Promise<PluginListenerHandle>;
+    addListener(event: 'videoError', handler: (data: NativeVideoVideoErrorEvent) => void): Promise<PluginListenerHandle>;
     addListener(event: 'audioSwitchJellyfin', handler: (data: NativeVideoAudioSwitchJellyfinEvent) => void): Promise<PluginListenerHandle>;
     addListener(event: 'debugLog', handler: (data: { message: string }) => void): Promise<PluginListenerHandle>;
 

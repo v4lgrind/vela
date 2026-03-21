@@ -416,6 +416,39 @@ let offlineProgressInterval: ReturnType<typeof setInterval> | null = null;
 let isSwitching = false;
 let isOfflinePlayback = false;
 
+// ── Device codec detection (cached) ─────────────────────────────────────────────
+// Maps Jellyfin codec names to Android MIME types for capability checking.
+const CODEC_MIME_MAP: Record<string, string> = {
+    ac3: 'audio/ac3',
+    eac3: 'audio/eac3',
+    dts: 'audio/vnd.dts',
+    truehd: 'audio/true-hd',
+    flac: 'audio/flac',
+    opus: 'audio/opus',
+    vorbis: 'audio/vorbis',
+    aac: 'audio/mp4a-latm',
+    mp3: 'audio/mpeg',
+};
+let deviceCodecsCache: string[] | null = null;
+async function getDeviceCodecs(): Promise<string[]> {
+    if (deviceCodecsCache) return deviceCodecsCache;
+    if (!isNative) return [];
+    try {
+        const result = await NativeVideo.getDeviceCodecs();
+        deviceCodecsCache = result.codecs || [];
+        debugLog(`[Codec] Device audio codecs: ${deviceCodecsCache.join(', ')}`);
+        return deviceCodecsCache;
+    } catch {
+        return [];
+    }
+}
+
+function isCodecSupported(jellyfinCodec: string, deviceCodecs: string[]): boolean {
+    const mime = CODEC_MIME_MAP[jellyfinCodec?.toLowerCase()];
+    if (!mime) return true; // Unknown codec — assume supported
+    return deviceCodecs.includes(mime);
+}
+
 // ── Video event handlers ───────────────────────────────────────────────────────
 
 function onLoadStart() { isLoading.value = true; }
@@ -1010,7 +1043,7 @@ function buildMediaTitle(item: any): string {
 
 // ── Native player init (Android ExoPlayer) ─────────────────────────────────────
 
-async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: number, title?: string, transcodeAudio = false) {
+async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: number, title?: string, transcodeAudio = false, forceTranscodeVideo = false) {
     isLoading.value = true;
 
     try {
@@ -1018,7 +1051,7 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
             ? Math.floor(resumeSeconds * 10_000_000)
             : undefined;
 
-        const data = await fetchPlaybackInfo(startTicks, preferredAudioIndex, false, true, transcodeAudio);
+        const data = await fetchPlaybackInfo(startTicks, preferredAudioIndex, forceTranscodeVideo, true, transcodeAudio);
         mediaSource.value = data.MediaSources?.[0];
         if (!mediaSource.value) throw new Error('No media source available');
 
@@ -1100,6 +1133,21 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
             debugLog(`[AudioCrash] error listener (NO audio fallback): ${data.message}`);
             error.value = data.message;
             isLoading.value = false;
+        });
+
+        // Dolby Vision video decode failure → restart with server-side transcoding
+        await NativeVideo.addListener('videoError', async (data) => {
+            debugLog(`[DVFallback] videoError: reason=${data.reason} positionMs=${data.positionMs}`);
+            if (data.reason === 'dolby_vision_unsupported') {
+                debugLog('[DVFallback] Restarting with video transcoding...');
+                await NativeVideo.removeAllListeners();
+                const resumeSec = data.positionMs / 1000;
+                // 5th arg = forceTranscodeVideo: strips DirectPlay + forces re-encode
+                await initNativePlayer(resumeSec, selectedAudioIndex.value ?? undefined, title, false, true);
+            } else {
+                error.value = `Video error: ${data.reason}`;
+                isLoading.value = false;
+            }
         });
 
         await NativeVideo.addListener('tracksReady', async (data) => {
@@ -1277,7 +1325,7 @@ async function saveOfflineProgress() {
 
 // ── Offline player init (local downloaded file) ────────────────────────────────
 
-async function initOfflinePlayer(cachedDownload: any, resumeSeconds?: number, itemTitle?: string) {
+async function initOfflinePlayer(cachedDownload: any, resumeSeconds?: number, itemTitle?: string, skipAudioGroupIndex?: number) {
     isOfflinePlayback = true;
     isLoading.value = true;
     try {
@@ -1316,10 +1364,14 @@ async function initOfflinePlayer(cachedDownload: any, resumeSeconds?: number, it
         // no startProgressReporting, no deleteActiveEncodings.
         if (isNative) {
             let nativeProgressCount = 0;
+            let lastGoodPositionSec = resumeSeconds || 0;
+            let restoringSubtitle = false;
+
             await NativeVideo.addListener('progress', (data) => {
                 currentTime.value = data.positionMs / 1000;
                 duration.value = data.durationMs / 1000;
                 if (duration.value > 0) progressPct.value = (currentTime.value / duration.value) * 100;
+                lastGoodPositionSec = currentTime.value;
                 if (++nativeProgressCount % 10 === 0) saveOfflineProgress();
             });
             await NativeVideo.addListener('stopped', async () => {
@@ -1333,6 +1385,115 @@ async function initOfflinePlayer(cachedDownload: any, resumeSeconds?: number, it
             await NativeVideo.addListener('error', (data) => {
                 error.value = data.message;
                 isLoading.value = false;
+            });
+
+            // Dolby Vision unsupported — offline content can't be transcoded
+            await NativeVideo.addListener('videoError', (data) => {
+                debugLog(`[DVFallback] offline videoError: reason=${data.reason}`);
+                if (data.reason === 'dolby_vision_unsupported') {
+                    error.value = 'This device cannot play Dolby Vision video. Try playing online — the server will transcode automatically.';
+                } else {
+                    error.value = `Video error: ${data.reason}`;
+                }
+                isLoading.value = false;
+            });
+
+            // ── Offline track handling ──────────────────────────────────────
+            // Populate audio/subtitle pickers from ExoPlayer embedded tracks,
+            // apply saved preferences, and handle unsupported codecs.
+
+            await NativeVideo.addListener('tracksReady', async (data) => {
+                try {
+                    const parsed = JSON.parse(data.tracks);
+                    const nativeAudio: any[] = parsed.audioTracks ?? [];
+                    const nativeSubtitle: any[] = parsed.subtitleTracks ?? [];
+
+                    // Populate audio list from embedded tracks (always DirectPlay offline)
+                    if (nativeAudio.length > 0) {
+                        audioList.value = nativeAudio.map((t: any) => ({
+                            index: t.groupIndex,
+                            language: t.language || 'und',
+                            label: `${(t.language || 'und').toUpperCase()} ${t.channelCount > 0 ? `(${t.channelCount}ch)` : ''} ${t.codec ? `- ${t.codec.toUpperCase()}` : ''}`.trim(),
+                        }));
+
+                        // Apply saved audio preference to ExoPlayer (skip any track that previously crashed)
+                        const savedLang = localStorage.getItem(`msplayer-audio-${itemId}`);
+                        const globalLang = preferencesStore.preferredAudioLanguage;
+                        debugLog(`[Offline] tracksReady: ${nativeAudio.length} audio tracks, savedLang="${savedLang}" globalLang="${globalLang}"`);
+                        nativeAudio.forEach((t: any) => debugLog(`[Offline]   track: groupIndex=${t.groupIndex} lang="${t.language}" codec="${t.codec}" ch=${t.channelCount}`));
+
+                        const preferredAudio =
+                            (savedLang ? nativeAudio.find((t: any) => t.language === savedLang && t.groupIndex !== skipAudioGroupIndex) : null) ||
+                            (globalLang ? nativeAudio.find((t: any) => t.language === globalLang && t.groupIndex !== skipAudioGroupIndex) : null);
+                        if (preferredAudio) {
+                            debugLog(`[Offline] tracksReady: auto-switching to groupIndex=${preferredAudio.groupIndex} lang="${preferredAudio.language}"`);
+                            NativeVideo.selectAudioTrack({ groupIndex: preferredAudio.groupIndex });
+                            selectedAudioIndex.value = preferredAudio.groupIndex;
+                        } else {
+                            debugLog(`[Offline] tracksReady: no preference match, keeping default`);
+                        }
+                    }
+
+                    // Apply saved subtitle preference to ExoPlayer
+                    const savedNative = localStorage.getItem(`msplayer-subtitle-native-${itemId}`);
+                    const globalSubLang = preferencesStore.preferredSubtitleLanguage;
+                    if (savedNative === 'off') {
+                        // ExoPlayer defaults to no subtitles — nothing needed
+                    } else if (savedNative !== null) {
+                        const nativeSub = nativeSubtitle.find((t: any) => t.label === savedNative);
+                        if (nativeSub) {
+                            restoringSubtitle = true;
+                            NativeVideo.selectSubtitleTrack({ groupIndex: nativeSub.groupIndex });
+                            selectedSubtitleIndex.value = nativeSub.groupIndex;
+                        }
+                    } else if (globalSubLang) {
+                        const nativeSub = nativeSubtitle.find((t: any) => t.language === globalSubLang);
+                        if (nativeSub) {
+                            restoringSubtitle = true;
+                            NativeVideo.selectSubtitleTrack({ groupIndex: nativeSub.groupIndex });
+                            selectedSubtitleIndex.value = nativeSub.groupIndex;
+                        }
+                    }
+                } catch (e) {
+                    console.warn('[Offline] Failed to parse tracksReady:', e);
+                }
+            });
+
+            await NativeVideo.addListener('audioSelected', (data) => {
+                localStorage.setItem(`msplayer-audio-${itemId}`, data.language);
+                selectedAudioIndex.value = data.groupIndex;
+            });
+
+            await NativeVideo.addListener('subtitleSelected', (data) => {
+                if (restoringSubtitle) {
+                    restoringSubtitle = false;
+                    return;
+                }
+                localStorage.setItem(`msplayer-subtitle-native-${itemId}`, data.label);
+                selectedSubtitleIndex.value = data.groupIndex;
+            });
+
+            // Offline audio error: FFmpeg decoder should handle most codecs, but as
+            // a safety net restart playback skipping the unsupported track.
+            await NativeVideo.addListener('audioError', async (data) => {
+                debugLog(`[Offline] audioError: groupIndex=${data.groupIndex} lang="${data.language}" — restarting with fallback track`);
+                if (restartInProgress) return;
+                restartInProgress = true;
+                try {
+                    await NativeVideo.removeAllListeners();
+                    await NativeVideo.stop();
+                    await initOfflinePlayer(cachedDownload, lastGoodPositionSec || resumeSeconds, itemTitle, data.groupIndex);
+                } catch (e) {
+                    debugLog(`[Offline] audioError restart failed: ${e}`);
+                    error.value = 'Audio track not supported on this device';
+                    isLoading.value = false;
+                } finally {
+                    restartInProgress = false;
+                }
+            });
+
+            await NativeVideo.addListener('debugLog', (data) => {
+                debugLog(data.message, 'kotlin');
             });
 
             await NativeVideo.start({
@@ -1785,8 +1946,45 @@ onMounted(async () => {
         audioStreams[0];
     const preferredAudioIndex: number | undefined = preferred?.Index;
 
+    // Proactive codec detection: if the preferred audio codec is not natively
+    // supported by the device, request server-side transcoding upfront instead
+    // of letting ExoPlayer crash and then falling back (saves time & battery).
+    let forceTranscodeAudio = false;
+    let forceTranscodeVideo = false;
     if (isNative) {
-        await initNativePlayer(resumeSeconds, preferredAudioIndex, buildMediaTitle(details));
+        const deviceCodecs = await getDeviceCodecs();
+        if (deviceCodecs.length > 0) {
+            // Audio codec check
+            if (preferred && !isCodecSupported(preferred.Codec, deviceCodecs)) {
+                debugLog(`[Codec] Preferred audio codec "${preferred.Codec}" not natively supported — requesting server transcode`);
+                forceTranscodeAudio = true;
+            }
+            // Video codec check — detect any unsupported video codec
+            const videoStream = allStreams.find(s => s.Type === 'Video');
+            if (videoStream && !forceTranscodeVideo) {
+                const videoCodec = (videoStream.Codec || '').toLowerCase();
+                const videoProfile = (videoStream.Profile || '').toLowerCase();
+                // DV detection: Jellyfin may report codec as "hevc" with DV profile
+                const isDV = videoCodec.includes('dvhe') || videoCodec.includes('dvh1') ||
+                             videoProfile.includes('dolby vision');
+                const VIDEO_MIME: Record<string, string> = {
+                    dvhe: 'video/dolby-vision', dvh1: 'video/dolby-vision',
+                    hevc: 'video/hevc', h265: 'video/hevc',
+                    h264: 'video/avc', avc: 'video/avc',
+                    vp8: 'video/x-vnd.on2.vp8', vp9: 'video/x-vnd.on2.vp9',
+                    av1: 'video/av01',
+                };
+                const effectiveMime = isDV ? 'video/dolby-vision' : VIDEO_MIME[videoCodec];
+                if (effectiveMime && !deviceCodecs.includes(effectiveMime)) {
+                    debugLog(`[Codec] Video codec "${videoStream.Codec}" (${effectiveMime}) not supported — requesting server transcode`);
+                    forceTranscodeVideo = true;
+                }
+            }
+        }
+    }
+
+    if (isNative) {
+        await initNativePlayer(resumeSeconds, preferredAudioIndex, buildMediaTitle(details), forceTranscodeAudio, forceTranscodeVideo);
     } else {
         await initPlayer(resumeSeconds, preferredAudioIndex);
         document.addEventListener('click', handleClickOutside);

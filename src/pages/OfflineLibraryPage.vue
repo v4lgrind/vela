@@ -3,10 +3,11 @@
 
     <!-- Header -->
     <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-3 mb-5">
-      <Button variant="outline" class="justify-self-start flex items-center gap-1" @click="navigateBack">
+      <Button v-if="showBackButton" variant="outline" class="justify-self-start flex items-center gap-1" @click="navigateBack">
         <ArrowLeft class="size-4" />
         {{ backLabel }}
       </Button>
+      <div v-else></div>
       <h1 class="text-2xl font-semibold m-0 text-center truncate">{{ pageTitle }}</h1>
       <div class="justify-self-end"></div>
     </div>
@@ -29,20 +30,31 @@
               <div class="font-medium text-text-heading truncate">{{ task.name }}</div>
               <div class="text-xs text-text-muted">
                 <template v-if="task.status === 'queued'">Queued…</template>
+                <template v-else-if="task.transcoding && !task.total">
+                  Transcoding &amp; downloading… {{ formatSize(task.loaded) }}
+                </template>
                 <template v-else>{{ formatSize(task.loaded) }} / {{ formatSize(task.total) }}</template>
               </div>
             </div>
-            <Button variant="ghost" size="sm" @click="cancelDownload(task.itemId)" class="text-red-400 hover:text-red-300 hover:bg-red-500/10">
-              <X class="size-4" />
-            </Button>
+            <div class="flex items-center gap-1">
+              <Badge v-if="task.transcoding" class="bg-amber-500/20 text-amber-400 text-[0.65rem]">Transcoding</Badge>
+              <Button variant="ghost" size="sm" @click="cancelDownload(task.itemId)" class="text-red-400 hover:text-red-300 hover:bg-red-500/10">
+                <X class="size-4" />
+              </Button>
+            </div>
           </div>
           <div class="h-2 bg-white/10 rounded-full overflow-hidden">
-            <div class="h-full transition-all duration-300"
+            <!-- Indeterminate animation for transcoded downloads with unknown total -->
+            <div v-if="task.transcoding && !task.total && task.status === 'downloading'"
+              class="h-full bg-amber-500 rounded-full animate-indeterminate" />
+            <div v-else class="h-full transition-all duration-300"
               :class="task.status === 'queued' ? 'bg-white/20' : 'bg-accent-purple'"
               :style="{ width: task.status === 'queued' ? '100%' : `${task.progress}%` }" />
           </div>
-          <div class="text-right text-xs mt-1" :class="task.status === 'queued' ? 'text-text-muted' : 'text-accent-purple-light'">
-            {{ task.status === 'queued' ? 'Waiting' : `${task.progress}%` }}
+          <div class="text-right text-xs mt-1" :class="task.transcoding && !task.total ? 'text-amber-400' : task.status === 'queued' ? 'text-text-muted' : 'text-accent-purple-light'">
+            <template v-if="task.status === 'queued'">Waiting</template>
+            <template v-else-if="task.transcoding && !task.total">{{ formatSize(task.loaded) }} downloaded</template>
+            <template v-else>{{ task.progress }}%</template>
           </div>
         </Card>
       </div>
@@ -140,6 +152,11 @@
 
       <!-- ── SEASONS VIEW ── -->
       <template v-else-if="view === 'seasons' && selectedSeries">
+        <div class="flex justify-end mb-4">
+          <Button variant="destructive" size="sm" @click="deleteAllSeries(selectedSeries)">
+            <Trash2 class="size-3.5 mr-1" /> Delete series
+          </Button>
+        </div>
         <ul class="list-none p-0 m-0 grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-3 sm:grid-cols-[repeat(auto-fill,minmax(150px,1fr))] sm:gap-4">
           <li v-for="season in selectedSeries.seasons" :key="season.seasonId">
             <div class="cursor-pointer group active:scale-[0.97] active:opacity-75 transition-all duration-200" @click="openSeason(season)">
@@ -163,6 +180,11 @@
 
       <!-- ── EPISODES VIEW ── -->
       <template v-else-if="view === 'episodes' && selectedSeason">
+        <div class="flex justify-end mb-4">
+          <Button variant="destructive" size="sm" @click="deleteAllSeason(selectedSeason)">
+            <Trash2 class="size-3.5 mr-1" /> Delete season
+          </Button>
+        </div>
         <div class="flex flex-col gap-2">
           <div v-for="ep in selectedSeason.episodes" :key="ep.itemId"
             class="flex gap-3 p-3 rounded-xl border border-border-default bg-surface-raised hover:border-border-hover hover:bg-surface-hover transition-all duration-200">
@@ -198,6 +220,7 @@
 
 <script setup lang="ts">
 import { onMounted, computed, ref } from 'vue';
+import { useRouter, onBeforeRouteLeave } from 'vue-router';
 import { useOfflineStore } from '@/store/offline-store';
 import { useJellyfinStore } from '@/store/jellyfin-store';
 import { useDownloadStore } from '@/store/download-store';
@@ -227,6 +250,7 @@ const MediaCard = defineComponent({
   },
 });
 
+const router = useRouter();
 const offlineStore = useOfflineStore();
 const jellyfinStore = useJellyfinStore();
 const downloadStore = useDownloadStore();
@@ -247,14 +271,41 @@ const pageTitle = computed(() => {
 const backLabel = computed(() => {
   if (view.value === 'seasons') return 'Downloads';
   if (view.value === 'episodes') return selectedSeries.value?.seriesName ?? 'Back';
-  return 'Back';
+  return 'Library';
+});
+
+const showBackButton = computed(() => {
+  // At root, only show back button when online (navigates to library)
+  if (view.value === 'root') return offlineStore.isFullyOnline;
+  return true;
 });
 
 function navigateBack() {
   if (view.value === 'episodes') { view.value = 'seasons'; selectedSeason.value = null; return; }
   if (view.value === 'seasons') { view.value = 'root'; selectedSeries.value = null; return; }
-  history.back();
+  // At root: go to online library if reachable, otherwise stay here
+  if (offlineStore.isFullyOnline) {
+    router.push({ name: 'libraries' });
+  }
+  // When offline, there's nowhere to go — stay on the downloads page
 }
+
+// Intercept device back button when in a sub-view — navigate within the component instead of leaving
+onBeforeRouteLeave((_to, _from, next) => {
+  if (view.value === 'episodes') {
+    view.value = 'seasons';
+    selectedSeason.value = null;
+    next(false);
+    return;
+  }
+  if (view.value === 'seasons') {
+    view.value = 'root';
+    selectedSeries.value = null;
+    next(false);
+    return;
+  }
+  next();
+});
 
 function openSeries(series: any) {
   selectedSeries.value = series;
@@ -279,7 +330,14 @@ function cancelAll() {
   downloadStore.cancelAll();
 }
 
+// Cached local image URLs for offline display
+const cachedImageUrls = ref<Map<string, string>>(new Map());
+
 function getImageUrl(id: string, itemType?: string) {
+  // Prefer locally cached artwork (works offline)
+  const cached = cachedImageUrls.value.get(id);
+  if (cached) return cached;
+  // Fall back to server URL (works online)
   const isAudio = itemType === 'Audio' || itemType === 'MusicAlbum';
   return jellyfinStore.getImageUrl(id, 'Primary', isAudio ? 150 : 130, isAudio ? 150 : 195) || '';
 }
@@ -290,6 +348,46 @@ function formatSize(bytes: number): string {
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+}
+
+async function deleteAllSeries(series: any) {
+  const count = totalEpisodes(series);
+  if (!confirm(`Delete all ${count} episode${count !== 1 ? 's' : ''} of "${series.seriesName}"?`)) return;
+  try {
+    for (const season of series.seasons) {
+      for (const ep of season.episodes) {
+        await downloadService.deleteOfflineFile(ep.itemId);
+        await offlineStore.removeDownload(ep.itemId);
+      }
+    }
+    view.value = 'root';
+    selectedSeries.value = null;
+  } catch {
+    alert('Failed to delete some episodes');
+  }
+}
+
+async function deleteAllSeason(season: any) {
+  const count = season.episodes.length;
+  if (!confirm(`Delete all ${count} episode${count !== 1 ? 's' : ''} of Season ${season.seasonNumber}?`)) return;
+  try {
+    for (const ep of season.episodes) {
+      await downloadService.deleteOfflineFile(ep.itemId);
+      await offlineStore.removeDownload(ep.itemId);
+    }
+    // Go back to seasons view; if no seasons left, go to root
+    const updated = offlineStore.tvShowsGrouped.find(s => s.seriesId === selectedSeries.value?.seriesId);
+    if (!updated || updated.seasons.length === 0) {
+      view.value = 'root';
+      selectedSeries.value = null;
+    } else {
+      selectedSeries.value = updated;
+      view.value = 'seasons';
+      selectedSeason.value = null;
+    }
+  } catch {
+    alert('Failed to delete some episodes');
+  }
 }
 
 async function deleteDownload(itemId: string, name: string) {
@@ -312,5 +410,53 @@ async function deleteDownload(itemId: string, name: string) {
 
 onMounted(async () => {
   await offlineStore.loadDownloads();
+
+  // Collect all image IDs we need (items + series + seasons)
+  const imageIds = new Set<string>();
+  for (const d of offlineStore.downloads) {
+    imageIds.add(d.itemId);
+    if (d.seriesId) imageIds.add(d.seriesId);
+    if (d.seasonId) imageIds.add(d.seasonId);
+  }
+
+  // Preload cached artwork URLs for offline display
+  const urlMap = new Map<string, string>();
+  const missingIds: string[] = [];
+  await Promise.all(
+    Array.from(imageIds).map(async (id) => {
+      const url = await downloadService.getCachedImageUrl(id);
+      if (url) urlMap.set(id, url);
+      else missingIds.push(id);
+    })
+  );
+  cachedImageUrls.value = urlMap;
+
+  // Backfill missing artwork when online (for downloads created before caching was added)
+  if (missingIds.length > 0 && offlineStore.isFullyOnline) {
+    const serverUrl = jellyfinStore.serverUrl;
+    const token = jellyfinStore.accessToken;
+    if (serverUrl && token) {
+      Promise.all(
+        missingIds.map(async (id) => {
+          await downloadService.cacheArtworkById(serverUrl, token, id);
+          const url = await downloadService.getCachedImageUrl(id);
+          if (url) {
+            cachedImageUrls.value = new Map([...cachedImageUrls.value, [id, url]]);
+          }
+        })
+      ).catch(() => {});
+    }
+  }
 });
 </script>
+
+<style scoped>
+@keyframes indeterminate {
+  0% { width: 15%; margin-left: -15%; }
+  50% { width: 40%; }
+  100% { width: 15%; margin-left: 100%; }
+}
+.animate-indeterminate {
+  animation: indeterminate 1.5s ease-in-out infinite;
+}
+</style>

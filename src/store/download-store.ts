@@ -139,9 +139,12 @@ export const useDownloadStore = defineStore('downloads', {
       try {
         // Check if video codec needs transcoding before downloading
         let transcodedUrl: string | undefined;
+        let estimatedTranscodeSize = 0;
         if (Capacitor.isNativePlatform()) {
-          transcodedUrl = await this._getTranscodeUrlIfNeeded(itemId, metadata, jellyfinStore);
-          if (transcodedUrl) {
+          const transcodeResult = await this._getTranscodeUrlIfNeeded(itemId, metadata, jellyfinStore);
+          if (transcodeResult) {
+            transcodedUrl = transcodeResult.url;
+            estimatedTranscodeSize = transcodeResult.estimatedSize;
             task.transcoding = true;
           }
         }
@@ -159,7 +162,8 @@ export const useDownloadStore = defineStore('downloads', {
               t.total = progress.total;
             }
           },
-          transcodedUrl
+          transcodedUrl,
+          estimatedTranscodeSize || undefined,
         );
 
         const t = this.tasks.get(itemId);
@@ -208,12 +212,13 @@ export const useDownloadStore = defineStore('downloads', {
     /**
      * Check if any video or audio codec in the media is unsupported by the device.
      * If so, request a transcoding URL from Jellyfin's PlaybackInfo API.
+     * Returns the URL and an estimated file size (bytes) derived from Bitrate × duration.
      */
     async _getTranscodeUrlIfNeeded(
       itemId: string,
       metadata: any,
       jellyfinStore: ReturnType<typeof useJellyfinStore>
-    ): Promise<string | undefined> {
+    ): Promise<{ url: string; estimatedSize: number } | undefined> {
       try {
         // Get device codec capabilities
         const { NativeVideo } = await import('@/plugins/NativeVideoPlugin');
@@ -325,8 +330,11 @@ export const useDownloadStore = defineStore('downloads', {
 
         if (ms?.TranscodingUrl) {
           const url = `${serverUrl}${ms.TranscodingUrl}`;
-          console.log(`[DownloadStore] Transcoded URL: ${url.substring(0, 80)}...`);
-          return url;
+          const estimatedSize = (ms.Bitrate && ms.RunTimeTicks)
+            ? Math.ceil((ms.Bitrate / 8) * (ms.RunTimeTicks / 10_000_000))
+            : 0;
+          console.log(`[DownloadStore] Transcoded URL (est. ${Math.round(estimatedSize / 1024 / 1024)}MB): ${url.substring(0, 80)}...`);
+          return { url, estimatedSize };
         }
 
         return undefined;

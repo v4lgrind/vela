@@ -33,7 +33,8 @@ class DownloadService {
     accessToken: string,
     metadata: any,
     onProgress?: (progress: DownloadProgress) => void,
-    transcodedUrl?: string
+    transcodedUrl?: string,
+    estimatedSize?: number,
   ): Promise<void> {
     if (this.downloads.has(itemId)) {
       console.log('Already downloading:', itemId);
@@ -79,9 +80,10 @@ class DownloadService {
         const callback = this.progressCallbacks.get(itemId);
         if (callback) {
           const loaded = event.bytes || 0;
-          const total = (event.contentLength && event.contentLength > 0) ? event.contentLength : 0;
-          // Transcoded streams use chunked transfer — no Content-Length.
-          // Report loaded bytes with percentage = -1 so the UI can show indeterminate progress.
+          // For chunked transfers (transcoded), fall back to estimated size for progress calculation
+          const total = (event.contentLength && event.contentLength > 0)
+            ? event.contentLength
+            : (estimatedSize || 0);
           const percentage = total > 0 ? Math.min(99, Math.round((loaded / total) * 100)) : -1;
           callback({ itemId, filename, loaded, total, percentage });
         }
@@ -99,7 +101,9 @@ class DownloadService {
           if (size > 0) {
             const callback = this.progressCallbacks.get(itemId);
             if (callback) {
-              callback({ itemId, filename, loaded: size, total: 0, percentage: -1 });
+              const total = estimatedSize || 0;
+              const percentage = total > 0 ? Math.min(99, Math.round((size / total) * 100)) : -1;
+              callback({ itemId, filename, loaded: size, total, percentage });
             }
           }
         } catch { /* file may not exist yet */ }

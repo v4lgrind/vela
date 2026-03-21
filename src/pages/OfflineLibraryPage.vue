@@ -290,8 +290,13 @@ function navigateBack() {
   // When offline, there's nowhere to go — stay on the downloads page
 }
 
-// Intercept device back button when in a sub-view — navigate within the component instead of leaving
-onBeforeRouteLeave((_to, _from, next) => {
+// Intercept device back button when in a sub-view — navigate within the component instead of leaving.
+// Do NOT intercept intentional navigation to content pages (ItemDetails, Player, etc.).
+onBeforeRouteLeave((to, _from, next) => {
+  if (to.name === 'ItemDetails' || to.name === 'Player') {
+    next();
+    return;
+  }
   if (view.value === 'episodes') {
     view.value = 'seasons';
     selectedSeason.value = null;

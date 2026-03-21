@@ -81,6 +81,7 @@ export interface NativeVideoPlugin {
     updateStreamInfo(options: { streamInfo: string }): Promise<void>;
     updateQualityPresets(options: { presets: string; selectedBitrate: number }): Promise<void>;
     getDeviceCodecs(): Promise<{ codecs: string[] }>;
+    canDecodeHevc(options: { profile: string; level: number }): Promise<{ supported: boolean }>;
 
     addListener(event: 'progress', handler: (data: NativeVideoProgressEvent) => void): Promise<PluginListenerHandle>;
     addListener(event: 'ended', handler: () => void): Promise<PluginListenerHandle>;

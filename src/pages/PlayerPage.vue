@@ -1135,11 +1135,12 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
             isLoading.value = false;
         });
 
-        // Dolby Vision video decode failure → restart with server-side transcoding
+        // Video decode failure (Dolby Vision or hardware capability exceeded) →
+        // restart with server-side transcoding.
         await NativeVideo.addListener('videoError', async (data) => {
-            debugLog(`[DVFallback] videoError: reason=${data.reason} positionMs=${data.positionMs}`);
-            if (data.reason === 'dolby_vision_unsupported') {
-                debugLog('[DVFallback] Restarting with video transcoding...');
+            debugLog(`[VideoFallback] videoError: reason=${data.reason} positionMs=${data.positionMs}`);
+            if (data.reason === 'dolby_vision_unsupported' || data.reason === 'video_codec_unsupported') {
+                debugLog('[VideoFallback] Restarting with video transcoding...');
                 await NativeVideo.removeAllListeners();
                 const resumeSec = data.positionMs / 1000;
                 // 5th arg = forceTranscodeVideo: strips DirectPlay + forces re-encode
@@ -1151,6 +1152,7 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
         });
 
         await NativeVideo.addListener('tracksReady', async (data) => {
+            isLoading.value = false; // stream is ready — hide spinner now
             try {
                 const parsed = JSON.parse(data.tracks);
                 const nativeAudio: any[] = parsed.audioTracks ?? [];
@@ -1298,7 +1300,8 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
             selectedAudioIndex: selectedAudioIndex.value ?? -1,
         });
 
-        isLoading.value = false;
+        // Don't clear isLoading here — keep the spinner until tracksReady fires,
+        // so fallback restarts (e.g. codec unsupported → transcode) remain invisible.
     } catch (e: any) {
         console.error('[initNativePlayer] error:', e);
         error.value = 'Failed to initialize native player';
@@ -1387,11 +1390,13 @@ async function initOfflinePlayer(cachedDownload: any, resumeSeconds?: number, it
                 isLoading.value = false;
             });
 
-            // Dolby Vision unsupported — offline content can't be transcoded
+            // Video format unsupported — offline content can't be transcoded
             await NativeVideo.addListener('videoError', (data) => {
-                debugLog(`[DVFallback] offline videoError: reason=${data.reason}`);
+                debugLog(`[VideoFallback] offline videoError: reason=${data.reason}`);
                 if (data.reason === 'dolby_vision_unsupported') {
                     error.value = 'This device cannot play Dolby Vision video. Try playing online — the server will transcode automatically.';
+                } else if (data.reason === 'video_codec_unsupported') {
+                    error.value = 'This device cannot play this video format. Try playing online — the server will transcode automatically.';
                 } else {
                     error.value = `Video error: ${data.reason}`;
                 }
@@ -1403,6 +1408,7 @@ async function initOfflinePlayer(cachedDownload: any, resumeSeconds?: number, it
             // apply saved preferences, and handle unsupported codecs.
 
             await NativeVideo.addListener('tracksReady', async (data) => {
+                isLoading.value = false;
                 try {
                     const parsed = JSON.parse(data.tracks);
                     const nativeAudio: any[] = parsed.audioTracks ?? [];
@@ -1504,6 +1510,7 @@ async function initOfflinePlayer(cachedDownload: any, resumeSeconds?: number, it
                 playMethod: 'DirectPlay',
                 subtitleTracks: [],
             });
+            // isLoading cleared by tracksReady listener above
         } else {
             const video = videoEl.value;
             if (!video) return;
@@ -1519,9 +1526,8 @@ async function initOfflinePlayer(cachedDownload: any, resumeSeconds?: number, it
                 video.play().catch(() => {});
             }
             offlineProgressInterval = setInterval(saveOfflineProgress, 10_000);
+            isLoading.value = false;
         }
-
-        isLoading.value = false;
     } catch (e: any) {
         console.error('[initOfflinePlayer] error:', e);
         error.value = 'Failed to play downloaded file';
@@ -1978,6 +1984,19 @@ onMounted(async () => {
                 if (effectiveMime && !deviceCodecs.includes(effectiveMime)) {
                     debugLog(`[Codec] Video codec "${videoStream.Codec}" (${effectiveMime}) not supported — requesting server transcode`);
                     forceTranscodeVideo = true;
+                }
+                // MIME type supported — also verify HEVC profile/level (e.g. Main 10 / Level 5.1
+                // may be unsupported even when video/hevc is listed as a supported MIME type).
+                if (!forceTranscodeVideo && (videoCodec === 'hevc' || videoCodec === 'h265') && !isDV) {
+                    const profile = (videoStream.Profile || '') as string;
+                    const level = (videoStream.Level as number) || 0;
+                    if (profile && level) {
+                        const { supported } = await NativeVideo.canDecodeHevc({ profile, level });
+                        if (!supported) {
+                            debugLog(`[Codec] HEVC profile "${profile}" level ${level} not supported — requesting server transcode`);
+                            forceTranscodeVideo = true;
+                        }
+                    }
                 }
             }
         }

@@ -179,6 +179,58 @@ class NativeVideoPlugin : Plugin() {
         call.resolve(result)
     }
 
+    @PluginMethod
+    fun canDecodeHevc(call: PluginCall) {
+        val profileStr = (call.getString("profile") ?: "main").lowercase().trim()
+        val jellyfinLevel = call.getInt("level") ?: 0
+
+        // Map Jellyfin profile string → Android HEVCProfile integer
+        val targetProfile = when (profileStr) {
+            "main"               -> android.media.MediaCodecInfo.CodecProfileLevel.HEVCProfileMain
+            "main 10", "main10"  -> android.media.MediaCodecInfo.CodecProfileLevel.HEVCProfileMain10
+            "main still picture" -> android.media.MediaCodecInfo.CodecProfileLevel.HEVCProfileMainStill
+            "main 10 hdr10"      -> android.media.MediaCodecInfo.CodecProfileLevel.HEVCProfileMain10HDR10
+            "main 10 hdr10 plus" -> android.media.MediaCodecInfo.CodecProfileLevel.HEVCProfileMain10HDR10Plus
+            else -> -1 // unknown → assume supported
+        }
+
+        if (targetProfile == -1 || jellyfinLevel == 0) {
+            call.resolve(JSObject().apply { put("supported", true) })
+            return
+        }
+
+        // Map Android HEVC level constants → Jellyfin level (H.265 level_idc = level × 30).
+        // Both Main tier and High tier entries are included; either suffices.
+        val levelMap = mapOf(
+            0x1 to 30,   0x2 to 30,             // L1.0
+            0x4 to 60,   0x8 to 60,             // L2.0
+            0x10 to 63,  0x20 to 63,            // L2.1
+            0x40 to 90,  0x80 to 90,            // L3.0
+            0x100 to 93, 0x200 to 93,           // L3.1
+            0x400 to 120, 0x800 to 120,         // L4.0
+            0x1000 to 123, 0x2000 to 123,       // L4.1
+            0x4000 to 150, 0x8000 to 150,       // L5.0
+            0x10000 to 153, 0x20000 to 153,     // L5.1
+            0x40000 to 156, 0x80000 to 156,     // L5.2
+            0x100000 to 180, 0x200000 to 180,   // L6.0
+            0x400000 to 183, 0x800000 to 183,   // L6.1
+            0x1000000 to 186, 0x2000000 to 186  // L6.2
+        )
+
+        val supported = android.media.MediaCodecList(android.media.MediaCodecList.ALL_CODECS)
+            .codecInfos
+            .filter { !it.isEncoder }
+            .filter { info -> info.supportedTypes.contains("video/hevc") }
+            .any { info ->
+                info.getCapabilitiesForType("video/hevc").profileLevels.any { pl ->
+                    pl.profile == targetProfile &&
+                    (levelMap[pl.level] ?: 0) >= jellyfinLevel
+                }
+            }
+
+        call.resolve(JSObject().apply { put("supported", supported) })
+    }
+
     // ── Private helpers ────────────────────────────────────────────────────────
 
     private fun sendCommand(command: String) {

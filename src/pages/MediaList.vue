@@ -220,7 +220,8 @@ async function loadMedia() {
       imageUrl: store.getImageUrl(lib.Id!, 'Primary', 800, 400) || ''
     }));
     resumeItems.value = resume;
-    nextUpItems.value = nextUp;
+    const resumeIds = new Set(resume.map((i: any) => i.Id));
+    nextUpItems.value = nextUp.filter((i: any) => !resumeIds.has(i.Id));
     loading.value = false;
 
     // Fetch latest items per library in parallel after main content is shown

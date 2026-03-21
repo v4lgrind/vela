@@ -213,6 +213,11 @@ class NativePlayerActivity : AppCompatActivity() {
     // restart with a codec selector that maps video/dolby-vision → video/hevc.
     private var dvFallbackMode = false
 
+    // Video capability fallback: when the hardware decoder reports
+    // NO_EXCEEDS_CAPABILITIES (e.g. HEVC Main 10 Level 5.1 on a limited device),
+    // tell Vue to restart with server-side transcoding.
+    private var videoCapFallbackMode = false
+
     // Store build parameters so we can rebuild the player for DV fallback.
     private var buildUrl = ""
     private var buildAuthHeader = ""
@@ -547,6 +552,23 @@ class NativePlayerActivity : AppCompatActivity() {
                     stoppedSent = true // prevent the generic stopped broadcast
                     val intent = Intent(ACTION_VIDEO_ERROR)
                     intent.putExtra("reason", "dolby_vision_unsupported")
+                    intent.putExtra("positionMs", resumeMs)
+                    intent.setPackage(packageName)
+                    sendBroadcast(intent)
+                    finish()
+                    return
+                }
+
+                // Hardware decoder reports NO_EXCEEDS_CAPABILITIES (e.g. HEVC Main 10
+                // Level 5.1 on a device that only supports up to Level 4.1 or 8-bit).
+                // Tell Vue to restart with server-side video transcoding.
+                if (!videoCapFallbackMode && isVideoCapabilityExceededError(error)) {
+                    videoCapFallbackMode = true
+                    val resumeMs = player?.currentPosition ?: 0L
+                    debugLog("[VideoFallback] Video codec exceeds device capabilities, notifying Vue to transcode (resumeMs=$resumeMs)")
+                    stoppedSent = true
+                    val intent = Intent(ACTION_VIDEO_ERROR)
+                    intent.putExtra("reason", "video_codec_unsupported")
                     intent.putExtra("positionMs", resumeMs)
                     intent.setPackage(packageName)
                     sendBroadcast(intent)
@@ -1047,6 +1069,20 @@ class NativePlayerActivity : AppCompatActivity() {
                (msg.contains("dolby-vision", ignoreCase = true) ||
                 msg.contains("dolby_vision", ignoreCase = true) ||
                 msg.contains("dvhe", ignoreCase = true))
+    }
+
+    /** Returns true when the hardware video decoder rejects the stream because the
+     *  codec profile/level exceeds its capabilities (NO_EXCEEDS_CAPABILITIES). */
+    private fun isVideoCapabilityExceededError(error: androidx.media3.common.PlaybackException): Boolean {
+        val msg = buildString {
+            append(error.message ?: "")
+            var c: Throwable? = error.cause
+            while (c != null) { append(' ').append(c.message ?: ""); c = c.cause }
+        }
+        return (msg.contains("VideoRenderer", ignoreCase = true) ||
+                msg.contains("VideoDecoder", ignoreCase = true) ||
+                msg.contains("MediaCodecVideoRenderer", ignoreCase = true)) &&
+               msg.contains("NO_EXCEEDS_CAPABILITIES", ignoreCase = true)
     }
 
     /** Returns true when the error is identifiable as an audio renderer/sink failure. */

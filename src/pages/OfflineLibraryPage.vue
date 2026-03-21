@@ -279,7 +279,14 @@ function cancelAll() {
   downloadStore.cancelAll();
 }
 
+// Cached local image URLs for offline display
+const cachedImageUrls = ref<Map<string, string>>(new Map());
+
 function getImageUrl(id: string, itemType?: string) {
+  // Prefer locally cached artwork (works offline)
+  const cached = cachedImageUrls.value.get(id);
+  if (cached) return cached;
+  // Fall back to server URL (works online)
   const isAudio = itemType === 'Audio' || itemType === 'MusicAlbum';
   return jellyfinStore.getImageUrl(id, 'Primary', isAudio ? 150 : 130, isAudio ? 150 : 195) || '';
 }
@@ -312,5 +319,21 @@ async function deleteDownload(itemId: string, name: string) {
 
 onMounted(async () => {
   await offlineStore.loadDownloads();
+
+  // Preload cached artwork URLs for offline display
+  const imageIds = new Set<string>();
+  for (const d of offlineStore.downloads) {
+    imageIds.add(d.itemId);
+    if (d.seriesId) imageIds.add(d.seriesId);
+    if (d.seasonId) imageIds.add(d.seasonId);
+  }
+  const urlMap = new Map<string, string>();
+  await Promise.all(
+    Array.from(imageIds).map(async (id) => {
+      const url = await downloadService.getCachedImageUrl(id);
+      if (url) urlMap.set(id, url);
+    })
+  );
+  cachedImageUrls.value = urlMap;
 });
 </script>

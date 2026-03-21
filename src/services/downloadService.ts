@@ -124,6 +124,9 @@ class DownloadService {
       await offlineDatabase.addDownload(downloadedMedia);
       console.log('✅ Download complete:', filename);
 
+      // Cache artwork images for offline display (fire-and-forget, don't block)
+      this.cacheArtwork(serverUrl, accessToken, metadata).catch(() => {});
+
       // Final 100% callback
       const callback = this.progressCallbacks.get(itemId);
       if (callback) callback({ itemId, filename, loaded: fileSize, total: fileSize, percentage: 100 });
@@ -219,6 +222,60 @@ class DownloadService {
       }
       default:
         return `${root}/${filename}`;
+    }
+  }
+
+  /**
+   * Download artwork images for offline display.
+   * Caches the primary image for the item, plus series/season images for episodes.
+   */
+  private async cacheArtwork(serverUrl: string, accessToken: string, metadata: any): Promise<void> {
+    const imageIds: string[] = [metadata.Id];
+
+    // For episodes, also cache series and season artwork
+    if (metadata.Type === 'Episode') {
+      if (metadata.SeriesId) imageIds.push(metadata.SeriesId);
+      if (metadata.SeasonId) imageIds.push(metadata.SeasonId);
+    }
+
+    for (const id of imageIds) {
+      const imgPath = `Jellyfin V4lgrind/Images/${id}_Primary.jpg`;
+      try {
+        // Skip if already cached
+        await Filesystem.stat({ path: imgPath, directory: Directory.Data });
+        continue;
+      } catch { /* not cached yet */ }
+
+      const imgUrl = `${serverUrl}/Items/${id}/Images/Primary?maxWidth=400&quality=80&api_key=${accessToken}`;
+      try {
+        const dirPath = imgPath.substring(0, imgPath.lastIndexOf('/'));
+        try {
+          await Filesystem.mkdir({ path: dirPath, directory: Directory.Data, recursive: true });
+        } catch { /* may exist */ }
+
+        await Filesystem.downloadFile({
+          url: imgUrl,
+          path: imgPath,
+          directory: Directory.Data,
+          progress: false,
+        });
+      } catch {
+        // Non-critical — artwork just won't be available offline
+      }
+    }
+  }
+
+  /**
+   * Get a WebView-accessible URL for a cached artwork image.
+   * Returns null if the image is not cached locally.
+   */
+  async getCachedImageUrl(itemId: string): Promise<string | null> {
+    const imgPath = `Jellyfin V4lgrind/Images/${itemId}_Primary.jpg`;
+    try {
+      const fileInfo = await Filesystem.getUri({ path: imgPath, directory: Directory.Data });
+      return Capacitor.convertFileSrc(fileInfo.uri);
+    } catch {
+      return null;
     }
   }
 

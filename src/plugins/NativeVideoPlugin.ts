@@ -59,6 +59,11 @@ export interface NativeVideoAudioErrorEvent {
     language: string;
 }
 
+export interface NativeVideoVideoErrorEvent {
+    reason: string;
+    positionMs: number;
+}
+
 export interface NativeVideoAudioSwitchJellyfinEvent {
     jellyfinIndex: number;
 }
@@ -86,6 +91,7 @@ export interface NativeVideoPlugin {
     addListener(event: 'subtitleSelected', handler: (data: NativeVideoSubtitleSelectedEvent) => void): Promise<PluginListenerHandle>;
     addListener(event: 'qualitySelected', handler: (data: NativeVideoQualitySelectedEvent) => void): Promise<PluginListenerHandle>;
     addListener(event: 'audioError', handler: (data: NativeVideoAudioErrorEvent) => void): Promise<PluginListenerHandle>;
+    addListener(event: 'videoError', handler: (data: NativeVideoVideoErrorEvent) => void): Promise<PluginListenerHandle>;
     addListener(event: 'audioSwitchJellyfin', handler: (data: NativeVideoAudioSwitchJellyfinEvent) => void): Promise<PluginListenerHandle>;
     addListener(event: 'debugLog', handler: (data: { message: string }) => void): Promise<PluginListenerHandle>;
 

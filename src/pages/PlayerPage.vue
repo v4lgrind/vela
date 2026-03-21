@@ -1043,7 +1043,7 @@ function buildMediaTitle(item: any): string {
 
 // ── Native player init (Android ExoPlayer) ─────────────────────────────────────
 
-async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: number, title?: string, transcodeAudio = false) {
+async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: number, title?: string, transcodeAudio = false, forceTranscodeVideo = false) {
     isLoading.value = true;
 
     try {
@@ -1051,7 +1051,7 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
             ? Math.floor(resumeSeconds * 10_000_000)
             : undefined;
 
-        const data = await fetchPlaybackInfo(startTicks, preferredAudioIndex, false, true, transcodeAudio);
+        const data = await fetchPlaybackInfo(startTicks, preferredAudioIndex, forceTranscodeVideo, true, transcodeAudio);
         mediaSource.value = data.MediaSources?.[0];
         if (!mediaSource.value) throw new Error('No media source available');
 
@@ -1133,6 +1133,21 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
             debugLog(`[AudioCrash] error listener (NO audio fallback): ${data.message}`);
             error.value = data.message;
             isLoading.value = false;
+        });
+
+        // Dolby Vision video decode failure → restart with server-side transcoding
+        await NativeVideo.addListener('videoError', async (data) => {
+            debugLog(`[DVFallback] videoError: reason=${data.reason} positionMs=${data.positionMs}`);
+            if (data.reason === 'dolby_vision_unsupported') {
+                debugLog('[DVFallback] Restarting with video transcoding...');
+                await NativeVideo.removeAllListeners();
+                const resumeSec = data.positionMs / 1000;
+                // 5th arg = forceTranscodeVideo: strips DirectPlay + forces re-encode
+                await initNativePlayer(resumeSec, selectedAudioIndex.value ?? undefined, title, false, true);
+            } else {
+                error.value = `Video error: ${data.reason}`;
+                isLoading.value = false;
+            }
         });
 
         await NativeVideo.addListener('tracksReady', async (data) => {
@@ -1369,6 +1384,17 @@ async function initOfflinePlayer(cachedDownload: any, resumeSeconds?: number, it
             });
             await NativeVideo.addListener('error', (data) => {
                 error.value = data.message;
+                isLoading.value = false;
+            });
+
+            // Dolby Vision unsupported — offline content can't be transcoded
+            await NativeVideo.addListener('videoError', (data) => {
+                debugLog(`[DVFallback] offline videoError: reason=${data.reason}`);
+                if (data.reason === 'dolby_vision_unsupported') {
+                    error.value = 'This device cannot play Dolby Vision video. Try playing online — the server will transcode automatically.';
+                } else {
+                    error.value = `Video error: ${data.reason}`;
+                }
                 isLoading.value = false;
             });
 
@@ -1924,16 +1950,33 @@ onMounted(async () => {
     // supported by the device, request server-side transcoding upfront instead
     // of letting ExoPlayer crash and then falling back (saves time & battery).
     let forceTranscodeAudio = false;
-    if (isNative && preferred) {
+    let forceTranscodeVideo = false;
+    if (isNative) {
         const deviceCodecs = await getDeviceCodecs();
-        if (deviceCodecs.length > 0 && !isCodecSupported(preferred.Codec, deviceCodecs)) {
-            debugLog(`[Codec] Preferred audio codec "${preferred.Codec}" not natively supported — requesting server transcode`);
-            forceTranscodeAudio = true;
+        if (deviceCodecs.length > 0) {
+            // Audio codec check
+            if (preferred && !isCodecSupported(preferred.Codec, deviceCodecs)) {
+                debugLog(`[Codec] Preferred audio codec "${preferred.Codec}" not natively supported — requesting server transcode`);
+                forceTranscodeAudio = true;
+            }
+            // Dolby Vision video check — DV Profile 8 NAL units crash HEVC decoders
+            // on devices without DV support
+            const videoStream = allStreams.find(s => s.Type === 'Video');
+            if (videoStream) {
+                const videoCodec = (videoStream.Codec || '').toLowerCase();
+                const videoProfile = (videoStream.Profile || '').toLowerCase();
+                const isDV = videoCodec.includes('dvhe') || videoCodec.includes('dvh1') ||
+                             videoProfile.includes('dolby vision') || videoProfile.includes('dolby-vision');
+                if (isDV && !deviceCodecs.includes('video/dolby-vision')) {
+                    debugLog(`[Codec] Dolby Vision video not supported — requesting server transcode (codec=${videoStream.Codec} profile=${videoStream.Profile})`);
+                    forceTranscodeVideo = true;
+                }
+            }
         }
     }
 
     if (isNative) {
-        await initNativePlayer(resumeSeconds, preferredAudioIndex, buildMediaTitle(details), forceTranscodeAudio);
+        await initNativePlayer(resumeSeconds, preferredAudioIndex, buildMediaTitle(details), forceTranscodeAudio, forceTranscodeVideo);
     } else {
         await initPlayer(resumeSeconds, preferredAudioIndex);
         document.addEventListener('click', handleClickOutside);

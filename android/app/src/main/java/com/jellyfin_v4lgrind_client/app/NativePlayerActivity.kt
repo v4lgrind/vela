@@ -57,6 +57,7 @@ class NativePlayerActivity : AppCompatActivity() {
         const val ACTION_QUALITY_SELECTED = "com.jellyfin_v4lgrind_client.app.QUALITY_SELECTED"
         const val ACTION_AUDIO_ERROR = "com.jellyfin_v4lgrind_client.app.AUDIO_ERROR"
         const val ACTION_AUDIO_SWITCH_JELLYFIN = "com.jellyfin_v4lgrind_client.app.AUDIO_SWITCH_JELLYFIN"
+        const val ACTION_VIDEO_ERROR = "com.jellyfin_v4lgrind_client.app.VIDEO_ERROR"
         const val ACTION_DEBUG_LOG = "com.jellyfin_v4lgrind_client.app.DEBUG_LOG"
 
         const val EXTRA_AUDIO_TRACKS = "audioTracks"
@@ -470,15 +471,6 @@ class NativePlayerActivity : AppCompatActivity() {
                 androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
             )
 
-        // When DV fallback is active, remap video/dolby-vision → video/hevc so
-        // the platform HEVC decoder handles the base layer (DV Profile 8 is HEVC-based).
-        if (dvFallbackMode) {
-            debugLog("[DVFallback] Using HEVC codec selector for Dolby Vision content")
-            renderersFactory.setMediaCodecSelector { mimeType, requiresSecureDecoder, requiresTunnelingDecoder ->
-                val effectiveMime = if (mimeType == MimeTypes.VIDEO_DOLBY_VISION) MimeTypes.VIDEO_H265 else mimeType
-                androidx.media3.exoplayer.mediacodec.MediaCodecUtil.getDecoderInfos(effectiveMime, requiresSecureDecoder, requiresTunnelingDecoder)
-            }
-        }
         val exo = ExoPlayer.Builder(this, renderersFactory)
             .setMediaSourceFactory(defaultFactory)
             .setAudioAttributes(audioAttr, true)
@@ -543,22 +535,20 @@ class NativePlayerActivity : AppCompatActivity() {
                     debugLog("[AudioCrash]   cause[$depth]: ${c.javaClass.name}: ${c.message}")
                     c = c.cause; depth++
                 }
-                // Dolby Vision video decode failure → restart with HEVC fallback
+                // Dolby Vision video decode failure → tell Vue to restart with
+                // server-side transcoding (online) or show error (offline).
+                // The device's HEVC decoder can't handle DV Profile 8 NAL units.
                 if (!dvFallbackMode && isDolbyVisionVideoError(error)) {
-                    val resumeMs = player?.currentPosition ?: 0L
-                    debugLog("[DVFallback] DV video decode failed, restarting with HEVC fallback at ${resumeMs}ms")
                     dvFallbackMode = true
-                    // Release current player and rebuild
-                    handler.removeCallbacks(progressRunnable)
-                    handler.removeCallbacks(seekBarUpdateRunnable)
-                    player?.release()
-                    player = null
-                    tracksReported = false
-                    audioTrackGroups.clear()
-                    subtitleTrackGroups.clear()
-                    selectedAudioGroupIndex = -1
-                    selectedSubtitleGroupIndex = -1
-                    buildPlayer(buildUrl, buildAuthHeader, resumeMs, buildPlayMethod, buildSubtitleTracksJson)
+                    val resumeMs = player?.currentPosition ?: 0L
+                    debugLog("[DVFallback] DV video decode failed, notifying Vue to transcode (resumeMs=$resumeMs)")
+                    stoppedSent = true // prevent the generic stopped broadcast
+                    val intent = Intent(ACTION_VIDEO_ERROR)
+                    intent.putExtra("reason", "dolby_vision_unsupported")
+                    intent.putExtra("positionMs", resumeMs)
+                    intent.setPackage(packageName)
+                    sendBroadcast(intent)
+                    finish()
                     return
                 }
 

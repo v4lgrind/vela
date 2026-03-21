@@ -6,6 +6,7 @@ import {
   getPlaystateApi,
   getTvShowsApi,
   getUserLibraryApi,
+  getUserViewsApi,
 } from "@jellyfin/sdk/lib/utils/api";
 import { downloadService } from "../services/downloadService";
 
@@ -61,9 +62,11 @@ export const useJellyfinStore = defineStore("jellyfin", {
     },
     async fetchLibraries() {
       this.initializeApi();
-      const libraries = await getLibraryApi(this.api).getMediaFolders();
+      const views = await getUserViewsApi(this.api).getUserViews({
+        userId: this.userId!,
+      });
 
-      const Items = libraries.data.Items?.filter(
+      const Items = views.data.Items?.filter(
         (library) => library.CollectionType !== "playlists"
       ) || [];
       this.libraries = Items;

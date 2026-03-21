@@ -30,7 +30,7 @@
               <div class="font-medium text-text-heading truncate">{{ task.name }}</div>
               <div class="text-xs text-text-muted">
                 <template v-if="task.status === 'queued'">Queued…</template>
-                <template v-else-if="task.transcoding && task.total <= 0">
+                <template v-else-if="task.transcoding && !task.total">
                   Transcoding &amp; downloading… {{ formatSize(task.loaded) }}
                 </template>
                 <template v-else>{{ formatSize(task.loaded) }} / {{ formatSize(task.total) }}</template>
@@ -45,15 +45,15 @@
           </div>
           <div class="h-2 bg-white/10 rounded-full overflow-hidden">
             <!-- Indeterminate animation for transcoded downloads with unknown total -->
-            <div v-if="task.transcoding && task.total <= 0 && task.status === 'downloading'"
+            <div v-if="task.transcoding && !task.total && task.status === 'downloading'"
               class="h-full bg-amber-500 rounded-full animate-indeterminate" />
             <div v-else class="h-full transition-all duration-300"
               :class="task.status === 'queued' ? 'bg-white/20' : 'bg-accent-purple'"
               :style="{ width: task.status === 'queued' ? '100%' : `${task.progress}%` }" />
           </div>
-          <div class="text-right text-xs mt-1" :class="task.transcoding && task.total <= 0 ? 'text-amber-400' : task.status === 'queued' ? 'text-text-muted' : 'text-accent-purple-light'">
+          <div class="text-right text-xs mt-1" :class="task.transcoding && !task.total ? 'text-amber-400' : task.status === 'queued' ? 'text-text-muted' : 'text-accent-purple-light'">
             <template v-if="task.status === 'queued'">Waiting</template>
-            <template v-else-if="task.transcoding && task.total <= 0">{{ formatSize(task.loaded) }} downloaded</template>
+            <template v-else-if="task.transcoding && !task.total">{{ formatSize(task.loaded) }} downloaded</template>
             <template v-else>{{ task.progress }}%</template>
           </div>
         </Card>

@@ -78,8 +78,8 @@ class DownloadService {
 
         const callback = this.progressCallbacks.get(itemId);
         if (callback) {
-          const loaded = event.bytes;
-          const total = event.contentLength;
+          const loaded = event.bytes || 0;
+          const total = (event.contentLength && event.contentLength > 0) ? event.contentLength : 0;
           // Transcoded streams use chunked transfer — no Content-Length.
           // Report loaded bytes with percentage = -1 so the UI can show indeterminate progress.
           const percentage = total > 0 ? Math.min(99, Math.round((loaded / total) * 100)) : -1;

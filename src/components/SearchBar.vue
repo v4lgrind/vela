@@ -42,16 +42,16 @@
           <!-- Up/down controls (edit mode only) -->
           <div v-if="editingOrder" class="flex flex-col shrink-0">
             <button
-              class="p-0.5 rounded hover:bg-surface-hover transition-colors disabled:opacity-25 cursor-pointer"
+              class="p-2 rounded hover:bg-surface-hover transition-colors disabled:opacity-25 cursor-pointer"
               :disabled="i === 0"
               @click="moveLibrary(lib.Id, -1)">
-              <ChevronUp class="size-3.5 text-text-muted" />
+              <ChevronUp class="size-5 text-text-muted" />
             </button>
             <button
-              class="p-0.5 rounded hover:bg-surface-hover transition-colors disabled:opacity-25 cursor-pointer"
+              class="p-2 rounded hover:bg-surface-hover transition-colors disabled:opacity-25 cursor-pointer"
               :disabled="i === orderedLibraries.length - 1"
               @click="moveLibrary(lib.Id, 1)">
-              <ChevronDown class="size-3.5 text-text-muted" />
+              <ChevronDown class="size-5 text-text-muted" />
             </button>
           </div>
 

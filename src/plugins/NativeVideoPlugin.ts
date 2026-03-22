@@ -19,6 +19,7 @@ export interface NativeVideoStartOptions {
     streamInfo?: string;
     audioTracksJson?: string;
     selectedAudioIndex?: number;
+    subtitleTextSize?: number;
 }
 
 export interface NativeVideoProgressEvent {

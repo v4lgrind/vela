@@ -45,6 +45,7 @@ class NativeVideoPlugin : Plugin() {
         val streamInfo = call.getString("streamInfo") ?: ""
         val audioTracksJson = call.getString("audioTracksJson") ?: "[]"
         val selectedAudioIndex = call.data.optInt("selectedAudioIndex", -1)
+        val subtitleTextSize = call.data.optDouble("subtitleTextSize", 1.0).toFloat()
 
         val intent = Intent(activity, NativePlayerActivity::class.java).apply {
             putExtra(NativePlayerActivity.EXTRA_URL, url)
@@ -58,6 +59,7 @@ class NativeVideoPlugin : Plugin() {
             putExtra(NativePlayerActivity.EXTRA_STREAM_INFO, streamInfo)
             putExtra(NativePlayerActivity.EXTRA_AUDIO_TRACKS, audioTracksJson)
             putExtra(NativePlayerActivity.EXTRA_SELECTED_AUDIO_INDEX, selectedAudioIndex)
+            putExtra(NativePlayerActivity.EXTRA_SUBTITLE_TEXT_SIZE, subtitleTextSize)
         }
         activity.startActivity(intent)
         call.resolve()

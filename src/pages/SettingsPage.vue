@@ -25,6 +25,15 @@
               <option v-for="lang in SUBTITLE_LANGUAGES" :key="lang.code" :value="lang.code">{{ lang.label }}</option>
             </select>
           </div>
+          <div class="flex items-center justify-between px-4 py-3 bg-surface-raised">
+            <span class="text-sm font-medium text-text-heading">Subtitle Size</span>
+            <select
+              v-model.number="preferencesStore.subtitleSize"
+              class="bg-surface-raised border border-border-input rounded-lg px-3 py-2 text-sm text-text-heading focus:outline-none focus:border-accent-purple w-48"
+            >
+              <option v-for="s in SUBTITLE_SIZES" :key="s.value" :value="s.value">{{ s.label }}</option>
+            </select>
+          </div>
         </div>
       </section>
 
@@ -109,6 +118,14 @@ const LANGUAGES = [
 const SUBTITLE_LANGUAGES = [
   { code: '',    label: 'Off' },
   ...LANGUAGES.slice(1),
+];
+
+const SUBTITLE_SIZES = [
+  { value: 0.75, label: 'Small' },
+  { value: 1.0,  label: 'Normal' },
+  { value: 1.25, label: 'Large' },
+  { value: 1.5,  label: 'Extra Large' },
+  { value: 2.0,  label: 'Huge' },
 ];
 
 const QUALITY_PRESETS = [

@@ -76,6 +76,7 @@ class NativePlayerActivity : AppCompatActivity() {
         const val EXTRA_QUALITY_PRESETS = "qualityPresets"
         const val EXTRA_SELECTED_BITRATE = "selectedBitrate"
         const val EXTRA_STREAM_INFO = "streamInfo"
+        const val EXTRA_SUBTITLE_TEXT_SIZE = "subtitleTextSize"
     }
 
     private var player: ExoPlayer? = null
@@ -620,6 +621,12 @@ class NativePlayerActivity : AppCompatActivity() {
                 android.graphics.Color.BLACK,
                 null
             )
+        )
+        // Apply user subtitle size preference (scale relative to ExoPlayer default)
+        val subtitleScale = intent.getFloatExtra(EXTRA_SUBTITLE_TEXT_SIZE, 1.0f)
+        playerView.subtitleView?.setFractionalTextSize(
+            androidx.media3.ui.SubtitleView.DEFAULT_TEXT_SIZE_FRACTION * subtitleScale,
+            false
         )
 
         scheduleHideControls()

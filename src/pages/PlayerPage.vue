@@ -1298,6 +1298,7 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
                 language: a.language,
             }))),
             selectedAudioIndex: selectedAudioIndex.value ?? -1,
+            subtitleTextSize: preferencesStore.subtitleSize,
         });
 
         // Don't clear isLoading here — keep the spinner until tracksReady fires,
@@ -1509,6 +1510,7 @@ async function initOfflinePlayer(cachedDownload: any, resumeSeconds?: number, it
                 title: itemTitle || '',
                 playMethod: 'DirectPlay',
                 subtitleTracks: [],
+                subtitleTextSize: preferencesStore.subtitleSize,
             });
             // isLoading cleared by tracksReady listener above
         } else {

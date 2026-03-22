@@ -94,10 +94,29 @@
         </button>
         <button
           class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left text-sm font-medium text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
-          @click="onLogout">
+          @click="logoutConfirmOpen = true">
           <LogOut class="size-4" />
           Logout
         </button>
+
+        <!-- Logout confirmation -->
+        <Transition name="confirm-fade">
+          <div v-if="logoutConfirmOpen" class="mt-1 rounded-xl border border-red-500/30 bg-red-500/10 p-3">
+            <p class="text-sm text-red-300 mb-3">Are you sure you want to log out?</p>
+            <div class="flex gap-2">
+              <button
+                class="flex-1 rounded-lg bg-red-500 hover:bg-red-600 active:bg-red-700 text-white text-sm font-medium py-2 transition-colors cursor-pointer"
+                @click="onLogout">
+                Log out
+              </button>
+              <button
+                class="flex-1 rounded-lg bg-surface-hover hover:bg-border-default text-text-heading text-sm font-medium py-2 transition-colors cursor-pointer"
+                @click="logoutConfirmOpen = false">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </Transition>
       </div>
     </div>
   </Transition>
@@ -264,6 +283,7 @@ const themeOptions = [
 
 const sidebarOpen = ref(false);
 const editingOrder = ref(false);
+const logoutConfirmOpen = ref(false);
 
 const orderedLibraries = computed(() => {
     const order = preferencesStore.libraryOrder;
@@ -327,7 +347,7 @@ function libraryIcon(lib: any): Component {
 
 // Close sidebar (and exit edit mode) whenever the route changes
 watch(() => route.path, () => { sidebarOpen.value = false; editingOrder.value = false; });
-watch(sidebarOpen, open => { if (!open) editingOrder.value = false; });
+watch(sidebarOpen, open => { if (!open) { editingOrder.value = false; logoutConfirmOpen.value = false; } });
 
 // ── Search ─────────────────────────────────────────────────────────────────────
 
@@ -492,5 +512,15 @@ watch(query, (val) => {
 .sb-slide-enter-from,
 .sb-slide-leave-to {
   transform: translateX(-100%);
+}
+
+.confirm-fade-enter-active,
+.confirm-fade-leave-active {
+  transition: opacity 150ms ease, transform 150ms ease;
+}
+.confirm-fade-enter-from,
+.confirm-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
 }
 </style>

@@ -314,16 +314,6 @@ class NativePlayerActivity : AppCompatActivity() {
                 showSeekFeedback(isForward)
                 return true
             }
-            override fun onFling(e1: MotionEvent?, e2: MotionEvent, vx: Float, vy: Float): Boolean {
-                if (isScrubbing) return false
-                val dy = e2.y - (e1?.y ?: e2.y)
-                if (vy > 1500f && dy > 100f && Math.abs(vx) / vy < 0.8f) {
-                    sendStoppedBroadcast()
-                    finish()
-                    return true
-                }
-                return false
-            }
             override fun onLongPress(e: MotionEvent) {
                 if (isTapOnInteractiveView(e.rawX.toInt(), e.rawY.toInt())) return
                 isScrubbing = true

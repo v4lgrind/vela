@@ -214,9 +214,10 @@ class NativePlayerActivity : AppCompatActivity() {
 
             // Show/hide Next Episode button (last 60 seconds)
             if (nextEpisodeId.isNotEmpty()) {
-                val dur = player?.duration ?: 0L
                 val remaining = dur - pos
-                btnNextEpisode.visibility = if (dur > 0L && remaining in 1L..60_000L) View.VISIBLE else View.GONE
+                val showNext = dur > 1L && remaining in 1L..60_000L
+                if (showNext) android.util.Log.d("NativePlayer", "nextEp: dur=$dur pos=$pos remaining=$remaining → VISIBLE")
+                btnNextEpisode.visibility = if (showNext) View.VISIBLE else View.GONE
             }
 
             handler.postDelayed(this, 500)
@@ -332,6 +333,7 @@ class NativePlayerActivity : AppCompatActivity() {
         if (jellyfinAudioTracks.size > 1) btnAudio.visibility = View.VISIBLE
 
         nextEpisodeId = intent.getStringExtra(EXTRA_NEXT_EPISODE_ID) ?: ""
+        android.util.Log.d("NativePlayer", "nextEpisodeId='$nextEpisodeId'")
 
         tvTitle.text = title
 

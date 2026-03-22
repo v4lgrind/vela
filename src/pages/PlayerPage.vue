@@ -1330,7 +1330,7 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
             router.replace({ name: 'Player', params: { id: data.nextEpisodeId } });
         });
 
-        debugLog(`[NativePlayer] calling NativeVideo.start: startPositionMs=${finalStartPositionMs} playMethod=${playMethod.value} subtitleTracks=${subtitleTracks.length}`);
+        debugLog(`[NativePlayer] calling NativeVideo.start: startPositionMs=${finalStartPositionMs} playMethod=${playMethod.value} subtitleTracks=${subtitleTracks.length} nextEpisodeId=${nextEpisodeId}`);
         await NativeVideo.start({
             url: hlsUrl.value,
             authHeader: embyAuthHeader,

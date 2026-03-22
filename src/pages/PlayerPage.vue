@@ -1439,7 +1439,7 @@ async function initOfflinePlayer(cachedDownload: any, resumeSeconds?: number, it
                 if (data.reason === 'dolby_vision_unsupported') {
                     error.value = 'This device cannot play Dolby Vision video. Try playing online — the server will transcode automatically.';
                 } else if (data.reason === 'video_codec_unsupported') {
-                    error.value = 'This device cannot play this video format. Try playing online — the server will transcode automatically.';
+                    error.value = 'This device cannot play this video format. Delete the download and re-download — the app will automatically transcode it to a compatible format.';
                 } else {
                     error.value = `Video error: ${data.reason}`;
                 }

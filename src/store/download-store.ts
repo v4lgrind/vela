@@ -266,16 +266,17 @@ export const useDownloadStore = defineStore('downloads', {
 
           // MIME type supported — also check HEVC profile/level (e.g. Main 10 / Level 5.1
           // may exceed hardware decoder capabilities even if video/hevc is listed).
+          // When Jellyfin omits Profile/Level metadata, use conservative fallbacks:
+          // assume Main 10 at Level 5.1 (153) so devices that can't handle high profiles
+          // get a transcoded download rather than an unplayable raw file.
           if ((codec === 'hevc' || codec === 'h265') && stream.Type === 'Video') {
-            const streamProfile = (stream.Profile || '') as string;
-            const streamLevel = (stream.Level as number) || 0;
-            if (streamProfile && streamLevel) {
-              const { supported } = await NativeVideo.canDecodeHevc({ profile: streamProfile, level: streamLevel });
-              if (!supported) {
-                console.log(`[DownloadStore] HEVC profile "${streamProfile}" level ${streamLevel} not supported — will transcode`);
-                needsTranscode = true;
-                break;
-              }
+            const checkProfile = (stream.Profile as string) || 'Main 10';
+            const checkLevel = (stream.Level as number) || 153;
+            const { supported } = await NativeVideo.canDecodeHevc({ profile: checkProfile, level: checkLevel });
+            if (!supported) {
+              console.log(`[DownloadStore] HEVC profile "${checkProfile}" level ${checkLevel} not supported — will transcode`);
+              needsTranscode = true;
+              break;
             }
           }
         }

@@ -81,6 +81,8 @@ class NativePlayerActivity : AppCompatActivity() {
         const val EXTRA_SELECTED_BITRATE = "selectedBitrate"
         const val EXTRA_STREAM_INFO = "streamInfo"
         const val EXTRA_SUBTITLE_TEXT_SIZE = "subtitleTextSize"
+        const val EXTRA_NEXT_EPISODE_ID = "nextEpisodeId"
+        const val ACTION_NEXT_EPISODE = "com.jellyfin_v4lgrind_client.app.PLAYER_NEXT_EPISODE"
     }
 
     private var player: ExoPlayer? = null
@@ -94,6 +96,7 @@ class NativePlayerActivity : AppCompatActivity() {
     private lateinit var btnQuality: ImageButton
     private lateinit var btnInfo: ImageButton
     private lateinit var btnSkipIntro: Button
+    private lateinit var btnNextEpisode: Button
     private lateinit var loadingSpinner: View
     private lateinit var seekBar: SeekBar
     private lateinit var tvCurrentTime: TextView
@@ -209,6 +212,13 @@ class NativePlayerActivity : AppCompatActivity() {
                 btnSkipIntro.visibility = if (showSkip) View.VISIBLE else View.GONE
             }
 
+            // Show/hide Next Episode button (last 60 seconds)
+            if (nextEpisodeId.isNotEmpty()) {
+                val dur = player?.duration ?: 0L
+                val remaining = dur - pos
+                btnNextEpisode.visibility = if (dur > 0L && remaining in 1L..60_000L) View.VISIBLE else View.GONE
+            }
+
             handler.postDelayed(this, 500)
         }
     }
@@ -217,6 +227,7 @@ class NativePlayerActivity : AppCompatActivity() {
     private var introStartMs = -1L
     private var introEndMs = -1L
     private var introSkipped = false
+    private var nextEpisodeId = ""
 
     // Dolby Vision → HEVC fallback: when the device can't decode DV profile 8,
     // restart with a codec selector that maps video/dolby-vision → video/hevc.
@@ -274,6 +285,7 @@ class NativePlayerActivity : AppCompatActivity() {
         tvTotalTime = findViewById(R.id.tv_total_time)
         tvTitle = findViewById(R.id.tv_title)
         btnSkipIntro = findViewById(R.id.btn_skip_intro)
+        btnNextEpisode = findViewById(R.id.btn_next_episode)
         loadingSpinner = findViewById(R.id.loading_spinner)
         btnQuality = findViewById(R.id.btn_quality)
         btnInfo = findViewById(R.id.btn_info)
@@ -318,6 +330,8 @@ class NativePlayerActivity : AppCompatActivity() {
         selectedJellyfinAudioIndex = intent.getIntExtra(EXTRA_SELECTED_AUDIO_INDEX, -1)
         android.util.Log.d("NativePlayer", "selectedJellyfinAudioIndex=$selectedJellyfinAudioIndex jellyfinAudioTracks=${jellyfinAudioTracks.map { "(${it.first},${it.third})" }}")
         if (jellyfinAudioTracks.size > 1) btnAudio.visibility = View.VISIBLE
+
+        nextEpisodeId = intent.getStringExtra(EXTRA_NEXT_EPISODE_ID) ?: ""
 
         tvTitle.text = title
 
@@ -428,6 +442,11 @@ class NativePlayerActivity : AppCompatActivity() {
             introSkipped = true
             btnSkipIntro.visibility = View.GONE
             p.seekTo(introEndMs)
+        }
+
+        btnNextEpisode.setOnClickListener {
+            sendNextEpisodeBroadcast()
+            finish()
         }
     }
 
@@ -1172,6 +1191,13 @@ class NativePlayerActivity : AppCompatActivity() {
             intent.putExtra("positionMs", p.currentPosition)
             intent.putExtra("durationMs", p.duration.coerceAtLeast(0L))
         }
+        intent.setPackage(packageName)
+        sendBroadcast(intent)
+    }
+
+    private fun sendNextEpisodeBroadcast() {
+        val intent = Intent(ACTION_NEXT_EPISODE)
+        intent.putExtra("nextEpisodeId", nextEpisodeId)
         intent.setPackage(packageName)
         sendBroadcast(intent)
     }

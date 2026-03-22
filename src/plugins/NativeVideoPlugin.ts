@@ -20,6 +20,7 @@ export interface NativeVideoStartOptions {
     audioTracksJson?: string;
     selectedAudioIndex?: number;
     subtitleTextSize?: number;
+    nextEpisodeId?: string;
 }
 
 export interface NativeVideoProgressEvent {
@@ -95,6 +96,7 @@ export interface NativeVideoPlugin {
     addListener(event: 'audioError', handler: (data: NativeVideoAudioErrorEvent) => void): Promise<PluginListenerHandle>;
     addListener(event: 'videoError', handler: (data: NativeVideoVideoErrorEvent) => void): Promise<PluginListenerHandle>;
     addListener(event: 'audioSwitchJellyfin', handler: (data: NativeVideoAudioSwitchJellyfinEvent) => void): Promise<PluginListenerHandle>;
+    addListener(event: 'nextEpisode', handler: (data: { nextEpisodeId: string }) => void): Promise<PluginListenerHandle>;
     addListener(event: 'debugLog', handler: (data: { message: string }) => void): Promise<PluginListenerHandle>;
 
     removeAllListeners(): Promise<void>;

@@ -686,7 +686,14 @@ async function playNextInSeason(season: any) {
 }
 
 function playEpisode(ep: any) {
-    router.push({ name: 'Player', params: { id: ep.Id } });
+    const sorted = [...episodes.value].sort((a, b) => (a.IndexNumber ?? 0) - (b.IndexNumber ?? 0));
+    const idx = sorted.findIndex(e => e.Id === ep.Id);
+    const next = idx >= 0 && idx < sorted.length - 1 ? sorted[idx + 1] : null;
+    router.push({
+        name: 'Player',
+        params: { id: ep.Id },
+        query: next ? { nextEpisodeId: next.Id } : {},
+    });
 }
 
 async function toggleWatched() {

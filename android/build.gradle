@@ -23,6 +23,16 @@ allprojects {
         google()
         mavenCentral()
     }
+    // kotlin-stdlib 1.8+ merged the jdk7/jdk8 extension modules into the main artifact.
+    // Old Cordova/Capacitor plugin subprojects still pull in the separate jdk7/jdk8 jars,
+    // causing duplicate class errors. Force them to the same version as the main stdlib.
+    configurations.all {
+        resolutionStrategy.eachDependency { DependencyResolveDetails details ->
+            if (details.requested.group == 'org.jetbrains.kotlin') {
+                details.useVersion '2.2.10'
+            }
+        }
+    }
 }
 
 task clean(type: Delete) {

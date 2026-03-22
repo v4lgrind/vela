@@ -306,6 +306,7 @@ const preferencesStore = usePreferencesStore();
 const offlineStore = useOfflineStore();
 
 const itemId = route.params.id as string;
+const nextEpisodeId = (route.query.nextEpisodeId as string | undefined) || '';
 const accessToken = store.accessToken || '';
 const serverUrl = store.serverUrl;
 const isNative = Capacitor.isNativePlatform();
@@ -1323,6 +1324,12 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
             debugLog(data.message, 'kotlin');
         });
 
+        await NativeVideo.addListener('nextEpisode', async (data) => {
+            if (!data.nextEpisodeId) return;
+            await NativeVideo.removeAllListeners();
+            router.replace({ name: 'Player', params: { id: data.nextEpisodeId } });
+        });
+
         debugLog(`[NativePlayer] calling NativeVideo.start: startPositionMs=${finalStartPositionMs} playMethod=${playMethod.value} subtitleTracks=${subtitleTracks.length}`);
         await NativeVideo.start({
             url: hlsUrl.value,
@@ -1341,6 +1348,7 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
             }))),
             selectedAudioIndex: selectedAudioIndex.value ?? -1,
             subtitleTextSize: preferencesStore.subtitleSize,
+            nextEpisodeId: nextEpisodeId || '',
         });
 
         // Don't clear isLoading here — keep the spinner until tracksReady fires,
@@ -1553,6 +1561,7 @@ async function initOfflinePlayer(cachedDownload: any, resumeSeconds?: number, it
                 playMethod: 'DirectPlay',
                 subtitleTracks: [],
                 subtitleTextSize: preferencesStore.subtitleSize,
+                nextEpisodeId: nextEpisodeId || '',
             });
 
             // Apply stored intro/outro segments so skip-intro works offline

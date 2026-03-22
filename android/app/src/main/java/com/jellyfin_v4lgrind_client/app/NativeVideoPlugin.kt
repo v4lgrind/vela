@@ -47,6 +47,8 @@ class NativeVideoPlugin : Plugin() {
         val selectedAudioIndex = call.data.optInt("selectedAudioIndex", -1)
         val subtitleTextSize = call.data.optDouble("subtitleTextSize", 1.0).toFloat()
 
+        val nextEpisodeId = call.getString("nextEpisodeId") ?: ""
+
         val intent = Intent(activity, NativePlayerActivity::class.java).apply {
             putExtra(NativePlayerActivity.EXTRA_URL, url)
             putExtra(NativePlayerActivity.EXTRA_AUTH_HEADER, authHeader)
@@ -60,6 +62,7 @@ class NativeVideoPlugin : Plugin() {
             putExtra(NativePlayerActivity.EXTRA_AUDIO_TRACKS, audioTracksJson)
             putExtra(NativePlayerActivity.EXTRA_SELECTED_AUDIO_INDEX, selectedAudioIndex)
             putExtra(NativePlayerActivity.EXTRA_SUBTITLE_TEXT_SIZE, subtitleTextSize)
+            putExtra(NativePlayerActivity.EXTRA_NEXT_EPISODE_ID, nextEpisodeId)
         }
         activity.startActivity(intent)
         call.resolve()
@@ -324,6 +327,11 @@ class NativeVideoPlugin : Plugin() {
                         notifyListeners("videoError", data)
                         unregisterEventReceiver()
                     }
+                    NativePlayerActivity.ACTION_NEXT_EPISODE -> {
+                        val data = JSObject()
+                        data.put("nextEpisodeId", intent.getStringExtra("nextEpisodeId") ?: "")
+                        notifyListeners("nextEpisode", data)
+                    }
                     NativePlayerActivity.ACTION_DEBUG_LOG -> {
                         val data = JSObject()
                         data.put("message", intent.getStringExtra("message") ?: "")
@@ -345,6 +353,7 @@ class NativeVideoPlugin : Plugin() {
             addAction(NativePlayerActivity.ACTION_AUDIO_ERROR)
             addAction(NativePlayerActivity.ACTION_AUDIO_SWITCH_JELLYFIN)
             addAction(NativePlayerActivity.ACTION_VIDEO_ERROR)
+            addAction(NativePlayerActivity.ACTION_NEXT_EPISODE)
             addAction(NativePlayerActivity.ACTION_DEBUG_LOG)
         }
         ContextCompat.registerReceiver(context, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)

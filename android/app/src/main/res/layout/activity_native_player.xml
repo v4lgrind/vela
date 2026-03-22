@@ -283,4 +283,22 @@
         android:paddingBottom="10dp"
         android:visibility="gone" />
 
+    <!-- Next Episode button — mirrors Skip Intro but anchored bottom|start -->
+    <Button
+        android:id="@+id/btn_next_episode"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|start"
+        android:layout_marginStart="16dp"
+        android:layout_marginBottom="80dp"
+        android:text="Next Episode"
+        android:textColor="#FFFFFF"
+        android:textSize="14sp"
+        android:backgroundTint="#CC000000"
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp"
+        android:visibility="gone" />
+
 </FrameLayout>

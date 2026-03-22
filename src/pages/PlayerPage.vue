@@ -1084,6 +1084,22 @@ function buildMediaTitle(item: any): string {
     return item.Name || '';
 }
 
+// ── Next-episode resolver ────────────────────────────────────────────────────────
+
+async function fetchNextEpisodeForItem(epItemId: string): Promise<string> {
+    try {
+        const item = await store.fetchItemDetails(epItemId);
+        if (item.Type !== 'Episode' || !item.SeasonId) return '';
+        const episodes = await store.fetchEpisodes(item.SeasonId);
+        const sorted = [...episodes].sort((a: any, b: any) => (a.IndexNumber ?? 0) - (b.IndexNumber ?? 0));
+        const idx = sorted.findIndex((e: any) => e.Id === epItemId);
+        if (idx < 0 || idx >= sorted.length - 1) return '';
+        return (sorted[idx + 1] as any).Id ?? '';
+    } catch {
+        return '';
+    }
+}
+
 // ── Native player init (Android ExoPlayer) ─────────────────────────────────────
 
 async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: number, title?: string, transcodeAudio = false, forceTranscodeVideo = false) {
@@ -1094,7 +1110,10 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
             ? Math.floor(resumeSeconds * 10_000_000)
             : undefined;
 
-        const data = await fetchPlaybackInfo(startTicks, preferredAudioIndex, forceTranscodeVideo, true, transcodeAudio);
+        const [data, resolvedNextEpisodeId] = await Promise.all([
+            fetchPlaybackInfo(startTicks, preferredAudioIndex, forceTranscodeVideo, true, transcodeAudio),
+            nextEpisodeId ? Promise.resolve(nextEpisodeId) : fetchNextEpisodeForItem(itemId),
+        ]);
         mediaSource.value = data.MediaSources?.[0];
         if (!mediaSource.value) throw new Error('No media source available');
 
@@ -1330,7 +1349,7 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
             router.replace({ name: 'Player', params: { id: data.nextEpisodeId } });
         });
 
-        debugLog(`[NativePlayer] calling NativeVideo.start: startPositionMs=${finalStartPositionMs} playMethod=${playMethod.value} subtitleTracks=${subtitleTracks.length} nextEpisodeId=${nextEpisodeId}`);
+        debugLog(`[NativePlayer] calling NativeVideo.start: startPositionMs=${finalStartPositionMs} playMethod=${playMethod.value} subtitleTracks=${subtitleTracks.length} nextEpisodeId=${resolvedNextEpisodeId}`);
         await NativeVideo.start({
             url: hlsUrl.value,
             authHeader: embyAuthHeader,
@@ -1348,7 +1367,7 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
             }))),
             selectedAudioIndex: selectedAudioIndex.value ?? -1,
             subtitleTextSize: preferencesStore.subtitleSize,
-            nextEpisodeId: nextEpisodeId || '',
+            nextEpisodeId: resolvedNextEpisodeId,
         });
 
         // Don't clear isLoading here — keep the spinner until tracksReady fires,

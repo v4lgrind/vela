@@ -24,6 +24,9 @@ export interface DownloadedMedia {
 
   // Cached Jellyfin item for details page
   jellyfinItem: any; // Full item object
+
+  // Intro/outro segment timestamps for offline skip-intro support
+  introSegments?: Array<{ Type: string; StartTicks: number; EndTicks: number }>;
 }
 
 export interface WatchProgress {

@@ -1554,6 +1554,17 @@ async function initOfflinePlayer(cachedDownload: any, resumeSeconds?: number, it
                 subtitleTracks: [],
                 subtitleTextSize: preferencesStore.subtitleSize,
             });
+
+            // Apply stored intro/outro segments so skip-intro works offline
+            if (cachedDownload.introSegments?.length) {
+                const intro = cachedDownload.introSegments.find((s: any) => s.Type === 'Intro');
+                if (intro) {
+                    NativeVideo.setIntroTimestamps({
+                        introStartMs: Math.floor(intro.StartTicks / 10_000),
+                        introEndMs: Math.floor(intro.EndTicks / 10_000),
+                    }).catch(() => {});
+                }
+            }
             // isLoading cleared by tracksReady listener above
         } else {
             const video = videoEl.value;

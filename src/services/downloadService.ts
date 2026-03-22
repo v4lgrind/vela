@@ -158,6 +158,23 @@ class DownloadService {
         downloadedMedia.albumName = metadata.Album;
       }
 
+      // Fetch intro/outro segment timestamps so skip-intro works offline
+      try {
+        const segRes = await fetch(
+          `${serverUrl}/MediaSegments/${itemId}?includeSegmentTypes=Intro&includeSegmentTypes=Outro&api_key=${accessToken}`
+        );
+        if (segRes.ok) {
+          const segData = await segRes.json();
+          if (segData.Items?.length) {
+            downloadedMedia.introSegments = segData.Items.map((s: any) => ({
+              Type: s.Type,
+              StartTicks: s.StartTicks,
+              EndTicks: s.EndTicks,
+            }));
+          }
+        }
+      } catch { /* non-critical — skip intro just won't work offline for this item */ }
+
       await offlineDatabase.addDownload(downloadedMedia);
       console.log('✅ Download complete:', filename);
 

@@ -34,6 +34,19 @@
               <option v-for="s in SUBTITLE_SIZES" :key="s.value" :value="s.value">{{ s.label }}</option>
             </select>
           </div>
+          <!-- Subtitle size preview -->
+          <div class="px-4 py-3 bg-black/60">
+            <div class="rounded-lg bg-black overflow-hidden relative flex items-end justify-center" style="height: 90px;">
+              <!-- Simulated scene -->
+              <div class="absolute inset-0 bg-gradient-to-br from-zinc-800 via-zinc-900 to-black" />
+              <p
+                class="relative text-white text-center leading-snug px-3 pb-2 font-medium subtitle-preview-text"
+                :style="{ fontSize: `${Math.round(15 * preferencesStore.subtitleSize)}px` }"
+              >
+                The quick brown fox jumps over the lazy dog
+              </p>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -137,3 +150,16 @@ const QUALITY_PRESETS = [
   { bitrate:  1_500_000, label: '360p' },
 ];
 </script>
+
+<style scoped>
+/* Mimics ExoPlayer's EDGE_TYPE_OUTLINE (black outline on white text) */
+.subtitle-preview-text {
+  text-shadow:
+    -1px -1px 0 #000,
+     1px -1px 0 #000,
+    -1px  1px 0 #000,
+     1px  1px 0 #000,
+     0    0   4px #000;
+  transition: font-size 0.2s ease;
+}
+</style>

@@ -2,6 +2,7 @@ import { offlineDatabase, type DownloadedMedia } from './offlineDatabase';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Capacitor } from '@capacitor/core';
 import type { PluginListenerHandle } from '@capacitor/core';
+import { DownloadPlugin } from '@/plugins/DownloadPlugin';
 
 interface DownloadProgress {
   itemId: string;
@@ -13,19 +14,15 @@ interface DownloadProgress {
 
 interface ActiveDownload {
   aborted: boolean;
-  progressListener: PluginListenerHandle | null;
 }
 
 class DownloadService {
   private downloads: Map<string, ActiveDownload> = new Map();
   private progressCallbacks: Map<string, (progress: DownloadProgress) => void> = new Map();
-  /** Map download URLs to item IDs for progress event routing */
-  private urlToItemId: Map<string, string> = new Map();
 
   /**
-   * Download file for offline use.
-   * Progress is tracked via Capacitor's built-in progress event, filtered by
-   * download URL so concurrent downloads report independently.
+   * Download file for offline use via native Android ForegroundService.
+   * The download survives app backgrounding, screen-off, and retries on network errors.
    */
   async downloadForOffline(
     serverUrl: string,
@@ -55,73 +52,57 @@ class DownloadService {
 
     if (onProgress) this.progressCallbacks.set(itemId, onProgress);
 
-    const activeDownload: ActiveDownload = { aborted: false, progressListener: null };
+    const activeDownload: ActiveDownload = { aborted: false };
     this.downloads.set(itemId, activeDownload);
-    this.urlToItemId.set(downloadUrl, itemId);
-
-    // Listen for Capacitor progress events.
-    // URL matching is lenient: we check if the event URL contains our itemId
-    // because Capacitor may encode/normalize URLs differently (especially transcoded ones).
-    try {
-      activeDownload.progressListener = await Filesystem.addListener('progress', (event) => {
-        // Try exact match first, then check if event URL contains our download URL's path
-        let matchedId = this.urlToItemId.get(event.url);
-        if (!matchedId) {
-          // Fallback: match by itemId in URL (covers encoding differences)
-          for (const [url, id] of this.urlToItemId) {
-            if (event.url?.includes(itemId) || url === event.url) {
-              matchedId = id;
-              break;
-            }
-          }
-        }
-        if (matchedId !== itemId) return;
-
-        const callback = this.progressCallbacks.get(itemId);
-        if (callback) {
-          const loaded = event.bytes || 0;
-          // For chunked transfers (transcoded), fall back to estimated size for progress calculation
-          const total = (event.contentLength && event.contentLength > 0)
-            ? event.contentLength
-            : (estimatedSize || 0);
-          const percentage = total > 0 ? Math.min(99, Math.round((loaded / total) * 100)) : -1;
-          callback({ itemId, filename, loaded, total, percentage });
-        }
-      });
-    } catch { /* listener setup failed — progress just won't update */ }
-
-    // For transcoded downloads, poll file size as a fallback since
-    // Capacitor progress events may not fire for chunked responses.
-    let sizePollInterval: ReturnType<typeof setInterval> | null = null;
-    if (transcodedUrl && onProgress) {
-      sizePollInterval = setInterval(async () => {
-        try {
-          const stat = await Filesystem.stat({ path: filePath, directory: Directory.Data });
-          const size = stat.size ?? 0;
-          if (size > 0) {
-            const callback = this.progressCallbacks.get(itemId);
-            if (callback) {
-              const total = estimatedSize || 0;
-              const percentage = total > 0 ? Math.min(99, Math.round((size / total) * 100)) : -1;
-              callback({ itemId, filename, loaded: size, total, percentage });
-            }
-          }
-        } catch { /* file may not exist yet */ }
-      }, 2000);
-    }
 
     try {
-      // Ensure directory exists
-      const dirPath = filePath.substring(0, filePath.lastIndexOf('/'));
-      try {
-        await Filesystem.mkdir({ path: dirPath, directory: Directory.Data, recursive: true });
-      } catch { /* may already exist */ }
+      // Download via native Android ForegroundService (keeps CPU awake, shows notification)
+      await new Promise<void>(async (resolve, reject) => {
+        const handles: PluginListenerHandle[] = [];
 
-      await Filesystem.downloadFile({
-        url: downloadUrl,
-        path: filePath,
-        directory: Directory.Data,
-        progress: true,
+        const cleanup = async () => {
+          for (const h of handles) {
+            try { await h.remove(); } catch { /* ignore */ }
+          }
+        };
+
+        handles.push(await DownloadPlugin.addListener('downloadProgress', (evt) => {
+          if (evt.itemId !== itemId) return;
+          if (activeDownload.aborted) {
+            DownloadPlugin.cancel({ itemId }).catch(() => {});
+            return;
+          }
+          const callback = this.progressCallbacks.get(itemId);
+          if (callback) {
+            const total = evt.total > 0 ? evt.total : (estimatedSize || 0);
+            const pct = total > 0 ? Math.min(99, Math.round((evt.loaded / total) * 100)) : -1;
+            callback({ itemId, filename, loaded: evt.loaded, total, percentage: pct });
+          }
+        }));
+
+        handles.push(await DownloadPlugin.addListener('downloadComplete', async (evt) => {
+          if (evt.itemId !== itemId) return;
+          await cleanup();
+          resolve();
+        }));
+
+        handles.push(await DownloadPlugin.addListener('downloadFailed', async (evt) => {
+          if (evt.itemId !== itemId) return;
+          await cleanup();
+          if (activeDownload.aborted || evt.error === 'AbortError') {
+            reject(Object.assign(new Error('AbortError'), { name: 'AbortError' }));
+          } else {
+            reject(new Error(evt.error));
+          }
+        }));
+
+        await DownloadPlugin.enqueue({
+          itemId,
+          url: downloadUrl,
+          destPath: filePath,
+          itemName: metadata.Name || '',
+          estimatedSize: estimatedSize || 0,
+        });
       });
 
       if (activeDownload.aborted) {
@@ -195,14 +176,8 @@ class DownloadService {
       console.error('❌ Download error:', error);
       throw error;
     } finally {
-      if (sizePollInterval) clearInterval(sizePollInterval);
-      if (activeDownload.progressListener) {
-        await activeDownload.progressListener.remove();
-        activeDownload.progressListener = null;
-      }
       this.downloads.delete(itemId);
       this.progressCallbacks.delete(itemId);
-      this.urlToItemId.delete(downloadUrl);
     }
   }
 
@@ -367,6 +342,7 @@ class DownloadService {
     const download = this.downloads.get(itemId);
     if (download) {
       download.aborted = true;
+      DownloadPlugin.cancel({ itemId }).catch(() => {});
       console.log('🚫 Cancelling:', itemId);
     }
   }

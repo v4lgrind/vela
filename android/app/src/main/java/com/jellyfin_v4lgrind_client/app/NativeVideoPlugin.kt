@@ -113,8 +113,10 @@ class NativeVideoPlugin : Plugin() {
 
     @PluginMethod
     fun setIntroTimestamps(call: PluginCall) {
-        val introStartMs = call.getLong("introStartMs") ?: -1L
-        val introEndMs = call.getLong("introEndMs") ?: -1L
+        // getLong() only matches JSON Long; JS numbers in int range arrive as Integer.
+        // optLong() coerces Integer → Long correctly (same issue as startPositionMs in start()).
+        val introStartMs = call.data.optLong("introStartMs", -1L)
+        val introEndMs = call.data.optLong("introEndMs", -1L)
         val intent = Intent(NativePlayerActivity.ACTION_COMMAND)
         intent.putExtra("command", NativePlayerActivity.CMD_SET_INTRO)
         intent.putExtra("introStartMs", introStartMs)

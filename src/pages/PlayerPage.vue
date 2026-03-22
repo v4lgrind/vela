@@ -25,13 +25,24 @@
                 <p class="mt-5 text-white text-base font-medium">Loading...</p>
             </div>
 
+            <!-- Double-tap seek feedback (web player) -->
+            <Transition name="seek-ripple">
+                <div v-if="seekFeedback"
+                    :key="seekFeedback"
+                    class="absolute top-1/2 -translate-y-1/2 w-20 h-20 rounded-full bg-white/20 backdrop-blur-sm flex flex-col items-center justify-center pointer-events-none z-40 select-none"
+                    :class="seekFeedback === 'back' ? 'left-10' : 'right-10'">
+                    <span class="text-2xl leading-none font-bold">{{ seekFeedback === 'back' ? '«' : '»' }}</span>
+                    <span class="text-xs mt-0.5">{{ seekFeedback === 'back' ? '−10s' : '+10s' }}</span>
+                </div>
+            </Transition>
+
             <!-- Video element (web only) -->
             <video v-if="!isNative" ref="videoEl" class="w-full h-full bg-black object-contain" preload="metadata" playsinline
                 :poster="posterUrl" @loadstart="onLoadStart" @canplay="onCanPlay"
                 @waiting="onWaiting" @playing="onPlaying" @pause="onPause" @timeupdate="onTimeUpdate"
                 @loadedmetadata="onLoadedMetadata" @ended="onEnded"
                 @click="handleVideoTap"
-                @touchstart="handleVideoTap">
+                @touchstart.passive="handleTouchStart">
                 <track
                     v-if="activeTrackBlobUrl"
                     :key="selectedSubtitleIndex ?? -1"
@@ -321,6 +332,7 @@ const subtitleDropdown = ref<HTMLElement | null>(null);
 
 const isLoading = ref(true);
 const isPlaying = ref(false);
+const seekFeedback = ref<'back' | 'fwd' | null>(null);
 const isMuted = ref(false);
 const currentTime = ref(0);
 const duration = ref(0);
@@ -504,6 +516,36 @@ function handleVideoTap() {
     } else {
         togglePlayPause();
     }
+}
+
+let doubleTapTimer: ReturnType<typeof setTimeout> | null = null;
+let seekFeedbackTimer: ReturnType<typeof setTimeout> | null = null;
+
+function handleTouchStart(e: TouchEvent) {
+    const touch = e.touches[0];
+    if (!touch) return;
+    if (doubleTapTimer !== null) {
+        clearTimeout(doubleTapTimer);
+        doubleTapTimer = null;
+        const isLeft = touch.clientX < (e.currentTarget as HTMLElement).clientWidth / 2;
+        doubleTapSeek(isLeft ? -10 : 10);
+    } else {
+        doubleTapTimer = setTimeout(() => {
+            doubleTapTimer = null;
+            handleVideoTap();
+        }, 250);
+    }
+}
+
+function doubleTapSeek(deltaSec: number) {
+    const video = videoEl.value;
+    if (!video) return;
+    video.currentTime = Math.max(0, Math.min(video.duration || Infinity, video.currentTime + deltaSec));
+    if (!isOfflinePlayback) reportPlaybackProgress();
+    if (seekFeedbackTimer !== null) clearTimeout(seekFeedbackTimer);
+    seekFeedback.value = deltaSec < 0 ? 'back' : 'fwd';
+    seekFeedbackTimer = setTimeout(() => { seekFeedback.value = null; }, 700);
+    showControls();
 }
 
 // ── Playback controls ──────────────────────────────────────────────────────────
@@ -2089,6 +2131,20 @@ onBeforeUnmount(() => {
 .skip-intro-leave-to {
     opacity: 0;
     transform: translateY(8px);
+}
+
+.seek-ripple-enter-active {
+    transition: opacity 100ms ease, transform 100ms ease;
+}
+.seek-ripple-leave-active {
+    transition: opacity 350ms ease;
+}
+.seek-ripple-enter-from {
+    opacity: 0;
+    transform: translateY(-50%) scale(0.6);
+}
+.seek-ripple-leave-to {
+    opacity: 0;
 }
 </style>
 

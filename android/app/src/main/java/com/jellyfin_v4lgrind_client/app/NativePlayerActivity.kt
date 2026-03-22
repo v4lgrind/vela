@@ -8,8 +8,12 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.view.GestureDetector
+import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
+import android.widget.LinearLayout
+import androidx.core.view.GestureDetectorCompat
 import android.widget.Button
 import android.widget.ImageButton
 import android.widget.SeekBar
@@ -95,6 +99,10 @@ class NativePlayerActivity : AppCompatActivity() {
     private lateinit var tvCurrentTime: TextView
     private lateinit var tvTotalTime: TextView
     private lateinit var tvTitle: TextView
+
+    private lateinit var seekFeedbackBack: LinearLayout
+    private lateinit var seekFeedbackFwd: LinearLayout
+    private lateinit var gestureDetector: GestureDetectorCompat
 
     private val handler = Handler(Looper.getMainLooper())
     private var controlsVisible = true
@@ -269,6 +277,23 @@ class NativePlayerActivity : AppCompatActivity() {
         loadingSpinner = findViewById(R.id.loading_spinner)
         btnQuality = findViewById(R.id.btn_quality)
         btnInfo = findViewById(R.id.btn_info)
+        seekFeedbackBack = findViewById(R.id.seek_feedback_back)
+        seekFeedbackFwd = findViewById(R.id.seek_feedback_fwd)
+
+        gestureDetector = GestureDetectorCompat(this, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
+                if (!isTapOnInteractiveView(e.rawX.toInt(), e.rawY.toInt())) toggleControls()
+                return true
+            }
+            override fun onDoubleTap(e: MotionEvent): Boolean {
+                if (isTapOnInteractiveView(e.rawX.toInt(), e.rawY.toInt())) return true
+                val isForward = e.x > controlsOverlay.width / 2f
+                val deltaMs = if (isForward) 10_000L else -10_000L
+                player?.let { it.seekTo(maxOf(0L, it.currentPosition + deltaMs)) }
+                showSeekFeedback(isForward)
+                return true
+            }
+        })
 
         val url = intent.getStringExtra(EXTRA_URL) ?: run {
             finish()
@@ -370,9 +395,7 @@ class NativePlayerActivity : AppCompatActivity() {
             }
         })
 
-        // Tap on player view toggles controls
-        playerView.setOnClickListener { toggleControls() }
-        controlsOverlay.setOnClickListener { toggleControls() }
+        // Single-tap and double-tap handled via gestureDetector in dispatchTouchEvent
 
         // Quality picker
         btnQuality.setOnClickListener {
@@ -1002,6 +1025,35 @@ class NativePlayerActivity : AppCompatActivity() {
             controlsVisible = true
             scheduleHideControls()
         }
+    }
+
+    override fun dispatchTouchEvent(ev: MotionEvent?): Boolean {
+        if (ev != null) gestureDetector.onTouchEvent(ev)
+        return super.dispatchTouchEvent(ev)
+    }
+
+    /** Returns true if the touch coordinates land on one of the interactive control buttons. */
+    private fun isTapOnInteractiveView(x: Int, y: Int): Boolean {
+        val views = listOf(btnBack, btnPlayPause, btnAudio, btnSubtitle, btnFullscreen, btnQuality, btnInfo, seekBar, btnSkipIntro)
+        val loc = IntArray(2)
+        for (v in views) {
+            if (v.visibility != View.VISIBLE) continue
+            v.getLocationOnScreen(loc)
+            if (x >= loc[0] && x <= loc[0] + v.width && y >= loc[1] && y <= loc[1] + v.height) return true
+        }
+        return false
+    }
+
+    private fun showSeekFeedback(isForward: Boolean) {
+        val show = if (isForward) seekFeedbackFwd else seekFeedbackBack
+        val hide = if (isForward) seekFeedbackBack else seekFeedbackFwd
+        hide.visibility = View.INVISIBLE
+        hide.clearAnimation()
+        show.alpha = 1f
+        show.visibility = View.VISIBLE
+        show.animate().setStartDelay(400).alpha(0f).setDuration(300).withEndAction {
+            show.visibility = View.INVISIBLE
+        }.start()
     }
 
     private fun scheduleHideControls() {

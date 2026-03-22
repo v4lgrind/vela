@@ -211,6 +211,60 @@
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
+    <!-- Seek feedback: rewind (double-tap left) -->
+    <LinearLayout
+        android:id="@+id/seek_feedback_back"
+        android:layout_width="80dp"
+        android:layout_height="80dp"
+        android:layout_gravity="center_vertical|start"
+        android:layout_marginStart="40dp"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:background="@drawable/bg_seek_feedback"
+        android:visibility="invisible"
+        android:clickable="false">
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="«"
+            android:textColor="#FFFFFF"
+            android:textSize="28sp"
+            android:textStyle="bold" />
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="−10s"
+            android:textColor="#FFFFFF"
+            android:textSize="11sp" />
+    </LinearLayout>
+
+    <!-- Seek feedback: forward (double-tap right) -->
+    <LinearLayout
+        android:id="@+id/seek_feedback_fwd"
+        android:layout_width="80dp"
+        android:layout_height="80dp"
+        android:layout_gravity="center_vertical|end"
+        android:layout_marginEnd="40dp"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:background="@drawable/bg_seek_feedback"
+        android:visibility="invisible"
+        android:clickable="false">
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="»"
+            android:textColor="#FFFFFF"
+            android:textSize="28sp"
+            android:textStyle="bold" />
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="+10s"
+            android:textColor="#FFFFFF"
+            android:textSize="11sp" />
+    </LinearLayout>
+
     <!-- Skip Intro button — outside controls overlay so it stays visible when controls are hidden -->
     <Button
         android:id="@+id/btn_skip_intro"

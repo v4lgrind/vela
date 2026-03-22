@@ -220,7 +220,7 @@ export const useJellyfinStore = defineStore("jellyfin", {
         includeItemTypes: ["Episode"] as any,
         sortBy: ["SortName"],
         sortOrder: ["Ascending"],
-        fields: ["Overview", "PrimaryImageAspectRatio", "CommunityRating", "PremiereDate", "UserData"] as any,
+        fields: ["Overview", "PrimaryImageAspectRatio", "CommunityRating", "PremiereDate", "UserData", "MediaStreams", "MediaSources"] as any,
       });
       return resp.data.Items ?? [];
     },

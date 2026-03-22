@@ -159,7 +159,11 @@ export const useDownloadStore = defineStore('downloads', {
             if (t) {
               t.progress = progress.percentage >= 0 ? progress.percentage : 0;
               t.loaded = progress.loaded;
-              t.total = progress.total;
+              // Never reset a known total back to 0 — a later event with no content-length
+              // would otherwise wipe out the estimated size we calculated upfront.
+              if (progress.total > 0 || t.total === 0) {
+                t.total = progress.total;
+              }
             }
           },
           transcodedUrl,

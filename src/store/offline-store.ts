@@ -4,6 +4,7 @@ import { usePreferencesStore } from './preferences-store';
 import { offlineDatabase, type DownloadedMedia } from '../services/offlineDatabase';
 import { syncService } from '../services/syncService';
 import { useJellyfinStore } from './jellyfin-store';
+import { Capacitor } from '@capacitor/core';
 
 interface State {
   downloads: DownloadedMedia[];
@@ -149,6 +150,13 @@ export const useOfflineStore = defineStore('offline', {
           console.error('[OfflineStore] Failed to load downloads:', loadError);
         }
 
+        // Recover downloads that completed natively while the app was killed
+        try {
+          await this.reconcileNativeDownloads();
+        } catch (reconcileError) {
+          console.error('[OfflineStore] Reconcile failed:', reconcileError);
+        }
+
         // Initialize offline detection with server URL and await the first check
         // so that serverReachable is accurate before we set initialized = true.
         // Without this, the watcher in App.vue sees isFullyOnline=false immediately
@@ -198,6 +206,57 @@ export const useOfflineStore = defineStore('offline', {
       } catch (error) {
         console.error('[OfflineStore] Failed to load downloads:', error);
       }
+    },
+
+    /**
+     * Recover downloads that completed natively (DownloadService) while the JS
+     * layer was not running. The native service persists a "dl_done" list; we
+     * drain it here, reconstruct the DB record from localStorage metadata saved
+     * before the enqueue call, and save it to IndexedDB.
+     */
+    async reconcileNativeDownloads() {
+      if (!Capacitor.isNativePlatform()) return;
+      const { DownloadPlugin } = await import('@/plugins/DownloadPlugin');
+      const { items } = await DownloadPlugin.getPendingCompletions();
+      if (items.length === 0) return;
+      console.log(`[OfflineStore] Reconciling ${items.length} natively-completed download(s)`);
+      for (const item of items) {
+        try {
+          const existing = await offlineDatabase.getDownload(item.itemId);
+          if (existing) continue; // already in DB (e.g. app resumed before kill)
+          const savedStr = localStorage.getItem(`dl_meta_${item.itemId}`);
+          if (!savedStr) {
+            console.warn('[OfflineStore] No saved metadata for', item.itemId);
+            continue;
+          }
+          const { metadata, filePath } = JSON.parse(savedStr) as { metadata: any; filePath: string };
+          const media: DownloadedMedia = {
+            itemId: metadata.Id,
+            type: (['Movie', 'Episode', 'MusicAlbum', 'Audio'].includes(metadata.Type) ? metadata.Type : 'Movie') as DownloadedMedia['type'],
+            name: metadata.Name || 'Unknown',
+            filePath,
+            fileSize: item.fileSize,
+            downloadDate: Date.now(),
+            jellyfinItem: metadata,
+          };
+          if (metadata.Type === 'Episode') {
+            media.seriesId     = metadata.SeriesId;
+            media.seriesName   = metadata.SeriesName;
+            media.seasonId     = metadata.SeasonId;
+            media.seasonNumber = metadata.ParentIndexNumber;
+            media.episodeNumber = metadata.IndexNumber;
+          } else if (metadata.Type === 'Audio') {
+            media.albumId   = metadata.AlbumId;
+            media.albumName = metadata.Album;
+          }
+          await offlineDatabase.addDownload(media);
+          localStorage.removeItem(`dl_meta_${item.itemId}`);
+          console.log('[OfflineStore] Reconciled:', metadata.Name);
+        } catch (e) {
+          console.error('[OfflineStore] Failed to reconcile item', item.itemId, e);
+        }
+      }
+      await this.loadDownloads();
     },
 
     /**

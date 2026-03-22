@@ -3,6 +3,7 @@ package com.jellyfin_v4lgrind_client.app
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.content.pm.ServiceInfo
@@ -31,8 +32,9 @@ class DownloadService : Service() {
 
         private const val CHANNEL_ID = "dl_channel"
         private const val NOTIF_ID   = 3001
-        private const val PREFS_NAME = "dl_prefs"
-        private const val PREFS_KEY  = "dl_queue"
+        private const val PREFS_NAME     = "dl_prefs"
+        private const val PREFS_KEY      = "dl_queue"
+        private const val PREFS_KEY_DONE = "dl_done"
         private const val MAX_RETRIES = 3
     }
 
@@ -74,7 +76,7 @@ class DownloadService : Service() {
                     persistQueue()
                 }
                 ServiceCompat.startForeground(
-                    this, NOTIF_ID, buildNotif("Preparing download…", 0L, -1L),
+                    this, NOTIF_ID, buildNotif("Preparing download…", "", 0L, -1L),
                     ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
                 )
                 ensureWorkerRunning()
@@ -188,7 +190,7 @@ class DownloadService : Service() {
                         if (now - lastBroadcast >= 500) {
                             lastBroadcast = now
                             broadcastProgress(task.itemId, downloaded, totalSize)
-                            updateNotif(task.itemName, downloaded, totalSize)
+                            updateNotif(task.itemName, task.itemId, downloaded, totalSize)
                         }
                     }
                 }
@@ -199,12 +201,14 @@ class DownloadService : Service() {
 
         if (task.itemId in cancelledIds) throw InterruptedException()
 
+        val fileSize = destFile.length()
         lbm.sendBroadcast(Intent(ACTION_COMPLETE).apply {
             putExtra("itemId", task.itemId)
             putExtra("filePath", destFile.absolutePath)
-            putExtra("fileSize", destFile.length())
+            putExtra("fileSize", fileSize)
         })
-        android.util.Log.d("DownloadService", "Complete: ${task.itemName} (${destFile.length()} bytes)")
+        savePendingComplete(task.itemId, destFile.absolutePath, fileSize)
+        android.util.Log.d("DownloadService", "Complete: ${task.itemName} ($fileSize bytes)")
     }
 
     // ── Notification ─────────────────────────────────────────────────────────────
@@ -217,21 +221,32 @@ class DownloadService : Service() {
         })
     }
 
-    private fun updateNotif(name: String, loaded: Long, total: Long) {
+    private fun updateNotif(name: String, itemId: String, loaded: Long, total: Long) {
         val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-        nm.notify(NOTIF_ID, buildNotif(name, loaded, total))
+        nm.notify(NOTIF_ID, buildNotif(name, itemId, loaded, total))
     }
 
-    private fun buildNotif(name: String, loaded: Long, total: Long): Notification {
+    private fun buildNotif(name: String, itemId: String, loaded: Long, total: Long): Notification {
         val progress = if (total > 0) ((loaded.toDouble() / total) * 100).toInt() else 0
-        return NotificationCompat.Builder(this, CHANNEL_ID)
+        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.stat_sys_download)
             .setContentTitle(name)
             .setContentText(if (total > 0) "${mb(loaded)} / ${mb(total)} MB" else "${mb(loaded)} MB")
             .setProgress(100, progress, total <= 0)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
-            .build()
+        if (itemId.isNotEmpty()) {
+            val cancelIntent = Intent(this, DownloadService::class.java).apply {
+                action = ACTION_CANCEL
+                putExtra("itemId", itemId)
+            }
+            val cancelPi = PendingIntent.getService(
+                this, itemId.hashCode(),
+                cancelIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            builder.addAction(android.R.drawable.ic_delete, "Cancel", cancelPi)
+        }
+        return builder.build()
     }
 
     private fun mb(bytes: Long) = "%.1f".format(bytes / 1_048_576.0)
@@ -287,10 +302,25 @@ class DownloadService : Service() {
         }
         if (queue.isNotEmpty()) {
             ServiceCompat.startForeground(
-                this, NOTIF_ID, buildNotif("Resuming downloads…", 0L, -1L),
+                this, NOTIF_ID, buildNotif("Resuming downloads…", "", 0L, -1L),
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
             )
             ensureWorkerRunning()
+        }
+    }
+
+    private fun savePendingComplete(itemId: String, filePath: String, fileSize: Long) {
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        try {
+            val arr = JSONArray(prefs.getString(PREFS_KEY_DONE, "[]") ?: "[]")
+            arr.put(JSONObject().apply {
+                put("itemId",   itemId)
+                put("filePath", filePath)
+                put("fileSize", fileSize)
+            })
+            prefs.edit().putString(PREFS_KEY_DONE, arr.toString()).apply()
+        } catch (e: Exception) {
+            android.util.Log.e("DownloadService", "savePendingComplete error: $e")
         }
     }
 

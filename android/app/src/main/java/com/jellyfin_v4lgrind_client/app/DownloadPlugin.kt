@@ -5,11 +5,14 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
+import com.getcapacitor.JSArray
 import com.getcapacitor.JSObject
 import com.getcapacitor.Plugin
 import com.getcapacitor.PluginCall
 import com.getcapacitor.PluginMethod
 import com.getcapacitor.annotation.CapacitorPlugin
+import org.json.JSONArray
+import org.json.JSONObject
 
 @CapacitorPlugin(name = "Download")
 class DownloadPlugin : Plugin() {
@@ -53,6 +56,33 @@ class DownloadPlugin : Plugin() {
         }
         context.startService(intent)
         call.resolve()
+    }
+
+    /**
+     * Returns downloads that completed natively while the JS layer was not running
+     * (e.g. app was killed). Clears the list after reading so items are only returned once.
+     */
+    @PluginMethod
+    fun getPendingCompletions(call: PluginCall) {
+        val prefs = context.getSharedPreferences("dl_prefs", android.content.Context.MODE_PRIVATE)
+        val json = prefs.getString("dl_done", "[]") ?: "[]"
+        try {
+            val arr = JSONArray(json)
+            val items = JSArray()
+            for (i in 0 until arr.length()) {
+                val o = arr.getJSONObject(i)
+                items.put(JSObject().apply {
+                    put("itemId",   o.getString("itemId"))
+                    put("filePath", o.getString("filePath"))
+                    put("fileSize", o.getLong("fileSize"))
+                })
+            }
+            prefs.edit().putString("dl_done", "[]").apply()
+            call.resolve(JSObject().apply { put("items", items) })
+        } catch (e: Exception) {
+            android.util.Log.e("DownloadPlugin", "getPendingCompletions error: $e")
+            call.resolve(JSObject().apply { put("items", JSArray()) })
+        }
     }
 
     // ── LocalBroadcast receiver ───────────────────────────────────────────────

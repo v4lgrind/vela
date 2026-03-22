@@ -70,6 +70,15 @@
                 :item-type="item.Type"
                 class="w-full h-full object-cover block"
               />
+              <!-- Watched toggle -->
+              <button
+                @click.stop="toggleWatched(item)"
+                :disabled="watchingId === item.Id"
+                class="absolute top-1 right-1 z-10 rounded-full p-1 transition-all active:scale-95 disabled:opacity-60 pointer-events-auto"
+                :class="item.UserData?.Played ? 'bg-accent-purple text-white' : 'bg-black/50 text-white/60 hover:bg-black/75 hover:text-white'">
+                <Loader2 v-if="watchingId === item.Id" class="size-3 animate-spin" />
+                <Check v-else class="size-3" />
+              </button>
               <!-- Episode label -->
               <div v-if="item.Type === 'Episode' && (item.ParentIndexNumber || item.IndexNumber)"
                 class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-2 py-1.5">
@@ -98,7 +107,7 @@ import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useJellyfinStore } from '@/store/jellyfin-store';
 import LazyImg from '@/components/LazyImg.vue';
-import { ArrowLeft, Loader2, Search } from 'lucide-vue-next';
+import { ArrowLeft, Loader2, Search, Check } from 'lucide-vue-next';
 
 const route = useRoute();
 const router = useRouter();
@@ -108,6 +117,24 @@ const inputEl = ref<HTMLInputElement | null>(null);
 const searchQuery = ref((route.query.q as string) || '');
 const results = ref<any[]>([]);
 const isSearching = ref(false);
+const watchingId = ref<string | null>(null);
+
+async function toggleWatched(item: any) {
+  if (watchingId.value) return;
+  watchingId.value = item.Id;
+  try {
+    if (item.UserData?.Played) {
+      await store.markUnplayed(item.Id);
+      if (item.UserData) item.UserData.Played = false;
+    } else {
+      await store.markPlayed(item.Id);
+      if (!item.UserData) item.UserData = {};
+      item.UserData.Played = true;
+    }
+  } finally {
+    watchingId.value = null;
+  }
+}
 const activeTab = ref<'all' | 'Movie' | 'Series' | 'Episode'>('all');
 let debounceId: number | undefined;
 

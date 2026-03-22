@@ -96,6 +96,11 @@ class DownloadService {
           }
         }));
 
+        // Persist metadata so offline-store can reconstruct the DB record if the
+        // app is killed after the native download completes but before this JS
+        // completion logic runs.
+        localStorage.setItem(`dl_meta_${itemId}`, JSON.stringify({ metadata, filePath }));
+
         await DownloadPlugin.enqueue({
           itemId,
           url: downloadUrl,
@@ -157,6 +162,7 @@ class DownloadService {
       } catch { /* non-critical — skip intro just won't work offline for this item */ }
 
       await offlineDatabase.addDownload(downloadedMedia);
+      localStorage.removeItem(`dl_meta_${itemId}`);
       console.log('✅ Download complete:', filename);
 
       // Cache artwork images for offline display (fire-and-forget, don't block)

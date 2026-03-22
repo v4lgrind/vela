@@ -230,6 +230,13 @@ class NativePlayerActivity : AppCompatActivity() {
     private var introSkipped = false
     private var nextEpisodeId = ""
 
+    // Long-press scrubbing
+    private var isScrubbing = false
+    private var scrubStartX = 0f
+    private var scrubStartPositionMs = 0L
+    private val SCRUB_MS_PER_PX = 300L
+    private lateinit var tvScrubOverlay: TextView
+
     // Dolby Vision → HEVC fallback: when the device can't decode DV profile 8,
     // restart with a codec selector that maps video/dolby-vision → video/hevc.
     private var dvFallbackMode = false
@@ -287,6 +294,7 @@ class NativePlayerActivity : AppCompatActivity() {
         tvTitle = findViewById(R.id.tv_title)
         btnSkipIntro = findViewById(R.id.btn_skip_intro)
         btnNextEpisode = findViewById(R.id.btn_next_episode)
+        tvScrubOverlay = findViewById(R.id.tv_scrub_overlay)
         loadingSpinner = findViewById(R.id.loading_spinner)
         btnQuality = findViewById(R.id.btn_quality)
         btnInfo = findViewById(R.id.btn_info)
@@ -305,6 +313,16 @@ class NativePlayerActivity : AppCompatActivity() {
                 player?.let { it.seekTo(maxOf(0L, it.currentPosition + deltaMs)) }
                 showSeekFeedback(isForward)
                 return true
+            }
+            override fun onLongPress(e: MotionEvent) {
+                if (isTapOnInteractiveView(e.rawX.toInt(), e.rawY.toInt())) return
+                isScrubbing = true
+                scrubStartX = e.x
+                scrubStartPositionMs = player?.currentPosition ?: 0L
+                handler.removeCallbacks(hideControlsRunnable)
+                controlsOverlay.visibility = View.INVISIBLE
+                controlsVisible = false
+                showScrubOverlay(scrubStartPositionMs)
             }
         })
 
@@ -1049,16 +1067,40 @@ class NativePlayerActivity : AppCompatActivity() {
     }
 
     override fun dispatchTouchEvent(ev: MotionEvent?): Boolean {
-        if (ev != null) gestureDetector.onTouchEvent(ev)
+        if (ev != null) {
+            gestureDetector.onTouchEvent(ev)
+            when (ev.action) {
+                MotionEvent.ACTION_MOVE -> {
+                    if (isScrubbing) {
+                        val deltaX = ev.x - scrubStartX
+                        val dur = player?.duration?.coerceAtLeast(0L) ?: 0L
+                        val newPos = (scrubStartPositionMs + deltaX * SCRUB_MS_PER_PX)
+                            .toLong().coerceIn(0L, dur)
+                        player?.seekTo(newPos)
+                        updateScrubOverlay(newPos)
+                    }
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    if (isScrubbing) {
+                        isScrubbing = false
+                        hideScrubOverlay()
+                        controlsOverlay.visibility = View.VISIBLE
+                        controlsOverlay.alpha = 1f
+                        controlsVisible = true
+                        scheduleHideControls()
+                    }
+                }
+            }
+        }
         return super.dispatchTouchEvent(ev)
     }
 
     /** Returns true if the touch coordinates land on one of the interactive control buttons. */
     private fun isTapOnInteractiveView(x: Int, y: Int): Boolean {
-        val views = listOf(btnBack, btnPlayPause, btnAudio, btnSubtitle, btnFullscreen, btnQuality, btnInfo, seekBar, btnSkipIntro)
+        val views = listOf(btnBack, btnPlayPause, btnAudio, btnSubtitle, btnFullscreen, btnQuality, btnInfo, seekBar, btnSkipIntro, btnNextEpisode)
         val loc = IntArray(2)
         for (v in views) {
-            if (v.visibility != View.VISIBLE) continue
+            if (!v.isShown) continue
             v.getLocationOnScreen(loc)
             if (x >= loc[0] && x <= loc[0] + v.width && y >= loc[1] && y <= loc[1] + v.height) return true
         }
@@ -1075,6 +1117,19 @@ class NativePlayerActivity : AppCompatActivity() {
         show.animate().setStartDelay(400).alpha(0f).setDuration(300).withEndAction {
             show.visibility = View.INVISIBLE
         }.start()
+    }
+
+    private fun showScrubOverlay(posMs: Long) {
+        tvScrubOverlay.text = formatTime(posMs)
+        tvScrubOverlay.visibility = View.VISIBLE
+    }
+
+    private fun updateScrubOverlay(posMs: Long) {
+        tvScrubOverlay.text = formatTime(posMs)
+    }
+
+    private fun hideScrubOverlay() {
+        tvScrubOverlay.visibility = View.GONE
     }
 
     private fun scheduleHideControls() {

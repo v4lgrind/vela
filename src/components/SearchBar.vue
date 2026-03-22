@@ -152,7 +152,7 @@
         class="w-full focus:border-accent-purple focus:ring-accent-purple/15"
         @input="onInput" @focus="onFocus"
         @keydown.down.prevent="moveActive(1)" @keydown.up.prevent="moveActive(-1)"
-        @keydown.enter.prevent="selectActive" @keydown.esc="close" />
+        @keydown.enter.prevent="onEnter" @keydown.esc="close" />
 
       <div v-if="open && (hasResults || isSearching)"
         class="absolute left-0 right-0 mt-2 bg-surface-raised border border-border-input rounded-xl max-h-[70vh] overflow-hidden shadow-[0_10px_30px_rgba(0,0,0,0.5)] z-[1000] max-md:-mx-3 max-md:rounded-none max-md:max-h-[calc(100vh-120px)]">
@@ -244,6 +244,12 @@
         <div v-else class="py-10 text-center text-text-muted">
           No results for "{{ query }}"
         </div>
+
+        <!-- See all results -->
+        <button v-if="query.trim()" @click="goToSearchPage"
+          class="w-full text-left px-4 py-3 text-sm text-accent-purple-light border-t border-border-input hover:bg-surface-hover transition-colors cursor-pointer">
+          See all results for "{{ query }}" →
+        </button>
       </div>
     </div>
   </nav>
@@ -356,7 +362,7 @@ const searchContainerEl = ref<HTMLElement | null>(null);
 const query = ref('');
 const results = ref<any[]>([]);
 const open = ref(false);
-const activeIndex = ref(0);
+const activeIndex = ref(-1);
 const isSearching = ref(false);
 let debounceId: number | undefined;
 
@@ -425,7 +431,7 @@ async function searchAll(term: string) {
             limit: 50,
             includeItemTypes: ['Movie', 'Series', 'MusicAlbum']
         });
-        activeIndex.value = 0;
+        activeIndex.value = -1;
     } catch (e) {
         console.error('Search error:', e);
         results.value = [];
@@ -451,10 +457,18 @@ function moveActive(delta: number) {
     }, 10);
 }
 
-function selectActive() {
-    const flat = flatResults.value;
-    const r = flat[activeIndex.value];
+function onEnter() {
+    const r = flatResults.value[activeIndex.value];
     if (r) goToResult(r);
+    else goToSearchPage();
+}
+
+function goToSearchPage() {
+    if (!query.value.trim()) return;
+    const q = query.value.trim();
+    close();
+    query.value = '';
+    router.push({ name: 'search', query: { q } });
 }
 
 function goToResult(r: any) {

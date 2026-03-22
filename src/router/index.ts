@@ -54,6 +54,12 @@ const routes = [
     props: true,
   },
   {
+    path: "/search",
+    name: "search",
+    component: () => import("@/pages/SearchPage.vue"),
+    meta: { requiresAuth: true },
+  },
+  {
     path: "/settings",
     name: "settings",
     component: () => import("@/pages/SettingsPage.vue"),

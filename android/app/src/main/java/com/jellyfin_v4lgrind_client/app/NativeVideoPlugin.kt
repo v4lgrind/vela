@@ -227,26 +227,46 @@ class NativeVideoPlugin : Plugin() {
         // Only check hardware decoders — software decoders (OMX.google.*, c2.android.*)
         // may declare Main 10 support but ExoPlayer uses hardware decoders by default,
         // so a software-only match would produce a false positive that causes runtime failure.
-        val supported = android.media.MediaCodecList(android.media.MediaCodecList.ALL_CODECS)
-            .codecInfos
-            .filter { !it.isEncoder }
-            .filter { info ->
-                val isHardware = if (android.os.Build.VERSION.SDK_INT >= 29) {
-                    info.isHardwareAccelerated
-                } else {
-                    !info.name.startsWith("OMX.google.", ignoreCase = true) &&
-                    !info.name.startsWith("c2.android.", ignoreCase = true)
-                }
-                isHardware && info.supportedTypes.contains("video/hevc")
-            }
-            .any { info ->
-                info.getCapabilitiesForType("video/hevc").profileLevels.any { pl ->
-                    pl.profile == targetProfile &&
-                    (levelMap[pl.level] ?: 0) >= jellyfinLevel
-                }
-            }
+        android.util.Log.d("NativePlayer", "canDecodeHevc: profile='$profileStr' (targetProfile=$targetProfile) level=$jellyfinLevel")
 
-        call.resolve(JSObject().apply { put("supported", supported) })
+        val allHevcDecoders = android.media.MediaCodecList(android.media.MediaCodecList.ALL_CODECS)
+            .codecInfos
+            .filter { !it.isEncoder && it.supportedTypes.contains("video/hevc") }
+
+        android.util.Log.d("NativePlayer", "canDecodeHevc: all HEVC decoders: ${allHevcDecoders.map { it.name }}")
+
+        val hwHevcDecoders = allHevcDecoders.filter { info ->
+            val isHardware = if (android.os.Build.VERSION.SDK_INT >= 29) {
+                info.isHardwareAccelerated
+            } else {
+                !info.name.startsWith("OMX.google.", ignoreCase = true) &&
+                !info.name.startsWith("c2.android.", ignoreCase = true)
+            }
+            isHardware
+        }
+
+        android.util.Log.d("NativePlayer", "canDecodeHevc: hardware HEVC decoders: ${hwHevcDecoders.map { it.name }}")
+
+        val supported = hwHevcDecoders.any { info ->
+            val match = info.getCapabilitiesForType("video/hevc").profileLevels.any { pl ->
+                pl.profile == targetProfile &&
+                (levelMap[pl.level] ?: 0) >= jellyfinLevel
+            }
+            val levels = info.getCapabilitiesForType("video/hevc").profileLevels
+                .map { "profile=${it.profile} level=${it.level}(${levelMap[it.level] ?: 0})" }
+            android.util.Log.d("NativePlayer", "canDecodeHevc: ${info.name} match=$match levels=$levels")
+            match
+        }
+
+        // If hardware can't handle it, check if FFmpeg software decoder can.
+        // FFmpeg supports all valid HEVC bitstreams (including Main 10), so any HEVC
+        // content that hardware rejects can still be played via the software fallback.
+        val ffmpegSupported = !supported &&
+            androidx.media3.decoder.ffmpeg.FfmpegLibrary.isAvailable() &&
+            androidx.media3.decoder.ffmpeg.FfmpegLibrary.supportsFormat("video/hevc")
+        val finalSupported = supported || ffmpegSupported
+        android.util.Log.d("NativePlayer", "canDecodeHevc: result supported=$finalSupported (hw=$supported ffmpeg=$ffmpegSupported) for profile=$profileStr level=$jellyfinLevel")
+        call.resolve(JSObject().apply { put("supported", finalSupported) })
     }
 
     // ── Private helpers ────────────────────────────────────────────────────────

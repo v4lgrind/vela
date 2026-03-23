@@ -227,10 +227,12 @@ export const useDownloadStore = defineStore('downloads', {
         // Get device codec capabilities
         const { NativeVideo } = await import('@/plugins/NativeVideoPlugin');
         const { codecs: deviceCodecs } = await NativeVideo.getDeviceCodecs();
+        console.log(`[DownloadStore] device codecs: ${deviceCodecs.join(', ')}`);
         if (deviceCodecs.length === 0) return undefined;
 
         // Check all media streams for unsupported codecs
         const streams: any[] = metadata.MediaStreams || metadata.MediaSources?.[0]?.MediaStreams || [];
+        console.log(`[DownloadStore] codec check for ${metadata.Name}: streams=${streams.length}`, streams.map((s: any) => `${s.Type}/${s.Codec} profile=${s.Profile} level=${s.Level}`));
         const CODEC_MIME_MAP: Record<string, string> = {
           // Video
           dvhe: 'video/dolby-vision', dvh1: 'video/dolby-vision',
@@ -272,7 +274,9 @@ export const useDownloadStore = defineStore('downloads', {
           if ((codec === 'hevc' || codec === 'h265') && stream.Type === 'Video') {
             const checkProfile = (stream.Profile as string) || 'Main 10';
             const checkLevel = (stream.Level as number) || 153;
+            console.log(`[DownloadStore] Calling canDecodeHevc: profile="${checkProfile}" level=${checkLevel}`);
             const { supported } = await NativeVideo.canDecodeHevc({ profile: checkProfile, level: checkLevel });
+            console.log(`[DownloadStore] canDecodeHevc result: supported=${supported} for profile="${checkProfile}" level=${checkLevel}`);
             if (!supported) {
               console.log(`[DownloadStore] HEVC profile "${checkProfile}" level ${checkLevel} not supported — will transcode`);
               needsTranscode = true;
@@ -306,7 +310,7 @@ export const useDownloadStore = defineStore('downloads', {
                     VideoCodec: 'h264',
                     // Broad list — Jellyfin copies compatible tracks, transcodes the rest to aac
                     AudioCodec: 'aac,mp3,ac3,eac3,dts,flac,opus,pcm',
-                    Context: 'Static',
+                    Context: 'Streaming',
                     Protocol: 'http',
                     CopyTimestamps: true,
                     MaxAudioChannels: '8',
@@ -329,19 +333,24 @@ export const useDownloadStore = defineStore('downloads', {
           }
         );
 
-        if (!response.ok) return undefined;
+        if (!response.ok) {
+          console.warn(`[DownloadStore] PlaybackInfo request failed: ${response.status} ${response.statusText}`);
+          return undefined;
+        }
         const result = await response.json();
         const ms = result.MediaSources?.[0];
+        console.log(`[DownloadStore] PlaybackInfo response: TranscodingUrl=${ms?.TranscodingUrl} SupportsTranscoding=${ms?.SupportsTranscoding} Protocol=${ms?.TranscodingSubProtocol}`);
 
         if (ms?.TranscodingUrl) {
           const url = `${serverUrl}${ms.TranscodingUrl}`;
           const estimatedSize = (ms.Bitrate && ms.RunTimeTicks)
             ? Math.ceil((ms.Bitrate / 8) * (ms.RunTimeTicks / 10_000_000))
             : 0;
-          console.log(`[DownloadStore] Transcoded URL (est. ${Math.round(estimatedSize / 1024 / 1024)}MB): ${url.substring(0, 80)}...`);
+          console.log(`[DownloadStore] Transcoded URL (est. ${Math.round(estimatedSize / 1024 / 1024)}MB): ${url}`);
           return { url, estimatedSize };
         }
 
+        console.warn('[DownloadStore] PlaybackInfo returned no TranscodingUrl — falling back to raw download');
         return undefined;
       } catch (e) {
         console.warn('[DownloadStore] Codec check failed, downloading raw:', e);

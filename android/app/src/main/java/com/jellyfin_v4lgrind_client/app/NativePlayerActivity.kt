@@ -243,8 +243,10 @@ class NativePlayerActivity : AppCompatActivity() {
 
     // Video capability fallback: when the hardware decoder reports
     // NO_EXCEEDS_CAPABILITIES (e.g. HEVC Main 10 Level 5.1 on a limited device),
-    // tell Vue to restart with server-side transcoding.
+    // for online streams tell Vue to restart with server-side transcoding,
+    // for offline files retry with software video decoder.
     private var videoCapFallbackMode = false
+    private var forceSoftwareVideo = false
 
     // Store build parameters so we can rebuild the player for DV fallback.
     private var buildUrl = ""
@@ -332,6 +334,7 @@ class NativePlayerActivity : AppCompatActivity() {
         }
         val authHeader = intent.getStringExtra(EXTRA_AUTH_HEADER) ?: ""
         val startMs = intent.getLongExtra(EXTRA_START_MS, 0L)
+        android.util.Log.d("NativePlayer", "NativePlayerActivity.onCreate: url=$url startMs=$startMs")
         val title = intent.getStringExtra(EXTRA_TITLE) ?: ""
         val playMethod = intent.getStringExtra(EXTRA_PLAY_METHOD) ?: "Transcode"
         val subtitleTracksJson = intent.getStringExtra(EXTRA_SUBTITLE_TRACKS) ?: "[]"
@@ -540,11 +543,59 @@ class NativePlayerActivity : AppCompatActivity() {
                 androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
             )
 
-        val exo = ExoPlayer.Builder(this, renderersFactory)
-            .setMediaSourceFactory(defaultFactory)
-            .setAudioAttributes(audioAttr, true)
-            .setWakeMode(C.WAKE_MODE_NETWORK)
-            .build()
+        // When hardware video decoder fails (e.g. HEVC Main 10 on limited hardware),
+        // use the FFmpeg software video renderer if its native lib supports the codec.
+        // This is triggered on the second attempt (forceSoftwareVideo=true) after the
+        // first attempt fails with NO_EXCEEDS_CAPABILITIES.
+        val ffmpegVideoAvailable = forceSoftwareVideo &&
+            androidx.media3.decoder.ffmpeg.FfmpegLibrary.isAvailable() &&
+            (androidx.media3.decoder.ffmpeg.FfmpegLibrary.supportsFormat("video/hevc") ||
+             androidx.media3.decoder.ffmpeg.FfmpegLibrary.supportsFormat("video/avc"))
+
+        val exo = if (ffmpegVideoAvailable) {
+            debugLog("[SWVideo] FFmpeg video renderer available — using custom renderer factory")
+            // Make PlayerView shutter transparent so Canvas-rendered frames are visible
+            // (PlayerView keeps a black shutter until its standard renderer reports first frame,
+            // but our custom renderer draws via Canvas directly to the Surface).
+            playerView.setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
+            val ffmpegVideoRenderer = androidx.media3.decoder.ffmpeg.FfmpegVideoRenderer(
+                /* allowedJoiningTimeMs= */ 5000L,
+                /* eventHandler= */ null,
+                /* eventListener= */ null,
+                /* maxDroppedFramesToNotify= */ 50
+            )
+            // Wrap DefaultRenderersFactory, prepending FFmpegVideoRenderer so ExoPlayer
+            // tries it before the MediaCodec renderers.
+            val wrappedFactory = androidx.media3.exoplayer.RenderersFactory { eventHandler,
+                videoListener, audioListener, textOutput, metadataOutput ->
+                val base = renderersFactory.createRenderers(
+                    eventHandler, videoListener, audioListener, textOutput, metadataOutput)
+                arrayOf(ffmpegVideoRenderer, *base)
+            }
+            ExoPlayer.Builder(this, wrappedFactory)
+                .setMediaSourceFactory(defaultFactory)
+                .setAudioAttributes(audioAttr, true)
+                .setWakeMode(C.WAKE_MODE_NETWORK)
+                .build()
+        } else {
+            if (forceSoftwareVideo) {
+                debugLog("[SWVideo] FFmpeg video not available — MediaCodec software fallback")
+                renderersFactory.setMediaCodecSelector { mimeType, requiresSecureDecoder, requiresTunnelingDecoder ->
+                    val all = androidx.media3.exoplayer.mediacodec.MediaCodecSelector.DEFAULT
+                        .getDecoderInfos(mimeType, requiresSecureDecoder, requiresTunnelingDecoder)
+                    if (mimeType.startsWith("video/")) {
+                        val sw = all.filter { it.softwareOnly }
+                        debugLog("[SWVideo] $mimeType: ${all.size} total, ${sw.size} software: ${sw.map { it.name }}")
+                        sw.toMutableList()
+                    } else all
+                }
+            }
+            ExoPlayer.Builder(this, renderersFactory)
+                .setMediaSourceFactory(defaultFactory)
+                .setAudioAttributes(audioAttr, true)
+                .setWakeMode(C.WAKE_MODE_NETWORK)
+                .build()
+        }
 
         android.util.Log.d("NativePlayer", "buildPlayer: startMs=$startMs playMethod=$playMethod isHls=${url.contains(".m3u8")} sidecarSubs=${subtitleConfigs.size}")
 
@@ -625,9 +676,24 @@ class NativePlayerActivity : AppCompatActivity() {
                 // Hardware decoder reports NO_EXCEEDS_CAPABILITIES (e.g. HEVC Main 10
                 // Level 5.1 on a device that only supports up to Level 4.1 or 8-bit).
                 // Tell Vue to restart with server-side video transcoding.
+                debugLog("[VideoFallback] isVideoCapabilityExceededError=${isVideoCapabilityExceededError(error)} isDolbyVision=${isDolbyVisionVideoError(error)}")
                 if (!videoCapFallbackMode && isVideoCapabilityExceededError(error)) {
                     videoCapFallbackMode = true
                     val resumeMs = player?.currentPosition ?: 0L
+
+                    // Offline files: retry with software video decoder before giving up
+                    val isOffline = buildUrl.startsWith("file://") || buildUrl.startsWith("content://")
+                    if (isOffline && !forceSoftwareVideo) {
+                        debugLog("[VideoFallback] Offline file — retrying with software video decoder (resumeMs=$resumeMs)")
+                        forceSoftwareVideo = true
+                        tracksReported = false
+                        player?.release()
+                        player = null
+                        buildPlayer(buildUrl, buildAuthHeader, resumeMs, buildPlayMethod, buildSubtitleTracksJson)
+                        return
+                    }
+
+                    // Online or software decoder also failed → tell Vue
                     debugLog("[VideoFallback] Video codec exceeds device capabilities, notifying Vue to transcode (resumeMs=$resumeMs)")
                     stoppedSent = true
                     val intent = Intent(ACTION_VIDEO_ERROR)

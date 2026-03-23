@@ -787,6 +787,10 @@ class NativePlayerActivity : AppCompatActivity() {
         playerView.player = exo
         player = exo
 
+        // Create MediaSession for system media controls (lock screen, notification, Bluetooth)
+        mediaSession?.release()
+        mediaSession = MediaSession.Builder(this, exo).build()
+
         // Remove the black background box behind subtitles; keep white text with a
         // dark outline so they remain readable on any content.
         playerView.subtitleView?.setStyle(

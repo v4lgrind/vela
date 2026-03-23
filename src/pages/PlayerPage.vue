@@ -1102,7 +1102,7 @@ async function fetchNextEpisodeForItem(epItemId: string): Promise<string> {
 
 // ── Native player init (Android ExoPlayer) ─────────────────────────────────────
 
-async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: number, title?: string, transcodeAudio = false, forceTranscodeVideo = false) {
+async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: number, title?: string, transcodeAudio = false, forceTranscodeVideo = false, chapters?: Array<{ name: string; startMs: number }>) {
     isLoading.value = true;
 
     try {
@@ -1368,6 +1368,7 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
             selectedAudioIndex: selectedAudioIndex.value ?? -1,
             subtitleTextSize: preferencesStore.subtitleSize,
             nextEpisodeId: resolvedNextEpisodeId,
+            chaptersJson: chapters?.length ? JSON.stringify(chapters) : undefined,
         });
 
         // Don't clear isLoading here — keep the spinner until tracksReady fires,
@@ -2086,7 +2087,11 @@ onMounted(async () => {
     }
 
     if (isNative) {
-        await initNativePlayer(resumeSeconds, preferredAudioIndex, buildMediaTitle(details), forceTranscodeAudio, forceTranscodeVideo);
+        const chapters = (details?.Chapters || []).map((ch: any) => ({
+            name: ch.Name || '',
+            startMs: Math.floor((ch.StartPositionTicks || 0) / 10_000),
+        }));
+        await initNativePlayer(resumeSeconds, preferredAudioIndex, buildMediaTitle(details), forceTranscodeAudio, forceTranscodeVideo, chapters);
     } else {
         await initPlayer(resumeSeconds, preferredAudioIndex);
         document.addEventListener('click', handleClickOutside);

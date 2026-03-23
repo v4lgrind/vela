@@ -48,6 +48,7 @@ class NativeVideoPlugin : Plugin() {
         val subtitleTextSize = call.data.optDouble("subtitleTextSize", 1.0).toFloat()
 
         val nextEpisodeId = call.getString("nextEpisodeId") ?: ""
+        val chaptersJson = call.getString("chaptersJson") ?: "[]"
 
         val intent = Intent(activity, NativePlayerActivity::class.java).apply {
             putExtra(NativePlayerActivity.EXTRA_URL, url)
@@ -63,6 +64,7 @@ class NativeVideoPlugin : Plugin() {
             putExtra(NativePlayerActivity.EXTRA_SELECTED_AUDIO_INDEX, selectedAudioIndex)
             putExtra(NativePlayerActivity.EXTRA_SUBTITLE_TEXT_SIZE, subtitleTextSize)
             putExtra(NativePlayerActivity.EXTRA_NEXT_EPISODE_ID, nextEpisodeId)
+            putExtra(NativePlayerActivity.EXTRA_CHAPTERS_JSON, chaptersJson)
         }
         activity.startActivity(intent)
         call.resolve()

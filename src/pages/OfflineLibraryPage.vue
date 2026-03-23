@@ -75,7 +75,7 @@
       <template v-if="view === 'root'">
 
         <!-- Stats -->
-        <div class="flex gap-4 mb-8 flex-wrap">
+        <div class="flex gap-4 mb-4 flex-wrap">
           <Card class="bg-surface-raised border-border-input px-5 py-3 flex flex-col items-center gap-1">
             <span class="text-2xl font-bold text-accent-purple-light">{{ offlineStore.downloadCount }}</span>
             <span class="text-sm text-text-muted">items</span>
@@ -84,6 +84,17 @@
             <span class="text-2xl font-bold text-accent-purple-light">{{ formatSize(offlineStore.totalStorageUsed) }}</span>
             <span class="text-sm text-text-muted">storage</span>
           </Card>
+          <button @click="deleteAll" class="ml-auto text-sm text-red-400 hover:text-red-300 transition-colors self-center px-3 py-2">
+            Delete All
+          </button>
+        </div>
+        <!-- Storage breakdown by type -->
+        <div v-if="offlineStore.downloadCount > 0" class="text-xs text-text-muted mb-8">
+          <span v-if="movieStorageBytes > 0">Movies: {{ formatSize(movieStorageBytes) }}</span>
+          <span v-if="movieStorageBytes > 0 && tvStorageBytes > 0"> · </span>
+          <span v-if="tvStorageBytes > 0">TV Shows: {{ formatSize(tvStorageBytes) }}</span>
+          <span v-if="(movieStorageBytes > 0 || tvStorageBytes > 0) && musicStorageBytes > 0"> · </span>
+          <span v-if="musicStorageBytes > 0">Music: {{ formatSize(musicStorageBytes) }}</span>
         </div>
 
         <!-- Movies -->
@@ -346,6 +357,28 @@ function getImageUrl(id: string, itemType?: string) {
   // Fall back to server URL (works online)
   const isAudio = itemType === 'Audio' || itemType === 'MusicAlbum';
   return jellyfinStore.getImageUrl(id, 'Primary', isAudio ? 150 : 130, isAudio ? 150 : 195) || '';
+}
+
+const movieStorageBytes = computed(() =>
+  offlineStore.movieDownloads.reduce((sum: number, d: any) => sum + (d.fileSize || 0), 0)
+);
+const tvStorageBytes = computed(() =>
+  offlineStore.downloads.filter((d: any) => d.type === 'Episode').reduce((sum: number, d: any) => sum + (d.fileSize || 0), 0)
+);
+const musicStorageBytes = computed(() =>
+  offlineStore.downloads.filter((d: any) => d.type === 'Audio').reduce((sum: number, d: any) => sum + (d.fileSize || 0), 0)
+);
+
+async function deleteAll() {
+  if (!confirm(`Delete all ${offlineStore.downloadCount} offline items? This cannot be undone.`)) return;
+  try {
+    for (const dl of [...offlineStore.downloads]) {
+      await downloadService.deleteOfflineFile(dl.itemId);
+      await offlineStore.removeDownload(dl.itemId);
+    }
+  } catch {
+    alert('Failed to delete some items');
+  }
 }
 
 function formatSize(bytes: number): string {

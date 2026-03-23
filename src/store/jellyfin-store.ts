@@ -81,6 +81,7 @@ export const useJellyfinStore = defineStore("jellyfin", {
         sortOrder?: string[];
         filters?: string[];
         genres?: string[];
+        nameStartsWith?: string;
       }
     ) {
       this.initializeApi();
@@ -96,6 +97,7 @@ export const useJellyfinStore = defineStore("jellyfin", {
         limit: options?.limit ?? 48,
         filters: options?.filters as any,
         genres: options?.genres as any,
+        nameStartsWith: options?.nameStartsWith || undefined,
       };
 
       const resp = await getItemsApi(this.api).getItems(apiParams);

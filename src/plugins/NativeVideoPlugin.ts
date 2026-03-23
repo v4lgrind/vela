@@ -21,6 +21,7 @@ export interface NativeVideoStartOptions {
     selectedAudioIndex?: number;
     subtitleTextSize?: number;
     nextEpisodeId?: string;
+    chaptersJson?: string;
 }
 
 export interface NativeVideoProgressEvent {

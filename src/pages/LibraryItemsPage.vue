@@ -16,6 +16,15 @@
           <ChevronDown class="size-3.5 transition-transform duration-200" :class="showFilters ? 'rotate-180' : ''" />
         </button>
         <Button v-if="hasActiveFilters" variant="ghost" size="sm" @click="resetFilters" class="text-xs px-2 text-text-muted">Reset</Button>
+
+        <!-- Spacer -->
+        <div class="flex-1" />
+
+        <!-- View mode toggle -->
+        <button @click="toggleViewMode" class="p-2 rounded-md border border-border-default bg-surface-raised hover:border-accent-purple transition-colors" title="Toggle view">
+          <List v-if="viewMode === 'grid'" class="size-4" />
+          <LayoutGrid v-else class="size-4" />
+        </button>
       </div>
 
       <!-- Collapsible filter panel -->
@@ -48,8 +57,9 @@
       </div>
     </section>
 
-    <section class="flex-1">
-      <ul class="list-none p-0 m-0 grid grid-cols-3 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(150px,1fr))] sm:gap-4">
+    <section class="flex-1 relative">
+      <!-- Grid view -->
+      <ul v-if="viewMode === 'grid'" class="list-none p-0 m-0 grid grid-cols-3 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(150px,1fr))] sm:gap-4">
         <li v-for="item in items" :key="item.Id">
           <Card class="bg-surface-raised border-border-default hover:-translate-y-1 hover:bg-surface-hover hover:border-border-hover hover:shadow-xl transition-all duration-200 flex flex-col items-center p-2.5 pb-3 overflow-hidden active:scale-[0.97] active:opacity-80">
             <!-- Poster with overlay -->
@@ -100,12 +110,71 @@
         </li>
       </ul>
 
+      <!-- List view -->
+      <ul v-else class="list-none p-0 m-0 flex flex-col">
+        <li v-for="item in items" :key="item.Id">
+          <router-link
+            :to="item.Type === 'BoxSet'
+              ? { name: 'libraryItem', params: { id: item.Id, name: item.Name } }
+              : { name: 'ItemDetails', params: { id: item.Id } }"
+            class="flex items-center gap-3 py-2.5 px-1 border-b border-border-default hover:bg-surface-hover transition-colors active:opacity-80">
+            <!-- Thumbnail -->
+            <div class="w-[60px] shrink-0 rounded-md overflow-hidden bg-black/60"
+              :class="isAudioType(item.Type) ? 'aspect-square' : 'aspect-[2/3]'">
+              <LazyImg :src="getImageUrl(item.Id, item.Type)" :alt="item.Name" :item-type="item.Type"
+                class="w-full h-full object-cover block" />
+            </div>
+            <!-- Info -->
+            <div class="flex-1 min-w-0">
+              <div class="text-sm font-semibold text-text-heading truncate">{{ item.Name }}</div>
+              <div class="text-xs text-text-muted mt-0.5 flex items-center gap-2">
+                <span v-if="item.ProductionYear">{{ item.ProductionYear }}</span>
+                <span v-if="item.RunTimeTicks">{{ formatRuntime(item.RunTimeTicks) }}</span>
+                <span v-if="item.CommunityRating" class="text-yellow-400">★ {{ item.CommunityRating.toFixed(1) }}</span>
+              </div>
+              <!-- Progress bar for partially watched -->
+              <div v-if="item.UserData?.PlayedPercentage && !item.UserData?.Played" class="mt-1.5 h-1 bg-white/10 rounded-full overflow-hidden">
+                <div class="h-full bg-accent-purple rounded-full" :style="{ width: item.UserData.PlayedPercentage + '%' }" />
+              </div>
+            </div>
+            <!-- Right side: watched + actions -->
+            <div class="flex items-center gap-2 shrink-0">
+              <div v-if="item.UserData?.Played" class="bg-accent-purple rounded-full p-0.5">
+                <Check class="size-3 text-white" />
+              </div>
+              <button v-if="!isAudioType(item.Type) && item.Type !== 'BoxSet'"
+                @click.prevent.stop="playItem(item)"
+                :disabled="playingId === item.Id"
+                class="bg-surface-raised border border-border-default rounded-full p-2 hover:border-accent-purple transition-colors"
+                title="Play">
+                <Loader2 v-if="playingId === item.Id" class="size-4 animate-spin" />
+                <Play v-else class="size-4 fill-text-primary stroke-none" />
+              </button>
+            </div>
+          </router-link>
+        </li>
+      </ul>
+
+      <!-- A-Z Quick Jump Sidebar -->
+      <div v-if="sortBy === 'SortName'" class="fixed right-0.5 top-1/2 -translate-y-1/2 flex flex-col items-center z-10 py-1">
+        <button
+          v-for="letter in alphabet" :key="letter"
+          @click="jumpToLetter(letter)"
+          class="px-1.5 py-[1px] text-[10px] font-bold leading-tight transition-colors"
+          :class="nameStartsWith === letter ? 'text-accent-purple' : 'text-text-muted hover:text-text-primary'">
+          {{ letter }}
+        </button>
+      </div>
+
       <!-- Pagination -->
       <div class="flex items-center justify-center gap-3 mt-6">
         <Button variant="outline" :disabled="startIndex === 0" @click="prevPage" class="min-h-[44px] px-4">
           <ArrowLeft class="size-4 mr-1" /> Previous
         </Button>
-        <span class="text-text-primary font-semibold">Page {{ currentPage }}</span>
+        <span class="text-text-primary font-semibold">
+          Page {{ currentPage }}
+          <span v-if="nameStartsWith" class="text-accent-purple ml-1">({{ nameStartsWith }})</span>
+        </span>
         <Button variant="outline" :disabled="!hasNextPage" @click="nextPage" class="min-h-[44px] px-4">
           Next <ArrowRight class="size-4 ml-1" />
         </Button>
@@ -118,14 +187,16 @@
 import { onMounted, ref, computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useJellyfinStore } from '@/store/jellyfin-store';
+import { usePreferencesStore } from '@/store/preferences-store';
 import LazyImg from '@/components/LazyImg.vue';
 import { isAudioType } from '@/utils/helpers';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ArrowRight, Play, Check, Loader2, SlidersHorizontal, ChevronDown } from 'lucide-vue-next';
+import { ArrowLeft, ArrowRight, Play, Check, Loader2, SlidersHorizontal, ChevronDown, LayoutGrid, List } from 'lucide-vue-next';
 
 const store = useJellyfinStore();
+const prefs = usePreferencesStore();
 const route = useRoute();
 const router = useRouter();
 const libraryId = route.params.id as string;
@@ -146,16 +217,42 @@ const sortBy = ref('SortName');
 const sortOrder = ref('Ascending');
 const filter = ref('');
 const selectedGenre = ref('');
+const nameStartsWith = ref('');
 const hasActiveFilters = computed(() =>
   sortBy.value !== 'SortName' || sortOrder.value !== 'Ascending' || filter.value !== '' || selectedGenre.value !== ''
 );
 const availableGenres = ref<string[]>([]);
+
+// View mode
+const viewMode = computed(() => prefs.libraryViewMode);
+function toggleViewMode() {
+  prefs.libraryViewMode = prefs.libraryViewMode === 'grid' ? 'list' : 'grid';
+}
+
+// A-Z sidebar
+const alphabet = ['#', ...Array.from({ length: 26 }, (_, i) => String.fromCharCode(65 + i))];
+
+function jumpToLetter(letter: string) {
+  if (nameStartsWith.value === letter) {
+    nameStartsWith.value = '';
+  } else {
+    nameStartsWith.value = letter;
+  }
+  startIndex.value = 0;
+  loadPage();
+}
 
 const currentPage = computed(() => Math.floor(startIndex.value / limit.value) + 1);
 
 function getImageUrl(id: string, itemType?: string) {
   const isAudio = itemType && isAudioType(itemType);
   return store.getImageUrl(id, 'Primary', isAudio ? 150 : 130, isAudio ? 150 : 195) || '';
+}
+
+function formatRuntime(ticks: number): string {
+  const minutes = Math.round(ticks / 600_000_000);
+  if (minutes < 60) return `${minutes}m`;
+  return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
 }
 
 async function loadPage() {
@@ -169,6 +266,7 @@ async function loadPage() {
       sortOrder: [sortOrder.value],
       filters: filter.value ? [filter.value] : undefined,
       genres: selectedGenre.value ? [selectedGenre.value] : undefined,
+      nameStartsWith: nameStartsWith.value === '#' ? '#' : nameStartsWith.value || undefined,
     });
     items.value = pageItems;
     hasNextPage.value = pageItems.length === limit.value;
@@ -188,6 +286,7 @@ async function loadGenres() {
 }
 
 function onFilterChange() {
+  nameStartsWith.value = '';
   startIndex.value = 0;
   loadPage();
 }
@@ -197,6 +296,7 @@ function resetFilters() {
   sortOrder.value = 'Ascending';
   filter.value = '';
   selectedGenre.value = '';
+  nameStartsWith.value = '';
   startIndex.value = 0;
   showFilters.value = false;
   loadPage();
@@ -233,7 +333,6 @@ async function playItem(item: any) {
       if (nextEp) {
         router.push({ name: 'Player', params: { id: nextEp.Id } });
       } else {
-        // All watched or no episodes – go to series detail
         router.push({ name: 'ItemDetails', params: { id: item.Id } });
       }
     } else {
@@ -269,6 +368,7 @@ onMounted(() => {
 watch(() => route.params.id, async (newId) => {
   if (!newId) return;
   startIndex.value = 0;
+  nameStartsWith.value = '';
   await loadGenres();
   await loadPage();
 });

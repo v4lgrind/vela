@@ -305,7 +305,10 @@ public final class FfmpegVideoRenderer extends BaseRenderer {
       inputBuffer.clear();
       inputFormat = formatHolder.format;
     } else if (result == C.RESULT_NOTHING_READ) {
+      // Must queue buffer back to SimpleDecoder's pool — not doing so leaves it
+      // "dequeued" and the next dequeueInputBuffer() throws IllegalStateException.
       inputBuffer.clear();
+      try { decoder.queueInputBuffer(inputBuffer); } catch (FfmpegDecoderException e) { /* ok */ }
     } else if (inputBuffer.isEndOfStream()) {
       inputStreamEnded = true;
       try { decoder.queueInputBuffer(inputBuffer); } catch (FfmpegDecoderException e) { /* ok */ }

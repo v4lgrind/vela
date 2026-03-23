@@ -12,6 +12,7 @@ import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import androidx.core.view.GestureDetectorCompat
 import android.widget.Button
@@ -82,6 +83,7 @@ class NativePlayerActivity : AppCompatActivity() {
         const val EXTRA_STREAM_INFO = "streamInfo"
         const val EXTRA_SUBTITLE_TEXT_SIZE = "subtitleTextSize"
         const val EXTRA_NEXT_EPISODE_ID = "nextEpisodeId"
+        const val EXTRA_CHAPTERS_JSON = "chaptersJson"
         const val ACTION_NEXT_EPISODE = "com.jellyfin_v4lgrind_client.app.PLAYER_NEXT_EPISODE"
     }
 
@@ -99,6 +101,8 @@ class NativePlayerActivity : AppCompatActivity() {
     private lateinit var btnNextEpisode: Button
     private lateinit var loadingSpinner: View
     private lateinit var seekBar: SeekBar
+    private lateinit var chapterMarkersContainer: FrameLayout
+    private var chapterMarkersAdded = false
     private lateinit var tvCurrentTime: TextView
     private lateinit var tvTotalTime: TextView
     private lateinit var tvTitle: TextView
@@ -220,6 +224,12 @@ class NativePlayerActivity : AppCompatActivity() {
                 btnNextEpisode.visibility = if (showNext) View.VISIBLE else View.GONE
             }
 
+            // Add chapter markers once we know the duration
+            if (!chapterMarkersAdded && chapters.isNotEmpty() && dur > 1L) {
+                addChapterMarkers(dur)
+                chapterMarkersAdded = true
+            }
+
             handler.postDelayed(this, 500)
         }
     }
@@ -229,6 +239,8 @@ class NativePlayerActivity : AppCompatActivity() {
     private var introEndMs = -1L
     private var introSkipped = false
     private var nextEpisodeId = ""
+    private data class Chapter(val name: String, val startMs: Long)
+    private var chapters = emptyList<Chapter>()
 
     // Long-press scrubbing
     private var isScrubbing = false
@@ -291,6 +303,7 @@ class NativePlayerActivity : AppCompatActivity() {
         btnSubtitle = findViewById(R.id.btn_subtitle)
         btnFullscreen = findViewById(R.id.btn_fullscreen)
         seekBar = findViewById(R.id.seek_bar)
+        chapterMarkersContainer = findViewById(R.id.chapter_markers)
         tvCurrentTime = findViewById(R.id.tv_current_time)
         tvTotalTime = findViewById(R.id.tv_total_time)
         tvTitle = findViewById(R.id.tv_title)
@@ -355,6 +368,16 @@ class NativePlayerActivity : AppCompatActivity() {
 
         nextEpisodeId = intent.getStringExtra(EXTRA_NEXT_EPISODE_ID) ?: ""
         android.util.Log.d("NativePlayer", "nextEpisodeId='$nextEpisodeId'")
+
+        // Parse chapter markers
+        try {
+            val chaptersStr = intent.getStringExtra(EXTRA_CHAPTERS_JSON) ?: "[]"
+            val arr = org.json.JSONArray(chaptersStr)
+            chapters = (0 until arr.length()).map { i ->
+                val obj = arr.getJSONObject(i)
+                Chapter(obj.optString("name", ""), obj.optLong("startMs", 0))
+            }
+        } catch (_: Exception) { chapters = emptyList() }
 
         tvTitle.text = title
 
@@ -1208,6 +1231,31 @@ class NativePlayerActivity : AppCompatActivity() {
         tvTotalTime.text = formatTime(durMs)
         if (!isUserSeeking && durMs > 0) {
             seekBar.progress = ((posMs.toDouble() / durMs) * seekBar.max).toInt()
+        }
+    }
+
+    private fun addChapterMarkers(durationMs: Long) {
+        chapterMarkersContainer.removeAllViews()
+        val thumbPaddingPx = (16 * resources.displayMetrics.density).toInt() // match SeekBar thumb padding
+        for (ch in chapters) {
+            if (ch.startMs <= 0 || ch.startMs >= durationMs) continue
+            val fraction = ch.startMs.toFloat() / durationMs
+            val marker = View(this).apply {
+                setBackgroundColor(0xCCFFFFFF.toInt()) // white with slight transparency
+                layoutParams = FrameLayout.LayoutParams(
+                    (2 * resources.displayMetrics.density).toInt(), // 2dp wide
+                    (10 * resources.displayMetrics.density).toInt() // 10dp tall
+                ).apply {
+                    gravity = android.view.Gravity.CENTER_VERTICAL
+                }
+            }
+            chapterMarkersContainer.addView(marker)
+            // Position marker after layout
+            marker.post {
+                val trackWidth = chapterMarkersContainer.width - 2 * thumbPaddingPx
+                val x = thumbPaddingPx + (fraction * trackWidth).toInt() - marker.width / 2
+                marker.translationX = x.toFloat()
+            }
         }
     }
 

@@ -130,19 +130,37 @@
             app:layout_constraintEnd_toEndOf="parent"
             android:layout_marginEnd="16dp" />
 
-        <!-- Seek bar -->
-        <SeekBar
-            android:id="@+id/seek_bar"
+        <!-- Seek bar + chapter markers wrapper -->
+        <FrameLayout
+            android:id="@+id/seek_bar_wrapper"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:progressTint="#BB86FC"
-            android:thumbTint="#BB86FC"
             app:layout_constraintBottom_toTopOf="@id/bottom_row"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             android:layout_marginBottom="4dp"
             android:layout_marginStart="16dp"
-            android:layout_marginEnd="16dp" />
+            android:layout_marginEnd="16dp">
+
+            <SeekBar
+                android:id="@+id/seek_bar"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="20dp"
+                android:maxHeight="20dp"
+                android:progressDrawable="@drawable/seekbar_progress"
+                android:thumb="@drawable/seekbar_thumb"
+                android:splitTrack="false" />
+
+            <!-- Chapter tick marks rendered programmatically -->
+            <FrameLayout
+                android:id="@+id/chapter_markers"
+                android:layout_width="match_parent"
+                android:layout_height="20dp"
+                android:layout_gravity="center_vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp" />
+        </FrameLayout>
 
         <!-- Bottom row -->
         <LinearLayout

@@ -35,6 +35,7 @@ import androidx.media3.common.MimeTypes
 import androidx.media3.common.Player
 import androidx.media3.common.TrackGroup
 import androidx.media3.common.TrackSelectionOverride
+import androidx.media3.exoplayer.SeekParameters
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
@@ -657,6 +658,9 @@ class NativePlayerActivity : AppCompatActivity() {
         }
         exo.prepare()
         exo.playWhenReady = true
+        // Use exact seeking so the decoder always renders a frame at the target position.
+        // Default CLOSEST_SYNC can leave a stale frame on hardware decoders (progressive files).
+        exo.setSeekParameters(SeekParameters.EXACT)
 
         exo.addListener(object : Player.Listener {
             override fun onPlaybackStateChanged(state: Int) {

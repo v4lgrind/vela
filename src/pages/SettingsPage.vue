@@ -2,6 +2,36 @@
   <div class="min-h-dvh bg-surface text-text-body">
     <div class="max-w-2xl mx-auto px-4 py-8">
       <h1 class="text-xl font-bold text-text-heading mb-6">Settings</h1>
+
+      <!-- Account -->
+      <section class="mb-8">
+        <h2 class="text-base font-semibold text-text-heading mb-1">Account</h2>
+        <p class="text-sm text-text-muted mb-4">Manage your Jellyfin servers and account.</p>
+        <div class="flex flex-col gap-0 rounded-xl overflow-hidden border border-border-input divide-y divide-border-input">
+          <div class="flex items-center justify-between px-4 py-3 bg-surface-raised">
+            <div>
+              <span class="text-sm font-medium text-text-heading">{{ currentServerName }}</span>
+              <p class="text-xs text-text-muted mt-0.5">{{ jellyfinStore.serverUrl }}</p>
+            </div>
+            <span class="text-xs text-accent-purple font-medium">Active</span>
+          </div>
+          <button
+            class="flex items-center justify-between px-4 py-3 bg-surface-raised hover:bg-surface-hover w-full text-left"
+            @click="router.push('/login')"
+          >
+            <span class="text-sm font-medium text-text-heading">Switch Server</span>
+            <ChevronRight class="w-4 h-4 text-text-muted" />
+          </button>
+          <button
+            class="flex items-center justify-between px-4 py-3 bg-surface-raised hover:bg-surface-hover w-full text-left"
+            @click="signOut"
+          >
+            <span class="text-sm font-medium text-red-400">Sign Out</span>
+            <LogOut class="w-4 h-4 text-red-400" />
+          </button>
+        </div>
+      </section>
+
       <section>
         <h2 class="text-base font-semibold text-text-heading mb-1">Language Preferences</h2>
         <p class="text-sm text-text-muted mb-4">Applied to all new items. Per-item overrides take precedence.</p>
@@ -108,10 +138,27 @@
 </template>
 
 <script setup lang="ts">
-import { ChevronRight } from 'lucide-vue-next';
+import { computed } from 'vue';
+import { useRouter } from 'vue-router';
+import { ChevronRight, LogOut } from 'lucide-vue-next';
 import { usePreferencesStore } from '@/store/preferences-store';
+import { useJellyfinStore } from '@/store/jellyfin-store';
 
+const router = useRouter();
+const jellyfinStore = useJellyfinStore();
 const preferencesStore = usePreferencesStore();
+
+const currentServerName = computed(() => {
+  const saved = jellyfinStore.savedServers.find(
+    (s) => s.serverUrl === jellyfinStore.serverUrl && s.userId === jellyfinStore.userId
+  );
+  return saved?.serverName ?? new URL(jellyfinStore.serverUrl || 'http://unknown').hostname;
+});
+
+function signOut() {
+  jellyfinStore.logout();
+  router.push({ name: 'login' });
+}
 
 const LANGUAGES = [
   { code: '',    label: 'None – use default' },

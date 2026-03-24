@@ -7,8 +7,18 @@ import {
   getTvShowsApi,
   getUserLibraryApi,
   getUserViewsApi,
+  getSystemApi,
+  getUserApi,
 } from "@jellyfin/sdk/lib/utils/api";
 import { downloadService } from "../services/downloadService";
+
+export interface SavedServer {
+  serverUrl: string;
+  userId: string;
+  accessToken: string;
+  userName: string;
+  serverName: string;
+}
 
 interface State {
   serverUrl: string;
@@ -18,6 +28,8 @@ interface State {
   api: Api;
   accessToken: string | null | undefined;
   downloadProgress: Record<string, number>;
+  savedServers: SavedServer[];
+  _qcDeviceId: string;
 }
 
 export const useJellyfinStore = defineStore("jellyfin", {
@@ -28,7 +40,9 @@ export const useJellyfinStore = defineStore("jellyfin", {
     libraries: [],
     items: [],
     api: {} as Api,
-    downloadProgress: {} as Record<string, number>, // Progress par itemId
+    downloadProgress: {} as Record<string, number>,
+    savedServers: [],
+    _qcDeviceId: '',
   }),
   persist: true,
   actions: {
@@ -44,7 +58,6 @@ export const useJellyfinStore = defineStore("jellyfin", {
     },
 
     async login(serverUrl: string, username: string, password: string) {
-      // Initialisation du SDK et création de l'API sans token
       this.serverUrl = serverUrl;
       const jellyfin = new Jellyfin({
         clientInfo: { name: "Client", version: "1.0.0" },
@@ -52,13 +65,138 @@ export const useJellyfinStore = defineStore("jellyfin", {
       });
       this.api = jellyfin.createApi(serverUrl);
 
-      // Authentification
       const resp = await this.api.authenticateUserByName(username, password);
-      // Enregistrement en localStorage
       this.accessToken = resp.data.AccessToken;
       this.userId = resp.data.User?.Id;
-
       this.initializeApi();
+
+      // Persist this server in the saved servers list
+      try {
+        const infoResp = await getSystemApi(this.api).getPublicSystemInfo();
+        const serverName = infoResp.data.ServerName ?? new URL(serverUrl).hostname;
+        this._upsertSavedServer({
+          serverUrl,
+          userId: this.userId!,
+          accessToken: this.accessToken!,
+          userName: username,
+          serverName,
+        });
+      } catch {
+        // Non-fatal: still works without server name
+        this._upsertSavedServer({
+          serverUrl,
+          userId: this.userId!,
+          accessToken: this.accessToken!,
+          userName: username,
+          serverName: new URL(serverUrl).hostname,
+        });
+      }
+    },
+
+    _upsertSavedServer(server: SavedServer) {
+      const idx = this.savedServers.findIndex(
+        (s) => s.serverUrl === server.serverUrl && s.userId === server.userId
+      );
+      if (idx >= 0) {
+        this.savedServers[idx] = server;
+      } else {
+        this.savedServers.push(server);
+      }
+    },
+
+    switchServer(server: SavedServer) {
+      this.serverUrl = server.serverUrl;
+      this.userId = server.userId;
+      this.accessToken = server.accessToken;
+      this.libraries = [];
+      this.items = [];
+      this.initializeApi();
+    },
+
+    removeServer(serverUrl: string, userId: string) {
+      this.savedServers = this.savedServers.filter(
+        (s) => !(s.serverUrl === serverUrl && s.userId === userId)
+      );
+      if (this.serverUrl === serverUrl && this.userId === userId) {
+        this.logout();
+      }
+    },
+
+    _quickConnectAuthHeader(deviceId: string): string {
+      return `MediaBrowser Client="Jellyfin Android", Device="Android", DeviceId="${deviceId}", Version="1.0.0"`;
+    },
+
+    async quickConnectInitiate(serverUrl: string) {
+      // Generate a stable deviceId for the entire Quick Connect session and store it
+      this._qcDeviceId = `jellyfin-android-${Math.random().toString(36).slice(2, 11)}`;
+      const resp = await fetch(`${serverUrl}/QuickConnect/Initiate`, {
+        method: 'POST',
+        headers: {
+          'Authorization': this._quickConnectAuthHeader(this._qcDeviceId),
+          'Content-Type': 'application/json',
+        },
+      });
+      if (!resp.ok) {
+        const err: any = new Error(`Request failed with status code ${resp.status}`);
+        err.response = { status: resp.status };
+        throw err;
+      }
+      return resp.json() as Promise<{ Code: string; Secret: string; Authenticated: boolean }>;
+    },
+
+    async quickConnectPoll(serverUrl: string, secret: string) {
+      const resp = await fetch(`${serverUrl}/QuickConnect/Connect?Secret=${encodeURIComponent(secret)}`, {
+        headers: { 'Authorization': this._quickConnectAuthHeader(this._qcDeviceId ?? '') },
+      });
+      if (!resp.ok) {
+        const err: any = new Error(`Request failed with status code ${resp.status}`);
+        err.response = { status: resp.status };
+        throw err;
+      }
+      return resp.json() as Promise<{ Authenticated: boolean }>;
+    },
+
+    async quickConnectAuthenticate(serverUrl: string, secret: string) {
+      this.serverUrl = serverUrl;
+      const authHeader = this._quickConnectAuthHeader(this._qcDeviceId ?? '');
+      const fetchResp = await fetch(`${serverUrl}/Users/AuthenticateWithQuickConnect`, {
+        method: 'POST',
+        headers: {
+          'Authorization': authHeader,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ Secret: secret }),
+      });
+      if (!fetchResp.ok) {
+        const err: any = new Error(`Authentication failed with status code ${fetchResp.status}`);
+        err.response = { status: fetchResp.status };
+        throw err;
+      }
+      const data = await fetchResp.json();
+      this.accessToken = data.AccessToken;
+      this.userId = data.User?.Id;
+      this.initializeApi();
+      const resp = { data };
+
+      try {
+        const infoResp = await getSystemApi(this.api).getPublicSystemInfo();
+        const serverName = infoResp.data.ServerName ?? new URL(serverUrl).hostname;
+        this._upsertSavedServer({
+          serverUrl,
+          userId: this.userId!,
+          accessToken: this.accessToken!,
+          userName: resp.data.User?.Name ?? '',
+          serverName,
+        });
+      } catch {
+        this._upsertSavedServer({
+          serverUrl,
+          userId: this.userId!,
+          accessToken: this.accessToken!,
+          userName: resp.data.User?.Name ?? '',
+          serverName: new URL(serverUrl).hostname,
+        });
+      }
     },
     async fetchLibraries() {
       this.initializeApi();
@@ -317,6 +455,31 @@ export const useJellyfinStore = defineStore("jellyfin", {
         imageTypeLimit: 1,
       });
       return resp.data ?? [];
+    },
+
+    async fetchPersonDetails(personId: string) {
+      this.initializeApi();
+      const resp = await getItemsApi(this.api).getItems({
+        ids: [personId],
+        userId: this.userId,
+        fields: ['Overview', 'PrimaryImageAspectRatio'] as any,
+      });
+      return resp.data.Items?.[0] ?? null;
+    },
+
+    async fetchPersonFilmography(personId: string) {
+      this.initializeApi();
+      const resp = await getItemsApi(this.api).getItems({
+        userId: this.userId,
+        personIds: [personId],
+        includeItemTypes: ['Movie', 'Series'] as any,
+        sortBy: ['PremiereDate'] as any,
+        sortOrder: ['Descending'] as any,
+        fields: ['Overview', 'UserData'] as any,
+        enableUserData: true,
+        recursive: true,
+      });
+      return resp.data.Items ?? [];
     },
 
     async fetchSimilarItems(itemId: string, limit = 12) {

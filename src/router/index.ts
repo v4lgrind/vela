@@ -47,6 +47,13 @@ const routes = [
     props: true,
   },
   {
+    path: "/person/:id",
+    name: "PersonDetail",
+    component: () => import("@/pages/PersonDetailPage.vue"),
+    meta: { requiresAuth: true },
+    props: true,
+  },
+  {
     path: "/play/:id",
     name: "Player",
     component: PlayerPage,

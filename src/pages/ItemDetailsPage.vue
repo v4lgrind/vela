@@ -92,6 +92,16 @@
                                     <Play class="size-4 fill-black stroke-none" /> Play album
                                 </button>
 
+                                <!-- Cast button -->
+                                <button
+                                    v-if="isPlayable(item) && castState !== 'NO_DEVICES_AVAILABLE'"
+                                    @click="castItem"
+                                    :class="castState === 'CONNECTED' ? 'bg-accent-blue/20 border-accent-blue/50 text-accent-blue' : 'bg-white/10 border-white/10 text-white/90 hover:bg-white/15'"
+                                    class="flex items-center justify-center w-11 h-11 rounded-xl border transition-all cursor-pointer"
+                                    :title="castState === 'CONNECTED' ? 'Casting' : 'Cast to TV'">
+                                    <Tv2 class="size-4" />
+                                </button>
+
                                 <button v-if="isItemDownloaded && !isDownloading" @click="deleteDownload"
                                     class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-accent-purple/20 border border-accent-purple/40 text-accent-purple text-sm font-medium hover:bg-accent-purple/30 transition-all cursor-pointer">
                                     <Check class="size-4" /> Downloaded
@@ -383,7 +393,8 @@
                         class="grid grid-flow-col auto-cols-[minmax(100px,120px)] gap-3 overflow-x-auto overflow-y-hidden snap-x snap-proximity scroll-smooth scrollbar-hide"
                         role="list">
                         <div v-for="p in cast" :key="p.Id || p.Name"
-                            class="snap-center text-center group" role="listitem" :title="p.Name">
+                            class="snap-center text-center group cursor-pointer" role="listitem" :title="p.Name"
+                            @click="navigateToPerson(p.Id)">
                             <div class="w-full aspect-[2/3] rounded-xl overflow-hidden bg-surface-raised shadow-lg mb-2 group-hover:-translate-y-1 transition-transform duration-200">
                                 <LazyImg :src="personImageUrl(p)" :alt="p.Name" item-type="person"
                                     class="w-full h-full object-cover object-top" />
@@ -458,7 +469,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, computed, watch } from 'vue';
+import { onMounted, onUnmounted, ref, computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useJellyfinStore } from '@/store/jellyfin-store';
 import { useOfflineStore } from '@/store/offline-store';
@@ -472,7 +483,9 @@ import { isAudioType, formatTicksDuration, formatTicksHuman, formatBytes } from 
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose, DialogTrigger } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
-import { Play, Check, Download as DownloadIcon, X, ArrowLeft, ArrowRight, Loader2, Info } from 'lucide-vue-next';
+import { Play, Check, Download as DownloadIcon, X, ArrowLeft, ArrowRight, Loader2, Info, Tv2 } from 'lucide-vue-next';
+import { Capacitor } from '@capacitor/core';
+import CastPlugin, { type CastState } from '@/plugins/CastPlugin';
 
 const store = useJellyfinStore();
 const offlineStore = useOfflineStore();
@@ -596,7 +609,54 @@ async function load() {
     }
 }
 
-onMounted(load);
+// ── Cast ────────────────────────────────────────────────────────────────────
+const castState = ref<CastState>('NO_DEVICES_AVAILABLE');
+let castStateListener: { remove: () => void } | null = null;
+let castSessionListener: { remove: () => void } | null = null;
+
+async function initCast() {
+    if (!Capacitor.isNativePlatform()) return;
+    try {
+        await CastPlugin.initialize();
+        const stateResult = await CastPlugin.getState();
+        castState.value = stateResult.state;
+        castStateListener = await CastPlugin.addListener('castStateChanged', (d) => {
+            castState.value = d.state;
+        });
+        castSessionListener = await CastPlugin.addListener('sessionStarted', async () => {
+            if (!item.value) return;
+            const ticks = item.value.UserData?.PlaybackPositionTicks ?? 0;
+            await CastPlugin.castMedia({
+                itemId: item.value.Id,
+                serverUrl: store.serverUrl,
+                accessToken: store.accessToken ?? '',
+                startPositionTicks: ticks,
+                title: item.value.Name ?? '',
+            });
+        });
+    } catch {
+        // Cast not available (web / non-Google device)
+    }
+}
+
+async function castItem() {
+    if (castState.value === 'CONNECTED' && item.value) {
+        // Already connected — cast directly
+        const ticks = item.value.UserData?.PlaybackPositionTicks ?? 0;
+        await CastPlugin.castMedia({
+            itemId: item.value.Id,
+            serverUrl: store.serverUrl,
+            accessToken: store.accessToken ?? '',
+            startPositionTicks: ticks,
+            title: item.value.Name ?? '',
+        });
+    } else {
+        await CastPlugin.showPicker();
+    }
+}
+
+onMounted(() => { load(); initCast(); });
+onUnmounted(() => { castStateListener?.remove(); castSessionListener?.remove(); });
 watch(() => route.params.id, load);
 
 const isLandscapePoster = computed(() => {
@@ -644,6 +704,10 @@ const studioNames = computed(() => (item.value?.Studios || []).map((s: any) => s
 function personImageUrl(p: Person) {
     if (!p?.Id || !p.PrimaryImageTag) return '';
     return store.getImageUrl(p.Id, 'Primary', 220) || '';
+}
+
+function navigateToPerson(id?: string) {
+    if (id) router.push({ name: 'PersonDetail', params: { id } });
 }
 
 function isPlayable(it: any) {

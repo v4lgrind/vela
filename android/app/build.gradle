@@ -66,6 +66,9 @@ dependencies {
     // android/app/src/main/java/androidx/media3/decoder/ffmpeg/
     // Pre-built native libs in android/app/src/main/jniLibs/
     implementation "androidx.localbroadcastmanager:localbroadcastmanager:1.1.0"
+
+    // Google Cast SDK
+    implementation "com.google.android.gms:play-services-cast-framework:21.5.0"
 }
 
 apply from: 'capacitor.build.gradle'

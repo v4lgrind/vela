@@ -17,6 +17,7 @@ import { useJellyfinStore } from "@/store/jellyfin-store";
 import { useAudioPlayerStore } from "@/store/audio-player-store";
 import { useOfflineStore } from "@/store/offline-store";
 import { usePreferencesStore } from "@/store/preferences-store";
+import { useDpadNavigation } from "@/composables/useDpadNavigation";
 import { App as CapacitorApp } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
 import { StatusBar, Style } from "@capacitor/status-bar";
@@ -28,6 +29,7 @@ const store = useJellyfinStore();
 const audioStore = useAudioPlayerStore();
 const offlineStore = useOfflineStore();
 const preferencesStore = usePreferencesStore();
+useDpadNavigation();
 const isAuthenticated = computed(() => store.isAuthenticated);
 
 // ── Theme ──────────────────────────────────────────────────────────────────────

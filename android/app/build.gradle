@@ -62,6 +62,7 @@ dependencies {
     implementation "androidx.media3:media3-ui:$media3_version"
     implementation "androidx.media3:media3-datasource:$media3_version"
     implementation "androidx.media3:media3-common:$media3_version"
+    implementation "androidx.media3:media3-session:$media3_version"
     // FFmpeg audio decoder sources included directly (not on Maven) — see
     // android/app/src/main/java/androidx/media3/decoder/ffmpeg/
     // Pre-built native libs in android/app/src/main/jniLibs/

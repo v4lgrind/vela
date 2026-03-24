@@ -1,6 +1,6 @@
 <template>
     <div class="fixed inset-0 bg-black text-white flex flex-col z-[100] h-dvh"
-        style="padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px)">
+        style="padding: var(--sat, env(safe-area-inset-top, 0px)) var(--sar, env(safe-area-inset-right, 0px)) var(--sab, env(safe-area-inset-bottom, 0px)) var(--sal, env(safe-area-inset-left, 0px))">
 
         <!-- Error -->
         <section v-if="error"
@@ -14,7 +14,7 @@
             <button
                 :class="controlsVisible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'"
                 class="absolute bg-black/50 text-white border-none cursor-pointer px-3.5 py-2 rounded-lg flex items-center gap-1.5 text-[0.95rem] font-medium transition-colors hover:bg-white/15 z-[60]"
-                style="top: calc(12px + env(safe-area-inset-top, 0px)); left: calc(12px + env(safe-area-inset-left, 0px))" @click="goBack">
+                style="top: calc(12px + var(--sat, env(safe-area-inset-top, 0px))); left: calc(12px + var(--sal, env(safe-area-inset-left, 0px)))" @click="goBack">
                 <ArrowLeft class="size-5" />
                 Back
             </button>
@@ -147,6 +147,15 @@
                                     <Check class="size-4 shrink-0"
                                         :class="sub.index === selectedSubtitleIndex ? 'opacity-100' : 'opacity-0'" />
                                     {{ sub.label }}
+                                </div>
+                                <!-- Subtitle size control -->
+                                <div v-if="selectedSubtitleIndex !== null" class="flex items-center justify-between px-4 py-3 border-t border-white/10">
+                                    <span class="text-[0.85rem] text-white/60">Size</span>
+                                    <div class="flex items-center gap-3">
+                                        <button class="w-7 h-7 rounded bg-white/10 hover:bg-white/20 text-white text-lg leading-none flex items-center justify-center" @click.stop="adjustSubtitleSize(-0.25)">−</button>
+                                        <span class="text-[0.9rem] w-10 text-center">{{ Math.round(preferencesStore.subtitleSize * 100) }}%</span>
+                                        <button class="w-7 h-7 rounded bg-white/10 hover:bg-white/20 text-white text-lg leading-none flex items-center justify-center" @click.stop="adjustSubtitleSize(0.25)">+</button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -620,6 +629,14 @@ function toggleAudioMenu() {
 function toggleSubtitleMenu() {
     subtitleMenuOpen.value = !subtitleMenuOpen.value;
     showControls();
+}
+
+function adjustSubtitleSize(delta: number) {
+    const clamped = Math.min(2.0, Math.max(0.5, preferencesStore.subtitleSize + delta));
+    preferencesStore.subtitleSize = Math.round(clamped * 4) / 4; // snap to 0.25 steps
+    if (isNative) {
+        NativeVideo.setSubtitleSize({ scale: preferencesStore.subtitleSize });
+    }
 }
 
 function handleKeyDown(e: KeyboardEvent) {
@@ -1347,6 +1364,10 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
             if (!data.nextEpisodeId) return;
             await NativeVideo.removeAllListeners();
             router.replace({ name: 'Player', params: { id: data.nextEpisodeId } });
+        });
+
+        await NativeVideo.addListener('subtitleSizeChanged', (data) => {
+            preferencesStore.subtitleSize = data.scale;
         });
 
         debugLog(`[NativePlayer] calling NativeVideo.start: startPositionMs=${finalStartPositionMs} playMethod=${playMethod.value} subtitleTracks=${subtitleTracks.length} nextEpisodeId=${resolvedNextEpisodeId}`);

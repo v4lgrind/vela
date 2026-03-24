@@ -85,6 +85,7 @@ export interface NativeVideoPlugin {
     updateQualityPresets(options: { presets: string; selectedBitrate: number }): Promise<void>;
     getDeviceCodecs(): Promise<{ codecs: string[] }>;
     canDecodeHevc(options: { profile: string; level: number }): Promise<{ supported: boolean }>;
+    setSubtitleSize(options: { scale: number }): Promise<void>;
 
     addListener(event: 'progress', handler: (data: NativeVideoProgressEvent) => void): Promise<PluginListenerHandle>;
     addListener(event: 'ended', handler: () => void): Promise<PluginListenerHandle>;
@@ -99,6 +100,7 @@ export interface NativeVideoPlugin {
     addListener(event: 'audioSwitchJellyfin', handler: (data: NativeVideoAudioSwitchJellyfinEvent) => void): Promise<PluginListenerHandle>;
     addListener(event: 'nextEpisode', handler: (data: { nextEpisodeId: string }) => void): Promise<PluginListenerHandle>;
     addListener(event: 'debugLog', handler: (data: { message: string }) => void): Promise<PluginListenerHandle>;
+    addListener(event: 'subtitleSizeChanged', handler: (data: { scale: number }) => void): Promise<PluginListenerHandle>;
 
     removeAllListeners(): Promise<void>;
 }

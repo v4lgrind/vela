@@ -2,7 +2,7 @@
   <div class="flex flex-col h-dvh bg-surface">
     <!-- Header: back + search input -->
     <div class="flex items-center gap-3 px-4 border-b border-border-input bg-surface-raised"
-      style="padding-top: calc(12px + env(safe-area-inset-top, 0px)); padding-bottom: 12px">
+      style="padding-top: calc(12px + var(--sat, env(safe-area-inset-top, 0px))); padding-bottom: 12px">
       <button class="shrink-0 p-1.5 rounded-lg hover:bg-surface-hover transition-colors cursor-pointer"
         @click="router.back()">
         <ArrowLeft class="size-5 text-text-heading" />

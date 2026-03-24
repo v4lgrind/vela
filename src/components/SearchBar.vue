@@ -10,7 +10,7 @@
       class="fixed inset-y-0 left-0 w-72 bg-surface border-r border-border-input z-[501] flex flex-col">
       <!-- Header -->
       <div class="flex items-center justify-between px-4 border-b border-border-input"
-        style="padding-top: calc(14px + env(safe-area-inset-top, 0px)); padding-bottom: 14px">
+        style="padding-top: calc(14px + var(--sat, env(safe-area-inset-top, 0px))); padding-bottom: 14px">
         <button
           class="flex items-center gap-2 text-sm font-semibold text-text-heading hover:text-accent-purple transition-colors cursor-pointer"
           @click="sidebarOpen = false; goHome()">
@@ -122,7 +122,7 @@
   </Transition>
 
   <nav class="flex items-center gap-2 md:gap-4 bg-surface-raised px-3 md:px-5 pb-2.5"
-    style="padding-top: calc(10px + env(safe-area-inset-top, 0px))">
+    style="padding-top: calc(10px + var(--sat, env(safe-area-inset-top, 0px)))">
     <!-- Hamburger -->
     <Button variant="ghost" class="shrink-0 px-2 sm:px-3" aria-label="Open menu" @click="openSidebar">
       <Menu class="size-5 sm:size-4" />

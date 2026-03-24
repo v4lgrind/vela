@@ -1,6 +1,6 @@
 <template>
   <div class="fixed inset-0 z-200 bg-[radial-gradient(circle_at_top,#1a1a2e_0%,#0a0a0a_70%)] text-text-primary flex flex-col overflow-y-auto"
-    style="padding: env(safe-area-inset-top, 12px) 16px calc(16px + env(safe-area-inset-bottom, 0px))">
+    style="padding: var(--sat, env(safe-area-inset-top, 12px)) 16px calc(16px + var(--sab, env(safe-area-inset-bottom, 0px)))">
 
     <!-- Header -->
     <div class="flex items-center justify-between py-2 shrink-0">

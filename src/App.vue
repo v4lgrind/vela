@@ -76,7 +76,7 @@ watch(
   },
 );
 
-// Initialize offline store on app mount
+
 onMounted(async () => {
   // Apply persisted theme immediately
   applyTheme(preferencesStore.colorScheme);
@@ -85,6 +85,14 @@ onMounted(async () => {
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
     if (preferencesStore.colorScheme === 'system') applyTheme('system');
   });
+
+  if (Capacitor.isNativePlatform()) {
+    // Re-apply status bar icon style when returning from NativePlayerActivity or rotating
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') applyTheme(preferencesStore.colorScheme);
+    });
+    window.addEventListener('resize', () => applyTheme(preferencesStore.colorScheme), { passive: true });
+  }
 
   if (Capacitor.isNativePlatform()) {
     await CapacitorApp.addListener("backButton", ({ canGoBack }) => {

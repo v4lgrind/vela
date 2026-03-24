@@ -26,6 +26,8 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -37,6 +39,8 @@ import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.session.MediaSession
+import androidx.media3.ui.PlayerNotificationManager
 import androidx.media3.ui.PlayerView
 import org.json.JSONArray
 import org.json.JSONObject
@@ -77,6 +81,7 @@ class NativePlayerActivity : AppCompatActivity() {
         const val CMD_SET_INTRO = "setIntro"
         const val CMD_UPDATE_QUALITY_PRESETS = "updateQualityPresets"
         const val CMD_UPDATE_STREAM_INFO = "updateStreamInfo"
+        const val CMD_UPDATE_SUBTITLE_SIZE = "updateSubtitleSize"
 
         const val EXTRA_QUALITY_PRESETS = "qualityPresets"
         const val EXTRA_SELECTED_BITRATE = "selectedBitrate"
@@ -85,9 +90,15 @@ class NativePlayerActivity : AppCompatActivity() {
         const val EXTRA_NEXT_EPISODE_ID = "nextEpisodeId"
         const val EXTRA_CHAPTERS_JSON = "chaptersJson"
         const val ACTION_NEXT_EPISODE = "com.jellyfin_v4lgrind_client.app.PLAYER_NEXT_EPISODE"
+        const val ACTION_SUBTITLE_SIZE_CHANGED = "com.jellyfin_v4lgrind_client.app.SUBTITLE_SIZE_CHANGED"
+
+        const val NOTIFICATION_ID = 1001
+        const val NOTIFICATION_CHANNEL_ID = "media_playback"
     }
 
     private var player: ExoPlayer? = null
+    private var mediaSession: MediaSession? = null
+    private var playerNotificationManager: PlayerNotificationManager? = null
     private lateinit var playerView: PlayerView
     private lateinit var controlsOverlay: View
     private lateinit var btnBack: ImageButton
@@ -125,6 +136,9 @@ class NativePlayerActivity : AppCompatActivity() {
     private var sidecarSubtitleCount = 0
     // Fallback subtitle info from Vue when ExoPlayer doesn't expose sidecar tracks
     private val sidecarSubtitles = mutableListOf<Pair<String, String>>() // (label, language)
+
+    // Subtitle size scale (persisted via preferencesStore on Vue side; passed via intent)
+    private var currentSubtitleScale = 1.0f
 
     // Quality presets & stream info (passed from Vue)
     private var qualityPresets = mutableListOf<Pair<Int, String>>() // (bitrate, label)
@@ -176,6 +190,11 @@ class NativePlayerActivity : AppCompatActivity() {
                 CMD_UPDATE_STREAM_INFO -> {
                     streamInfoJson = intent.getStringExtra("streamInfo") ?: ""
                     btnInfo.visibility = if (streamInfoJson.isNotEmpty()) View.VISIBLE else View.GONE
+                }
+                CMD_UPDATE_SUBTITLE_SIZE -> {
+                    currentSubtitleScale = intent.getFloatExtra("subtitleSizeScale", 1.0f)
+                    val scale = currentSubtitleScale
+                    handler.post { applySubtitleTextSize(scale) }
                 }
             }
         }
@@ -773,14 +792,66 @@ class NativePlayerActivity : AppCompatActivity() {
                 null
             )
         )
-        // Apply user subtitle size preference (scale relative to ExoPlayer default)
-        val subtitleScale = intent.getFloatExtra(EXTRA_SUBTITLE_TEXT_SIZE, 1.0f)
-        playerView.subtitleView?.setFractionalTextSize(
-            androidx.media3.ui.SubtitleView.DEFAULT_TEXT_SIZE_FRACTION * subtitleScale,
-            false
-        )
+        // Apply user subtitle size preference — defer until view is laid out so width/height are known
+        currentSubtitleScale = intent.getFloatExtra(EXTRA_SUBTITLE_TEXT_SIZE, 1.0f)
+        val initialScale = currentSubtitleScale
+        playerView.subtitleView?.addOnLayoutChangeListener(object : View.OnLayoutChangeListener {
+            override fun onLayoutChange(v: View, l: Int, t: Int, r: Int, b: Int, ol: Int, ot: Int, or2: Int, ob: Int) {
+                v.removeOnLayoutChangeListener(this)
+                applySubtitleTextSize(initialScale)
+            }
+        })
 
         scheduleHideControls()
+        setupMediaNotification()
+    }
+
+    private fun setupMediaNotification() {
+        val exo = player ?: return
+
+        // Create notification channel (no-op if already exists)
+        val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        nm.createNotificationChannel(
+            NotificationChannel(
+                NOTIFICATION_CHANNEL_ID,
+                "Media Playback",
+                NotificationManager.IMPORTANCE_LOW
+            )
+        )
+
+        // MediaSession links ExoPlayer to the system (lock screen, BT controls, etc.)
+        mediaSession = MediaSession.Builder(this, exo).build()
+
+        // PlayerNotificationManager shows a media notification with play/pause/seek controls
+        playerNotificationManager = PlayerNotificationManager.Builder(this, NOTIFICATION_ID, NOTIFICATION_CHANNEL_ID)
+            .setMediaDescriptionAdapter(object : PlayerNotificationManager.MediaDescriptionAdapter {
+                override fun getCurrentContentTitle(player: Player): CharSequence =
+                    tvTitle.text
+                override fun createCurrentContentIntent(player: Player) = null
+                override fun getCurrentContentText(player: Player): CharSequence? = null
+                override fun getCurrentLargeIcon(
+                    player: Player,
+                    callback: PlayerNotificationManager.BitmapCallback
+                ) = null
+            })
+            .setSmallIconResourceId(android.R.drawable.ic_media_play)
+            .build()
+            .also { mgr ->
+                mgr.setMediaSessionToken(mediaSession!!.sessionCompatToken)
+                mgr.setPlayer(exo)
+            }
+    }
+
+    private fun applySubtitleTextSize(scale: Float) {
+        // Scale the SubtitleView directly — bypasses cue-level text size overrides
+        // (setFractionalTextSize/setFixedTextSize are ignored when cues embed their own size)
+        playerView.subtitleView?.let { view ->
+            view.scaleX = scale
+            view.scaleY = scale
+            // Anchor scaling to the bottom-center so subtitles grow upward, not off-screen
+            view.pivotX = view.width / 2f
+            view.pivotY = view.height.toFloat()
+        }
     }
 
     private fun parseSubtitleConfigs(json: String): List<MediaItem.SubtitleConfiguration> {
@@ -1023,6 +1094,9 @@ class NativePlayerActivity : AppCompatActivity() {
                     }
                     dialog.dismiss()
                 }
+                .setNeutralButton("Size: ${Math.round(currentSubtitleScale * 100)}%") { _, _ ->
+                    showSubtitleSizePicker()
+                }
                 .setNegativeButton("Cancel", null)
                 .show()
         } else {
@@ -1052,9 +1126,35 @@ class NativePlayerActivity : AppCompatActivity() {
                     }
                     dialog.dismiss()
                 }
+                .setNeutralButton("Size: ${Math.round(currentSubtitleScale * 100)}%") { _, _ ->
+                    showSubtitleSizePicker()
+                }
                 .setNegativeButton("Cancel", null)
                 .show()
         }
+    }
+
+    private fun showSubtitleSizePicker() {
+        val steps = floatArrayOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f)
+        val labels = steps.map { "${Math.round(it * 100)}%" }.toTypedArray()
+        val checkedItem = steps.indexOfFirst { it == currentSubtitleScale }.takeIf { it >= 0 } ?: 2
+
+        androidx.appcompat.app.AlertDialog.Builder(this, androidx.appcompat.R.style.Theme_AppCompat_Dialog)
+            .setTitle("Subtitle size")
+            .setSingleChoiceItems(labels, checkedItem) { dialog, which ->
+                currentSubtitleScale = steps[which]
+                val newScale = currentSubtitleScale
+                dialog.dismiss()
+                // Apply after dialog fully dismisses and window regains focus
+                handler.post { applySubtitleTextSize(newScale) }
+                // Notify Vue so preferencesStore stays in sync
+                val notify = Intent(ACTION_SUBTITLE_SIZE_CHANGED)
+                notify.putExtra("scale", newScale)
+                notify.setPackage(packageName)
+                sendBroadcast(notify)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun parseQualityPresets(json: String) {
@@ -1398,6 +1498,10 @@ class NativePlayerActivity : AppCompatActivity() {
         handler.removeCallbacksAndMessages(null)
         audioSwitchPendingGroupIndex = -1
         unregisterReceiver(commandReceiver)
+        playerNotificationManager?.setPlayer(null)
+        playerNotificationManager = null
+        mediaSession?.release()
+        mediaSession = null
         player?.release()
         player = null
     }

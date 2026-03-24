@@ -141,18 +141,21 @@ html.light {
   --ring: 263 70% 50%;
 }
 
-/* Safe area utilities */
+/* Safe area utilities.
+   --sat/sab/sal/sar are injected by MainActivity.reapplyInsets() with the real
+   measured values after rotation or returning from the native player.
+   env() is the fallback for web/iOS. */
 @utility safe-pt {
-  padding-top: env(safe-area-inset-top, 0px);
+  padding-top: var(--sat, env(safe-area-inset-top, 0px));
 }
 @utility safe-pb {
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-bottom: var(--sab, env(safe-area-inset-bottom, 0px));
 }
 @utility safe-pl {
-  padding-left: env(safe-area-inset-left, 0px);
+  padding-left: var(--sal, env(safe-area-inset-left, 0px));
 }
 @utility safe-pr {
-  padding-right: env(safe-area-inset-right, 0px);
+  padding-right: var(--sar, env(safe-area-inset-right, 0px));
 }
 
 /* Item details page ambient overlay — fades the blurred backdrop into the page background */

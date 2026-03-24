@@ -271,6 +271,17 @@ class NativeVideoPlugin : Plugin() {
         call.resolve(JSObject().apply { put("supported", finalSupported) })
     }
 
+    @PluginMethod
+    fun setSubtitleSize(call: PluginCall) {
+        val scale = call.data.optDouble("scale", 1.0).toFloat()
+        val intent = Intent(NativePlayerActivity.ACTION_COMMAND)
+        intent.putExtra("command", NativePlayerActivity.CMD_UPDATE_SUBTITLE_SIZE)
+        intent.putExtra("subtitleSizeScale", scale)
+        intent.setPackage(context.packageName)
+        context.sendBroadcast(intent)
+        call.resolve()
+    }
+
     // ── Private helpers ────────────────────────────────────────────────────────
 
     private fun sendCommand(command: String) {
@@ -370,6 +381,11 @@ class NativeVideoPlugin : Plugin() {
                         data.put("message", intent.getStringExtra("message") ?: "")
                         notifyListeners("debugLog", data)
                     }
+                    NativePlayerActivity.ACTION_SUBTITLE_SIZE_CHANGED -> {
+                        val data = JSObject()
+                        data.put("scale", intent.getFloatExtra("scale", 1.0f).toDouble())
+                        notifyListeners("subtitleSizeChanged", data)
+                    }
                 }
             }
         }
@@ -388,6 +404,7 @@ class NativeVideoPlugin : Plugin() {
             addAction(NativePlayerActivity.ACTION_VIDEO_ERROR)
             addAction(NativePlayerActivity.ACTION_NEXT_EPISODE)
             addAction(NativePlayerActivity.ACTION_DEBUG_LOG)
+            addAction(NativePlayerActivity.ACTION_SUBTITLE_SIZE_CHANGED)
         }
         ContextCompat.registerReceiver(context, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
         eventReceiver = receiver

@@ -416,6 +416,7 @@ const posterUrl = computed(() => store.getImageUrl(itemId, 'Primary') || '');
 const introEnd = ref<number | null>(null);
 const skipPromptStart = ref<number | null>(null);
 const skipPromptEnd = ref<number | null>(null);
+const creditsStartMs = ref<number>(-1);
 const introSkipped = ref(false);
 const nativeResumeOffsetMs = ref(0);
 const showSkipIntroButton = computed(() => {
@@ -965,6 +966,10 @@ async function fetchIntroTimestamps() {
                 }).catch(() => {});
             }
         }
+        const outro = (data.Items ?? []).find((s: any) => s.Type === 'Outro');
+        if (outro) {
+            creditsStartMs.value = Math.floor(outro.StartTicks / 10_000);
+        }
     } catch { /* plugin not available or item has no segments */ }
 }
 
@@ -1390,6 +1395,7 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
             subtitleTextSize: preferencesStore.subtitleSize,
             nextEpisodeId: resolvedNextEpisodeId,
             chaptersJson: chapters?.length ? JSON.stringify(chapters) : undefined,
+            creditsStartMs: creditsStartMs.value,
         });
 
         // Don't clear isLoading here — keep the spinner until tracksReady fires,
@@ -1603,6 +1609,7 @@ async function initOfflinePlayer(cachedDownload: any, resumeSeconds?: number, it
                 subtitleTracks: [],
                 subtitleTextSize: preferencesStore.subtitleSize,
                 nextEpisodeId: nextEpisodeId || '',
+                creditsStartMs: creditsStartMs.value,
             });
 
             // Apply stored intro/outro segments so skip-intro works offline
@@ -1613,6 +1620,10 @@ async function initOfflinePlayer(cachedDownload: any, resumeSeconds?: number, it
                         introStartMs: Math.floor(intro.StartTicks / 10_000),
                         introEndMs: Math.floor(intro.EndTicks / 10_000),
                     }).catch(() => {});
+                }
+                const outro = cachedDownload.introSegments.find((s: any) => s.Type === 'Outro');
+                if (outro) {
+                    creditsStartMs.value = Math.floor(outro.StartTicks / 10_000);
                 }
             }
             // isLoading cleared by tracksReady listener above

@@ -89,6 +89,7 @@ class NativePlayerActivity : AppCompatActivity() {
         const val EXTRA_SUBTITLE_TEXT_SIZE = "subtitleTextSize"
         const val EXTRA_NEXT_EPISODE_ID = "nextEpisodeId"
         const val EXTRA_CHAPTERS_JSON = "chaptersJson"
+        const val EXTRA_CREDITS_START_MS = "creditsStartMs"
         const val ACTION_NEXT_EPISODE = "com.jellyfin_v4lgrind_client.app.PLAYER_NEXT_EPISODE"
         const val ACTION_SUBTITLE_SIZE_CHANGED = "com.jellyfin_v4lgrind_client.app.SUBTITLE_SIZE_CHANGED"
 
@@ -235,11 +236,15 @@ class NativePlayerActivity : AppCompatActivity() {
                 btnSkipIntro.visibility = if (showSkip) View.VISIBLE else View.GONE
             }
 
-            // Show/hide Next Episode button (last 60 seconds)
+            // Show/hide Next Episode button
             if (nextEpisodeId.isNotEmpty()) {
-                val remaining = dur - pos
-                val showNext = dur > 1L && remaining in 1L..60_000L
-                if (showNext) android.util.Log.d("NativePlayer", "nextEp: dur=$dur pos=$pos remaining=$remaining → VISIBLE")
+                val showNext = if (creditsStartMs >= 0L) {
+                    // Use credits marker: show from credits start until end
+                    dur > 1L && pos >= creditsStartMs
+                } else {
+                    // Fallback: last 60 seconds
+                    dur > 1L && (dur - pos) in 1L..60_000L
+                }
                 btnNextEpisode.visibility = if (showNext) View.VISIBLE else View.GONE
             }
 
@@ -258,6 +263,7 @@ class NativePlayerActivity : AppCompatActivity() {
     private var introEndMs = -1L
     private var introSkipped = false
     private var nextEpisodeId = ""
+    private var creditsStartMs = -1L
     private data class Chapter(val name: String, val startMs: Long)
     private var chapters = emptyList<Chapter>()
 
@@ -386,7 +392,8 @@ class NativePlayerActivity : AppCompatActivity() {
         if (jellyfinAudioTracks.size > 1) btnAudio.visibility = View.VISIBLE
 
         nextEpisodeId = intent.getStringExtra(EXTRA_NEXT_EPISODE_ID) ?: ""
-        android.util.Log.d("NativePlayer", "nextEpisodeId='$nextEpisodeId'")
+        creditsStartMs = intent.getLongExtra(EXTRA_CREDITS_START_MS, -1L)
+        android.util.Log.d("NativePlayer", "nextEpisodeId='$nextEpisodeId' creditsStartMs=$creditsStartMs")
 
         // Parse chapter markers
         try {

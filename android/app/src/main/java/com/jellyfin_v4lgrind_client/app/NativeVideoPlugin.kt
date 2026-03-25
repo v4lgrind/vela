@@ -65,6 +65,7 @@ class NativeVideoPlugin : Plugin() {
             putExtra(NativePlayerActivity.EXTRA_SUBTITLE_TEXT_SIZE, subtitleTextSize)
             putExtra(NativePlayerActivity.EXTRA_NEXT_EPISODE_ID, nextEpisodeId)
             putExtra(NativePlayerActivity.EXTRA_CHAPTERS_JSON, chaptersJson)
+            putExtra(NativePlayerActivity.EXTRA_CREDITS_START_MS, call.data.optLong("creditsStartMs", -1L))
         }
         activity.startActivity(intent)
         call.resolve()

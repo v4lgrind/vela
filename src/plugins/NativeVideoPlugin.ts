@@ -22,6 +22,7 @@ export interface NativeVideoStartOptions {
     subtitleTextSize?: number;
     nextEpisodeId?: string;
     chaptersJson?: string;
+    creditsStartMs?: number;
 }
 
 export interface NativeVideoProgressEvent {

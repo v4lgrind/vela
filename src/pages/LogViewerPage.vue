@@ -57,7 +57,6 @@
 import { ref, computed } from 'vue';
 import { ArrowLeft } from 'lucide-vue-next';
 import { getLogEntries, clearLogs, dumpLogs } from '@/utils/debugLog';
-import type { LogEntry } from '@/utils/debugLog';
 
 const entries = computed(() => getLogEntries());
 const activeFilter = ref<'all' | 'vue' | 'kotlin'>('all');

@@ -8,7 +8,6 @@ import {
   getUserLibraryApi,
   getUserViewsApi,
   getSystemApi,
-  getUserApi,
 } from "@jellyfin/sdk/lib/utils/api";
 import { downloadService } from "../services/downloadService";
 
@@ -375,7 +374,7 @@ export const useJellyfinStore = defineStore("jellyfin", {
         sortOrder: ["Ascending"],
         fields: ["Overview", "UserData", "MediaSources"] as any,
         recursive: true,
-      });
+      } as any);
       return resp.data.Items ?? [];
     },
 
@@ -520,17 +519,13 @@ export const useJellyfinStore = defineStore("jellyfin", {
         // Récupérer les infos de l'item
         const item = await this.fetchItemDetails(itemId);
 
-        // Construire le nom de fichier
-        const extension = item.Container || "mkv";
-        const filename = `${item.Name}.${extension}`;
-
-        // Télécharger (ancienne méthode - browser download)
-        await downloadService.downloadFile(
+        // Télécharger via le service natif
+        await downloadService.downloadForOffline(
           this.serverUrl,
           itemId,
           this.accessToken || "",
-          filename,
-          (progress) => {
+          item,
+          (progress: { percentage: number; loaded: number; total: number }) => {
             // Mettre à jour le state
             this.downloadProgress[itemId] = progress.percentage;
 

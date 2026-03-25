@@ -21,6 +21,7 @@ import { useDpadNavigation } from "@/composables/useDpadNavigation";
 import { App as CapacitorApp } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
 import { StatusBar, Style } from "@capacitor/status-bar";
+import { NativeVideo } from "@/plugins/NativeVideoPlugin";
 
 
 const route = useRoute();
@@ -87,6 +88,16 @@ onMounted(async () => {
   });
 
   if (Capacitor.isNativePlatform()) {
+    // Set safe area CSS variables from native insets on initial load
+    try {
+      const insets = await NativeVideo.getSafeAreaInsets();
+      const root = document.documentElement;
+      root.style.setProperty('--sat', `${insets.top}px`);
+      root.style.setProperty('--sab', `${insets.bottom}px`);
+      root.style.setProperty('--sal', `${insets.left}px`);
+      root.style.setProperty('--sar', `${insets.right}px`);
+    } catch { /* non-native fallback, env() handles it */ }
+
     // Re-apply status bar icon style when returning from NativePlayerActivity or rotating
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') applyTheme(preferencesStore.colorScheme);

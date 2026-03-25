@@ -22,4 +22,6 @@ export class NativeVideoPluginWeb extends WebPlugin implements NativeVideoPlugin
     async updateQualityPresets(_options: { presets: string; selectedBitrate: number }): Promise<void> {}
     async getDeviceCodecs(): Promise<{ codecs: string[] }> { return { codecs: [] }; }
     async canDecodeHevc(_options: { profile: string; level: number }): Promise<{ supported: boolean }> { return { supported: true }; }
+    async setSubtitleSize(_options: { scale: number }): Promise<void> {}
+    async getSafeAreaInsets(): Promise<{ top: number; bottom: number; left: number; right: number }> { return { top: 0, bottom: 0, left: 0, right: 0 }; }
 }

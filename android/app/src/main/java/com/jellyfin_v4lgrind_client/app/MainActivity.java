@@ -51,24 +51,23 @@ public class MainActivity extends BridgeActivity {
         int left   = Math.max(bars.left,   cutout.left);
         int right  = Math.max(bars.right,  cutout.right);
 
-        // Convert px → dp (CSS uses dp/pt not raw px on Android)
-        float topDp    = top    / density;
-        float bottomDp = bottom / density;
-        float leftDp   = left   / density;
-        float rightDp  = right  / density;
+        // Convert px → rounded dp (CSS px == dp on Android WebView)
+        int topDp    = Math.round(top    / density);
+        int bottomDp = Math.round(bottom / density);
+        int leftDp   = Math.round(left   / density);
+        int rightDp  = Math.round(right  / density);
 
-        Log.d(TAG, String.format(
-            "injectSafeAreaInsets px top=%d bot=%d left=%d right=%d | dp top=%.1f bot=%.1f left=%.1f right=%.1f | density=%.2f",
-            top, bottom, left, right, topDp, bottomDp, leftDp, rightDp, density));
+        Log.d(TAG, "injectSafeAreaInsets px top=" + top + " bot=" + bottom +
+            " left=" + left + " right=" + right +
+            " | dp top=" + topDp + " bot=" + bottomDp +
+            " left=" + leftDp + " right=" + rightDp);
 
-        String js = String.format(
-            "document.documentElement.style.setProperty('--sat','%.1fpx');" +
-            "document.documentElement.style.setProperty('--sab','%.1fpx');" +
-            "document.documentElement.style.setProperty('--sal','%.1fpx');" +
-            "document.documentElement.style.setProperty('--sar','%.1fpx');" +
-            "console.log('[SafeArea][native] sat=%.1fpx sab=%.1fpx sal=%.1fpx sar=%.1fpx');",
-            topDp, bottomDp, leftDp, rightDp,
-            topDp, bottomDp, leftDp, rightDp);
+        String js =
+            "document.documentElement.style.setProperty('--sat','" + topDp + "px');" +
+            "document.documentElement.style.setProperty('--sab','" + bottomDp + "px');" +
+            "document.documentElement.style.setProperty('--sal','" + leftDp + "px');" +
+            "document.documentElement.style.setProperty('--sar','" + rightDp + "px');" +
+            "console.log('[SafeArea][native] sat=" + topDp + "px sab=" + bottomDp + "px sal=" + leftDp + "px sar=" + rightDp + "px');";
 
         if (getBridge() != null && getBridge().getWebView() != null) {
             getBridge().getWebView().post(() ->

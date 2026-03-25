@@ -282,6 +282,26 @@ class NativeVideoPlugin : Plugin() {
         call.resolve()
     }
 
+    @PluginMethod
+    fun getSafeAreaInsets(call: PluginCall) {
+        val decorView = activity.window.decorView
+        val insets = androidx.core.view.ViewCompat.getRootWindowInsets(decorView)
+        val density = activity.resources.displayMetrics.density
+        val result = JSObject()
+        if (insets != null) {
+            val bars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+            val cutout = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.displayCutout())
+            result.put("top",    Math.round(maxOf(bars.top,    cutout.top)    / density))
+            result.put("bottom", Math.round(maxOf(bars.bottom, cutout.bottom) / density))
+            result.put("left",   Math.round(maxOf(bars.left,   cutout.left)   / density))
+            result.put("right",  Math.round(maxOf(bars.right,  cutout.right)  / density))
+        } else {
+            result.put("top", 0.0); result.put("bottom", 0.0)
+            result.put("left", 0.0); result.put("right", 0.0)
+        }
+        call.resolve(result)
+    }
+
     // ── Private helpers ────────────────────────────────────────────────────────
 
     private fun sendCommand(command: String) {

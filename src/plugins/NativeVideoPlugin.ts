@@ -86,6 +86,7 @@ export interface NativeVideoPlugin {
     getDeviceCodecs(): Promise<{ codecs: string[] }>;
     canDecodeHevc(options: { profile: string; level: number }): Promise<{ supported: boolean }>;
     setSubtitleSize(options: { scale: number }): Promise<void>;
+    getSafeAreaInsets(): Promise<{ top: number; bottom: number; left: number; right: number }>;
 
     addListener(event: 'progress', handler: (data: NativeVideoProgressEvent) => void): Promise<PluginListenerHandle>;
     addListener(event: 'ended', handler: () => void): Promise<PluginListenerHandle>;

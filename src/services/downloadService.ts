@@ -34,8 +34,7 @@ class DownloadService {
     estimatedSize?: number,
   ): Promise<void> {
     if (this.downloads.has(itemId)) {
-      console.log('Already downloading:', itemId);
-      return;
+      throw new Error(`Download already in progress for ${itemId}`);
     }
 
     // When transcoding, the server outputs an MKV container (multi-track + subtitle support)
@@ -57,7 +56,7 @@ class DownloadService {
 
     try {
       // Download via native Android ForegroundService (keeps CPU awake, shows notification)
-      await new Promise<void>(async (resolve, reject) => {
+      await new Promise<void>((resolve, reject) => {
         const handles: PluginListenerHandle[] = [];
 
         const cleanup = async () => {
@@ -66,48 +65,50 @@ class DownloadService {
           }
         };
 
-        handles.push(await DownloadPlugin.addListener('downloadProgress', (evt) => {
-          if (evt.itemId !== itemId) return;
-          if (activeDownload.aborted) {
-            DownloadPlugin.cancel({ itemId }).catch(() => {});
-            return;
-          }
-          const callback = this.progressCallbacks.get(itemId);
-          if (callback) {
-            const total = evt.total > 0 ? evt.total : (estimatedSize || 0);
-            const pct = total > 0 ? Math.min(99, Math.round((evt.loaded / total) * 100)) : -1;
-            callback({ itemId, filename, loaded: evt.loaded, total, percentage: pct });
-          }
-        }));
+        (async () => {
+          handles.push(await DownloadPlugin.addListener('downloadProgress', (evt) => {
+            if (evt.itemId !== itemId) return;
+            if (activeDownload.aborted) {
+              DownloadPlugin.cancel({ itemId }).catch(() => {});
+              return;
+            }
+            const callback = this.progressCallbacks.get(itemId);
+            if (callback) {
+              const total = evt.total > 0 ? evt.total : (estimatedSize || 0);
+              const pct = total > 0 ? Math.min(99, Math.round((evt.loaded / total) * 100)) : -1;
+              callback({ itemId, filename, loaded: evt.loaded, total, percentage: pct });
+            }
+          }));
 
-        handles.push(await DownloadPlugin.addListener('downloadComplete', async (evt) => {
-          if (evt.itemId !== itemId) return;
-          await cleanup();
-          resolve();
-        }));
+          handles.push(await DownloadPlugin.addListener('downloadComplete', async (evt) => {
+            if (evt.itemId !== itemId) return;
+            await cleanup();
+            resolve();
+          }));
 
-        handles.push(await DownloadPlugin.addListener('downloadFailed', async (evt) => {
-          if (evt.itemId !== itemId) return;
-          await cleanup();
-          if (activeDownload.aborted || evt.error === 'AbortError') {
-            reject(Object.assign(new Error('AbortError'), { name: 'AbortError' }));
-          } else {
-            reject(new Error(evt.error));
-          }
-        }));
+          handles.push(await DownloadPlugin.addListener('downloadFailed', async (evt) => {
+            if (evt.itemId !== itemId) return;
+            await cleanup();
+            if (activeDownload.aborted || evt.error === 'AbortError') {
+              reject(Object.assign(new Error('AbortError'), { name: 'AbortError' }));
+            } else {
+              reject(new Error(evt.error));
+            }
+          }));
 
-        // Persist metadata so offline-store can reconstruct the DB record if the
-        // app is killed after the native download completes but before this JS
-        // completion logic runs.
-        localStorage.setItem(`dl_meta_${itemId}`, JSON.stringify({ metadata, filePath }));
+          // Persist metadata so offline-store can reconstruct the DB record if the
+          // app is killed after the native download completes but before this JS
+          // completion logic runs.
+          localStorage.setItem(`dl_meta_${itemId}`, JSON.stringify({ metadata, filePath }));
 
-        await DownloadPlugin.enqueue({
-          itemId,
-          url: downloadUrl,
-          destPath: filePath,
-          itemName: metadata.Name || '',
-          estimatedSize: estimatedSize || 0,
-        });
+          await DownloadPlugin.enqueue({
+            itemId,
+            url: downloadUrl,
+            destPath: filePath,
+            itemName: metadata.Name || '',
+            estimatedSize: estimatedSize || 0,
+          });
+        })().catch(reject);
       });
 
       if (activeDownload.aborted) {

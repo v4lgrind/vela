@@ -80,8 +80,15 @@ export const useDownloadStore = defineStore('downloads', {
     async startDownload(itemId: string, metadata: any) {
       const existing = this.tasks.get(itemId);
       if (existing?.status === 'downloading' || existing?.status === 'queued') {
-        console.log('[DownloadStore] Already queued/downloading:', itemId);
-        return;
+        // Cross-check with the service layer — if it says this item is NOT actually
+        // downloading, the store task is stale (e.g. native event was never received).
+        if (existing.status === 'downloading' && !downloadService.isDownloading(itemId)) {
+          console.warn('[DownloadStore] Stale downloading task for', itemId, '— allowing retry');
+          this.tasks.delete(itemId);
+        } else {
+          console.log('[DownloadStore] Already queued/downloading:', itemId);
+          return;
+        }
       }
 
       const jellyfinStore = useJellyfinStore();

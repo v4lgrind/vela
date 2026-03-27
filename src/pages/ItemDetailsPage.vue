@@ -331,6 +331,16 @@
                                     <div class="flex items-center gap-1.5 shrink-0">
                                         <span v-if="ep.RunTimeTicks"
                                             class="text-xs text-text-subtle hidden sm:block tabular-nums">{{ formatTicksDuration(ep.RunTimeTicks) }}</span>
+                                        <span v-if="offlineStore.isItemDownloaded(ep.Id)"
+                                            class="rounded-full p-1.5 bg-accent-purple/20 text-accent-purple"
+                                            title="Downloaded">
+                                            <DownloadIcon class="size-3.5" />
+                                        </span>
+                                        <span v-else-if="downloadStore.isDownloading(ep.Id)"
+                                            class="rounded-full p-1.5 bg-accent-purple/20 text-accent-purple animate-pulse"
+                                            :title="'Downloading ' + (downloadStore.getTask(ep.Id)?.progress ?? 0) + '%'">
+                                            <Loader2 class="size-3.5 animate-spin" />
+                                        </span>
                                         <button @click.stop="toggleWatchedEpisode(ep)" :disabled="watchingEpId === ep.Id"
                                             class="rounded-full p-1.5 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
                                             :class="ep.UserData?.Played ? 'bg-accent-purple text-white' : 'bg-surface-hover text-text-muted hover:bg-surface-raised hover:text-text-heading'"

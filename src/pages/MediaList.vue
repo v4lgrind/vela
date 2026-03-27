@@ -22,6 +22,16 @@
               </div>
             </div>
 
+            <!-- Download badge -->
+            <div v-if="offlineStore.isItemDownloaded(item.Id)"
+              class="absolute top-1.5 left-1.5 bg-accent-purple/80 rounded-full p-1 shadow pointer-events-none">
+              <DownloadIcon class="size-3 text-white" />
+            </div>
+            <div v-else-if="downloadStore.isDownloading(item.Id)"
+              class="absolute top-1.5 left-1.5 bg-accent-purple/80 rounded-full p-1 shadow pointer-events-none animate-pulse">
+              <Loader2 class="size-3 text-white animate-spin" />
+            </div>
+
             <!-- Mark as played button -->
             <button @click.stop="markPlayed(item)" title="Mark as played"
               class="absolute top-1.5 right-1.5 p-1.5 rounded-full bg-black/50 text-white/70
@@ -76,6 +86,16 @@
               </div>
             </div>
 
+            <!-- Download badge -->
+            <div v-if="offlineStore.isItemDownloaded(item.Id)"
+              class="absolute top-1.5 left-1.5 bg-accent-purple/80 rounded-full p-1 shadow pointer-events-none">
+              <DownloadIcon class="size-3 text-white" />
+            </div>
+            <div v-else-if="downloadStore.isDownloading(item.Id)"
+              class="absolute top-1.5 left-1.5 bg-accent-purple/80 rounded-full p-1 shadow pointer-events-none animate-pulse">
+              <Loader2 class="size-3 text-white animate-spin" />
+            </div>
+
             <!-- Mark as played button -->
             <button @click.stop="markPlayed(item)" title="Mark as played"
               class="absolute top-1.5 right-1.5 p-1.5 rounded-full bg-black/50 text-white/70
@@ -125,6 +145,15 @@
               :class="item.Type === 'Episode' ? 'aspect-video' : 'aspect-[2/3]'">
               <LazyImg :src="getLatestImageUrl(item)" :alt="item.Name" :item-type="item.Type"
                 class="block w-full h-full object-cover" />
+              <!-- Download badge -->
+              <div v-if="offlineStore.isItemDownloaded(item.Id)"
+                class="absolute top-1.5 left-1.5 bg-accent-purple/80 rounded-full p-1 shadow pointer-events-none">
+                <DownloadIcon class="size-3 text-white" />
+              </div>
+              <div v-else-if="downloadStore.isDownloading(item.Id)"
+                class="absolute top-1.5 left-1.5 bg-accent-purple/80 rounded-full p-1 shadow pointer-events-none animate-pulse">
+                <Loader2 class="size-3 text-white animate-spin" />
+              </div>
             </div>
             <div class="px-0.5 text-xs font-semibold text-text-heading truncate
                         group-hover:text-accent-purple-light transition-colors"
@@ -191,9 +220,13 @@ import { useRouter } from 'vue-router';
 import { useJellyfinStore } from '@/store/jellyfin-store';
 import LazyImg from '@/components/LazyImg.vue';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowRight, Check, Loader2, Play } from 'lucide-vue-next';
+import { ArrowRight, Check, Download as DownloadIcon, Loader2, Play } from 'lucide-vue-next';
+import { useOfflineStore } from '@/store/offline-store';
+import { useDownloadStore } from '@/store/download-store';
 
 const store = useJellyfinStore();
+const offlineStore = useOfflineStore();
+const downloadStore = useDownloadStore();
 const router = useRouter();
 
 const mediaItems = ref<Array<{ Id: string; Name: string; imageUrl: string; Type?: string }>>([]);

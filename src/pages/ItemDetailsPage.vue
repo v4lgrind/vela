@@ -380,7 +380,11 @@
                                 </div>
                                 <div v-if="track.Artists?.length" class="text-text-subtle text-xs mt-0.5 truncate">{{ track.Artists.join(', ') }}</div>
                             </div>
-                            <div class="text-right text-text-subtle text-xs tabular-nums">{{ formatTrackDuration(track.RunTimeTicks) }}</div>
+                            <div class="flex items-center gap-1.5 justify-end">
+                                <DownloadIcon v-if="offlineStore.isItemDownloaded(track.Id)" class="size-3.5 text-accent-purple" title="Downloaded" />
+                                <Loader2 v-else-if="downloadStore.isDownloading(track.Id)" class="size-3.5 text-accent-purple animate-spin" />
+                                <span class="text-text-subtle text-xs tabular-nums">{{ formatTrackDuration(track.RunTimeTicks) }}</span>
+                            </div>
                         </div>
                     </div>
                 </section>
@@ -435,9 +439,17 @@
                         <div v-for="sim in similarItems" :key="sim.Id"
                             class="snap-center cursor-pointer group rounded-xl overflow-hidden bg-surface-raised border border-border-default hover:-translate-y-1 hover:border-border-hover transition-all duration-200 active:scale-[0.97] active:opacity-75"
                             role="listitem" @click="goToItem(sim.Id)">
-                            <div class="w-full aspect-[2/3] overflow-hidden">
+                            <div class="relative w-full aspect-[2/3] overflow-hidden">
                                 <LazyImg :src="getImageUrl(sim.Id, 'Primary', 300, 450)" :alt="sim.Name"
                                     :item-type="sim.Type" class="w-full h-full object-cover" />
+                                <div v-if="offlineStore.isItemDownloaded(sim.Id)"
+                                    class="absolute top-1.5 left-1.5 bg-accent-purple/80 rounded-full p-1 shadow pointer-events-none">
+                                    <DownloadIcon class="size-3 text-white" />
+                                </div>
+                                <div v-else-if="downloadStore.isDownloading(sim.Id)"
+                                    class="absolute top-1.5 left-1.5 bg-accent-purple/80 rounded-full p-1 shadow pointer-events-none animate-pulse">
+                                    <Loader2 class="size-3 text-white animate-spin" />
+                                </div>
                             </div>
                             <div class="p-2">
                                 <div class="font-medium text-text-primary text-xs truncate">{{ sim.Name }}</div>

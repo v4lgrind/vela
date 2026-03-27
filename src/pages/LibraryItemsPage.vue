@@ -79,6 +79,15 @@
                 class="absolute top-1.5 right-1.5 bg-accent-purple rounded-full p-0.5 shadow pointer-events-none">
                 <Check class="size-3 text-white" />
               </div>
+              <!-- Download badge -->
+              <div v-if="offlineStore.isItemDownloaded(item.Id)"
+                class="absolute top-1.5 left-1.5 bg-accent-purple/80 rounded-full p-1 shadow pointer-events-none">
+                <DownloadIcon class="size-3 text-white" />
+              </div>
+              <div v-else-if="downloadStore.isDownloading(item.Id)"
+                class="absolute top-1.5 left-1.5 bg-accent-purple/80 rounded-full p-1 shadow pointer-events-none animate-pulse">
+                <Loader2 class="size-3 text-white animate-spin" />
+              </div>
 
               <!-- Action overlay: always visible on mobile, hover-only on desktop -->
               <div v-if="!isAudioType(item.Type) && item.Type !== 'BoxSet'"
@@ -137,8 +146,16 @@
                 <div class="h-full bg-accent-purple rounded-full" :style="{ width: item.UserData.PlayedPercentage + '%' }" />
               </div>
             </div>
-            <!-- Right side: watched + actions -->
+            <!-- Right side: download + watched + actions -->
             <div class="flex items-center gap-2 shrink-0">
+              <div v-if="offlineStore.isItemDownloaded(item.Id)"
+                class="rounded-full p-1 bg-accent-purple/20 text-accent-purple" title="Downloaded">
+                <DownloadIcon class="size-3" />
+              </div>
+              <div v-else-if="downloadStore.isDownloading(item.Id)"
+                class="rounded-full p-1 bg-accent-purple/20 text-accent-purple animate-pulse">
+                <Loader2 class="size-3 animate-spin" />
+              </div>
               <div v-if="item.UserData?.Played" class="bg-accent-purple rounded-full p-0.5">
                 <Check class="size-3 text-white" />
               </div>
@@ -193,9 +210,13 @@ import { isAudioType } from '@/utils/helpers';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ArrowRight, Play, Check, Loader2, SlidersHorizontal, ChevronDown, LayoutGrid, List } from 'lucide-vue-next';
+import { ArrowLeft, ArrowRight, Play, Check, Download as DownloadIcon, Loader2, SlidersHorizontal, ChevronDown, LayoutGrid, List } from 'lucide-vue-next';
+import { useOfflineStore } from '@/store/offline-store';
+import { useDownloadStore } from '@/store/download-store';
 
 const store = useJellyfinStore();
+const offlineStore = useOfflineStore();
+const downloadStore = useDownloadStore();
 const prefs = usePreferencesStore();
 const route = useRoute();
 const router = useRouter();

@@ -70,6 +70,15 @@
                 :item-type="item.Type"
                 class="w-full h-full object-cover block"
               />
+              <!-- Download badge -->
+              <div v-if="offlineStore.isItemDownloaded(item.Id)"
+                class="absolute top-1 left-1 z-10 bg-accent-purple/80 rounded-full p-1 shadow pointer-events-none">
+                <DownloadIcon class="size-3 text-white" />
+              </div>
+              <div v-else-if="downloadStore.isDownloading(item.Id)"
+                class="absolute top-1 left-1 z-10 bg-accent-purple/80 rounded-full p-1 shadow pointer-events-none animate-pulse">
+                <Loader2 class="size-3 text-white animate-spin" />
+              </div>
               <!-- Watched toggle -->
               <button
                 @click.stop="toggleWatched(item)"
@@ -107,9 +116,13 @@ import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useJellyfinStore } from '@/store/jellyfin-store';
 import LazyImg from '@/components/LazyImg.vue';
-import { ArrowLeft, Loader2, Search, Check } from 'lucide-vue-next';
+import { ArrowLeft, Download as DownloadIcon, Loader2, Search, Check } from 'lucide-vue-next';
+import { useOfflineStore } from '@/store/offline-store';
+import { useDownloadStore } from '@/store/download-store';
 
 const route = useRoute();
+const offlineStore = useOfflineStore();
+const downloadStore = useDownloadStore();
 const router = useRouter();
 const store = useJellyfinStore();
 

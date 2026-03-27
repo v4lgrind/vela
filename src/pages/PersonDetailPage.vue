@@ -36,13 +36,21 @@
             class="cursor-pointer group"
             @click="router.push({ name: 'ItemDetails', params: { id: item.Id } })"
           >
-            <div class="aspect-[2/3] rounded-xl overflow-hidden bg-surface-raised shadow mb-1.5 group-hover:-translate-y-0.5 transition-transform duration-200">
+            <div class="relative aspect-[2/3] rounded-xl overflow-hidden bg-surface-raised shadow mb-1.5 group-hover:-translate-y-0.5 transition-transform duration-200">
               <LazyImg
                 :src="store.getImageUrl(item.Id, 'Primary', 300)"
                 :alt="item.Name ?? ''"
                 :item-type="item.Type?.toLowerCase() ?? 'movie'"
                 class="w-full h-full object-cover"
               />
+              <div v-if="offlineStore.isItemDownloaded(item.Id)"
+                class="absolute top-1.5 left-1.5 bg-accent-purple/80 rounded-full p-1 shadow pointer-events-none">
+                <DownloadIcon class="size-3 text-white" />
+              </div>
+              <div v-else-if="downloadStore.isDownloading(item.Id)"
+                class="absolute top-1.5 left-1.5 bg-accent-purple/80 rounded-full p-1 shadow pointer-events-none animate-pulse">
+                <Loader2 class="size-3 text-white animate-spin" />
+              </div>
             </div>
             <p class="text-xs font-medium text-text-primary truncate">{{ item.Name }}</p>
             <p v-if="item.ProductionYear" class="text-xs text-text-subtle">{{ item.ProductionYear }}</p>
@@ -62,12 +70,16 @@ import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useJellyfinStore } from '@/store/jellyfin-store';
 import LazyImg from '@/components/LazyImg.vue';
-import { Loader2 } from 'lucide-vue-next';
+import { Download as DownloadIcon, Loader2 } from 'lucide-vue-next';
+import { useOfflineStore } from '@/store/offline-store';
+import { useDownloadStore } from '@/store/download-store';
 
 const props = defineProps<{ id: string }>();
 
 const router = useRouter();
 const store = useJellyfinStore();
+const offlineStore = useOfflineStore();
+const downloadStore = useDownloadStore();
 
 const loading = ref(true);
 const person = ref<any>(null);

@@ -29,7 +29,7 @@
       <!-- Filmography -->
       <section v-if="filmography.length" class="px-4 pb-8">
         <h3 class="text-xs font-semibold text-text-muted uppercase tracking-widest mb-4">Filmography</h3>
-        <div class="grid grid-cols-3 gap-3">
+        <div class="grid grid-cols-3 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(130px,1fr))] sm:gap-4">
           <div
             v-for="item in filmography"
             :key="item.Id"

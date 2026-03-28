@@ -834,9 +834,6 @@ class NativePlayerActivity : AppCompatActivity() {
             )
         )
 
-        // MediaSession links ExoPlayer to the system (lock screen, BT controls, etc.)
-        mediaSession = MediaSession.Builder(this, exo).build()
-
         // PlayerNotificationManager shows a media notification with play/pause/seek controls
         playerNotificationManager = PlayerNotificationManager.Builder(this, NOTIFICATION_ID, NOTIFICATION_CHANNEL_ID)
             .setMediaDescriptionAdapter(object : PlayerNotificationManager.MediaDescriptionAdapter {

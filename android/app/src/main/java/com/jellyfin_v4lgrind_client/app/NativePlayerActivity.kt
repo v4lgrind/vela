@@ -422,7 +422,14 @@ class NativePlayerActivity : AppCompatActivity() {
         }
 
         setupControls()
-        buildPlayer(url, authHeader, startMs, playMethod, subtitleTracksJson)
+        try {
+            buildPlayer(url, authHeader, startMs, playMethod, subtitleTracksJson)
+        } catch (e: Exception) {
+            android.util.Log.e("NativePlayer", "buildPlayer failed", e)
+            sendErrorBroadcast("Player initialization failed: ${e.message}")
+            finish()
+            return
+        }
 
         ContextCompat.registerReceiver(
             this,
@@ -791,10 +798,6 @@ class NativePlayerActivity : AppCompatActivity() {
         playerView.player = exo
         player = exo
 
-        // Create MediaSession for system media controls (lock screen, notification, Bluetooth)
-        mediaSession?.release()
-        mediaSession = MediaSession.Builder(this, exo).build()
-
         // Remove the black background box behind subtitles; keep white text with a
         // dark outline so they remain readable on any content.
         playerView.subtitleView?.setStyle(
@@ -823,6 +826,12 @@ class NativePlayerActivity : AppCompatActivity() {
 
     private fun setupMediaNotification() {
         val exo = player ?: return
+
+        // Clean up any previous session/notification (e.g. player rebuild for DV fallback)
+        playerNotificationManager?.setPlayer(null)
+        playerNotificationManager = null
+        mediaSession?.release()
+        mediaSession = null
 
         // Create notification channel (no-op if already exists)
         val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
@@ -1512,7 +1521,7 @@ class NativePlayerActivity : AppCompatActivity() {
         sendStoppedBroadcast()
         handler.removeCallbacksAndMessages(null)
         audioSwitchPendingGroupIndex = -1
-        unregisterReceiver(commandReceiver)
+        try { unregisterReceiver(commandReceiver) } catch (_: Exception) {}
         playerNotificationManager?.setPlayer(null)
         playerNotificationManager = null
         mediaSession?.release()

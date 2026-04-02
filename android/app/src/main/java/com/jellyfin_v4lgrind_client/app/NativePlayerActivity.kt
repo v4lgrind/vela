@@ -758,6 +758,24 @@ class NativePlayerActivity : AppCompatActivity() {
                     return
                 }
 
+                // Hardware decoder failed (videoCapFallbackMode=true) and we already retried
+                // with the FFmpeg software decoder (forceSoftwareVideo=true), but it also failed.
+                // The error message is now a generic RuntimeException from FfmpegVideoRenderer,
+                // not NO_EXCEEDS_CAPABILITIES, so the branch above won't catch it.
+                // Treat any non-audio error in this state as a video codec failure.
+                if (videoCapFallbackMode && forceSoftwareVideo && !isAudioPlaybackError(error)) {
+                    val resumeMs = player?.currentPosition ?: 0L
+                    debugLog("[VideoFallback] Software decoder also failed — notifying Vue to transcode (resumeMs=$resumeMs)")
+                    stoppedSent = true
+                    val intent = Intent(ACTION_VIDEO_ERROR)
+                    intent.putExtra("reason", "video_codec_unsupported")
+                    intent.putExtra("positionMs", resumeMs)
+                    intent.setPackage(packageName)
+                    sendBroadcast(intent)
+                    finish()
+                    return
+                }
+
                 handler.removeCallbacks(clearAudioSwitchPending)
                 val pendingIdx = audioSwitchPendingGroupIndex
                 val pendingLang = audioSwitchPendingLanguage

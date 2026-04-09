@@ -66,6 +66,8 @@ class NativeVideoPlugin : Plugin() {
             putExtra(NativePlayerActivity.EXTRA_NEXT_EPISODE_ID, nextEpisodeId)
             putExtra(NativePlayerActivity.EXTRA_CHAPTERS_JSON, chaptersJson)
             putExtra(NativePlayerActivity.EXTRA_CREDITS_START_MS, call.data.optLong("creditsStartMs", -1L))
+            putExtra(NativePlayerActivity.EXTRA_DURATION_HINT_MS, call.data.optLong("durationHintMs", 0L))
+            putExtra(NativePlayerActivity.EXTRA_SRT_FILE_PATH, call.data.optString("srtFilePath", ""))
         }
         activity.startActivity(intent)
         call.resolve()
@@ -264,11 +266,14 @@ class NativeVideoPlugin : Plugin() {
         // If hardware can't handle it, check if FFmpeg software decoder can.
         // FFmpeg supports all valid HEVC bitstreams (including Main 10), so any HEVC
         // content that hardware rejects can still be played via the software fallback.
-        val ffmpegSupported = !supported &&
+        // When hardwareOnly=true (used by download codec check), skip FFmpeg fallback
+        // so the caller knows transcoding is recommended.
+        val hardwareOnly = call.getBoolean("hardwareOnly") ?: false
+        val ffmpegSupported = !hardwareOnly && !supported &&
             androidx.media3.decoder.ffmpeg.FfmpegLibrary.isAvailable() &&
             androidx.media3.decoder.ffmpeg.FfmpegLibrary.supportsFormat("video/hevc")
         val finalSupported = supported || ffmpegSupported
-        android.util.Log.d("NativePlayer", "canDecodeHevc: result supported=$finalSupported (hw=$supported ffmpeg=$ffmpegSupported) for profile=$profileStr level=$jellyfinLevel")
+        android.util.Log.d("NativePlayer", "canDecodeHevc: result supported=$finalSupported (hw=$supported ffmpeg=$ffmpegSupported hardwareOnly=$hardwareOnly) for profile=$profileStr level=$jellyfinLevel")
         call.resolve(JSObject().apply { put("supported", finalSupported) })
     }
 

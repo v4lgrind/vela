@@ -753,7 +753,7 @@ function stopProgressReporting() {
 
 // ── Jellyfin API ───────────────────────────────────────────────────────────────
 
-async function fetchPlaybackInfo(startTimeTicks?: number, audioStreamIndex?: number, forceTranscode = false, useNativeProfile = false, transcodeAudio = false) {
+async function fetchPlaybackInfo(startTimeTicks?: number, audioStreamIndex?: number, forceTranscode = false, useNativeProfile = false, transcodeAudio = false, stripHevc = false) {
     const bitrateCap = selectedBitrate.value || 1_000_000_000;
     // When a quality cap is active we must force a real video re-encode.
     // Stripping DirectPlayProfiles prevents DirectPlay, but Jellyfin can still
@@ -764,9 +764,23 @@ async function fetchPlaybackInfo(startTimeTicks?: number, audioStreamIndex?: num
 
     const baseDeviceProfile = useNativeProfile ? nativeAndroidDeviceProfile : deviceProfile;
     const stripDirectPlay = shouldForce || transcodeAudio;
-    const baseProfile = stripDirectPlay
-        ? { ...baseDeviceProfile.DeviceProfile, DirectPlayProfiles: [], MaxStreamingBitrate: bitrateCap }
+
+    // When stripHevc is set (video fallback after HEVC decode failure), remove
+    // hevc/h265 from TranscodingProfiles so Jellyfin transcodes to H.264 instead
+    // of picking HEVC again (which would fail in the same way).
+    const removeHevcCodec = (csv: string) => csv.split(',').filter(c => c !== 'hevc' && c !== 'h265').join(',');
+    const patchedDeviceProfile = stripHevc
+        ? {
+            ...baseDeviceProfile.DeviceProfile,
+            TranscodingProfiles: (baseDeviceProfile.DeviceProfile.TranscodingProfiles || []).map((tp: any) =>
+                tp.VideoCodec ? { ...tp, VideoCodec: removeHevcCodec(tp.VideoCodec) } : tp
+            ),
+        }
         : baseDeviceProfile.DeviceProfile;
+
+    const baseProfile = stripDirectPlay
+        ? { ...patchedDeviceProfile, DirectPlayProfiles: [], MaxStreamingBitrate: bitrateCap }
+        : patchedDeviceProfile;
 
     // AllowVideoStreamCopy: false forces a real re-encode so the bitrate cap
     // is honoured. BUT Jellyfin has a bug where it drops StartTimeTicks from the
@@ -788,7 +802,7 @@ async function fetchPlaybackInfo(startTimeTicks?: number, audioStreamIndex?: num
         ...(audioStreamIndex !== undefined ? { AudioStreamIndex: audioStreamIndex } : {}),
     };
 
-    debugLog(`[AudioCrash] fetchPlaybackInfo: forceTranscode=${forceTranscode} transcodeAudio=${transcodeAudio} shouldForce=${shouldForce} stripDirectPlay=${stripDirectPlay} audioStreamIndex=${audioStreamIndex}`);
+    debugLog(`[AudioCrash] fetchPlaybackInfo: forceTranscode=${forceTranscode} transcodeAudio=${transcodeAudio} shouldForce=${shouldForce} stripDirectPlay=${stripDirectPlay} stripHevc=${stripHevc} audioStreamIndex=${audioStreamIndex}`);
     debugLog(`[AudioCrash]   DirectPlayProfiles count=${baseProfile.DirectPlayProfiles?.length ?? 'N/A'} AllowAudioStreamCopy=${transcodeAudio ? false : 'unset'} AllowVideoStreamCopy=${shouldForce ? false : 'unset'}`);
 
     // Pass StartTimeTicks as both a query parameter and in the body.
@@ -1124,7 +1138,7 @@ async function fetchNextEpisodeForItem(epItemId: string): Promise<string> {
 
 // ── Native player init (Android ExoPlayer) ─────────────────────────────────────
 
-async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: number, title?: string, transcodeAudio = false, forceTranscodeVideo = false, chapters?: Array<{ name: string; startMs: number }>) {
+async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: number, title?: string, transcodeAudio = false, forceTranscodeVideo = false, chapters?: Array<{ name: string; startMs: number }>, stripHevc = false) {
     isLoading.value = true;
 
     try {
@@ -1133,7 +1147,7 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
             : undefined;
 
         const [data, resolvedNextEpisodeId] = await Promise.all([
-            fetchPlaybackInfo(startTicks, preferredAudioIndex, forceTranscodeVideo, true, transcodeAudio),
+            fetchPlaybackInfo(startTicks, preferredAudioIndex, forceTranscodeVideo, true, transcodeAudio, stripHevc),
             nextEpisodeId ? Promise.resolve(nextEpisodeId) : fetchNextEpisodeForItem(itemId),
         ]);
         mediaSource.value = data.MediaSources?.[0];
@@ -1224,11 +1238,12 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
         await NativeVideo.addListener('videoError', async (data) => {
             debugLog(`[VideoFallback] videoError: reason=${data.reason} positionMs=${data.positionMs}`);
             if (data.reason === 'dolby_vision_unsupported' || data.reason === 'video_codec_unsupported') {
-                debugLog('[VideoFallback] Restarting with video transcoding...');
+                debugLog('[VideoFallback] Restarting with video transcoding (stripHevc=true)...');
                 await NativeVideo.removeAllListeners();
                 const resumeSec = data.positionMs / 1000;
-                // 5th arg = forceTranscodeVideo: strips DirectPlay + forces re-encode
-                await initNativePlayer(resumeSec, selectedAudioIndex.value ?? undefined, title, false, true);
+                // forceTranscodeVideo + stripHevc: forces re-encode and removes HEVC
+                // from TranscodingProfiles so Jellyfin picks H.264 instead
+                await initNativePlayer(resumeSec, selectedAudioIndex.value ?? undefined, title, false, true, undefined, true);
             } else {
                 error.value = `Video error: ${data.reason}`;
                 isLoading.value = false;
@@ -1468,9 +1483,16 @@ async function initOfflinePlayer(cachedDownload: any, resumeSeconds?: number, it
             let lastGoodPositionSec = resumeSeconds || 0;
             let restoringSubtitle = false;
 
+            // Fallback duration from cached Jellyfin metadata — transcoded MKV containers
+            // may not have accurate duration headers, causing ExoPlayer to report 0.
+            const cachedDurationMs = cachedDownload.jellyfinItem?.RunTimeTicks
+              ? Math.floor(cachedDownload.jellyfinItem.RunTimeTicks / 10_000)
+              : 0;
+
             await NativeVideo.addListener('progress', (data) => {
                 currentTime.value = data.positionMs / 1000;
-                duration.value = data.durationMs / 1000;
+                const durMs = data.durationMs > 0 ? data.durationMs : cachedDurationMs;
+                duration.value = durMs / 1000;
                 if (duration.value > 0) progressPct.value = (currentTime.value / duration.value) * 100;
                 lastGoodPositionSec = currentTime.value;
                 if (++nativeProgressCount % 10 === 0) saveOfflineProgress();
@@ -1512,31 +1534,47 @@ async function initOfflinePlayer(cachedDownload: any, resumeSeconds?: number, it
                     const nativeAudio: any[] = parsed.audioTracks ?? [];
                     const nativeSubtitle: any[] = parsed.subtitleTracks ?? [];
 
+                    // Enrich ExoPlayer track info with cached Jellyfin metadata —
+                    // transcoded MKV containers may lack proper language tags.
+                    const jellyfinStreams: any[] = cachedDownload.jellyfinItem?.MediaStreams || [];
+                    const jfAudioStreams = jellyfinStreams.filter((s: any) => s.Type === 'Audio');
+                    const jfSubStreams = jellyfinStreams.filter((s: any) => s.Type === 'Subtitle');
+
                     // Populate audio list from embedded tracks (always DirectPlay offline)
                     if (nativeAudio.length > 0) {
-                        audioList.value = nativeAudio.map((t: any) => ({
-                            index: t.groupIndex,
-                            language: t.language || 'und',
-                            label: `${(t.language || 'und').toUpperCase()} ${t.channelCount > 0 ? `(${t.channelCount}ch)` : ''} ${t.codec ? `- ${t.codec.toUpperCase()}` : ''}`.trim(),
-                        }));
+                        audioList.value = nativeAudio.map((t: any, i: number) => {
+                            const jf = jfAudioStreams[i];
+                            const lang = t.language && t.language !== 'und' ? t.language : (jf?.Language || 'und');
+                            const label = jf?.DisplayTitle
+                              || `${lang.toUpperCase()} ${t.channelCount > 0 ? `(${t.channelCount}ch)` : ''} ${t.codec ? `- ${t.codec.toUpperCase()}` : ''}`.trim();
+                            return { index: t.groupIndex, language: lang, label };
+                        });
 
                         // Apply saved audio preference to ExoPlayer (skip any track that previously crashed)
                         const savedLang = localStorage.getItem(`msplayer-audio-${itemId}`);
                         const globalLang = preferencesStore.preferredAudioLanguage;
                         debugLog(`[Offline] tracksReady: ${nativeAudio.length} audio tracks, savedLang="${savedLang}" globalLang="${globalLang}"`);
-                        nativeAudio.forEach((t: any) => debugLog(`[Offline]   track: groupIndex=${t.groupIndex} lang="${t.language}" codec="${t.codec}" ch=${t.channelCount}`));
+                        audioList.value.forEach((t: any) => debugLog(`[Offline]   track: groupIndex=${t.index} lang="${t.language}" label="${t.label}"`));
 
                         const preferredAudio =
-                            (savedLang ? nativeAudio.find((t: any) => t.language === savedLang && t.groupIndex !== skipAudioGroupIndex) : null) ||
-                            (globalLang ? nativeAudio.find((t: any) => t.language === globalLang && t.groupIndex !== skipAudioGroupIndex) : null);
+                            (savedLang ? audioList.value.find((t: any) => t.language === savedLang && t.index !== skipAudioGroupIndex) : null) ||
+                            (globalLang ? audioList.value.find((t: any) => t.language === globalLang && t.index !== skipAudioGroupIndex) : null);
                         if (preferredAudio) {
-                            debugLog(`[Offline] tracksReady: auto-switching to groupIndex=${preferredAudio.groupIndex} lang="${preferredAudio.language}"`);
-                            NativeVideo.selectAudioTrack({ groupIndex: preferredAudio.groupIndex });
-                            selectedAudioIndex.value = preferredAudio.groupIndex;
+                            debugLog(`[Offline] tracksReady: auto-switching to groupIndex=${preferredAudio.index} lang="${preferredAudio.language}"`);
+                            NativeVideo.selectAudioTrack({ groupIndex: preferredAudio.index });
+                            selectedAudioIndex.value = preferredAudio.index;
                         } else {
                             debugLog(`[Offline] tracksReady: no preference match, keeping default`);
                         }
                     }
+
+                    // Enrich subtitle labels with Jellyfin metadata
+                    const enrichedSubs = nativeSubtitle.map((t: any, i: number) => {
+                        const jf = jfSubStreams[i];
+                        const lang = t.language && t.language !== 'und' ? t.language : (jf?.Language || 'und');
+                        const label = jf?.DisplayTitle || t.label || lang;
+                        return { ...t, language: lang, label };
+                    });
 
                     // Apply saved subtitle preference to ExoPlayer
                     const savedNative = localStorage.getItem(`msplayer-subtitle-native-${itemId}`);
@@ -1544,14 +1582,14 @@ async function initOfflinePlayer(cachedDownload: any, resumeSeconds?: number, it
                     if (savedNative === 'off') {
                         // ExoPlayer defaults to no subtitles — nothing needed
                     } else if (savedNative !== null) {
-                        const nativeSub = nativeSubtitle.find((t: any) => t.label === savedNative);
+                        const nativeSub = enrichedSubs.find((t: any) => t.label === savedNative);
                         if (nativeSub) {
                             restoringSubtitle = true;
                             NativeVideo.selectSubtitleTrack({ groupIndex: nativeSub.groupIndex });
                             selectedSubtitleIndex.value = nativeSub.groupIndex;
                         }
                     } else if (globalSubLang) {
-                        const nativeSub = nativeSubtitle.find((t: any) => t.language === globalSubLang);
+                        const nativeSub = enrichedSubs.find((t: any) => t.language === globalSubLang);
                         if (nativeSub) {
                             restoringSubtitle = true;
                             NativeVideo.selectSubtitleTrack({ groupIndex: nativeSub.groupIndex });
@@ -1600,6 +1638,21 @@ async function initOfflinePlayer(cachedDownload: any, resumeSeconds?: number, it
                 debugLog(data.message, 'kotlin');
             });
 
+            // Build sidecar subtitle path for offline SRT rendering (bypasses ExoPlayer MergingMediaSource)
+            let offlineSrtPath: string | undefined;
+            if (cachedDownload.subtitleFilePath) {
+                try {
+                    const subUri = await Filesystem.getUri({
+                        path: cachedDownload.subtitleFilePath,
+                        directory: Directory.Data,
+                    });
+                    offlineSrtPath = subUri.uri;
+                    debugLog(`[Offline] SRT subtitle: ${subUri.uri}`);
+                } catch (e) {
+                    debugLog(`[Offline] Subtitle file not found: ${cachedDownload.subtitleFilePath}`);
+                }
+            }
+
             await NativeVideo.start({
                 url: playUrl,
                 authHeader: '',
@@ -1610,6 +1663,8 @@ async function initOfflinePlayer(cachedDownload: any, resumeSeconds?: number, it
                 subtitleTextSize: preferencesStore.subtitleSize,
                 nextEpisodeId: nextEpisodeId || '',
                 creditsStartMs: creditsStartMs.value,
+                durationHintMs: cachedDurationMs || undefined,
+                srtFilePath: offlineSrtPath,
             });
 
             // Apply stored intro/outro segments so skip-intro works offline
@@ -2073,6 +2128,7 @@ onMounted(async () => {
     // of letting ExoPlayer crash and then falling back (saves time & battery).
     let forceTranscodeAudio = false;
     let forceTranscodeVideo = false;
+    let stripHevcFromProfile = false;
     if (isNative) {
         const deviceCodecs = await getDeviceCodecs();
         if (deviceCodecs.length > 0) {
@@ -2100,6 +2156,7 @@ onMounted(async () => {
                 if (effectiveMime && !deviceCodecs.includes(effectiveMime)) {
                     debugLog(`[Codec] Video codec "${videoStream.Codec}" (${effectiveMime}) not supported — requesting server transcode`);
                     forceTranscodeVideo = true;
+                    if (effectiveMime === 'video/hevc') stripHevcFromProfile = true;
                 }
                 // MIME type supported — also verify HEVC profile/level (e.g. Main 10 / Level 5.1
                 // may be unsupported even when video/hevc is listed as a supported MIME type).
@@ -2111,6 +2168,7 @@ onMounted(async () => {
                         if (!supported) {
                             debugLog(`[Codec] HEVC profile "${profile}" level ${level} not supported — requesting server transcode`);
                             forceTranscodeVideo = true;
+                            stripHevcFromProfile = true;
                         }
                     }
                 }
@@ -2123,7 +2181,7 @@ onMounted(async () => {
             name: ch.Name || '',
             startMs: Math.floor((ch.StartPositionTicks || 0) / 10_000),
         }));
-        await initNativePlayer(resumeSeconds, preferredAudioIndex, buildMediaTitle(details), forceTranscodeAudio, forceTranscodeVideo, chapters);
+        await initNativePlayer(resumeSeconds, preferredAudioIndex, buildMediaTitle(details), forceTranscodeAudio, forceTranscodeVideo, chapters, stripHevcFromProfile);
     } else {
         await initPlayer(resumeSeconds, preferredAudioIndex);
         document.addEventListener('click', handleClickOutside);

@@ -341,6 +341,12 @@
                                             :title="'Downloading ' + (downloadStore.getTask(ep.Id)?.progress ?? 0) + '%'">
                                             <Loader2 class="size-3.5 animate-spin" />
                                         </span>
+                                        <button v-else
+                                            @click.stop="handleEpisodeDownload(ep)"
+                                            class="rounded-full p-1.5 bg-surface-hover text-text-muted hover:bg-surface-raised hover:text-text-heading transition-all active:scale-95 cursor-pointer"
+                                            title="Download">
+                                            <DownloadIcon class="size-3.5" />
+                                        </button>
                                         <button @click.stop="toggleWatchedEpisode(ep)" :disabled="watchingEpId === ep.Id"
                                             class="rounded-full p-1.5 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
                                             :class="ep.UserData?.Played ? 'bg-accent-purple text-white' : 'bg-surface-hover text-text-muted hover:bg-surface-raised hover:text-text-heading'"
@@ -464,6 +470,15 @@
         </template>
     </div>
 
+    <!-- Transcode Download Options Dialog -->
+    <TranscodeDownloadDialog
+        v-if="pendingTranscodeTarget"
+        v-model:open="showTranscodeDialog"
+        :item="pendingTranscodeTarget.metadata"
+        @confirm="onTranscodeConfirm"
+        @original="onTranscodeOriginal"
+    />
+
     <!-- Bulk Download Confirmation Dialog -->
     <Dialog v-model:open="showBulkDialog">
         <DialogContent class="max-w-sm bg-surface-raised border-border-default">
@@ -508,6 +523,8 @@ import { Separator } from '@/components/ui/separator';
 import { Play, Check, Download as DownloadIcon, X, ArrowLeft, ArrowRight, Loader2, Info, Tv2 } from 'lucide-vue-next';
 import { Capacitor } from '@capacitor/core';
 import CastPlugin, { type CastState } from '@/plugins/CastPlugin';
+import TranscodeDownloadDialog from '@/components/TranscodeDownloadDialog.vue';
+import type { TranscodeOptions } from '@/store/download-store';
 
 const store = useJellyfinStore();
 const offlineStore = useOfflineStore();
@@ -532,6 +549,9 @@ const accessToken = store.accessToken;
 const showMediaInfo = ref(false);
 const showBulkDialog = ref(false);
 const bulkDownloadTarget = ref<'season' | 'series'>('season');
+const showTranscodeDialog = ref(false);
+const pendingTranscodeTarget = ref<{ itemId: string; metadata: any } | null>(null);
+const pendingBulkTranscode = ref<any[] | null>(null);
 const playingSeasonId = ref<string | null>(null);
 const watchingSeasonId = ref<string | null>(null);
 const watchingEpId = ref<string | null>(null);
@@ -973,12 +993,65 @@ const downloadProgress = computed(() => {
 
 async function handleDownload() {
     if (!item.value) return;
-    // Start download in background - don't await, let it run
-    downloadStore.startDownload(itemId.value, item.value).catch((error: any) => {
-        if (error.name !== 'AbortError') {
-            console.error('Download failed:', error);
+    const needsTranscode = await downloadStore.checkNeedsTranscode(item.value);
+    if (needsTranscode) {
+        pendingTranscodeTarget.value = { itemId: itemId.value, metadata: item.value };
+        pendingBulkTranscode.value = null;
+        showTranscodeDialog.value = true;
+    } else {
+        downloadStore.startDownload(itemId.value, item.value).catch((error: any) => {
+            if (error.name !== 'AbortError') {
+                console.error('Download failed:', error);
+            }
+        });
+    }
+}
+
+function onTranscodeConfirm(options: TranscodeOptions) {
+    if (pendingBulkTranscode.value) {
+        for (const ep of pendingBulkTranscode.value) {
+            downloadStore.startDownload(ep.Id, ep, options).catch((err: any) => {
+                if (err?.name !== 'AbortError') console.error('[BulkDownload] Failed:', ep.Name, err);
+            });
         }
-    });
+        pendingBulkTranscode.value = null;
+    } else if (pendingTranscodeTarget.value) {
+        const { itemId: id, metadata } = pendingTranscodeTarget.value;
+        downloadStore.startDownload(id, metadata, options).catch((error: any) => {
+            if (error.name !== 'AbortError') console.error('Download failed:', error);
+        });
+        pendingTranscodeTarget.value = null;
+    }
+}
+
+async function handleEpisodeDownload(ep: any) {
+    const needsTranscode = await downloadStore.checkNeedsTranscode(ep);
+    if (needsTranscode) {
+        pendingTranscodeTarget.value = { itemId: ep.Id, metadata: ep };
+        pendingBulkTranscode.value = null;
+        showTranscodeDialog.value = true;
+    } else {
+        downloadStore.startDownload(ep.Id, ep).catch((error: any) => {
+            if (error.name !== 'AbortError') console.error('Download failed:', error);
+        });
+    }
+}
+
+function onTranscodeOriginal() {
+    if (pendingBulkTranscode.value) {
+        for (const ep of pendingBulkTranscode.value) {
+            downloadStore.startDownload(ep.Id, ep).catch((err: any) => {
+                if (err?.name !== 'AbortError') console.error('[BulkDownload] Failed:', ep.Name, err);
+            });
+        }
+        pendingBulkTranscode.value = null;
+    } else if (pendingTranscodeTarget.value) {
+        const { itemId: id, metadata } = pendingTranscodeTarget.value;
+        downloadStore.startDownload(id, metadata).catch((error: any) => {
+            if (error.name !== 'AbortError') console.error('Download failed:', error);
+        });
+        pendingTranscodeTarget.value = null;
+    }
 }
 
 async function deleteDownload() {
@@ -1009,10 +1082,8 @@ async function startBulkDownload(mode: 'all' | 'unwatched') {
     let candidates: any[] = [];
 
     if (bulkDownloadTarget.value === 'season') {
-        // Episodes already loaded for Season pages
         candidates = [...episodes.value];
     } else {
-        // Fetch all episodes for the series in one API call
         try {
             candidates = await store.fetchAllSeriesEpisodes(item.value.Id);
         } catch (e) {
@@ -1021,17 +1092,23 @@ async function startBulkDownload(mode: 'all' | 'unwatched') {
         }
     }
 
-    // Filter by watched state
     if (mode === 'unwatched') {
         candidates = candidates.filter(ep => !ep.UserData?.Played);
     }
-
-    // Skip already-downloaded episodes
     candidates = candidates.filter(ep => !offlineStore.isItemDownloaded(ep.Id));
-
     if (candidates.length === 0) return;
 
     console.log(`[BulkDownload] Queueing ${candidates.length} episodes (mode: ${mode})`);
+
+    // Check first episode to see if transcode is needed — apply same choice to all
+    const firstWithStreams = candidates.find(ep => ep.MediaStreams?.length > 0) || candidates[0];
+    const needsTranscode = await downloadStore.checkNeedsTranscode(firstWithStreams);
+    if (needsTranscode) {
+        pendingTranscodeTarget.value = { itemId: firstWithStreams.Id, metadata: firstWithStreams };
+        pendingBulkTranscode.value = candidates;
+        showTranscodeDialog.value = true;
+        return;
+    }
 
     for (const ep of candidates) {
         downloadStore.startDownload(ep.Id, ep).catch((err: any) => {

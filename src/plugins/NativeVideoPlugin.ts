@@ -23,6 +23,8 @@ export interface NativeVideoStartOptions {
     nextEpisodeId?: string;
     chaptersJson?: string;
     creditsStartMs?: number;
+    durationHintMs?: number;
+    srtFilePath?: string;
 }
 
 export interface NativeVideoProgressEvent {
@@ -85,7 +87,7 @@ export interface NativeVideoPlugin {
     updateStreamInfo(options: { streamInfo: string }): Promise<void>;
     updateQualityPresets(options: { presets: string; selectedBitrate: number }): Promise<void>;
     getDeviceCodecs(): Promise<{ codecs: string[] }>;
-    canDecodeHevc(options: { profile: string; level: number }): Promise<{ supported: boolean }>;
+    canDecodeHevc(options: { profile: string; level: number; hardwareOnly?: boolean }): Promise<{ supported: boolean }>;
     setSubtitleSize(options: { scale: number }): Promise<void>;
     getSafeAreaInsets(): Promise<{ top: number; bottom: number; left: number; right: number }>;
 

@@ -91,6 +91,8 @@ class NativePlayerActivity : AppCompatActivity() {
         const val EXTRA_NEXT_EPISODE_ID = "nextEpisodeId"
         const val EXTRA_CHAPTERS_JSON = "chaptersJson"
         const val EXTRA_CREDITS_START_MS = "creditsStartMs"
+        const val EXTRA_DURATION_HINT_MS = "durationHintMs"
+        const val EXTRA_SRT_FILE_PATH = "srtFilePath"
         const val ACTION_NEXT_EPISODE = "com.jellyfin_v4lgrind_client.app.PLAYER_NEXT_EPISODE"
         const val ACTION_SUBTITLE_SIZE_CHANGED = "com.jellyfin_v4lgrind_client.app.SUBTITLE_SIZE_CHANGED"
 
@@ -167,7 +169,7 @@ class NativePlayerActivity : AppCompatActivity() {
                 CMD_RESUME -> player?.play()
                 CMD_SEEK -> {
                     val ms = intent.getLongExtra("positionMs", 0L)
-                    player?.seekTo(ms)
+                    safeSeekTo(ms)
                 }
                 CMD_SELECT_AUDIO -> {
                     val groupIdx = intent.getIntExtra("groupIndex", -1)
@@ -211,11 +213,35 @@ class NativePlayerActivity : AppCompatActivity() {
         }
     }
 
+    /** Return player duration, falling back to durationHintMs for transcoded files with no container duration. */
+    private fun effectiveDuration(): Long {
+        val dur = player?.duration ?: -1L
+        return if (dur > 0) dur else durationHintMs
+    }
+
+    /**
+     * Seek to a position. For non-seekable media (transcoded downloads without container
+     * seek indices), re-prepare the player at the target position.
+     */
+    private fun safeSeekTo(positionMs: Long) {
+        val p = player ?: return
+        if (p.isCurrentMediaItemSeekable) {
+            p.seekTo(positionMs)
+        } else {
+            val item = p.currentMediaItem ?: return
+            val wasPlaying = p.playWhenReady
+            p.setMediaItem(item, positionMs)
+            p.prepare()
+            p.playWhenReady = wasPlaying
+        }
+    }
+
     private val progressRunnable = object : Runnable {
         override fun run() {
             val p = player ?: return
-            sendProgressBroadcast(p.currentPosition, p.duration.coerceAtLeast(0L))
-            updateTimeUI(p.currentPosition, p.duration.coerceAtLeast(0L))
+            val dur = effectiveDuration()
+            sendProgressBroadcast(p.currentPosition, dur)
+            updateTimeUI(p.currentPosition, dur)
             handler.postDelayed(this, 5000)
         }
     }
@@ -224,7 +250,7 @@ class NativePlayerActivity : AppCompatActivity() {
         override fun run() {
             val p = player ?: return
             val pos = p.currentPosition
-            val dur = p.duration.coerceAtLeast(1L)
+            val dur = effectiveDuration().coerceAtLeast(1L)
             val progress = ((pos.toDouble() / dur) * seekBar.max).toInt()
             if (!isUserSeeking) seekBar.progress = progress
             tvCurrentTime.text = formatTime(pos)
@@ -255,6 +281,9 @@ class NativePlayerActivity : AppCompatActivity() {
                 chapterMarkersAdded = true
             }
 
+            // Update SRT subtitle overlay
+            updateSrtSubtitle(pos)
+
             handler.postDelayed(this, 500)
         }
     }
@@ -265,6 +294,14 @@ class NativePlayerActivity : AppCompatActivity() {
     private var introSkipped = false
     private var nextEpisodeId = ""
     private var creditsStartMs = -1L
+    private var durationHintMs = 0L
+
+    // SRT subtitle rendering (bypasses ExoPlayer MergingMediaSource)
+    private data class SrtCue(val startMs: Long, val endMs: Long, val text: String)
+    private var srtCues = emptyList<SrtCue>()
+    private var srtEnabled = false
+    private var tvSrtSubtitle: android.widget.TextView? = null
+
     private data class Chapter(val name: String, val startMs: Long)
     private var chapters = emptyList<Chapter>()
 
@@ -351,7 +388,7 @@ class NativePlayerActivity : AppCompatActivity() {
                 if (isTapOnInteractiveView(e.rawX.toInt(), e.rawY.toInt())) return true
                 val isForward = e.x > controlsOverlay.width / 2f
                 val deltaMs = if (isForward) 10_000L else -10_000L
-                player?.let { it.seekTo(maxOf(0L, it.currentPosition + deltaMs)) }
+                player?.let { safeSeekTo(maxOf(0L, it.currentPosition + deltaMs)) }
                 showSeekFeedback(isForward)
                 return true
             }
@@ -394,7 +431,8 @@ class NativePlayerActivity : AppCompatActivity() {
 
         nextEpisodeId = intent.getStringExtra(EXTRA_NEXT_EPISODE_ID) ?: ""
         creditsStartMs = intent.getLongExtra(EXTRA_CREDITS_START_MS, -1L)
-        android.util.Log.d("NativePlayer", "nextEpisodeId='$nextEpisodeId' creditsStartMs=$creditsStartMs")
+        durationHintMs = intent.getLongExtra(EXTRA_DURATION_HINT_MS, 0L)
+        android.util.Log.d("NativePlayer", "nextEpisodeId='$nextEpisodeId' creditsStartMs=$creditsStartMs durationHintMs=$durationHintMs")
 
         // Parse chapter markers
         try {
@@ -407,6 +445,10 @@ class NativePlayerActivity : AppCompatActivity() {
         } catch (_: Exception) { chapters = emptyList() }
 
         tvTitle.text = title
+
+        // SRT subtitle overlay — parsed from file, rendered outside ExoPlayer pipeline
+        val srtPath = intent.getStringExtra(EXTRA_SRT_FILE_PATH) ?: ""
+        setupSrtSubtitle(srtPath)
 
         // Pad the controls overlay to keep all UI outside the display cutout and system bars.
         ViewCompat.setOnApplyWindowInsetsListener(controlsOverlay) { view, windowInsets ->
@@ -461,8 +503,7 @@ class NativePlayerActivity : AppCompatActivity() {
         seekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(sb: SeekBar, progress: Int, fromUser: Boolean) {
                 if (fromUser) {
-                    val p = player ?: return
-                    val dur = p.duration.coerceAtLeast(1L)
+                    val dur = effectiveDuration().coerceAtLeast(1L)
                     tvCurrentTime.text = formatTime((progress.toLong() * dur) / sb.max)
                 }
             }
@@ -474,10 +515,9 @@ class NativePlayerActivity : AppCompatActivity() {
 
             override fun onStopTrackingTouch(sb: SeekBar) {
                 isUserSeeking = false
-                val p = player ?: return
-                val dur = p.duration.coerceAtLeast(1L)
+                val dur = effectiveDuration().coerceAtLeast(1L)
                 val seekMs = (sb.progress.toLong() * dur) / sb.max
-                p.seekTo(seekMs)
+                safeSeekTo(seekMs)
                 scheduleHideControls()
             }
         })
@@ -511,10 +551,9 @@ class NativePlayerActivity : AppCompatActivity() {
         }
 
         btnSkipIntro.setOnClickListener {
-            val p = player ?: return@setOnClickListener
             introSkipped = true
             btnSkipIntro.visibility = View.GONE
-            p.seekTo(introEndMs)
+            safeSeekTo(introEndMs)
         }
 
         btnNextEpisode.setOnClickListener {
@@ -687,7 +726,8 @@ class NativePlayerActivity : AppCompatActivity() {
                         loadingSpinner.visibility = View.GONE
                         handler.removeCallbacks(progressRunnable)
                         handler.removeCallbacks(seekBarUpdateRunnable)
-                        sendProgressBroadcast(exo.duration.coerceAtLeast(0L), exo.duration.coerceAtLeast(0L))
+                        val endDur = effectiveDuration()
+                        sendProgressBroadcast(endDur, endDur)
                         sendEndedBroadcast()
                     }
                     Player.STATE_BUFFERING -> { loadingSpinner.visibility = View.VISIBLE }
@@ -793,7 +833,9 @@ class NativePlayerActivity : AppCompatActivity() {
 
         // Create MediaSession for system media controls (lock screen, notification, Bluetooth)
         mediaSession?.release()
-        mediaSession = MediaSession.Builder(this, exo).build()
+        mediaSession = MediaSession.Builder(this, exo)
+            .setId("NativePlayer_${System.currentTimeMillis()}")
+            .build()
 
         // Remove the black background box behind subtitles; keep white text with a
         // dark outline so they remain readable on any content.
@@ -864,6 +906,8 @@ class NativePlayerActivity : AppCompatActivity() {
             view.pivotX = view.width / 2f
             view.pivotY = view.height.toFloat()
         }
+        // Also scale the SRT overlay to match
+        tvSrtSubtitle?.textSize = 22f * scale
     }
 
     private fun parseSubtitleConfigs(json: String): List<MediaItem.SubtitleConfiguration> {
@@ -924,7 +968,7 @@ class NativePlayerActivity : AppCompatActivity() {
 
         // Show/hide buttons based on track availability
         if (audioTrackGroups.size > 1 || jellyfinAudioTracks.size > 1) btnAudio.visibility = View.VISIBLE
-        if (subtitleTrackGroups.isNotEmpty() || sidecarSubtitleCount > 0) btnSubtitle.visibility = View.VISIBLE
+        if (subtitleTrackGroups.isNotEmpty() || sidecarSubtitleCount > 0 || srtCues.isNotEmpty()) btnSubtitle.visibility = View.VISIBLE
 
         android.util.Log.d("NativePlayer", "[Subtitles] reportTracks: ${audioTrackGroups.size} audio, ${subtitleTrackGroups.size} subtitle")
         subtitleTrackGroups.forEach { (idx, group) ->
@@ -1082,6 +1126,34 @@ class NativePlayerActivity : AppCompatActivity() {
     }
 
     private fun showSubtitlePicker() {
+        // SRT subtitle (offline transcoded downloads) — on/off toggle with size picker
+        if (srtCues.isNotEmpty()) {
+            val labels = arrayOf("Off", "Subtitles")
+            val checkedItem = if (srtEnabled) 1 else 0
+            androidx.appcompat.app.AlertDialog.Builder(this, androidx.appcompat.R.style.Theme_AppCompat_Dialog)
+                .setTitle("Subtitles")
+                .setSingleChoiceItems(labels, checkedItem) { dialog, which ->
+                    srtEnabled = which == 1
+                    if (!srtEnabled) tvSrtSubtitle?.visibility = View.GONE
+                    btnSubtitle.setBackgroundResource(
+                        if (srtEnabled) R.drawable.bg_player_button_selected
+                        else R.drawable.bg_player_button
+                    )
+                    val broadcastIntent = Intent(ACTION_SUBTITLE_SELECTED)
+                    broadcastIntent.putExtra("groupIndex", if (srtEnabled) 0 else -1)
+                    broadcastIntent.putExtra("label", if (srtEnabled) "Subtitles" else "Off")
+                    broadcastIntent.setPackage(packageName)
+                    sendBroadcast(broadcastIntent)
+                    dialog.dismiss()
+                }
+                .setNeutralButton("Size: ${Math.round(currentSubtitleScale * 100)}%") { _, _ ->
+                    showSubtitleSizePicker()
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
+            return
+        }
+
         if (subtitleTrackGroups.isEmpty() && sidecarSubtitles.isEmpty()) return
 
         if (subtitleTrackGroups.isNotEmpty()) {
@@ -1274,10 +1346,10 @@ class NativePlayerActivity : AppCompatActivity() {
                 MotionEvent.ACTION_MOVE -> {
                     if (isScrubbing) {
                         val deltaX = ev.x - scrubStartX
-                        val dur = player?.duration?.coerceAtLeast(0L) ?: 0L
+                        val dur = effectiveDuration()
                         val newPos = (scrubStartPositionMs + deltaX * SCRUB_MS_PER_PX)
                             .toLong().coerceIn(0L, dur)
-                        player?.seekTo(newPos)
+                        safeSeekTo(newPos)
                         updateScrubOverlay(newPos)
                     }
                 }
@@ -1368,6 +1440,87 @@ class NativePlayerActivity : AppCompatActivity() {
                 val x = thumbPaddingPx + (fraction * trackWidth).toInt() - marker.width / 2
                 marker.translationX = x.toFloat()
             }
+        }
+    }
+
+    // ── SRT subtitle rendering ──────────────────────────────────────────────────
+
+    private fun setupSrtSubtitle(srtPath: String) {
+        // Create the subtitle overlay TextView programmatically
+        val root = findViewById<FrameLayout>(android.R.id.content)
+            .getChildAt(0) as? android.view.ViewGroup ?: return
+        tvSrtSubtitle = OutlineTextView(this).apply {
+            setTextColor(android.graphics.Color.WHITE)
+            outlineColor = android.graphics.Color.BLACK
+            outlineWidth = 4f
+            textSize = 22f * currentSubtitleScale
+            gravity = android.view.Gravity.CENTER_HORIZONTAL
+            setPadding(32, 8, 32, 8)
+            setBackgroundColor(android.graphics.Color.TRANSPARENT)
+            visibility = View.GONE
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                android.view.Gravity.BOTTOM or android.view.Gravity.CENTER_HORIZONTAL
+            ).apply {
+                bottomMargin = (80 * resources.displayMetrics.density).toInt()
+            }
+        }
+        root.addView(tvSrtSubtitle)
+
+        if (srtPath.isBlank()) return
+
+        // Parse the SRT file
+        try {
+            val file = java.io.File(android.net.Uri.parse(srtPath).path ?: return)
+            if (!file.exists()) {
+                android.util.Log.w("NativePlayer", "[SRT] File not found: $srtPath")
+                return
+            }
+            srtCues = parseSrt(file.readText())
+            android.util.Log.d("NativePlayer", "[SRT] Parsed ${srtCues.size} cues from $srtPath")
+            // Show subtitle button so user can toggle
+            if (srtCues.isNotEmpty()) btnSubtitle.visibility = View.VISIBLE
+        } catch (e: Exception) {
+            android.util.Log.w("NativePlayer", "[SRT] Failed to parse: $e")
+        }
+    }
+
+    private fun parseSrt(content: String): List<SrtCue> {
+        val cues = mutableListOf<SrtCue>()
+        // Split by blank lines (double newline), handling \r\n
+        val blocks = content.replace("\r\n", "\n").trim().split(Regex("\n\\s*\n"))
+        for (block in blocks) {
+            val lines = block.trim().split("\n")
+            if (lines.size < 3) continue
+            // Line 1: index (skip), Line 2: timestamps, Line 3+: text
+            val timeLine = lines[1]
+            val match = Regex("(\\d{2}):(\\d{2}):(\\d{2})[,.]?(\\d{3})?\\s*-->\\s*(\\d{2}):(\\d{2}):(\\d{2})[,.]?(\\d{3})?")
+                .find(timeLine) ?: continue
+            val (h1, m1, s1, ms1, h2, m2, s2, ms2) = match.destructured
+            val startMs = h1.toLong() * 3600000 + m1.toLong() * 60000 + s1.toLong() * 1000 + (ms1.toLongOrNull() ?: 0)
+            val endMs = h2.toLong() * 3600000 + m2.toLong() * 60000 + s2.toLong() * 1000 + (ms2.toLongOrNull() ?: 0)
+            val text = lines.drop(2).joinToString("\n")
+                .replace(Regex("<[^>]+>"), "") // strip HTML tags
+                .replace(Regex("\\{[^}]+\\}"), "") // strip ASS tags
+                .trim()
+            if (text.isNotEmpty()) cues.add(SrtCue(startMs, endMs, text))
+        }
+        return cues.sortedBy { it.startMs }
+    }
+
+    private fun updateSrtSubtitle(posMs: Long) {
+        val tv = tvSrtSubtitle ?: return
+        if (!srtEnabled || srtCues.isEmpty()) {
+            tv.visibility = View.GONE
+            return
+        }
+        val cue = srtCues.firstOrNull { posMs >= it.startMs && posMs <= it.endMs }
+        if (cue != null) {
+            tv.text = cue.text
+            tv.visibility = View.VISIBLE
+        } else {
+            tv.visibility = View.GONE
         }
     }
 
@@ -1472,7 +1625,7 @@ class NativePlayerActivity : AppCompatActivity() {
         val intent = Intent(ACTION_STOPPED)
         if (p != null) {
             intent.putExtra("positionMs", p.currentPosition)
-            intent.putExtra("durationMs", p.duration.coerceAtLeast(0L))
+            intent.putExtra("durationMs", effectiveDuration())
         }
         intent.setPackage(packageName)
         sendBroadcast(intent)
@@ -1516,5 +1669,29 @@ class NativePlayerActivity : AppCompatActivity() {
         mediaSession = null
         player?.release()
         player = null
+    }
+}
+
+/**
+ * TextView that draws white text with a black outline, matching ExoPlayer's
+ * CaptionStyleCompat.EDGE_TYPE_OUTLINE appearance for consistent subtitles.
+ */
+private class OutlineTextView(context: android.content.Context) : android.widget.TextView(context) {
+    var outlineColor: Int = android.graphics.Color.BLACK
+    var outlineWidth: Float = 4f
+
+    override fun onDraw(canvas: android.graphics.Canvas) {
+        val textColor = currentTextColor
+        // Draw outline (stroke)
+        paint.style = android.graphics.Paint.Style.STROKE
+        paint.strokeWidth = outlineWidth
+        paint.strokeJoin = android.graphics.Paint.Join.ROUND
+        setTextColor(outlineColor)
+        super.onDraw(canvas)
+        // Draw fill
+        paint.style = android.graphics.Paint.Style.FILL
+        paint.strokeWidth = 0f
+        setTextColor(textColor)
+        super.onDraw(canvas)
     }
 }

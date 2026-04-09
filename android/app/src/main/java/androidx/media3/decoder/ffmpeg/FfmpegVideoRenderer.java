@@ -205,26 +205,26 @@ public final class FfmpegVideoRenderer extends BaseRenderer {
     }
     if (decoder == null) return;
 
-    // Maximum lateness before dropping a frame (one frame period at 25fps)
-    final long MAX_LATE_US = 40_000;
+    // Software decode may be much slower than real-time (especially for 4K
+    // HEVC downscaled to 1080p).  Instead of hard-dropping late frames and
+    // showing a black screen, always render the most recent decoded frame.
 
     // ── 1. Check pending frame ───────────────────────────────────────────────
     if (pendingOutputBuffer != null) {
       long late = positionUs - pendingOutputBuffer.timeUs;
-      if (late >= 0 && late <= MAX_LATE_US) {
+      if (late >= 0) {
         renderFrame(pendingOutputBuffer.data, decoder.getWidth(), decoder.getHeight());
         pendingOutputBuffer.release();
         pendingOutputBuffer = null;
-      } else if (late > MAX_LATE_US) {
-        pendingOutputBuffer.release();
-        pendingOutputBuffer = null;
       } else {
+        // Not yet time — keep it pending
         feedOneInputPacket();
         return;
       }
     }
 
-    // ── 2. Drain decoded frames, dropping stale ones ─────────────────────────
+    // ── 2. Drain decoded frames, keeping the most recent past-due frame ──────
+    SimpleDecoderOutputBuffer lastRenderable = null;
     while (true) {
       SimpleDecoderOutputBuffer out;
       try {
@@ -235,6 +235,10 @@ public final class FfmpegVideoRenderer extends BaseRenderer {
       if (out == null) break;
 
       if (out.isEndOfStream()) {
+        if (lastRenderable != null) {
+          renderFrame(lastRenderable.data, decoder.getWidth(), decoder.getHeight());
+          lastRenderable.release();
+        }
         outputStreamEnded = true;
         out.release();
         return;
@@ -245,19 +249,26 @@ public final class FfmpegVideoRenderer extends BaseRenderer {
       }
 
       long late = positionUs - out.timeUs;
-      if (late > MAX_LATE_US) {
-        out.release();
-        continue;
-      } else if (late >= 0) {
-        renderFrame(out.data, decoder.getWidth(), decoder.getHeight());
-        out.release();
-        feedOneInputPacket();
-        return;
+      if (late >= 0) {
+        // This frame is due or past-due — keep the newest one
+        if (lastRenderable != null) lastRenderable.release();
+        lastRenderable = out;
       } else {
+        // Future frame — render whatever we had, then save this one
+        if (lastRenderable != null) {
+          renderFrame(lastRenderable.data, decoder.getWidth(), decoder.getHeight());
+          lastRenderable.release();
+        }
         pendingOutputBuffer = out;
         feedOneInputPacket();
         return;
       }
+    }
+
+    // Render the latest past-due frame (if any) so the screen is never black
+    if (lastRenderable != null) {
+      renderFrame(lastRenderable.data, decoder.getWidth(), decoder.getHeight());
+      lastRenderable.release();
     }
 
     // ── 3. No output ready — feed input ──────────────────────────────────────

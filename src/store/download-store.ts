@@ -20,10 +20,16 @@ export interface DownloadTask {
   transcoding?: boolean;
 }
 
+export interface TranscodeOptions {
+  audioStreamIndex?: number;
+  subtitleStreamIndex?: number;
+}
+
 interface DownloadStoreState {
   tasks: Map<string, DownloadTask>;
   // Metadata kept separately — not reactive, just for queue execution
   _metadataQueue: Map<string, any>;
+  _transcodeOptionsQueue: Map<string, TranscodeOptions>;
   showIndicator: boolean;
 }
 
@@ -31,6 +37,7 @@ export const useDownloadStore = defineStore('downloads', {
   state: (): DownloadStoreState => ({
     tasks: new Map(),
     _metadataQueue: new Map(),
+    _transcodeOptionsQueue: new Map(),
     showIndicator: false,
   }),
 
@@ -77,15 +84,16 @@ export const useDownloadStore = defineStore('downloads', {
 
   actions: {
     /** Enqueue a download. Starts immediately if a slot is free, otherwise waits. */
-    async startDownload(itemId: string, metadata: any) {
+    async startDownload(itemId: string, metadata: any, transcodeOptions?: TranscodeOptions) {
       const existing = this.tasks.get(itemId);
-      if (existing?.status === 'downloading' || existing?.status === 'queued') {
-        // Cross-check with the service layer — if it says this item is NOT actually
-        // downloading, the store task is stale (e.g. native event was never received).
-        if (existing.status === 'downloading' && !downloadService.isDownloading(itemId)) {
+      if (existing) {
+        if (existing.status === 'cancelled' || existing.status === 'failed') {
+          // Clear stale task so it can be retried
+          this.tasks.delete(itemId);
+        } else if (existing.status === 'downloading' && !downloadService.isDownloading(itemId)) {
           console.warn('[DownloadStore] Stale downloading task for', itemId, '— allowing retry');
           this.tasks.delete(itemId);
-        } else {
+        } else if (existing.status === 'downloading' || existing.status === 'queued') {
           console.log('[DownloadStore] Already queued/downloading:', itemId);
           return;
         }
@@ -110,6 +118,9 @@ export const useDownloadStore = defineStore('downloads', {
 
       this.tasks.set(itemId, task);
       this._metadataQueue.set(itemId, metadata);
+      if (transcodeOptions) {
+        this._transcodeOptionsQueue.set(itemId, transcodeOptions);
+      }
       this.showIndicator = true;
 
       this._processQueue();
@@ -140,6 +151,7 @@ export const useDownloadStore = defineStore('downloads', {
       if (!task || !metadata) return;
 
       const jellyfinStore = useJellyfinStore();
+      const transcodeOptions = this._transcodeOptionsQueue.get(itemId);
 
       task.status = 'downloading';
 
@@ -148,12 +160,24 @@ export const useDownloadStore = defineStore('downloads', {
         let transcodedUrl: string | undefined;
         let estimatedTranscodeSize = 0;
         if (Capacitor.isNativePlatform()) {
-          const transcodeResult = await this._getTranscodeUrlIfNeeded(itemId, metadata, jellyfinStore);
+          const transcodeResult = await this._getTranscodeUrlIfNeeded(itemId, metadata, jellyfinStore, transcodeOptions);
           if (transcodeResult) {
             transcodedUrl = transcodeResult.url;
             estimatedTranscodeSize = transcodeResult.estimatedSize;
             task.transcoding = true;
           }
+        }
+
+        // Build subtitle info for sidecar download (when user chose a subtitle track)
+        let subtitleInfo: { streamIndex: number; label: string; language: string } | undefined;
+        if (transcodeOptions?.subtitleStreamIndex != null && transcodeOptions.subtitleStreamIndex >= 0) {
+          const streams: any[] = metadata.MediaStreams || [];
+          const subStream = streams.find((s: any) => s.Index === transcodeOptions.subtitleStreamIndex);
+          subtitleInfo = {
+            streamIndex: transcodeOptions.subtitleStreamIndex,
+            label: subStream?.DisplayTitle || subStream?.Language || 'Unknown',
+            language: subStream?.Language || 'und',
+          };
         }
 
         await downloadService.downloadForOffline(
@@ -175,6 +199,7 @@ export const useDownloadStore = defineStore('downloads', {
           },
           transcodedUrl,
           estimatedTranscodeSize || undefined,
+          subtitleInfo,
         );
 
         const t = this.tasks.get(itemId);
@@ -197,6 +222,7 @@ export const useDownloadStore = defineStore('downloads', {
         }
       } finally {
         this._metadataQueue.delete(itemId);
+        this._transcodeOptionsQueue.delete(itemId);
         // Start next queued item regardless of outcome
         this._processQueue();
       }
@@ -225,29 +251,24 @@ export const useDownloadStore = defineStore('downloads', {
      * If so, request a transcoding URL from Jellyfin's PlaybackInfo API.
      * Returns the URL and an estimated file size (bytes) derived from Bitrate × duration.
      */
-    async _getTranscodeUrlIfNeeded(
-      itemId: string,
-      metadata: any,
-      jellyfinStore: ReturnType<typeof useJellyfinStore>
-    ): Promise<{ url: string; estimatedSize: number } | undefined> {
+    /**
+     * Check if any video or audio codec in the media is unsupported by the device.
+     * Returns true if transcoding would be beneficial.
+     */
+    async checkNeedsTranscode(metadata: any): Promise<boolean> {
+      if (!Capacitor.isNativePlatform()) return false;
       try {
-        // Get device codec capabilities
         const { NativeVideo } = await import('@/plugins/NativeVideoPlugin');
         const { codecs: deviceCodecs } = await NativeVideo.getDeviceCodecs();
-        console.log(`[DownloadStore] device codecs: ${deviceCodecs.join(', ')}`);
-        if (deviceCodecs.length === 0) return undefined;
+        if (deviceCodecs.length === 0) return false;
 
-        // Check all media streams for unsupported codecs
         const streams: any[] = metadata.MediaStreams || metadata.MediaSources?.[0]?.MediaStreams || [];
-        console.log(`[DownloadStore] codec check for ${metadata.Name}: streams=${streams.length}`, streams.map((s: any) => `${s.Type}/${s.Codec} profile=${s.Profile} level=${s.Level}`));
         const CODEC_MIME_MAP: Record<string, string> = {
-          // Video
           dvhe: 'video/dolby-vision', dvh1: 'video/dolby-vision',
           hevc: 'video/hevc', h265: 'video/hevc',
           h264: 'video/avc', avc: 'video/avc',
           vp8: 'video/x-vnd.on2.vp8', vp9: 'video/x-vnd.on2.vp9',
           av1: 'video/av01',
-          // Audio
           ac3: 'audio/ac3', eac3: 'audio/eac3',
           dts: 'audio/vnd.dts', truehd: 'audio/true-hd',
           flac: 'audio/flac', opus: 'audio/opus',
@@ -255,49 +276,94 @@ export const useDownloadStore = defineStore('downloads', {
           mp3: 'audio/mpeg',
         };
 
-        let needsTranscode = false;
+        // Only suggest server-side transcoding for resolutions above 1080p.
+        // At 1080p and below, the FFmpeg software decoder handles it fine.
+        const MAX_SW_HEIGHT = 1080;
+
         for (const stream of streams) {
           const codec = (stream.Codec || '').toLowerCase();
           const profile = (stream.Profile || '').toLowerCase();
           const mime = CODEC_MIME_MAP[codec];
-          if (!mime) continue; // Unknown codec — assume supported
+          if (!mime) continue;
 
-          // Special DV detection: Jellyfin may report codec as "hevc" with DV profile
           const isDV = codec.includes('dvhe') || codec.includes('dvh1') ||
                        profile.includes('dolby vision');
           const effectiveMime = isDV ? 'video/dolby-vision' : mime;
 
           if (!deviceCodecs.includes(effectiveMime)) {
-            console.log(`[DownloadStore] Unsupported codec: ${stream.Type} ${codec} (${effectiveMime}) — will transcode`);
-            needsTranscode = true;
-            break;
+            if (stream.Type === 'Video' && (stream.Height || 0) <= MAX_SW_HEIGHT) continue;
+            return true;
           }
 
-          // MIME type supported — also check HEVC profile/level (e.g. Main 10 / Level 5.1
-          // may exceed hardware decoder capabilities even if video/hevc is listed).
-          // When Jellyfin omits Profile/Level metadata, use conservative fallbacks:
-          // assume Main 10 at Level 5.1 (153) so devices that can't handle high profiles
-          // get a transcoded download rather than an unplayable raw file.
           if ((codec === 'hevc' || codec === 'h265') && stream.Type === 'Video') {
             const checkProfile = (stream.Profile as string) || 'Main 10';
             const checkLevel = (stream.Level as number) || 153;
-            console.log(`[DownloadStore] Calling canDecodeHevc: profile="${checkProfile}" level=${checkLevel}`);
-            const { supported } = await NativeVideo.canDecodeHevc({ profile: checkProfile, level: checkLevel });
-            console.log(`[DownloadStore] canDecodeHevc result: supported=${supported} for profile="${checkProfile}" level=${checkLevel}`);
-            if (!supported) {
-              console.log(`[DownloadStore] HEVC profile "${checkProfile}" level ${checkLevel} not supported — will transcode`);
-              needsTranscode = true;
-              break;
-            }
+            const { supported } = await NativeVideo.canDecodeHevc({ profile: checkProfile, level: checkLevel, hardwareOnly: true });
+            if (!supported && (stream.Height || 0) > MAX_SW_HEIGHT) return true;
           }
         }
+        return false;
+      } catch {
+        return false;
+      }
+    },
 
-        if (!needsTranscode) return undefined;
+    async _getTranscodeUrlIfNeeded(
+      itemId: string,
+      metadata: any,
+      jellyfinStore: ReturnType<typeof useJellyfinStore>,
+      transcodeOptions?: TranscodeOptions,
+    ): Promise<{ url: string; estimatedSize: number } | undefined> {
+      try {
+        // If user explicitly chose transcode options, always transcode.
+        // Otherwise, auto-detect based on device codec capabilities.
+        const forceTranscode = transcodeOptions != null;
+
+        if (!forceTranscode) {
+          const needsTranscode = await this.checkNeedsTranscode(metadata);
+          if (!needsTranscode) return undefined;
+        }
 
         // Request a transcoding URL from Jellyfin
-        console.log(`[DownloadStore] Requesting transcoded download for ${itemId}`);
+        console.log(`[DownloadStore] Requesting transcoded download for ${itemId}` +
+          (transcodeOptions ? ` (audio=${transcodeOptions.audioStreamIndex} sub=${transcodeOptions.subtitleStreamIndex})` : ' (auto-detected)'));
         const serverUrl = jellyfinStore.serverUrl!;
         const token = jellyfinStore.accessToken!;
+
+        const requestBody: any = {
+          DeviceProfile: {
+            DirectPlayProfiles: [],
+            TranscodingProfiles: [
+              {
+                Container: 'ts',
+                Type: 'Video',
+                VideoCodec: 'h264',
+                AudioCodec: 'aac,mp3,ac3',
+                Context: 'Streaming',
+                Protocol: 'http',
+                CopyTimestamps: true,
+                MaxAudioChannels: '8',
+              },
+            ],
+            SubtitleProfiles: [
+              { Format: 'srt',    Method: 'External' },
+              { Format: 'subrip', Method: 'External' },
+              { Format: 'ass',    Method: 'External' },
+              { Format: 'ssa',    Method: 'External' },
+              { Format: 'pgs',    Method: 'External' },
+              { Format: 'pgssub', Method: 'External' },
+            ],
+            CodecProfiles: [],
+          },
+          MediaSourceId: itemId,
+          AllowVideoStreamCopy: false,
+          AllowAudioStreamCopy: true,
+        };
+
+        if (transcodeOptions?.audioStreamIndex != null) {
+          requestBody.AudioStreamIndex = transcodeOptions.audioStreamIndex;
+        }
+        // Subtitles are downloaded separately as sidecar files — don't include in transcode
 
         const response = await fetch(
           `${serverUrl}/Items/${itemId}/PlaybackInfo?userId=${jellyfinStore.userId}`,
@@ -307,36 +373,7 @@ export const useDownloadStore = defineStore('downloads', {
               'Content-Type': 'application/json',
               'X-Emby-Token': token,
             },
-            body: JSON.stringify({
-              DeviceProfile: {
-                DirectPlayProfiles: [],
-                TranscodingProfiles: [
-                  {
-                    Container: 'mkv',
-                    Type: 'Video',
-                    VideoCodec: 'h264',
-                    // Broad list — Jellyfin copies compatible tracks, transcodes the rest to aac
-                    AudioCodec: 'aac,mp3,ac3,eac3,dts,flac,opus,pcm',
-                    Context: 'Streaming',
-                    Protocol: 'http',
-                    CopyTimestamps: true,
-                    MaxAudioChannels: '8',
-                  },
-                ],
-                SubtitleProfiles: [
-                  { Format: 'srt',    Method: 'Embed' },
-                  { Format: 'subrip', Method: 'Embed' },
-                  { Format: 'ass',    Method: 'Embed' },
-                  { Format: 'ssa',    Method: 'Embed' },
-                  { Format: 'pgs',    Method: 'Embed' },
-                  { Format: 'pgssub', Method: 'Embed' },
-                ],
-                CodecProfiles: [],
-              },
-              MediaSourceId: itemId,
-              AllowVideoStreamCopy: false,  // always re-encode video to h264
-              AllowAudioStreamCopy: true,   // preserve original audio where possible
-            }),
+            body: JSON.stringify(requestBody),
           }
         );
 
@@ -369,9 +406,9 @@ export const useDownloadStore = defineStore('downloads', {
       const task = this.tasks.get(itemId);
       if (!task) return;
       if (task.status === 'queued') {
-        // Never started — just mark cancelled and remove from metadata queue
         task.status = 'cancelled';
         this._metadataQueue.delete(itemId);
+        this._transcodeOptionsQueue.delete(itemId);
         this._processQueue();
       } else {
         downloadService.cancelDownload(itemId);

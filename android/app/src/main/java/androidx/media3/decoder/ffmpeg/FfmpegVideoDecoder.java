@@ -31,7 +31,7 @@ public final class FfmpegVideoDecoder
     extends SimpleDecoder<DecoderInputBuffer, SimpleDecoderOutputBuffer, FfmpegDecoderException> {
 
   private static final int NUM_INPUT_BUFFERS  = 4;
-  private static final int NUM_OUTPUT_BUFFERS = 4;
+  private static final int NUM_OUTPUT_BUFFERS = 3;
   private static final int INITIAL_INPUT_BUFFER_SIZE = 768 * 1024;
 
   private static final int VIDEO_DECODER_ERROR_INVALID  = -1;

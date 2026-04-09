@@ -27,6 +27,9 @@
 #define VIDEO_DECODER_ERROR_NO_FRAME -2
 #define VIDEO_DECODER_ERROR_OTHER    -3
 
+/* Cap software-decoded output to 1080p height to keep memory and CPU viable. */
+#define MAX_SW_HEIGHT 1080
+
 typedef struct {
     AVCodecContext  *codec_ctx;
     AVPacket        *packet;
@@ -36,6 +39,8 @@ typedef struct {
     int              last_width;
     int              last_height;
     enum AVPixelFormat last_src_fmt;
+    int              out_width;       /* actual output size (may be scaled)   */
+    int              out_height;
     int64_t          last_frame_pts;  /* PTS of most recently decoded frame  */
 } VideoState;
 
@@ -61,12 +66,23 @@ static int ensure_sws(VideoState *state, int w, int h, enum AVPixelFormat src_fm
     }
     if (state->sws_ctx) sws_freeContext(state->sws_ctx);
 
+    /* Downscale to MAX_SW_HEIGHT if source is larger, preserving aspect ratio.
+     * Keeps width even (required by many pixel formats / GPUs). */
+    int dst_w = w;
+    int dst_h = h;
+    if (h > MAX_SW_HEIGHT) {
+        dst_h = MAX_SW_HEIGHT;
+        dst_w = (int)((int64_t)w * MAX_SW_HEIGHT / h);
+        dst_w &= ~1; /* ensure even */
+        LOGD("ensure_sws: downscaling %dx%d → %dx%d", w, h, dst_w, dst_h);
+    }
+
     state->sws_ctx = sws_getContext(
         w, h, src_fmt,
-        w, h, AV_PIX_FMT_RGBA,
+        dst_w, dst_h, AV_PIX_FMT_RGBA,
         SWS_BILINEAR, NULL, NULL, NULL);
     if (!state->sws_ctx) {
-        LOGE("sws_getContext failed for fmt=%d %dx%d", src_fmt, w, h);
+        LOGE("sws_getContext failed for fmt=%d %dx%d → %dx%d", src_fmt, w, h, dst_w, dst_h);
         return -1;
     }
     /* Preserve full color range during 10-bit → 8-bit conversion.
@@ -82,20 +98,22 @@ static int ensure_sws(VideoState *state, int w, int h, enum AVPixelFormat src_fm
                                  bt709, 1 /* full output range */,
                                  brightness, contrast, saturation);
     }
-    /* (Re-)allocate the RGBA output frame */
+    /* (Re-)allocate the RGBA output frame at (possibly scaled) output size */
     if (state->i420_frame) av_frame_free(&state->i420_frame);
     state->i420_frame = av_frame_alloc();
     if (!state->i420_frame) return -1;
     state->i420_frame->format = AV_PIX_FMT_RGBA;
-    state->i420_frame->width  = w;
-    state->i420_frame->height = h;
+    state->i420_frame->width  = dst_w;
+    state->i420_frame->height = dst_h;
     if (av_frame_get_buffer(state->i420_frame, 32) < 0) {
-        LOGE("av_frame_get_buffer failed");
+        LOGE("av_frame_get_buffer failed for %dx%d", dst_w, dst_h);
         return -1;
     }
     state->last_width   = w;
     state->last_height  = h;
     state->last_src_fmt = src_fmt;
+    state->out_width    = dst_w;
+    state->out_height   = dst_h;
     return 0;
 }
 
@@ -226,24 +244,26 @@ Java_androidx_media3_decoder_ffmpeg_FfmpegVideoDecoder_ffmpegDecode(
 
     av_frame_unref(state->decoded_frame);
 
-    /* ── copy RGBA to Java ByteBuffer ──────────────────────────────────── */
+    /* ── copy RGBA to Java ByteBuffer (using scaled output dimensions) ── */
     uint8_t *out = (uint8_t *)(*env)->GetDirectBufferAddress(env, jOutputBuffer);
     if (!out) return VIDEO_DECODER_ERROR_OTHER;
     jlong out_cap = (*env)->GetDirectBufferCapacity(env, jOutputBuffer);
 
+    int ow = state->out_width;
+    int oh = state->out_height;
     int stride = state->i420_frame->linesize[0]; /* RGBA stride (may include padding) */
-    int row_bytes = w * 4;
-    int total = row_bytes * h;
+    int row_bytes = ow * 4;
+    int total = row_bytes * oh;
     if (out_cap < total) {
         LOGE("output buffer too small: cap=%lld need=%d", (long long)out_cap, total);
         return VIDEO_DECODER_ERROR_OTHER;
     }
 
-    /* Copy RGBA rows (handle stride != w*4 due to alignment padding) */
+    /* Copy RGBA rows (handle stride != ow*4 due to alignment padding) */
     if (stride == row_bytes) {
         memcpy(out, state->i420_frame->data[0], total);
     } else {
-        for (int row = 0; row < h; row++) {
+        for (int row = 0; row < oh; row++) {
             memcpy(out + row * row_bytes,
                    state->i420_frame->data[0] + row * stride,
                    row_bytes);
@@ -259,7 +279,7 @@ JNIEXPORT jint JNICALL
 Java_androidx_media3_decoder_ffmpeg_FfmpegVideoDecoder_ffmpegGetWidth(
         JNIEnv *env, jobject obj, jlong jContext) {
     VideoState *state = (VideoState *)(uintptr_t)jContext;
-    return state ? state->codec_ctx->width : 0;
+    return state ? (state->out_width > 0 ? state->out_width : state->codec_ctx->width) : 0;
 }
 
 /*
@@ -269,7 +289,7 @@ JNIEXPORT jint JNICALL
 Java_androidx_media3_decoder_ffmpeg_FfmpegVideoDecoder_ffmpegGetHeight(
         JNIEnv *env, jobject obj, jlong jContext) {
     VideoState *state = (VideoState *)(uintptr_t)jContext;
-    return state ? state->codec_ctx->height : 0;
+    return state ? (state->out_height > 0 ? state->out_height : state->codec_ctx->height) : 0;
 }
 
 /*

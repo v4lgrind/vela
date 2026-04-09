@@ -32,13 +32,14 @@ class DownloadService {
     onProgress?: (progress: DownloadProgress) => void,
     transcodedUrl?: string,
     estimatedSize?: number,
+    subtitleInfo?: { streamIndex: number; label: string; language: string },
   ): Promise<void> {
     if (this.downloads.has(itemId)) {
       throw new Error(`Download already in progress for ${itemId}`);
     }
 
-    // When transcoding, the server outputs an MKV container (multi-track + subtitle support)
-    const extension = transcodedUrl ? 'mkv' : this.getFileExtension(metadata);
+    // When transcoding, the server outputs a TS container (MPEG Transport Stream — seekable without index)
+    const extension = transcodedUrl ? 'ts' : this.getFileExtension(metadata);
     const filename = this.sanitizeFilename(`${metadata.Name || itemId}.${extension}`);
     const filePath = this.buildFilePath(metadata, filename);
     const downloadUrl = transcodedUrl || `${serverUrl}/Items/${itemId}/Download?api_key=${accessToken}`;
@@ -145,6 +146,27 @@ class DownloadService {
         downloadedMedia.albumName = metadata.Album;
       }
 
+      // Download sidecar subtitle file for transcoded downloads
+      if (subtitleInfo && subtitleInfo.streamIndex >= 0) {
+        try {
+          const subPath = filePath.replace(/\.[^.]+$/, '.srt');
+          const subUrl = `${serverUrl}/Videos/${itemId}/${itemId}/Subtitles/${subtitleInfo.streamIndex}/Stream.srt?api_key=${accessToken}`;
+          console.log('📝 Downloading subtitle:', subPath);
+          await Filesystem.downloadFile({
+            url: subUrl,
+            path: subPath,
+            directory: Directory.Data,
+            progress: false,
+          });
+          downloadedMedia.subtitleFilePath = subPath;
+          downloadedMedia.subtitleLabel = subtitleInfo.label;
+          downloadedMedia.subtitleLanguage = subtitleInfo.language;
+          console.log('✅ Subtitle downloaded:', subPath);
+        } catch (e) {
+          console.warn('⚠️ Subtitle download failed (non-critical):', e);
+        }
+      }
+
       // Fetch intro/outro segment timestamps so skip-intro works offline
       try {
         const segRes = await fetch(
@@ -209,6 +231,12 @@ class DownloadService {
         await Filesystem.deleteFile({ path: download.filePath, directory: Directory.Data });
         console.log('🗑️ File deleted:', download.filePath);
       } catch { /* file doesn't exist */ }
+      // Also delete sidecar subtitle file if present
+      if (download.subtitleFilePath) {
+        try {
+          await Filesystem.deleteFile({ path: download.subtitleFilePath, directory: Directory.Data });
+        } catch { /* ignore */ }
+      }
       await offlineDatabase.deleteDownload(itemId);
       console.log('✅ Download removed:', itemId);
     } catch (error) {

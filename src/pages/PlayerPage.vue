@@ -10,14 +10,18 @@
 
         <div class="relative w-full flex-1 overflow-hidden bg-black" @mouseleave="hideControls" @mousemove="showControls">
 
-            <!-- Back button — always visible above loader so user can escape a stuck load -->
-            <button
+            <!-- Top bar: back + title — kept reachable during load so the user can escape a stuck load -->
+            <div
                 :class="controlsVisible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'"
-                class="absolute bg-black/50 text-white border-none cursor-pointer px-3.5 py-2 rounded-lg flex items-center gap-1.5 text-[0.95rem] font-medium transition-colors hover:bg-white/15 z-[60]"
-                style="top: calc(12px + var(--sat, env(safe-area-inset-top, 0px))); left: calc(12px + var(--sal, env(safe-area-inset-left, 0px)))" @click="goBack">
-                <ArrowLeft class="size-5" />
-                Back
-            </button>
+                class="absolute top-0 left-0 right-0 z-[60] flex items-center gap-2.5 transition-opacity duration-300 bg-gradient-to-b from-black/70 to-transparent"
+                style="padding: calc(12px + var(--sat, env(safe-area-inset-top, 0px))) calc(12px + var(--sar, env(safe-area-inset-right, 0px))) 32px calc(12px + var(--sal, env(safe-area-inset-left, 0px)))">
+                <button
+                    class="bg-black/40 text-white border-none cursor-pointer p-2 rounded-lg flex items-center transition-colors hover:bg-white/15 shrink-0"
+                    @click="goBack" aria-label="Back">
+                    <ArrowLeft class="size-5" />
+                </button>
+                <span v-if="mediaTitle" class="text-white text-[0.95rem] font-medium truncate">{{ mediaTitle }}</span>
+            </div>
 
             <!-- Loading overlay -->
             <div v-if="isLoading" class="absolute inset-0 bg-black/90 flex flex-col items-center justify-center z-50">
@@ -53,23 +57,32 @@
                 />
             </video>
 
+            <!-- Center play/pause (web only) -->
+            <button v-if="!isNative && !isLoading"
+                :class="controlsVisible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'"
+                class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[55] flex items-center justify-center size-[72px] rounded-full bg-black/45 backdrop-blur-sm text-white transition-all duration-300 hover:bg-black/60 active:scale-95"
+                @click="togglePlayPause" aria-label="Play/Pause">
+                <Play v-if="!isPlaying" class="size-9 fill-current translate-x-0.5" />
+                <Pause v-else class="size-9 fill-current" />
+            </button>
+
             <!-- Skip Intro button -->
             <Transition name="skip-intro">
                 <button v-if="showSkipIntroButton"
-                    class="absolute bottom-32 right-4 z-[60] px-5 py-2.5 bg-black/60 hover:bg-black/80 active:bg-black/90 backdrop-blur-sm border border-white/30 hover:border-white/60 text-white text-sm font-semibold rounded-lg transition-all cursor-pointer select-none"
+                    class="absolute bottom-32 right-4 z-[60] px-5 py-2.5 bg-accent-purple/85 hover:bg-accent-purple active:bg-accent-purple-light backdrop-blur-sm border border-white/15 text-white text-sm font-semibold rounded-full shadow-lg transition-all cursor-pointer select-none"
                     @click="skipIntro">
                     Skip Intro
                 </button>
             </Transition>
 
-            <!-- Controls overlay (auto-hide, web only) -->
-            <div v-if="!isNative" class="absolute inset-0 flex flex-col justify-end player-gradient transition-opacity duration-300"
+            <!-- Bottom controls overlay (auto-hide, web only) -->
+            <div v-if="!isNative" class="absolute inset-x-0 bottom-0 flex flex-col justify-end player-gradient transition-opacity duration-300"
                 :class="controlsVisible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'"
-                style="padding-top: 20px; padding-right: calc(16px + env(safe-area-inset-right, 0px)); padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); padding-left: calc(16px + env(safe-area-inset-left, 0px));"
+                style="padding-top: 40px; padding-right: calc(16px + env(safe-area-inset-right, 0px)); padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); padding-left: calc(16px + env(safe-area-inset-left, 0px));"
                 @click.self="handleVideoTap">
 
                 <!-- Progress bar -->
-                <div class="w-full h-6 flex items-center cursor-pointer mb-3 group active:brightness-90" @click="seek">
+                <div class="w-full h-6 flex items-center cursor-pointer mb-2 group active:brightness-90" @click="seek">
                     <div
                         class="w-full h-1 bg-white/30 rounded-sm relative transition-[height] duration-200 group-hover:h-1.5">
                         <div class="h-full bg-accent-purple rounded-sm transition-[width] duration-100 ease-linear"
@@ -77,127 +90,88 @@
                     </div>
                 </div>
 
-                <!-- Bottom controls -->
+                <!-- Bottom controls: time (left) + actions (right) -->
                 <div class="flex justify-between items-center">
-                    <!-- Left: play/pause, mute, time -->
-                    <div class="flex items-center gap-2">
-                        <button
-                            class="bg-transparent border-none text-white cursor-pointer p-2 rounded flex items-center transition-colors hover:bg-white/10"
-                            @click="togglePlayPause">
-                            <Play v-if="!isPlaying" class="size-6 fill-current" />
-                            <Pause v-else class="size-6 fill-current" />
-                        </button>
-
-                        <button
-                            class="bg-transparent border-none text-white cursor-pointer p-2 rounded flex items-center transition-colors hover:bg-white/10"
-                            @click="toggleMute">
-                            <VolumeX v-if="isMuted" class="size-6" />
-                            <Volume2 v-else class="size-6" />
-                        </button>
-
-                        <div class="text-[0.9rem] text-white tabular-nums min-w-[110px]">
-                            {{ formatTime(currentTime) }} / {{ formatTime(duration) }}
-                        </div>
+                    <div class="text-[0.9rem] text-white tabular-nums">
+                        {{ formatTime(currentTime) }} / {{ formatTime(duration) }}
                     </div>
 
-                    <!-- Right: audio selector, fullscreen -->
-                    <div class="flex items-center gap-2">
+                    <div class="flex items-center gap-1">
                         <!-- Audio track selector (only shown when multiple tracks exist) -->
-                        <div v-if="audioList.length > 1" class="relative" ref="audioDropdown">
-                            <button
-                                class="bg-transparent border-none text-white cursor-pointer p-2 rounded flex items-center gap-1.5 transition-colors hover:bg-white/10"
-                                @click="toggleAudioMenu">
-                                <AudioLines class="size-6" />
-                            </button>
-                            <div class="absolute bottom-full right-0 mb-2 bg-[rgba(28,28,28,0.98)] rounded-lg min-w-[250px] max-h-[400px] overflow-y-auto shadow-[0_8px_24px_rgba(0,0,0,0.5)] backdrop-blur-[10px] transition-all duration-200 scrollbar-hide"
-                                :class="audioMenuOpen ? 'opacity-100 pointer-events-auto translate-y-0' : 'opacity-0 pointer-events-none translate-y-2.5'">
-                                <div v-for="opt in audioList" :key="opt.index"
-                                    class="flex items-center gap-2.5 px-4 py-3 cursor-pointer text-[0.9rem] transition-colors hover:bg-white/10 active:opacity-75"
-                                    :class="opt.index === selectedAudioIndex ? 'bg-accent-purple/20' : ''"
-                                    @click="switchAudio(opt.index)">
-                                    <Check class="size-4 shrink-0"
-                                        :class="opt.index === selectedAudioIndex ? 'opacity-100' : 'opacity-0'" />
-                                    {{ opt.label }}
-                                </div>
-                            </div>
-                        </div>
+                        <button v-if="audioList.length > 1"
+                            class="bg-transparent border-none text-white cursor-pointer p-2 rounded flex items-center transition-colors hover:bg-white/10"
+                            @click="toggleAudioMenu" aria-label="Audio track">
+                            <AudioLines class="size-6" />
+                        </button>
 
                         <!-- Subtitle track selector (only shown when subtitles exist) -->
-                        <div v-if="subtitleList.length > 0" class="relative" ref="subtitleDropdown">
-                            <button
-                                class="bg-transparent border-none text-white cursor-pointer p-2 rounded flex items-center gap-1.5 transition-colors hover:bg-white/10"
-                                @click="toggleSubtitleMenu">
-                                <Captions class="size-6" />
-                            </button>
-                            <div class="absolute bottom-full right-0 mb-2 bg-[rgba(28,28,28,0.98)] rounded-lg min-w-[250px] max-h-[400px] overflow-y-auto shadow-[0_8px_24px_rgba(0,0,0,0.5)] backdrop-blur-[10px] transition-all duration-200 scrollbar-hide"
-                                :class="subtitleMenuOpen ? 'opacity-100 pointer-events-auto translate-y-0' : 'opacity-0 pointer-events-none translate-y-2.5'">
-                                <!-- Off -->
-                                <div
-                                    class="flex items-center gap-2.5 px-4 py-3 cursor-pointer text-[0.9rem] transition-colors hover:bg-white/10 active:opacity-75"
-                                    :class="selectedSubtitleIndex === null ? 'bg-accent-purple/20' : ''"
-                                    @click="switchSubtitle(null)">
-                                    <Check class="size-4 shrink-0"
-                                        :class="selectedSubtitleIndex === null ? 'opacity-100' : 'opacity-0'" />
-                                    Off
-                                </div>
-                                <div v-for="sub in subtitleList" :key="sub.index"
-                                    class="flex items-center gap-2.5 px-4 py-3 cursor-pointer text-[0.9rem] transition-colors hover:bg-white/10 active:opacity-75"
-                                    :class="sub.index === selectedSubtitleIndex ? 'bg-accent-purple/20' : ''"
-                                    @click="switchSubtitle(sub.index)">
-                                    <Check class="size-4 shrink-0"
-                                        :class="sub.index === selectedSubtitleIndex ? 'opacity-100' : 'opacity-0'" />
-                                    {{ sub.label }}
-                                </div>
-                                <!-- Subtitle size control -->
-                                <div v-if="selectedSubtitleIndex !== null" class="flex items-center justify-between px-4 py-3 border-t border-white/10">
-                                    <span class="text-[0.85rem] text-white/60">Size</span>
-                                    <div class="flex items-center gap-3">
-                                        <button class="w-7 h-7 rounded bg-white/10 hover:bg-white/20 text-white text-lg leading-none flex items-center justify-center" @click.stop="adjustSubtitleSize(-0.25)">−</button>
-                                        <span class="text-[0.9rem] w-10 text-center">{{ Math.round(preferencesStore.subtitleSize * 100) }}%</span>
-                                        <button class="w-7 h-7 rounded bg-white/10 hover:bg-white/20 text-white text-lg leading-none flex items-center justify-center" @click.stop="adjustSubtitleSize(0.25)">+</button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                        <button v-if="subtitleList.length > 0"
+                            class="bg-transparent border-none text-white cursor-pointer p-2 rounded flex items-center transition-colors hover:bg-white/10"
+                            :class="selectedSubtitleIndex !== null ? 'text-accent-purple' : ''"
+                            @click="toggleSubtitleMenu" aria-label="Subtitles">
+                            <Captions class="size-6" />
+                        </button>
 
                         <!-- Quality selector -->
-                        <div class="relative" ref="qualityDropdown">
-                            <button
-                                class="bg-transparent border-none text-white cursor-pointer p-2 rounded flex items-center gap-1.5 transition-colors hover:bg-white/10"
-                                @click="toggleQualityMenu">
-                                <Gauge class="size-6" />
-                                <span class="text-[0.9rem] font-medium">{{ currentQualityLabel }}</span>
-                            </button>
-                            <div class="absolute bottom-full right-0 mb-2 bg-[rgba(28,28,28,0.98)] rounded-lg min-w-[160px] overflow-y-auto shadow-[0_8px_24px_rgba(0,0,0,0.5)] backdrop-blur-[10px] transition-all duration-200"
-                                :class="qualityMenuOpen ? 'opacity-100 pointer-events-auto translate-y-0' : 'opacity-0 pointer-events-none translate-y-2.5'">
-                                <div v-for="preset in availablePresets" :key="preset.bitrate"
-                                    class="flex items-center gap-2.5 px-4 py-3 cursor-pointer text-[0.9rem] transition-colors hover:bg-white/10 active:opacity-75"
-                                    :class="preset.bitrate === selectedBitrate ? 'bg-accent-purple/20' : ''"
-                                    @click="switchQuality(preset.bitrate)">
-                                    <Check class="size-4 shrink-0"
-                                        :class="preset.bitrate === selectedBitrate ? 'opacity-100' : 'opacity-0'" />
-                                    {{ preset.label }}
-                                </div>
-                            </div>
-                        </div>
+                        <button
+                            class="bg-transparent border-none text-white cursor-pointer p-2 rounded flex items-center gap-1.5 transition-colors hover:bg-white/10"
+                            @click="toggleQualityMenu" aria-label="Quality">
+                            <Gauge class="size-6" />
+                            <span class="text-[0.9rem] font-medium">{{ currentQualityLabel }}</span>
+                        </button>
 
                         <!-- Stream info -->
                         <button
                             class="bg-transparent border-none text-white cursor-pointer p-2 rounded flex items-center transition-colors hover:bg-white/10"
-                            @click="openInfoModal" title="Stream info">
+                            @click="openInfoModal" aria-label="Stream info">
                             <Info class="size-6" />
                         </button>
 
                         <!-- Fullscreen -->
                         <button
                             class="bg-transparent border-none text-white cursor-pointer p-2 rounded flex items-center transition-colors hover:bg-white/10"
-                            @click="toggleFullscreen">
+                            @click="toggleFullscreen" aria-label="Toggle fullscreen">
                             <Maximize v-if="!isFullscreen" class="size-6" />
                             <Minimize v-else class="size-6" />
                         </button>
                     </div>
                 </div>
             </div>
+
+            <!-- Track / quality bottom sheets (web only) -->
+            <template v-if="!isNative">
+                <PlayerBottomSheet
+                    :open="audioMenuOpen"
+                    title="Audio Track"
+                    :items="audioSheetItems"
+                    @select="(k) => switchAudio(Number(k))"
+                    @close="audioMenuOpen = false" />
+
+                <PlayerBottomSheet
+                    :open="subtitleMenuOpen"
+                    title="Subtitles"
+                    :items="subtitleSheetItems"
+                    @select="(k) => switchSubtitle(k === 'off' ? null : Number(k))"
+                    @close="subtitleMenuOpen = false">
+                    <template v-if="selectedSubtitleIndex !== null" #footer>
+                        <div class="flex items-center justify-between">
+                            <span class="text-[0.9rem] text-white/60">Size</span>
+                            <div class="flex items-center gap-3">
+                                <button class="w-8 h-8 rounded bg-white/10 hover:bg-white/20 text-white text-lg leading-none flex items-center justify-center" @click="adjustSubtitleSize(-0.25)">−</button>
+                                <span class="text-[0.9rem] w-10 text-center">{{ Math.round(preferencesStore.subtitleSize * 100) }}%</span>
+                                <button class="w-8 h-8 rounded bg-white/10 hover:bg-white/20 text-white text-lg leading-none flex items-center justify-center" @click="adjustSubtitleSize(0.25)">+</button>
+                            </div>
+                        </div>
+                    </template>
+                </PlayerBottomSheet>
+
+                <PlayerBottomSheet
+                    :open="qualityMenuOpen"
+                    title="Quality"
+                    :items="qualitySheetItems"
+                    @select="(k) => switchQuality(Number(k))"
+                    @close="qualityMenuOpen = false" />
+            </template>
         </div>
 
 
@@ -303,7 +277,8 @@ import { deviceProfile, nativeAndroidDeviceProfile } from '@/constants';
 import { formatTime } from '@/utils/helpers';
 import { lockLandscape, unlockOrientation } from '@/utils/orientation';
 import { debugLog } from '@/utils/debugLog';
-import { ArrowLeft, Play, Pause, Volume2, VolumeX, AudioLines, Captions, Gauge, Info, Check, Maximize, Minimize, Loader2 } from 'lucide-vue-next';
+import { ArrowLeft, Play, Pause, AudioLines, Captions, Gauge, Info, Maximize, Minimize, Loader2 } from 'lucide-vue-next';
+import PlayerBottomSheet from '@/components/PlayerBottomSheet.vue';
 
 // ── Setup ──────────────────────────────────────────────────────────────────────
 
@@ -343,13 +318,13 @@ const subtitleDropdown = ref<HTMLElement | null>(null);
 const isLoading = ref(true);
 const isPlaying = ref(false);
 const seekFeedback = ref<'back' | 'fwd' | null>(null);
-const isMuted = ref(false);
 const currentTime = ref(0);
 const duration = ref(0);
 const progressPct = ref(0);
 const isFullscreen = ref(false);
 const controlsVisible = ref(true);
 const error = ref<string | null>(null);
+const mediaTitle = ref('');
 
 // Jellyfin session
 const playSessionId = ref('');
@@ -395,6 +370,18 @@ const availablePresets = computed(() => {
 });
 const currentQualityLabel = computed(() =>
     ALL_QUALITY_PRESETS.find(p => p.bitrate === selectedBitrate.value)?.label ?? 'Auto'
+);
+
+// Bottom-sheet item lists (shared PlayerBottomSheet component)
+const audioSheetItems = computed(() =>
+    audioList.value.map(o => ({ key: o.index, label: o.label, selected: o.index === selectedAudioIndex.value }))
+);
+const subtitleSheetItems = computed(() => [
+    { key: 'off', label: 'Off', selected: selectedSubtitleIndex.value === null },
+    ...subtitleList.value.map(s => ({ key: s.index, label: s.label, selected: s.index === selectedSubtitleIndex.value })),
+]);
+const qualitySheetItems = computed(() =>
+    availablePresets.value.map(p => ({ key: p.bitrate, label: p.label, selected: p.bitrate === selectedBitrate.value }))
 );
 
 // Stream info modal
@@ -491,7 +478,6 @@ function onLoadedMetadata() {
     const video = videoEl.value;
     if (!video) return;
     duration.value = video.duration;
-    isMuted.value = video.muted;
 }
 
 function onEnded() {
@@ -505,13 +491,17 @@ function showControls() {
     controlsVisible.value = true;
     if (controlsTimeout) clearTimeout(controlsTimeout);
     controlsTimeout = setTimeout(() => {
-        if (!audioMenuOpen.value && !subtitleMenuOpen.value) controlsVisible.value = false;
+        if (!anyMenuOpen()) controlsVisible.value = false;
     }, 3000);
+}
+
+function anyMenuOpen() {
+    return audioMenuOpen.value || subtitleMenuOpen.value || qualityMenuOpen.value;
 }
 
 function hideControls() {
     if (controlsTimeout) clearTimeout(controlsTimeout);
-    if (!audioMenuOpen.value && !subtitleMenuOpen.value) {
+    if (!anyMenuOpen()) {
         controlsTimeout = setTimeout(() => { controlsVisible.value = false; }, 1000);
     }
 }
@@ -572,13 +562,6 @@ function togglePlayPause() {
     }
 }
 
-function toggleMute() {
-    const video = videoEl.value;
-    if (!video) return;
-    video.muted = !video.muted;
-    isMuted.value = video.muted;
-}
-
 function seek(e: MouseEvent) {
     const bar = e.currentTarget as HTMLElement;
     const rect = bar.getBoundingClientRect();
@@ -623,12 +606,18 @@ function toggleFullscreen() {
 }
 
 function toggleAudioMenu() {
-    audioMenuOpen.value = !audioMenuOpen.value;
+    const next = !audioMenuOpen.value;
+    subtitleMenuOpen.value = false;
+    qualityMenuOpen.value = false;
+    audioMenuOpen.value = next;
     showControls(); // reset idle timer so menu stays visible
 }
 
 function toggleSubtitleMenu() {
-    subtitleMenuOpen.value = !subtitleMenuOpen.value;
+    const next = !subtitleMenuOpen.value;
+    audioMenuOpen.value = false;
+    qualityMenuOpen.value = false;
+    subtitleMenuOpen.value = next;
     showControls();
 }
 
@@ -1943,7 +1932,10 @@ function closeInfoModal() {
 // ── Quality ────────────────────────────────────────────────────────────────────
 
 function toggleQualityMenu() {
-    qualityMenuOpen.value = !qualityMenuOpen.value;
+    const next = !qualityMenuOpen.value;
+    audioMenuOpen.value = false;
+    subtitleMenuOpen.value = false;
+    qualityMenuOpen.value = next;
     showControls();
 }
 
@@ -2087,7 +2079,8 @@ onMounted(async () => {
             resumeSeconds = cachedTicks ? cachedTicks / 10_000_000 : undefined;
         }
 
-        await initOfflinePlayer(cachedDownload, resumeSeconds, buildMediaTitle(cachedDownload.jellyfinItem));
+        mediaTitle.value = buildMediaTitle(cachedDownload.jellyfinItem);
+        await initOfflinePlayer(cachedDownload, resumeSeconds, mediaTitle.value);
         if (!isNative) {
             document.addEventListener('click', handleClickOutside);
             document.addEventListener('fullscreenchange', () => { isFullscreen.value = !!getFullscreenElement(); });
@@ -2104,6 +2097,7 @@ onMounted(async () => {
     } catch (e) {
         console.warn('[Player] Failed to load item details:', e);
     }
+    mediaTitle.value = buildMediaTitle(details);
 
     // Prefer ticks passed through the route query (set by the calling page which has live data).
     // Fall back to Jellyfin's stored value only if no route ticks are present.

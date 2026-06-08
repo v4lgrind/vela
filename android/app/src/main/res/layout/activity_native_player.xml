@@ -19,7 +19,7 @@
         android:layout_width="56dp"
         android:layout_height="56dp"
         android:layout_gravity="center"
-        android:indeterminateTint="#BB86FC"
+        android:indeterminateTint="#7c3aed"
         android:visibility="visible" />
 
     <!-- Controls overlay -->
@@ -29,17 +29,27 @@
         android:layout_height="match_parent"
         android:background="#00000000">
 
-        <!-- Top scrim — keeps buttons readable against bright content -->
+        <!-- Top scrim — keeps the title/back readable against bright content -->
         <View
             android:id="@+id/top_scrim"
             android:layout_width="0dp"
-            android:layout_height="80dp"
+            android:layout_height="96dp"
             android:background="@drawable/bg_controls_scrim"
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent" />
 
-        <!-- Top row -->
+        <!-- Bottom scrim — keeps the transport row readable -->
+        <View
+            android:id="@+id/bottom_scrim"
+            android:layout_width="0dp"
+            android:layout_height="160dp"
+            android:background="@drawable/bg_controls_scrim_bottom"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent" />
+
+        <!-- Top row: back + title -->
         <ImageButton
             android:id="@+id/btn_back"
             android:layout_width="48dp"
@@ -66,69 +76,25 @@
             app:layout_constraintTop_toTopOf="@id/btn_back"
             app:layout_constraintBottom_toBottomOf="@id/btn_back"
             app:layout_constraintStart_toEndOf="@id/btn_back"
-            app:layout_constraintEnd_toStartOf="@id/btn_info"
-            android:layout_marginStart="8dp"
-            android:layout_marginEnd="8dp" />
-
-        <ImageButton
-            android:id="@+id/btn_info"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:src="@drawable/ic_info"
-            android:background="@drawable/bg_player_button"
-            android:tint="#FFFFFF"
-            android:padding="10dp"
-            android:contentDescription="Stream info"
-            android:visibility="gone"
-            app:layout_constraintTop_toTopOf="@id/btn_back"
-            app:layout_constraintBottom_toBottomOf="@id/btn_back"
-            app:layout_constraintEnd_toStartOf="@id/btn_quality"
-            android:layout_marginEnd="4dp" />
-
-        <ImageButton
-            android:id="@+id/btn_quality"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:src="@drawable/ic_quality"
-            android:background="@drawable/bg_player_button"
-            android:tint="#FFFFFF"
-            android:padding="10dp"
-            android:contentDescription="Quality"
-            android:visibility="gone"
-            app:layout_constraintTop_toTopOf="@id/btn_back"
-            app:layout_constraintBottom_toBottomOf="@id/btn_back"
-            app:layout_constraintEnd_toStartOf="@id/btn_audio"
-            android:layout_marginEnd="4dp" />
-
-        <ImageButton
-            android:id="@+id/btn_audio"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:src="@drawable/ic_audio_track"
-            android:background="@drawable/bg_player_button"
-            android:tint="#FFFFFF"
-            android:padding="10dp"
-            android:contentDescription="Audio track"
-            android:visibility="gone"
-            app:layout_constraintTop_toTopOf="@id/btn_back"
-            app:layout_constraintBottom_toBottomOf="@id/btn_back"
-            app:layout_constraintEnd_toStartOf="@id/btn_subtitle"
-            android:layout_marginEnd="4dp" />
-
-        <ImageButton
-            android:id="@+id/btn_subtitle"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:src="@drawable/ic_subtitles"
-            android:background="@drawable/bg_player_button"
-            android:tint="#FFFFFF"
-            android:padding="10dp"
-            android:contentDescription="Subtitles"
-            android:visibility="gone"
-            app:layout_constraintTop_toTopOf="@id/btn_back"
-            app:layout_constraintBottom_toBottomOf="@id/btn_back"
             app:layout_constraintEnd_toEndOf="parent"
+            android:layout_marginStart="8dp"
             android:layout_marginEnd="16dp" />
+
+        <!-- Center play/pause — large, primary transport control -->
+        <ImageButton
+            android:id="@+id/btn_play_pause"
+            android:layout_width="72dp"
+            android:layout_height="72dp"
+            android:src="@drawable/ic_pause"
+            android:background="@drawable/bg_center_play"
+            android:tint="#FFFFFF"
+            android:padding="16dp"
+            android:scaleType="fitCenter"
+            android:contentDescription="Play/Pause"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent" />
 
         <!-- Seek bar + chapter markers wrapper -->
         <FrameLayout
@@ -162,28 +128,19 @@
                 android:paddingEnd="16dp" />
         </FrameLayout>
 
-        <!-- Bottom row -->
+        <!-- Bottom row: time (left) + actions (right) -->
         <LinearLayout
             android:id="@+id/bottom_row"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:paddingStart="8dp"
+            android:paddingStart="16dp"
             android:paddingEnd="8dp"
             android:paddingBottom="12dp"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent">
-
-            <ImageButton
-                android:id="@+id/btn_play_pause"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:src="@drawable/ic_pause"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:tint="#FFFFFF"
-                android:contentDescription="Play/Pause" />
 
             <TextView
                 android:id="@+id/tv_current_time"
@@ -192,8 +149,7 @@
                 android:text="0:00:00"
                 android:textColor="#FFFFFF"
                 android:textSize="13sp"
-                android:fontFamily="monospace"
-                android:layout_marginStart="8dp" />
+                android:fontFamily="monospace" />
 
             <TextView
                 android:layout_width="wrap_content"
@@ -217,12 +173,57 @@
                 android:layout_weight="1" />
 
             <ImageButton
+                android:id="@+id/btn_audio"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:src="@drawable/ic_audio_track"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:tint="#FFFFFF"
+                android:padding="9dp"
+                android:contentDescription="Audio track"
+                android:visibility="gone" />
+
+            <ImageButton
+                android:id="@+id/btn_subtitle"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:src="@drawable/ic_subtitles"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:tint="#FFFFFF"
+                android:padding="9dp"
+                android:contentDescription="Subtitles"
+                android:visibility="gone" />
+
+            <ImageButton
+                android:id="@+id/btn_quality"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:src="@drawable/ic_quality"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:tint="#FFFFFF"
+                android:padding="9dp"
+                android:contentDescription="Quality"
+                android:visibility="gone" />
+
+            <ImageButton
+                android:id="@+id/btn_info"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:src="@drawable/ic_info"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:tint="#FFFFFF"
+                android:padding="9dp"
+                android:contentDescription="Stream info"
+                android:visibility="gone" />
+
+            <ImageButton
                 android:id="@+id/btn_fullscreen"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
                 android:src="@drawable/ic_fullscreen_exit"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:tint="#FFFFFF"
+                android:padding="9dp"
                 android:contentDescription="Toggle fullscreen" />
 
         </LinearLayout>
@@ -294,7 +295,8 @@
         android:text="Skip Intro"
         android:textColor="#FFFFFF"
         android:textSize="14sp"
-        android:backgroundTint="#CC000000"
+        android:textAllCaps="false"
+        android:background="@drawable/bg_skip_button"
         android:paddingStart="20dp"
         android:paddingEnd="20dp"
         android:paddingTop="10dp"
@@ -328,7 +330,8 @@
         android:text="Next Episode"
         android:textColor="#FFFFFF"
         android:textSize="14sp"
-        android:backgroundTint="#CC000000"
+        android:textAllCaps="false"
+        android:background="@drawable/bg_skip_button"
         android:paddingStart="20dp"
         android:paddingEnd="20dp"
         android:paddingTop="10dp"

@@ -1,9 +1,14 @@
 package com.jellyfin_v4lgrind_client.app
 
+import android.app.Dialog
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -11,12 +16,15 @@ import android.os.Looper
 import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewGroup
+import android.view.Window
 import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import androidx.core.view.GestureDetectorCompat
 import android.widget.Button
 import android.widget.ImageButton
+import android.widget.ImageView
 import android.widget.SeekBar
 import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
@@ -1068,43 +1076,124 @@ class NativePlayerActivity : AppCompatActivity() {
             ?: lower
     }
 
+    // ── Bottom-sheet pickers ─────────────────────────────────────────────────────
+    // Custom Dialog-based bottom sheet (no Material dependency) so the picker style
+    // matches the web player's PlayerBottomSheet exactly.
+
+    private data class SheetOption(val label: String, val selected: Boolean, val onSelect: () -> Unit)
+
+    private fun showOptionSheet(
+        titleText: String,
+        options: List<SheetOption>,
+        footerBuilder: ((LinearLayout) -> Unit)? = null
+    ) {
+        val dialog = Dialog(this)
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
+        val view = layoutInflater.inflate(R.layout.bottom_sheet_options, null)
+        dialog.setContentView(view)
+
+        view.findViewById<TextView>(R.id.sheet_title).text = titleText
+        view.findViewById<ImageButton>(R.id.sheet_close).setOnClickListener { dialog.dismiss() }
+
+        val container = view.findViewById<LinearLayout>(R.id.sheet_options_container)
+        for (opt in options) {
+            val row = layoutInflater.inflate(R.layout.item_sheet_option, container, false)
+            row.findViewById<TextView>(R.id.sheet_option_label).text = opt.label
+            row.findViewById<ImageView>(R.id.sheet_option_check).visibility =
+                if (opt.selected) View.VISIBLE else View.INVISIBLE
+            if (opt.selected) row.setBackgroundResource(R.drawable.bg_sheet_row_selected)
+            row.setOnClickListener {
+                opt.onSelect()
+                dialog.dismiss()
+            }
+            container.addView(row)
+        }
+
+        val footer = view.findViewById<LinearLayout>(R.id.sheet_footer)
+        if (footerBuilder != null) {
+            footer.visibility = View.VISIBLE
+            footerBuilder(footer)
+        }
+
+        dialog.window?.apply {
+            setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+            setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            setGravity(android.view.Gravity.BOTTOM)
+            setWindowAnimations(R.style.BottomSheetAnim)
+        }
+        dialog.show()
+    }
+
+    /** Inline subtitle-size stepper used as the subtitle sheet footer (mirrors the web). */
+    private fun buildSubtitleSizeFooter(footer: LinearLayout) {
+        val d = resources.displayMetrics.density
+        val label = TextView(this).apply {
+            text = "Size"
+            setTextColor(0x99FFFFFF.toInt())
+            textSize = 14f
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        val value = TextView(this).apply {
+            text = "${Math.round(currentSubtitleScale * 100)}%"
+            setTextColor(Color.WHITE)
+            textSize = 14f
+            gravity = android.view.Gravity.CENTER
+            minWidth = (52 * d).toInt()
+        }
+        fun stepButton(symbol: String, delta: Float): TextView = TextView(this).apply {
+            text = symbol
+            setTextColor(Color.WHITE)
+            textSize = 20f
+            gravity = android.view.Gravity.CENTER
+            val size = (36 * d).toInt()
+            layoutParams = LinearLayout.LayoutParams(size, size).apply { marginStart = (8 * d).toInt() }
+            setBackgroundResource(R.drawable.bg_player_button)
+            setOnClickListener {
+                val next = (currentSubtitleScale + delta).coerceIn(0.5f, 2.0f)
+                currentSubtitleScale = Math.round(next * 4) / 4f
+                value.text = "${Math.round(currentSubtitleScale * 100)}%"
+                val scale = currentSubtitleScale
+                handler.post { applySubtitleTextSize(scale) }
+                val notify = Intent(ACTION_SUBTITLE_SIZE_CHANGED)
+                notify.putExtra("scale", scale)
+                notify.setPackage(packageName)
+                sendBroadcast(notify)
+            }
+        }
+        footer.addView(label)
+        footer.addView(stepButton("−", -0.25f))
+        value.layoutParams = LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply { marginStart = (8 * d).toInt() }
+        footer.addView(value)
+        footer.addView(stepButton("+", 0.25f))
+    }
+
     private fun showAudioPicker() {
         // If ExoPlayer has multiple tracks (DirectPlay), use them directly.
         // Otherwise fall back to the Jellyfin track list and trigger a Vue-side restart.
         if (audioTrackGroups.size > 1) {
-            val labels = audioTrackGroups.map { (_, group) ->
+            val options = audioTrackGroups.map { (groupIndex, group) ->
                 val format = group.getFormat(0)
-                "${format.language ?: "und"} ${if (format.channelCount > 0) "(${format.channelCount}ch)" else ""} ${if (!format.codecs.isNullOrEmpty()) "- ${format.codecs!!.uppercase()}" else ""}".trim()
-            }.toTypedArray()
-            val checkedItem = audioTrackGroups.indexOfFirst { it.first == selectedAudioGroupIndex }
-            androidx.appcompat.app.AlertDialog.Builder(this, androidx.appcompat.R.style.Theme_AppCompat_Dialog)
-                .setTitle("Audio Track")
-                .setSingleChoiceItems(labels, checkedItem) { dialog, which ->
-                    selectAudioTrack(audioTrackGroups[which].first)
-                    dialog.dismiss()
-                }
-                .setNegativeButton("Cancel", null)
-                .show()
+                val label = "${format.language ?: "und"} ${if (format.channelCount > 0) "(${format.channelCount}ch)" else ""} ${if (!format.codecs.isNullOrEmpty()) "- ${format.codecs!!.uppercase()}" else ""}".trim()
+                SheetOption(label, groupIndex == selectedAudioGroupIndex) { selectAudioTrack(groupIndex) }
+            }
+            showOptionSheet("Audio Track", options)
         } else if (jellyfinAudioTracks.isNotEmpty()) {
-            val labels = jellyfinAudioTracks.map { it.second }.toTypedArray()
             // Use the Jellyfin audio index that was requested for this session.
             // Language matching is unreliable here because the transcoded stream
             // has only one ExoPlayer track whose language may not match.
-            val checkedItem = jellyfinAudioTracks.indexOfFirst { it.first == selectedJellyfinAudioIndex }
-            android.util.Log.d("NativePlayer", "showAudioPicker: jellyfin branch, selectedJellyfinAudioIndex=$selectedJellyfinAudioIndex checkedItem=$checkedItem")
-            androidx.appcompat.app.AlertDialog.Builder(this, androidx.appcompat.R.style.Theme_AppCompat_Dialog)
-                .setTitle("Audio Track")
-                .setSingleChoiceItems(labels, checkedItem) { dialog, which ->
-                    val (jellyfinIndex, _, _) = jellyfinAudioTracks[which]
+            android.util.Log.d("NativePlayer", "showAudioPicker: jellyfin branch, selectedJellyfinAudioIndex=$selectedJellyfinAudioIndex")
+            val options = jellyfinAudioTracks.map { (jellyfinIndex, label, _) ->
+                SheetOption(label, jellyfinIndex == selectedJellyfinAudioIndex) {
                     selectedJellyfinAudioIndex = jellyfinIndex
-                    dialog.dismiss()
                     val broadcastIntent = Intent(ACTION_AUDIO_SWITCH_JELLYFIN)
                     broadcastIntent.putExtra("jellyfinIndex", jellyfinIndex)
                     broadcastIntent.setPackage(packageName)
                     sendBroadcast(broadcastIntent)
                 }
-                .setNegativeButton("Cancel", null)
-                .show()
+            }
+            showOptionSheet("Audio Track", options)
         }
     }
 
@@ -1126,31 +1215,22 @@ class NativePlayerActivity : AppCompatActivity() {
     }
 
     private fun showSubtitlePicker() {
-        // SRT subtitle (offline transcoded downloads) — on/off toggle with size picker
+        // SRT subtitle (offline transcoded downloads) — on/off toggle with size stepper
         if (srtCues.isNotEmpty()) {
-            val labels = arrayOf("Off", "Subtitles")
-            val checkedItem = if (srtEnabled) 1 else 0
-            androidx.appcompat.app.AlertDialog.Builder(this, androidx.appcompat.R.style.Theme_AppCompat_Dialog)
-                .setTitle("Subtitles")
-                .setSingleChoiceItems(labels, checkedItem) { dialog, which ->
-                    srtEnabled = which == 1
-                    if (!srtEnabled) tvSrtSubtitle?.visibility = View.GONE
-                    btnSubtitle.setBackgroundResource(
-                        if (srtEnabled) R.drawable.bg_player_button_selected
-                        else R.drawable.bg_player_button
-                    )
-                    val broadcastIntent = Intent(ACTION_SUBTITLE_SELECTED)
-                    broadcastIntent.putExtra("groupIndex", if (srtEnabled) 0 else -1)
-                    broadcastIntent.putExtra("label", if (srtEnabled) "Subtitles" else "Off")
-                    broadcastIntent.setPackage(packageName)
-                    sendBroadcast(broadcastIntent)
-                    dialog.dismiss()
+            val options = listOf(
+                SheetOption("Off", !srtEnabled) {
+                    srtEnabled = false
+                    tvSrtSubtitle?.visibility = View.GONE
+                    btnSubtitle.setBackgroundResource(R.drawable.bg_player_button)
+                    sendSubtitleSelectedBroadcast(-1, "Off")
+                },
+                SheetOption("Subtitles", srtEnabled) {
+                    srtEnabled = true
+                    btnSubtitle.setBackgroundResource(R.drawable.bg_player_button_selected)
+                    sendSubtitleSelectedBroadcast(0, "Subtitles")
                 }
-                .setNeutralButton("Size: ${Math.round(currentSubtitleScale * 100)}%") { _, _ ->
-                    showSubtitleSizePicker()
-                }
-                .setNegativeButton("Cancel", null)
-                .show()
+            )
+            showOptionSheet("Subtitles", options) { footer -> buildSubtitleSizeFooter(footer) }
             return
         }
 
@@ -1158,87 +1238,40 @@ class NativePlayerActivity : AppCompatActivity() {
 
         if (subtitleTrackGroups.isNotEmpty()) {
             // ExoPlayer has track groups — use them directly
-            val labels = buildList {
-                add("Off")
-                addAll(subtitleTrackGroups.map { (_, group) ->
+            val options = buildList {
+                add(SheetOption("Off", selectedSubtitleGroupIndex < 0) { selectSubtitleTrack(-1) })
+                subtitleTrackGroups.forEach { (groupIndex, group) ->
                     val format = group.getFormat(0)
-                    format.label ?: (format.language ?: "und")
-                })
-            }.toTypedArray()
-            val checkedItem = if (selectedSubtitleGroupIndex < 0) 0
-                else (subtitleTrackGroups.indexOfFirst { it.first == selectedSubtitleGroupIndex } + 1)
-
-            androidx.appcompat.app.AlertDialog.Builder(this, androidx.appcompat.R.style.Theme_AppCompat_Dialog)
-                .setTitle("Subtitles")
-                .setSingleChoiceItems(labels, checkedItem) { dialog, which ->
-                    if (which == 0) {
-                        selectSubtitleTrack(-1)
-                    } else {
-                        selectSubtitleTrack(subtitleTrackGroups[which - 1].first)
-                    }
-                    dialog.dismiss()
+                    val label = format.label ?: (format.language ?: "und")
+                    add(SheetOption(label.toString(), groupIndex == selectedSubtitleGroupIndex) {
+                        selectSubtitleTrack(groupIndex)
+                    })
                 }
-                .setNeutralButton("Size: ${Math.round(currentSubtitleScale * 100)}%") { _, _ ->
-                    showSubtitleSizePicker()
-                }
-                .setNegativeButton("Cancel", null)
-                .show()
+            }
+            showOptionSheet("Subtitles", options) { footer -> buildSubtitleSizeFooter(footer) }
         } else {
             // Transcoded stream: ExoPlayer didn't report text tracks.
             // Show sidecar labels and broadcast selection to Vue for server-side burn-in.
-            val labels = buildList {
-                add("Off")
-                addAll(sidecarSubtitles.map { it.first })
-            }.toTypedArray()
-            val checkedItem = 0 // default to Off for now
-
-            androidx.appcompat.app.AlertDialog.Builder(this, androidx.appcompat.R.style.Theme_AppCompat_Dialog)
-                .setTitle("Subtitles")
-                .setSingleChoiceItems(labels, checkedItem) { dialog, which ->
-                    if (which == 0) {
-                        selectSubtitleTrack(-1)
-                    } else {
-                        // Broadcast the sidecar subtitle selection to Vue
-                        val sub = sidecarSubtitles[which - 1]
-                        val broadcastIntent = Intent(ACTION_SUBTITLE_SELECTED)
-                        broadcastIntent.putExtra("groupIndex", which - 1)
-                        broadcastIntent.putExtra("label", sub.first)
-                        broadcastIntent.setPackage(packageName)
-                        sendBroadcast(broadcastIntent)
-                        selectedSubtitleGroupIndex = which - 1
+            val options = buildList {
+                add(SheetOption("Off", selectedSubtitleGroupIndex < 0) { selectSubtitleTrack(-1) })
+                sidecarSubtitles.forEachIndexed { i, sub ->
+                    add(SheetOption(sub.first, selectedSubtitleGroupIndex == i) {
+                        sendSubtitleSelectedBroadcast(i, sub.first)
+                        selectedSubtitleGroupIndex = i
                         btnSubtitle.setBackgroundResource(R.drawable.bg_player_button_selected)
-                    }
-                    dialog.dismiss()
+                    })
                 }
-                .setNeutralButton("Size: ${Math.round(currentSubtitleScale * 100)}%") { _, _ ->
-                    showSubtitleSizePicker()
-                }
-                .setNegativeButton("Cancel", null)
-                .show()
+            }
+            showOptionSheet("Subtitles", options) { footer -> buildSubtitleSizeFooter(footer) }
         }
     }
 
-    private fun showSubtitleSizePicker() {
-        val steps = floatArrayOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f)
-        val labels = steps.map { "${Math.round(it * 100)}%" }.toTypedArray()
-        val checkedItem = steps.indexOfFirst { it == currentSubtitleScale }.takeIf { it >= 0 } ?: 2
-
-        androidx.appcompat.app.AlertDialog.Builder(this, androidx.appcompat.R.style.Theme_AppCompat_Dialog)
-            .setTitle("Subtitle size")
-            .setSingleChoiceItems(labels, checkedItem) { dialog, which ->
-                currentSubtitleScale = steps[which]
-                val newScale = currentSubtitleScale
-                dialog.dismiss()
-                // Apply after dialog fully dismisses and window regains focus
-                handler.post { applySubtitleTextSize(newScale) }
-                // Notify Vue so preferencesStore stays in sync
-                val notify = Intent(ACTION_SUBTITLE_SIZE_CHANGED)
-                notify.putExtra("scale", newScale)
-                notify.setPackage(packageName)
-                sendBroadcast(notify)
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
+    private fun sendSubtitleSelectedBroadcast(groupIndex: Int, label: String) {
+        val broadcastIntent = Intent(ACTION_SUBTITLE_SELECTED)
+        broadcastIntent.putExtra("groupIndex", groupIndex)
+        broadcastIntent.putExtra("label", label)
+        broadcastIntent.setPackage(packageName)
+        sendBroadcast(broadcastIntent)
     }
 
     private fun parseQualityPresets(json: String) {
@@ -1256,51 +1289,69 @@ class NativePlayerActivity : AppCompatActivity() {
 
     private fun showQualityPicker() {
         if (qualityPresets.isEmpty()) return
-        val labels = qualityPresets.map { it.second }.toTypedArray()
-        val checkedItem = qualityPresets.indexOfFirst { it.first == selectedBitrate }
-
-        androidx.appcompat.app.AlertDialog.Builder(this, androidx.appcompat.R.style.Theme_AppCompat_Dialog)
-            .setTitle("Quality")
-            .setSingleChoiceItems(labels, checkedItem) { dialog, which ->
-                val bitrate = qualityPresets[which].first
+        val options = qualityPresets.map { (bitrate, label) ->
+            SheetOption(label, bitrate == selectedBitrate) {
                 selectedBitrate = bitrate
-                dialog.dismiss()
                 // Broadcast back to Vue so it can do the actual quality switch
                 val broadcastIntent = Intent(ACTION_QUALITY_SELECTED)
                 broadcastIntent.putExtra("bitrate", bitrate)
                 broadcastIntent.setPackage(packageName)
                 sendBroadcast(broadcastIntent)
             }
-            .setNegativeButton("Cancel", null)
-            .show()
+        }
+        showOptionSheet("Quality", options)
     }
 
     private fun showStreamInfoDialog() {
         if (streamInfoJson.isEmpty()) return
         try {
             val info = JSONObject(streamInfoJson)
-            val sb = StringBuilder()
 
+            val dialog = Dialog(this)
+            dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
+            val view = layoutInflater.inflate(R.layout.view_stream_info, null)
+            dialog.setContentView(view)
+            view.findViewById<ImageButton>(R.id.info_close).setOnClickListener { dialog.dismiss() }
+
+            val badgeRow = view.findViewById<LinearLayout>(R.id.info_badge_row)
+            val content = view.findViewById<LinearLayout>(R.id.info_content)
+
+            // Play-method badge + transcode reason
             val method = info.optString("playMethod", "")
-            if (method.isNotEmpty()) sb.append("Play Method: $method\n")
-
+            if (method.isNotEmpty()) {
+                val color = when (method) {
+                    "DirectPlay" -> 0xFF43E97B.toInt()
+                    "DirectStream" -> 0xFF00A4DC.toInt()
+                    else -> 0xFF7C3AED.toInt()
+                }
+                badgeRow.addView(makeInfoBadge(method, color))
+            }
             val reason = info.optString("transcodeReason", "")
-            if (reason.isNotEmpty()) sb.append("Reason: $reason\n")
+            if (reason.isNotEmpty()) {
+                val d = resources.displayMetrics.density
+                badgeRow.addView(TextView(this).apply {
+                    text = reason
+                    setTextColor(0x66FFFFFF.toInt())
+                    textSize = 12f
+                    layoutParams = LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
+                    ).apply { marginStart = (8 * d).toInt() }
+                })
+            }
 
             // Video
             val vCodec = info.optString("videoCodec", "")
             val vRes = info.optString("resolution", "")
             val vBitrate = info.optInt("videoBitrate", 0)
             val vDirect = info.optBoolean("isVideoDirect", true)
-            if (vCodec.isNotEmpty() || vRes.isNotEmpty()) {
-                sb.append("\n— Video —\n")
-                if (vRes.isNotEmpty()) sb.append("Resolution: $vRes\n")
-                if (vCodec.isNotEmpty()) sb.append("Codec: ${vCodec.uppercase()}${if (!vDirect) " (transcoding)" else " (copy)"}\n")
-                if (vBitrate > 0) sb.append("Bitrate: ${vBitrate / 1000} kbps\n")
-            }
-
             val fps = info.optDouble("framerate", 0.0)
-            if (fps > 0) sb.append("Frame rate: ${"%.1f".format(fps)} fps\n")
+            if (vCodec.isNotEmpty() || vRes.isNotEmpty()) {
+                addInfoSection(content, "Video")
+                if (vRes.isNotEmpty()) addInfoRow(content, "Resolution", vRes)
+                if (vCodec.isNotEmpty()) addInfoRow(content, "Codec", "${vCodec.uppercase()} ${if (vDirect) "(copy)" else "(transcoding)"}")
+                if (vBitrate > 0) addInfoRow(content, "Bitrate", "${vBitrate / 1000} kbps")
+                if (fps > 0) addInfoRow(content, "Frame rate", "%.1f fps".format(fps))
+            }
 
             // Audio
             val aCodec = info.optString("audioCodec", "")
@@ -1308,20 +1359,75 @@ class NativePlayerActivity : AppCompatActivity() {
             val aBitrate = info.optInt("audioBitrate", 0)
             val aDirect = info.optBoolean("isAudioDirect", true)
             if (aCodec.isNotEmpty() || aChannels.isNotEmpty()) {
-                sb.append("\n— Audio —\n")
-                if (aCodec.isNotEmpty()) sb.append("Codec: ${aCodec.uppercase()}${if (!aDirect) " (transcoding)" else " (copy)"}\n")
-                if (aChannels.isNotEmpty()) sb.append("Channels: $aChannels\n")
-                if (aBitrate > 0) sb.append("Bitrate: ${aBitrate / 1000} kbps\n")
+                addInfoSection(content, "Audio")
+                if (aCodec.isNotEmpty()) addInfoRow(content, "Codec", "${aCodec.uppercase()} ${if (aDirect) "(copy)" else "(transcoding)"}")
+                if (aChannels.isNotEmpty()) addInfoRow(content, "Channels", aChannels)
+                if (aBitrate > 0) addInfoRow(content, "Bitrate", "${aBitrate / 1000} kbps")
             }
 
-            androidx.appcompat.app.AlertDialog.Builder(this, androidx.appcompat.R.style.Theme_AppCompat_Dialog)
-                .setTitle("Stream Info")
-                .setMessage(sb.toString().trimEnd())
-                .setPositiveButton("OK", null)
-                .show()
+            dialog.window?.apply {
+                setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+                setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+                setGravity(android.view.Gravity.BOTTOM)
+                setWindowAnimations(R.style.BottomSheetAnim)
+            }
+            dialog.show()
         } catch (e: Exception) {
             android.util.Log.e("NativePlayer", "showStreamInfoDialog error", e)
         }
+    }
+
+    private fun makeInfoBadge(text: String, color: Int): TextView {
+        val d = resources.displayMetrics.density
+        return TextView(this).apply {
+            this.text = text
+            setTextColor(color)
+            textSize = 12f
+            typeface = Typeface.DEFAULT_BOLD
+            setPadding((10 * d).toInt(), (4 * d).toInt(), (10 * d).toInt(), (4 * d).toInt())
+            background = GradientDrawable().apply {
+                cornerRadius = 999f
+                setColor((color and 0x00FFFFFF) or (0x33 shl 24))
+            }
+        }
+    }
+
+    private fun addInfoSection(container: LinearLayout, title: String) {
+        val d = resources.displayMetrics.density
+        container.addView(TextView(this).apply {
+            text = title.uppercase()
+            setTextColor(0x66FFFFFF.toInt())
+            textSize = 11f
+            letterSpacing = 0.08f
+            typeface = Typeface.DEFAULT_BOLD
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = (14 * d).toInt(); bottomMargin = (6 * d).toInt() }
+        })
+    }
+
+    private fun addInfoRow(container: LinearLayout, label: String, value: String) {
+        val d = resources.displayMetrics.density
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = (5 * d).toInt() }
+        }
+        row.addView(TextView(this).apply {
+            text = label
+            setTextColor(0x80FFFFFF.toInt())
+            textSize = 13f
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+        })
+        row.addView(TextView(this).apply {
+            text = value
+            setTextColor(Color.WHITE)
+            textSize = 13f
+            gravity = android.view.Gravity.END
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+        })
+        container.addView(row)
     }
 
     private fun toggleControls() {

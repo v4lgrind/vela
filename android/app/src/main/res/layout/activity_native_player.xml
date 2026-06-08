@@ -91,6 +91,7 @@
             android:padding="16dp"
             android:scaleType="fitCenter"
             android:contentDescription="Play/Pause"
+            android:visibility="invisible"
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintStart_toStartOf="parent"

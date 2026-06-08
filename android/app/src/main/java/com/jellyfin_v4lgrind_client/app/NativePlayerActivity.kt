@@ -723,6 +723,10 @@ class NativePlayerActivity : AppCompatActivity() {
                     Player.STATE_READY -> {
                         playerView.visibility = View.VISIBLE
                         loadingSpinner.visibility = View.GONE
+                        // Reveal the center play/pause only once the spinner is gone,
+                        // so the two never show at once (their centers differ because the
+                        // controls overlay is inset-padded for cutouts/system bars).
+                        btnPlayPause.visibility = View.VISIBLE
                         if (!tracksReported) {
                             tracksReported = true
                             reportTracks(exo)
@@ -738,7 +742,10 @@ class NativePlayerActivity : AppCompatActivity() {
                         sendProgressBroadcast(endDur, endDur)
                         sendEndedBroadcast()
                     }
-                    Player.STATE_BUFFERING -> { loadingSpinner.visibility = View.VISIBLE }
+                    Player.STATE_BUFFERING -> {
+                        loadingSpinner.visibility = View.VISIBLE
+                        btnPlayPause.visibility = View.INVISIBLE
+                    }
                     Player.STATE_IDLE -> { /* idle */ }
                 }
             }

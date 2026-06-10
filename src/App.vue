@@ -77,6 +77,20 @@ watch(
   },
 );
 
+// Initialize the offline store after a fresh login. onMounted only runs init()
+// for users already authenticated at launch; when auth flips true mid-session
+// (login flow) it would otherwise never run, leaving offlineStore.initialized
+// false all session and hiding the Offline button.
+watch(isAuthenticated, async (authed) => {
+  if (authed && !offlineStore.initialized) {
+    try {
+      await offlineStore.init();
+    } catch (error) {
+      console.error("[App] Failed to initialize offline store after login:", error);
+    }
+  }
+});
+
 
 onMounted(async () => {
   // Apply persisted theme immediately

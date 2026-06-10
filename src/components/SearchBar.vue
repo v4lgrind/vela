@@ -137,7 +137,7 @@
       @click="router.back()">
       <ArrowLeft class="size-5 sm:size-4" />
     </Button>
-<Button v-if="offlineStore.initialized && (offlineStore.downloadCount > 0 || downloadStore.hasActiveDownloads)" variant="ghost"
+<Button v-if="(offlineStore.initialized && offlineStore.downloadCount > 0) || downloadStore.hasActiveDownloads" variant="ghost"
       :class="!offlineStore.isFullyOnline ? 'bg-[#b45309] hover:bg-[#92400e] text-white shrink-0 px-2 sm:px-3' : 'bg-accent-purple/20 text-white shrink-0 px-2 sm:px-3'" aria-label="Downloads"
       @click="$router.push('/offline')">
       <Download class="size-5 sm:size-4 sm:mr-1" :class="downloadStore.hasActiveDownloads ? 'animate-pulse' : ''" /><span class="hidden sm:inline">Offline</span>

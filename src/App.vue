@@ -96,13 +96,13 @@ watch(isAuthenticated, async (authed) => {
 });
 
 
+let colorSchemeQuery: MediaQueryList | null = null;
 let mediaQueryListener: (() => void) | null = null;
 let visibilityListener: (() => void) | null = null;
 let resizeListener: (() => void) | null = null;
 
 onBeforeUnmount(() => {
-  const mq = window.matchMedia('(prefers-color-scheme: dark)');
-  if (mediaQueryListener) mq.removeEventListener('change', mediaQueryListener);
+  if (colorSchemeQuery && mediaQueryListener) colorSchemeQuery.removeEventListener('change', mediaQueryListener);
   if (visibilityListener) document.removeEventListener('visibilitychange', visibilityListener);
   if (resizeListener) window.removeEventListener('resize', resizeListener);
 });
@@ -115,7 +115,8 @@ onMounted(async () => {
   mediaQueryListener = () => {
     if (preferencesStore.colorScheme === 'system') applyTheme('system');
   };
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', mediaQueryListener);
+  colorSchemeQuery = window.matchMedia('(prefers-color-scheme: dark)');
+  colorSchemeQuery.addEventListener('change', mediaQueryListener);
 
   if (isNative) {
     // Set safe area CSS variables from native insets on initial load

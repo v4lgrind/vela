@@ -904,7 +904,10 @@ function determinePlaybackMethod(ms: any) {
     if (ms.SupportsDirectPlay) {
         playMethod.value = 'DirectPlay';
         const msId = ms.Id || itemId;
-        hlsUrl.value = `${serverUrl}/Videos/${itemId}/stream?static=true&mediaSourceId=${msId}`;
+        // Web plays DirectPlay via video.src, which can't send auth headers, so the
+        // token must ride in the URL. Native passes it via authHeader instead.
+        const auth = isNative ? '' : `&api_key=${accessToken}`;
+        hlsUrl.value = `${serverUrl}/Videos/${itemId}/stream?static=true&mediaSourceId=${msId}${auth}`;
     } else {
         playMethod.value = ms.SupportsDirectStream ? 'DirectStream' : 'Transcode';
         if (ms.TranscodingUrl) {

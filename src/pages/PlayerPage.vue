@@ -263,6 +263,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
+import { watchThrottled } from '@vueuse/core';
 import { useRoute, useRouter } from 'vue-router';
 import { useJellyfinStore } from '@/store/jellyfin-store';
 import { useAudioPlayerStore } from '@/store/audio-player-store';
@@ -277,6 +278,8 @@ import { deviceProfile, nativeAndroidDeviceProfile } from '@/constants';
 import { formatTime } from '@/utils/helpers';
 import { lockLandscape, unlockOrientation } from '@/utils/orientation';
 import { debugLog } from '@/utils/debugLog';
+import { CODEC_MIME_MAP, getDeviceCodecs, isCodecSupported, isDolbyVision } from '@/utils/codecDetection';
+import type { MediaSource, MediaStream, SubtitleTrack, AudioTrack, QualityPreset, IntroSegment } from '@/types/jellyfin';
 import { ArrowLeft, Play, Pause, AudioLines, Captions, Gauge, Info, Maximize, Minimize, Loader2 } from 'lucide-vue-next';
 import PlayerBottomSheet from '@/components/PlayerBottomSheet.vue';
 
@@ -328,17 +331,17 @@ const mediaTitle = ref('');
 
 // Jellyfin session
 const playSessionId = ref('');
-const mediaSource = ref<any>(null);
+const mediaSource = ref<MediaSource | null>(null);
 const hlsUrl = ref('');
 const playMethod = ref<'DirectPlay' | 'DirectStream' | 'Transcode'>('Transcode');
 
 // Audio tracks
-const audioList = ref<Array<{ index: number; label: string; language: string }>>([]);
+const audioList = ref<AudioTrack[]>([]);
 const selectedAudioIndex = ref<number | null>(null);
 const audioMenuOpen = ref(false);
 
 // Subtitle tracks
-const subtitleList = ref<Array<{ index: number; label: string; language: string; deliveryUrl: string }>>([]);
+const subtitleList = ref<SubtitleTrack[]>([]);
 const selectedSubtitleIndex = ref<number | null>(null); // null = off
 const subtitleMenuOpen = ref(false);
 
@@ -349,13 +352,13 @@ const activeTrackLabel = ref('');
 const subtitleBlobCache = new Map<number, string>(); // index → blob URL
 
 // Quality / bitrate
-const ALL_QUALITY_PRESETS = [
-    { label: 'Auto',     bitrate: 0,          minHeight: 0    },
-    { label: '4K',      bitrate: 80_000_000, minHeight: 2160 },
-    { label: '1080p',   bitrate: 20_000_000, minHeight: 1080 },
-    { label: '720p',    bitrate:  8_000_000, minHeight: 720  },
-    { label: '480p',    bitrate:  3_000_000, minHeight: 480  },
-    { label: '360p',    bitrate:  1_500_000, minHeight: 360  },
+const ALL_QUALITY_PRESETS: QualityPreset[] = [
+    { label: 'Auto',   bitrate: 0,          minHeight: 0    },
+    { label: '4K',     bitrate: 80_000_000, minHeight: 2160 },
+    { label: '1080p',  bitrate: 20_000_000, minHeight: 1080 },
+    { label: '720p',   bitrate:  8_000_000, minHeight: 720  },
+    { label: '480p',   bitrate:  3_000_000, minHeight: 480  },
+    { label: '360p',   bitrate:  1_500_000, minHeight: 360  },
 ];
 const selectedBitrate = ref(preferencesStore.preferredBitrate); // 0 = Auto (unlimited)
 const qualityMenuOpen = ref(false);
@@ -389,8 +392,8 @@ const infoModalOpen = ref(false);
 const liveTranscodingInfo = ref<any>(null);
 let infoPollingInterval: ReturnType<typeof setInterval> | null = null;
 
-const videoStream = computed(() =>
-    (mediaSource.value?.MediaStreams ?? []).find((s: any) => s.Type === 'Video')
+const videoStream = computed((): MediaStream | undefined =>
+    mediaSource.value?.MediaStreams?.find((s) => s.Type === 'Video')
 );
 const activeAudioStream = computed(() =>
     (mediaSource.value?.MediaStreams ?? []).find((s: any) => s.Type === 'Audio' && s.Index === selectedAudioIndex.value)
@@ -413,11 +416,11 @@ const showSkipIntroButton = computed(() => {
 });
 
 // Reset introSkipped when user seeks back into or before the intro window
-watch(currentTime, (t) => {
+watchThrottled(currentTime, (t) => {
     if (introSkipped.value && skipPromptEnd.value !== null && t < skipPromptEnd.value) {
         introSkipped.value = false;
     }
-});
+}, { throttle: 500 });
 
 let hls: Hls | null = null;
 let controlsTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -426,38 +429,6 @@ let offlineProgressInterval: ReturnType<typeof setInterval> | null = null;
 let isSwitching = false;
 let isOfflinePlayback = false;
 
-// ── Device codec detection (cached) ─────────────────────────────────────────────
-// Maps Jellyfin codec names to Android MIME types for capability checking.
-const CODEC_MIME_MAP: Record<string, string> = {
-    ac3: 'audio/ac3',
-    eac3: 'audio/eac3',
-    dts: 'audio/vnd.dts',
-    truehd: 'audio/true-hd',
-    flac: 'audio/flac',
-    opus: 'audio/opus',
-    vorbis: 'audio/vorbis',
-    aac: 'audio/mp4a-latm',
-    mp3: 'audio/mpeg',
-};
-let deviceCodecsCache: string[] | null = null;
-async function getDeviceCodecs(): Promise<string[]> {
-    if (deviceCodecsCache) return deviceCodecsCache;
-    if (!isNative) return [];
-    try {
-        const result = await NativeVideo.getDeviceCodecs();
-        deviceCodecsCache = result.codecs || [];
-        debugLog(`[Codec] Device audio codecs: ${deviceCodecsCache.join(', ')}`);
-        return deviceCodecsCache;
-    } catch {
-        return [];
-    }
-}
-
-function isCodecSupported(jellyfinCodec: string, deviceCodecs: string[]): boolean {
-    const mime = CODEC_MIME_MAP[jellyfinCodec?.toLowerCase()];
-    if (!mime) return true; // Unknown codec — assume supported
-    return deviceCodecs.includes(mime);
-}
 
 // ── Video event handlers ───────────────────────────────────────────────────────
 
@@ -1663,14 +1634,14 @@ async function initOfflinePlayer(cachedDownload: any, resumeSeconds?: number, it
 
             // Apply stored intro/outro segments so skip-intro works offline
             if (cachedDownload.introSegments?.length) {
-                const intro = cachedDownload.introSegments.find((s: any) => s.Type === 'Intro');
+                const intro = cachedDownload.introSegments.find((s: IntroSegment) => s.Type === 'Intro');
                 if (intro) {
                     NativeVideo.setIntroTimestamps({
                         introStartMs: Math.floor(intro.StartTicks / 10_000),
                         introEndMs: Math.floor(intro.EndTicks / 10_000),
                     }).catch(() => {});
                 }
-                const outro = cachedDownload.introSegments.find((s: any) => s.Type === 'Outro');
+                const outro = cachedDownload.introSegments.find((s: IntroSegment) => s.Type === 'Outro');
                 if (outro) {
                     creditsStartMs.value = Math.floor(outro.StartTicks / 10_000);
                 }
@@ -1925,7 +1896,7 @@ function openInfoModal() {
     infoModalOpen.value = true;
     showControls();
     fetchTranscodingInfo();
-    infoPollingInterval = setInterval(fetchTranscodingInfo, 2000);
+    infoPollingInterval = setInterval(fetchTranscodingInfo, 5000);
 }
 
 function closeInfoModal() {
@@ -2142,16 +2113,8 @@ onMounted(async () => {
                 const videoCodec = (videoStream.Codec || '').toLowerCase();
                 const videoProfile = (videoStream.Profile || '').toLowerCase();
                 // DV detection: Jellyfin may report codec as "hevc" with DV profile
-                const isDV = videoCodec.includes('dvhe') || videoCodec.includes('dvh1') ||
-                             videoProfile.includes('dolby vision');
-                const VIDEO_MIME: Record<string, string> = {
-                    dvhe: 'video/dolby-vision', dvh1: 'video/dolby-vision',
-                    hevc: 'video/hevc', h265: 'video/hevc',
-                    h264: 'video/avc', avc: 'video/avc',
-                    vp8: 'video/x-vnd.on2.vp8', vp9: 'video/x-vnd.on2.vp9',
-                    av1: 'video/av01',
-                };
-                const effectiveMime = isDV ? 'video/dolby-vision' : VIDEO_MIME[videoCodec];
+                const isDV = isDolbyVision(videoCodec, videoProfile);
+                const effectiveMime = isDV ? 'video/dolby-vision' : CODEC_MIME_MAP[videoCodec];
                 if (effectiveMime && !deviceCodecs.includes(effectiveMime)) {
                     debugLog(`[Codec] Video codec "${videoStream.Codec}" (${effectiveMime}) not supported — requesting server transcode`);
                     forceTranscodeVideo = true;

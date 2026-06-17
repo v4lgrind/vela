@@ -191,8 +191,8 @@ async function onSubmit() {
   }
 }
 
-function quickSwitch(server: SavedServer) {
-  jellyfin.switchServer(server)
+async function quickSwitch(server: SavedServer) {
+  await jellyfin.switchServer(server)
   router.push({ name: 'libraries' })
 }
 

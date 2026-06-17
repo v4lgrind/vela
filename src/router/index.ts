@@ -82,9 +82,9 @@ export const router = createRouter({
 router.beforeEach(async (to, _from, next) => {
   const store = useJellyfinStore();
 
-  // Initialiser l'API si on a un token persisté
-  if (store.accessToken && !store.api) {
-    store.initializeApi();
+  // Initialiser l'API si on a un token persisté (charge depuis Preferences si nécessaire)
+  if (!store.api || !store.accessToken) {
+    await store.initializeApiAsync();
   }
 
   const isAuthenticated = store.isAuthenticated;

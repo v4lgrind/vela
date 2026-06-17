@@ -3,6 +3,7 @@ import { downloadService } from '@/services/downloadService';
 import { useOfflineStore } from './offline-store';
 import { useJellyfinStore } from './jellyfin-store';
 import { useMetadataCacheStore } from './metadata-cache-store';
+import { CODEC_MIME_MAP, isDolbyVision } from '@/utils/codecDetection';
 import { Capacitor } from '@capacitor/core';
 
 const MAX_CONCURRENT = 3;
@@ -258,26 +259,12 @@ export const useDownloadStore = defineStore('downloads', {
     async checkNeedsTranscode(metadata: any): Promise<boolean> {
       if (!Capacitor.isNativePlatform()) return false;
       try {
+        const { getDeviceCodecs } = await import('@/utils/codecDetection');
         const { NativeVideo } = await import('@/plugins/NativeVideoPlugin');
-        const { codecs: deviceCodecs } = await NativeVideo.getDeviceCodecs();
+        const deviceCodecs = await getDeviceCodecs();
         if (deviceCodecs.length === 0) return false;
 
         const streams: any[] = metadata.MediaStreams || metadata.MediaSources?.[0]?.MediaStreams || [];
-        const CODEC_MIME_MAP: Record<string, string> = {
-          dvhe: 'video/dolby-vision', dvh1: 'video/dolby-vision',
-          hevc: 'video/hevc', h265: 'video/hevc',
-          h264: 'video/avc', avc: 'video/avc',
-          vp8: 'video/x-vnd.on2.vp8', vp9: 'video/x-vnd.on2.vp9',
-          av1: 'video/av01',
-          ac3: 'audio/ac3', eac3: 'audio/eac3',
-          dts: 'audio/vnd.dts', truehd: 'audio/true-hd',
-          flac: 'audio/flac', opus: 'audio/opus',
-          vorbis: 'audio/vorbis', aac: 'audio/mp4a-latm',
-          mp3: 'audio/mpeg',
-        };
-
-        // Only suggest server-side transcoding for resolutions above 1080p.
-        // At 1080p and below, the FFmpeg software decoder handles it fine.
         const MAX_SW_HEIGHT = 1080;
 
         for (const stream of streams) {
@@ -286,9 +273,7 @@ export const useDownloadStore = defineStore('downloads', {
           const mime = CODEC_MIME_MAP[codec];
           if (!mime) continue;
 
-          const isDV = codec.includes('dvhe') || codec.includes('dvh1') ||
-                       profile.includes('dolby vision');
-          const effectiveMime = isDV ? 'video/dolby-vision' : mime;
+          const effectiveMime = isDolbyVision(codec, profile) ? 'video/dolby-vision' : mime;
 
           if (!deviceCodecs.includes(effectiveMime)) {
             if (stream.Type === 'Video' && (stream.Height || 0) <= MAX_SW_HEIGHT) continue;

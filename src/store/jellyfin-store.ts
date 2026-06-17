@@ -9,7 +9,34 @@ import {
   getUserViewsApi,
   getSystemApi,
 } from "@jellyfin/sdk/lib/utils/api";
+import { Preferences } from "@capacitor/preferences";
 import { downloadService } from "../services/downloadService";
+
+async function getStoredToken(): Promise<string | null> {
+  try {
+    const { value } = await Preferences.get({ key: 'jellyfin_access_token' });
+    return value;
+  } catch {
+    return localStorage.getItem('jellyfin_access_token_fallback');
+  }
+}
+
+async function setStoredToken(token: string | null) {
+  try {
+    if (token) {
+      await Preferences.set({ key: 'jellyfin_access_token', value: token });
+    } else {
+      await Preferences.remove({ key: 'jellyfin_access_token' });
+    }
+    localStorage.removeItem('jellyfin_access_token_fallback');
+  } catch {
+    if (token) {
+      localStorage.setItem('jellyfin_access_token_fallback', token);
+    } else {
+      localStorage.removeItem('jellyfin_access_token_fallback');
+    }
+  }
+}
 
 export interface SavedServer {
   serverUrl: string;
@@ -43,8 +70,26 @@ export const useJellyfinStore = defineStore("jellyfin", {
     savedServers: [],
     _qcDeviceId: '',
   }),
-  persist: true,
+  persist: {
+    pick: ['serverUrl', 'savedServers', '_qcDeviceId'],
+  },
   actions: {
+    async initializeApiAsync() {
+      if (!this.serverUrl) return;
+      if (!this.accessToken) {
+        this.accessToken = await getStoredToken();
+      }
+      if (!this.accessToken) return;
+      this._buildApi();
+    },
+    _buildApi() {
+      if (!this.serverUrl || !this.accessToken) return;
+      const jellyfin = new Jellyfin({
+        clientInfo: { name: "Client", version: "1.0.0" },
+        deviceInfo: { name: "Desktop", id: `dev-${Date.now()}` },
+      });
+      this.api = jellyfin.createApi(this.serverUrl, this.accessToken);
+    },
     initializeApi() {
       if (!this.serverUrl || !this.accessToken) return;
       const jellyfin = new Jellyfin({
@@ -67,6 +112,7 @@ export const useJellyfinStore = defineStore("jellyfin", {
       const resp = await this.api.authenticateUserByName(username, password);
       this.accessToken = resp.data.AccessToken;
       this.userId = resp.data.User?.Id;
+      await setStoredToken(this.accessToken ?? null);
       this.initializeApi();
 
       // Persist this server in the saved servers list
@@ -103,12 +149,13 @@ export const useJellyfinStore = defineStore("jellyfin", {
       }
     },
 
-    switchServer(server: SavedServer) {
+    async switchServer(server: SavedServer) {
       this.serverUrl = server.serverUrl;
       this.userId = server.userId;
       this.accessToken = server.accessToken;
       this.libraries = [];
       this.items = [];
+      await setStoredToken(server.accessToken);
       this.initializeApi();
     },
 
@@ -174,6 +221,7 @@ export const useJellyfinStore = defineStore("jellyfin", {
       const data = await fetchResp.json();
       this.accessToken = data.AccessToken;
       this.userId = data.User?.Id;
+      await setStoredToken(this.accessToken ?? null);
       this.initializeApi();
       const resp = { data };
 
@@ -277,11 +325,12 @@ export const useJellyfinStore = defineStore("jellyfin", {
       url += `?${params.toString()}`;
       return url;
     },
-    logout() {
+    async logout() {
       this.userId = "";
       this.accessToken = "";
       this.libraries = [];
       this.items = [];
+      await setStoredToken(null);
     },
     currentItem: null as any | null,
     async fetchItemDetails(itemId: string) {

@@ -2148,8 +2148,8 @@ onMounted(async () => {
     } else {
         await initPlayer(resumeSeconds, preferredAudioIndex);
         document.addEventListener('click', handleClickOutside);
-        document.addEventListener('fullscreenchange', () => { isFullscreen.value = !!getFullscreenElement(); });
-        document.addEventListener('webkitfullscreenchange', () => { isFullscreen.value = !!getFullscreenElement(); });
+        document.addEventListener('fullscreenchange', onFullscreenChange);
+        document.addEventListener('webkitfullscreenchange', onFullscreenChange);
         document.addEventListener('keydown', handleKeyDown);
     }
 

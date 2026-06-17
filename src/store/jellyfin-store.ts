@@ -39,12 +39,51 @@ async function setStoredToken(token: string | null) {
   }
 }
 
+async function getStoredUserId(): Promise<string | null> {
+  try {
+    const { value } = await Preferences.get({ key: 'jellyfin_user_id' });
+    return value;
+  } catch {
+    return null;
+  }
+}
+
+async function setStoredUserId(userId: string | null) {
+  try {
+    if (userId) {
+      await Preferences.set({ key: 'jellyfin_user_id', value: userId });
+    } else {
+      await Preferences.remove({ key: 'jellyfin_user_id' });
+    }
+  } catch {}
+}
+
+async function getTokenForUser(userId: string): Promise<string | null> {
+  try {
+    const { value } = await Preferences.get({ key: `jellyfin_token_${userId}` });
+    return value;
+  } catch {
+    return null;
+  }
+}
+
+async function setTokenForUser(userId: string, token: string | null) {
+  try {
+    if (token) {
+      await Preferences.set({ key: `jellyfin_token_${userId}`, value: token });
+    } else {
+      await Preferences.remove({ key: `jellyfin_token_${userId}` });
+    }
+  } catch {}
+}
+
 export interface SavedServer {
   serverUrl: string;
   userId: string;
-  accessToken: string;
   userName: string;
   serverName: string;
+  /** @deprecated tokens are now stored in Preferences; this field is kept for migration only */
+  accessToken?: string;
 }
 
 interface State {
@@ -81,32 +120,36 @@ export const useJellyfinStore = defineStore("jellyfin", {
         this.accessToken = await getStoredToken();
       }
       if (!this.accessToken) return;
+      if (!this.userId) {
+        this.userId = (await getStoredUserId()) ?? '';
+      }
       this._buildApi();
     },
     _buildApi() {
       if (!this.serverUrl || !this.accessToken) return;
+      if (!this._qcDeviceId) this._qcDeviceId = `jellyfin-android-${Date.now()}`;
       const jellyfin = new Jellyfin({
         clientInfo: { name: "Client", version: "1.0.0" },
-        deviceInfo: { name: "Desktop", id: `dev-${Date.now()}` },
+        deviceInfo: { name: "Android", id: this._qcDeviceId },
       });
       this.api = jellyfin.createApi(this.serverUrl, this.accessToken);
     },
     initializeApi() {
       if (!this.serverUrl || !this.accessToken) return;
+      if (!this._qcDeviceId) this._qcDeviceId = `jellyfin-android-${Date.now()}`;
       const jellyfin = new Jellyfin({
         clientInfo: { name: "Client", version: "1.0.0" },
-        deviceInfo: { name: "Desktop", id: `dev-${Date.now()}` },
+        deviceInfo: { name: "Android", id: this._qcDeviceId },
       });
-
-      // Créer l'API avec le token existant
       this.api = jellyfin.createApi(this.serverUrl, this.accessToken);
     },
 
     async login(serverUrl: string, username: string, password: string) {
       this.serverUrl = serverUrl;
+      if (!this._qcDeviceId) this._qcDeviceId = `jellyfin-android-${Date.now()}`;
       const jellyfin = new Jellyfin({
         clientInfo: { name: "Client", version: "1.0.0" },
-        deviceInfo: { name: "Desktop", id: `dev-${Date.now()}` },
+        deviceInfo: { name: "Android", id: this._qcDeviceId },
       });
       this.api = jellyfin.createApi(serverUrl);
 
@@ -114,6 +157,8 @@ export const useJellyfinStore = defineStore("jellyfin", {
       this.accessToken = resp.data.AccessToken;
       this.userId = resp.data.User?.Id;
       await setStoredToken(this.accessToken ?? null);
+      await setStoredUserId(this.userId ?? null);
+      await setTokenForUser(this.userId!, this.accessToken!);
       this.initializeApi();
 
       // Persist this server in the saved servers list
@@ -123,7 +168,6 @@ export const useJellyfinStore = defineStore("jellyfin", {
         this._upsertSavedServer({
           serverUrl,
           userId: this.userId!,
-          accessToken: this.accessToken!,
           userName: username,
           serverName,
         });
@@ -132,7 +176,6 @@ export const useJellyfinStore = defineStore("jellyfin", {
         this._upsertSavedServer({
           serverUrl,
           userId: this.userId!,
-          accessToken: this.accessToken!,
           userName: username,
           serverName: new URL(serverUrl).hostname,
         });
@@ -153,19 +196,24 @@ export const useJellyfinStore = defineStore("jellyfin", {
     async switchServer(server: SavedServer) {
       this.serverUrl = server.serverUrl;
       this.userId = server.userId;
-      this.accessToken = server.accessToken;
+      // Load from Preferences; fall back to deprecated in-struct token for migration
+      const token = await getTokenForUser(server.userId) ?? server.accessToken ?? null;
+      this.accessToken = token;
       this.libraries = [];
       this.items = [];
-      await setStoredToken(server.accessToken);
+      await setStoredToken(token);
+      await setStoredUserId(server.userId);
+      if (token) await setTokenForUser(server.userId, token);
       this.initializeApi();
     },
 
-    removeServer(serverUrl: string, userId: string) {
+    async removeServer(serverUrl: string, userId: string) {
       this.savedServers = this.savedServers.filter(
         (s) => !(s.serverUrl === serverUrl && s.userId === userId)
       );
+      await setTokenForUser(userId, null);
       if (this.serverUrl === serverUrl && this.userId === userId) {
-        this.logout();
+        await this.logout();
       }
     },
 
@@ -223,6 +271,8 @@ export const useJellyfinStore = defineStore("jellyfin", {
       this.accessToken = data.AccessToken;
       this.userId = data.User?.Id;
       await setStoredToken(this.accessToken ?? null);
+      await setStoredUserId(this.userId ?? null);
+      await setTokenForUser(this.userId!, this.accessToken!);
       this.initializeApi();
       const resp = { data };
 
@@ -232,7 +282,6 @@ export const useJellyfinStore = defineStore("jellyfin", {
         this._upsertSavedServer({
           serverUrl,
           userId: this.userId!,
-          accessToken: this.accessToken!,
           userName: resp.data.User?.Name ?? '',
           serverName,
         });
@@ -240,7 +289,6 @@ export const useJellyfinStore = defineStore("jellyfin", {
         this._upsertSavedServer({
           serverUrl,
           userId: this.userId!,
-          accessToken: this.accessToken!,
           userName: resp.data.User?.Name ?? '',
           serverName: new URL(serverUrl).hostname,
         });
@@ -332,6 +380,7 @@ export const useJellyfinStore = defineStore("jellyfin", {
       this.libraries = [];
       this.items = [];
       await setStoredToken(null);
+      await setStoredUserId(null);
     },
     currentItem: null as any | null,
     async fetchItemDetails(itemId: string) {

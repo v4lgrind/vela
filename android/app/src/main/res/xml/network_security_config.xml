@@ -1,14 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android's <domain> element supports hostname suffix matching only — it cannot
+  express IP subnets or CIDR ranges. Since Jellyfin servers are typically accessed
+  via local IP addresses (192.168.x.x, 10.x.x.x, etc.) over HTTP, cleartext must
+  be permitted globally. HTTPS is enforced wherever the server supports it.
+-->
 <network-security-config>
-    <!-- Allow cleartext only for localhost and private network ranges (local Jellyfin servers) -->
-    <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="false">localhost</domain>
-        <domain includeSubdomains="false">127.0.0.1</domain>
-        <!-- RFC 1918 private ranges — covered at the application level via IP matching -->
-        <domain includeSubdomains="true">10.0.0.0</domain>
-        <domain includeSubdomains="true">192.168.0.0</domain>
-        <domain includeSubdomains="true">172.16.0.0</domain>
-    </domain-config>
-    <!-- All other traffic must use HTTPS -->
-    <base-config cleartextTrafficPermitted="false" />
+    <base-config cleartextTrafficPermitted="true" />
 </network-security-config>

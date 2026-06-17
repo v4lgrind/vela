@@ -379,8 +379,8 @@ function onClickOutside(e: MouseEvent) {
     }
 }
 
-function onLogout() {
-    store.logout();
+async function onLogout() {
+    await store.logout();
     router.push({ name: 'login' });
 }
 

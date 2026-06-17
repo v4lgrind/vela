@@ -18,5 +18,16 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
+    sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'hls': ['hls.js'],
+          'jellyfin': ['@jellyfin/sdk'],
+          'vendor-vue': ['vue', 'vue-router', 'pinia'],
+          'vendor-ui': ['reka-ui', 'lucide-vue-next'],
+        },
+      },
+    },
   }
 });

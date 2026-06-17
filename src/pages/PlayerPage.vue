@@ -589,6 +589,8 @@ function getFullscreenElement() {
     return document.fullscreenElement || (document as any).webkitFullscreenElement || null;
 }
 
+function onFullscreenChange() { isFullscreen.value = !!getFullscreenElement(); }
+
 function toggleFullscreen() {
     const container = videoEl.value?.parentElement;
     if (!container) return;
@@ -857,7 +859,7 @@ function parseSubtitleStreams(ms: any) {
             // support external delivery, construct the extraction URL ourselves.
             const deliveryUrl = s.DeliveryUrl
                 ? `${serverUrl}${s.DeliveryUrl}`
-                : `${serverUrl}/Videos/${itemId}/${msId}/Subtitles/${s.Index}/0/Stream.vtt?api_key=${accessToken}`;
+                : `${serverUrl}/Videos/${itemId}/${msId}/Subtitles/${s.Index}/0/Stream.vtt`;
             return {
                 index: s.Index as number,
                 language: s.Language || 'und',
@@ -901,7 +903,7 @@ async function applySubtitleTracks() {
     let blobUrl = subtitleBlobCache.get(index);
     if (!blobUrl) {
         try {
-            const resp = await fetch(sub.deliveryUrl);
+            const resp = await fetch(sub.deliveryUrl, { headers: { 'X-Emby-Token': accessToken } });
             blobUrl = URL.createObjectURL(await resp.blob());
             subtitleBlobCache.set(index, blobUrl);
         } catch (e) {
@@ -930,13 +932,13 @@ function determinePlaybackMethod(ms: any) {
     if (ms.SupportsDirectPlay) {
         playMethod.value = 'DirectPlay';
         const msId = ms.Id || itemId;
-        hlsUrl.value = `${serverUrl}/Videos/${itemId}/stream?static=true&mediaSourceId=${msId}&api_key=${accessToken}`;
+        hlsUrl.value = `${serverUrl}/Videos/${itemId}/stream?static=true&mediaSourceId=${msId}`;
     } else {
         playMethod.value = ms.SupportsDirectStream ? 'DirectStream' : 'Transcode';
         if (ms.TranscodingUrl) {
             hlsUrl.value = `${serverUrl}${ms.TranscodingUrl}`.replace('?&', '?');
         } else {
-            hlsUrl.value = `${serverUrl}/Videos/${itemId}/master.m3u8?mediaSourceId=${ms.Id || itemId}&api_key=${accessToken}&PlaySessionId=${playSessionId.value}`;
+            hlsUrl.value = `${serverUrl}/Videos/${itemId}/master.m3u8?mediaSourceId=${ms.Id || itemId}&PlaySessionId=${playSessionId.value}`;
         }
     }
     debugLog(`[NativePlayer] determinePlaybackMethod: ${playMethod.value}`);
@@ -1026,6 +1028,9 @@ function initHls(url: string, video: HTMLVideoElement, startSeconds?: number, on
             maxBufferLength: 30,
             maxMaxBufferLength: 60,
             fLoader: makeJellyfinFragmentLoader() as any,
+            xhrSetup: (xhr) => {
+                xhr.setRequestHeader('X-Emby-Token', accessToken);
+            },
         });
         hls.loadSource(url);
         hls.attachMedia(video);
@@ -1863,7 +1868,7 @@ async function switchAudio(index: number) {
             playMethod.value = ms.SupportsDirectStream ? 'DirectStream' : 'Transcode';
         } else {
             // Jellyfin didn't return a TranscodingUrl — build one manually.
-            hlsUrl.value = `${serverUrl}/Videos/${itemId}/master.m3u8?mediaSourceId=${ms.Id || itemId}&api_key=${accessToken}&AudioStreamIndex=${index}&PlaySessionId=${playSessionId.value}`;
+            hlsUrl.value = `${serverUrl}/Videos/${itemId}/master.m3u8?mediaSourceId=${ms.Id || itemId}&AudioStreamIndex=${index}&PlaySessionId=${playSessionId.value}`;
             playMethod.value = 'Transcode';
         }
 
@@ -2083,8 +2088,8 @@ onMounted(async () => {
         await initOfflinePlayer(cachedDownload, resumeSeconds, mediaTitle.value);
         if (!isNative) {
             document.addEventListener('click', handleClickOutside);
-            document.addEventListener('fullscreenchange', () => { isFullscreen.value = !!getFullscreenElement(); });
-            document.addEventListener('webkitfullscreenchange', () => { isFullscreen.value = !!getFullscreenElement(); });
+            document.addEventListener('fullscreenchange', onFullscreenChange);
+            document.addEventListener('webkitfullscreenchange', onFullscreenChange);
             document.addEventListener('keydown', handleKeyDown);
         }
         return;
@@ -2204,6 +2209,8 @@ onBeforeUnmount(() => {
     }
 
     document.removeEventListener('click', handleClickOutside);
+    document.removeEventListener('fullscreenchange', onFullscreenChange);
+    document.removeEventListener('webkitfullscreenchange', onFullscreenChange);
     document.removeEventListener('keydown', handleKeyDown);
 
     if (controlsTimeout) clearTimeout(controlsTimeout);

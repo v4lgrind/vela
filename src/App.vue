@@ -8,7 +8,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, watch } from "vue";
+import { computed, onMounted, onBeforeUnmount, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import SearchBar from "@/components/SearchBar.vue";
 import MiniAudioPlayer from "@/components/MiniAudioPlayer.vue";
@@ -92,14 +92,26 @@ watch(isAuthenticated, async (authed) => {
 });
 
 
+let mediaQueryListener: (() => void) | null = null;
+let visibilityListener: (() => void) | null = null;
+let resizeListener: (() => void) | null = null;
+
+onBeforeUnmount(() => {
+  const mq = window.matchMedia('(prefers-color-scheme: dark)');
+  if (mediaQueryListener) mq.removeEventListener('change', mediaQueryListener);
+  if (visibilityListener) document.removeEventListener('visibilitychange', visibilityListener);
+  if (resizeListener) window.removeEventListener('resize', resizeListener);
+});
+
 onMounted(async () => {
   // Apply persisted theme immediately
   applyTheme(preferencesStore.colorScheme);
 
   // Track system preference changes for 'system' mode
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+  mediaQueryListener = () => {
     if (preferencesStore.colorScheme === 'system') applyTheme('system');
-  });
+  };
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', mediaQueryListener);
 
   if (Capacitor.isNativePlatform()) {
     // Set safe area CSS variables from native insets on initial load
@@ -113,10 +125,12 @@ onMounted(async () => {
     } catch { /* non-native fallback, env() handles it */ }
 
     // Re-apply status bar icon style when returning from NativePlayerActivity or rotating
-    document.addEventListener('visibilitychange', () => {
+    visibilityListener = () => {
       if (document.visibilityState === 'visible') applyTheme(preferencesStore.colorScheme);
-    });
-    window.addEventListener('resize', () => applyTheme(preferencesStore.colorScheme), { passive: true });
+    };
+    resizeListener = () => applyTheme(preferencesStore.colorScheme);
+    document.addEventListener('visibilitychange', visibilityListener);
+    window.addEventListener('resize', resizeListener, { passive: true });
   }
 
   if (Capacitor.isNativePlatform()) {

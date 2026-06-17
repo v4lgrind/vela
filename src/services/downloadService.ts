@@ -42,7 +42,8 @@ class DownloadService {
     const extension = transcodedUrl ? 'ts' : this.getFileExtension(metadata);
     const filename = this.sanitizeFilename(`${metadata.Name || itemId}.${extension}`);
     const filePath = this.buildFilePath(metadata, filename);
-    const downloadUrl = transcodedUrl || `${serverUrl}/Items/${itemId}/Download?api_key=${accessToken}`;
+    const downloadUrl = transcodedUrl || `${serverUrl}/Items/${itemId}/Download`;
+    const authHeaders = { 'X-Emby-Token': accessToken };
 
     if (transcodedUrl) {
       console.log('📥 Transcoded download:', filename);
@@ -105,6 +106,7 @@ class DownloadService {
           await DownloadPlugin.enqueue({
             itemId,
             url: downloadUrl,
+            headers: authHeaders,
             destPath: filePath,
             itemName: metadata.Name || '',
             estimatedSize: estimatedSize || 0,
@@ -150,13 +152,14 @@ class DownloadService {
       if (subtitleInfo && subtitleInfo.streamIndex >= 0) {
         try {
           const subPath = filePath.replace(/\.[^.]+$/, '.srt');
-          const subUrl = `${serverUrl}/Videos/${itemId}/${itemId}/Subtitles/${subtitleInfo.streamIndex}/Stream.srt?api_key=${accessToken}`;
+          const subUrl = `${serverUrl}/Videos/${itemId}/${itemId}/Subtitles/${subtitleInfo.streamIndex}/Stream.srt`;
           console.log('📝 Downloading subtitle:', subPath);
           await Filesystem.downloadFile({
             url: subUrl,
             path: subPath,
             directory: Directory.Data,
             progress: false,
+            headers: authHeaders,
           });
           downloadedMedia.subtitleFilePath = subPath;
           downloadedMedia.subtitleLabel = subtitleInfo.label;
@@ -170,7 +173,8 @@ class DownloadService {
       // Fetch intro/outro segment timestamps so skip-intro works offline
       try {
         const segRes = await fetch(
-          `${serverUrl}/MediaSegments/${itemId}?includeSegmentTypes=Intro&includeSegmentTypes=Outro&api_key=${accessToken}`
+          `${serverUrl}/MediaSegments/${itemId}?includeSegmentTypes=Intro&includeSegmentTypes=Outro`,
+          { headers: authHeaders }
         );
         if (segRes.ok) {
           const segData = await segRes.json();
@@ -312,7 +316,7 @@ class DownloadService {
         continue;
       } catch { /* not cached yet */ }
 
-      const imgUrl = `${serverUrl}/Items/${id}/Images/Primary?maxWidth=400&quality=80&api_key=${accessToken}`;
+      const imgUrl = `${serverUrl}/Items/${id}/Images/Primary?maxWidth=400&quality=80`;
       try {
         const dirPath = imgPath.substring(0, imgPath.lastIndexOf('/'));
         try {
@@ -324,6 +328,7 @@ class DownloadService {
           path: imgPath,
           directory: Directory.Data,
           progress: false,
+          headers: { 'X-Emby-Token': accessToken },
         });
       } catch {
         // Non-critical — artwork just won't be available offline
@@ -357,7 +362,7 @@ class DownloadService {
       return;
     } catch { /* not cached yet */ }
 
-    const imgUrl = `${serverUrl}/Items/${itemId}/Images/Primary?maxWidth=400&quality=80&api_key=${accessToken}`;
+    const imgUrl = `${serverUrl}/Items/${itemId}/Images/Primary?maxWidth=400&quality=80`;
     try {
       const dirPath = imgPath.substring(0, imgPath.lastIndexOf('/'));
       try {
@@ -369,6 +374,7 @@ class DownloadService {
         path: imgPath,
         directory: Directory.Data,
         progress: false,
+        headers: { 'X-Emby-Token': accessToken },
       });
     } catch { /* non-critical */ }
   }

@@ -165,8 +165,22 @@ let qcPollTimer: ReturnType<typeof setInterval> | null = null
 let qcTimeoutTimer: ReturnType<typeof setTimeout> | null = null
 let qcAuthenticating = false
 
+function validateServerUrl(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return 'Server URL must use http:// or https://';
+    }
+    return null;
+  } catch {
+    return 'Please enter a valid server URL (e.g. http://192.168.1.10:8096)';
+  }
+}
+
 async function onSubmit() {
   error.value = null
+  const urlError = validateServerUrl(serverUrl.value)
+  if (urlError) { error.value = urlError; return; }
   loading.value = true
   try {
     await jellyfin.login(serverUrl.value, username.value, password.value)
@@ -184,6 +198,8 @@ function quickSwitch(server: SavedServer) {
 
 async function startQuickConnect() {
   quickConnectError.value = null
+  const urlError = validateServerUrl(serverUrl.value)
+  if (urlError) { quickConnectError.value = urlError; return; }
   try {
     const result = await jellyfin.quickConnectInitiate(serverUrl.value)
     quickConnectCode.value = result.Code

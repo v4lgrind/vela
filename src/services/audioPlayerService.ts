@@ -4,6 +4,7 @@ import { useJellyfinStore } from '../store/jellyfin-store';
 import { useOfflineStore } from '../store/offline-store';
 import { downloadService } from './downloadService';
 import { offlineDatabase } from './offlineDatabase';
+import { logger } from '@/utils/logger';
 
 class AudioPlayerService {
   private audio: HTMLAudioElement;
@@ -162,7 +163,7 @@ class AudioPlayerService {
 
     if (isDownloaded) {
       // Offline playback
-      console.log('[AudioPlayer] Lecture hors ligne:', trackId);
+      logger.log('[AudioPlayer] Lecture hors ligne:', trackId);
       const localUrl = await downloadService.getLocalFile(trackId);
 
       if (localUrl) {
@@ -179,7 +180,7 @@ class AudioPlayerService {
 
         return;
       } else {
-        console.error('[AudioPlayer] Fichier local introuvable');
+        logger.error('[AudioPlayer] Fichier local introuvable');
       }
     }
 
@@ -270,7 +271,7 @@ class AudioPlayerService {
         body: JSON.stringify(this.buildReportingPayload(itemId, { IsPaused: false })),
       });
     } catch (e) {
-      console.error('reportPlaybackStart error', e);
+      logger.error('reportPlaybackStart error', e);
     }
   }
 
@@ -286,7 +287,7 @@ class AudioPlayerService {
         ),
       });
     } catch (e) {
-      console.error('reportPlaybackProgress error', e);
+      logger.error('reportPlaybackProgress error', e);
     }
   }
 
@@ -304,7 +305,7 @@ class AudioPlayerService {
         }),
       });
     } catch (e) {
-      console.error('reportPlaybackStopped error', e);
+      logger.error('reportPlaybackStopped error', e);
     }
   }
 

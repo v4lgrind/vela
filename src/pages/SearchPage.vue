@@ -119,12 +119,14 @@ import LazyImg from '@/components/LazyImg.vue';
 import { ArrowLeft, Download as DownloadIcon, Loader2, Search, Check } from 'lucide-vue-next';
 import { useOfflineStore } from '@/store/offline-store';
 import { useDownloadStore } from '@/store/download-store';
+import { useToast } from '@/composables/useToast';
 
 const route = useRoute();
 const offlineStore = useOfflineStore();
 const downloadStore = useDownloadStore();
 const router = useRouter();
 const store = useJellyfinStore();
+const { showError } = useToast();
 
 const inputEl = ref<HTMLInputElement | null>(null);
 const searchQuery = ref((route.query.q as string) || '');
@@ -194,6 +196,7 @@ async function doSearch(term: string) {
     });
   } catch {
     results.value = [];
+    showError('Search failed. Please check your connection.');
   } finally {
     isSearching.value = false;
   }

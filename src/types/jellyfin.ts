@@ -31,6 +31,14 @@ export interface MediaStream {
   Level?: number;
   SampleRate?: number;
   Channels?: number;
+  ChannelLayout?: string;
+  RealFrameRate?: number;
+  AverageFrameRate?: number;
+  ColorSpace?: string;
+  ColorTransfer?: string;
+  ColorPrimaries?: string;
+  VideoRange?: string;
+  VideoRangeType?: string;
 }
 
 export interface MediaSource {

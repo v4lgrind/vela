@@ -11,6 +11,7 @@ import {
 } from "@jellyfin/sdk/lib/utils/api";
 import { Preferences } from "@capacitor/preferences";
 import { downloadService } from "../services/downloadService";
+import { logger } from "@/utils/logger";
 
 async function getStoredToken(): Promise<string | null> {
   try {
@@ -592,7 +593,7 @@ export const useJellyfinStore = defineStore("jellyfin", {
         // Nettoyer après téléchargement
         delete this.downloadProgress[itemId];
       } catch (error: any) {
-        console.error("Erreur téléchargement:", error);
+        logger.error("Erreur téléchargement:", error);
         delete this.downloadProgress[itemId];
         throw error;
       }
@@ -635,9 +636,9 @@ export const useJellyfinStore = defineStore("jellyfin", {
         delete this.downloadProgress[itemId];
 
         // Mettre à jour le store offline (il se rafraîchira automatiquement)
-        console.log("✅ Item téléchargé pour usage hors ligne:", itemId);
+        logger.log("✅ Item téléchargé pour usage hors ligne:", itemId);
       } catch (error: any) {
-        console.error("Erreur téléchargement offline:", error);
+        logger.error("Erreur téléchargement offline:", error);
         delete this.downloadProgress[itemId];
         throw error;
       }

@@ -202,6 +202,7 @@
 
 <script setup lang="ts">
 import { onMounted, ref, computed, watch } from 'vue';
+import { logger } from '@/utils/logger';
 import { useRoute, useRouter } from 'vue-router';
 import { useJellyfinStore } from '@/store/jellyfin-store';
 import { usePreferencesStore } from '@/store/preferences-store';
@@ -302,7 +303,7 @@ async function loadGenres() {
   try {
     availableGenres.value = await store.fetchGenres(libraryId);
   } catch (e) {
-    console.error('Failed to load genres', e);
+    logger.error('Failed to load genres', e);
   }
 }
 

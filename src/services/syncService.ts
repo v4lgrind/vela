@@ -1,5 +1,6 @@
 import { offlineDatabase } from './offlineDatabase';
 import { offlineDetection } from './offlineDetection';
+import { logger } from '@/utils/logger';
 
 /**
  * Sync Service
@@ -27,12 +28,12 @@ class SyncService {
     accessToken: string
   ): Promise<{ synced: number; failed: number }> {
     if (this.isSyncing) {
-      console.log('[SyncService] Sync already in progress');
+      logger.log('[SyncService] Sync already in progress');
       return { synced: 0, failed: 0 };
     }
 
     if (!offlineDetection.isFullyOnline) {
-      console.log('[SyncService] Cannot sync: offline');
+      logger.log('[SyncService] Cannot sync: offline');
       return { synced: 0, failed: 0 };
     }
 
@@ -42,7 +43,7 @@ class SyncService {
 
     try {
       const unsyncedProgress = await offlineDatabase.getUnsyncedProgress();
-      console.log(`[SyncService] Found ${unsyncedProgress.length} unsynced progress entries`);
+      logger.log(`[SyncService] Found ${unsyncedProgress.length} unsynced progress entries`);
 
       if (unsyncedProgress.length === 0) {
         return { synced: 0, failed: 0 };
@@ -70,24 +71,24 @@ class SyncService {
             // Mark as synced in database
             await offlineDatabase.markProgressSynced(progress.itemId);
             syncedCount++;
-            console.log(`[SyncService] Synced progress for ${progress.itemId}`);
+            logger.log(`[SyncService] Synced progress for ${progress.itemId}`);
           } else {
-            console.error(
+            logger.error(
               `[SyncService] Failed to sync ${progress.itemId}: HTTP ${response.status}`
             );
             failedCount++;
           }
         } catch (error) {
-          console.error(`[SyncService] Error syncing ${progress.itemId}:`, error);
+          logger.error(`[SyncService] Error syncing ${progress.itemId}:`, error);
           failedCount++;
         }
       }
 
-      console.log(
+      logger.log(
         `[SyncService] Sync complete: ${syncedCount} synced, ${failedCount} failed`
       );
     } catch (error) {
-      console.error('[SyncService] Sync failed:', error);
+      logger.error('[SyncService] Sync failed:', error);
     } finally {
       this.isSyncing = false;
     }

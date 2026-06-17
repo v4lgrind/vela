@@ -272,12 +272,13 @@ import { useOfflineStore } from '@/store/offline-store';
 import { offlineDatabase } from '@/services/offlineDatabase';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import Hls from 'hls.js';
-import { Capacitor } from '@capacitor/core';
 import { NativeVideo } from '@/plugins/NativeVideoPlugin';
+import { usePlatform } from '@/composables/usePlatform';
 import { deviceProfile, nativeAndroidDeviceProfile } from '@/constants';
 import { formatTime } from '@/utils/helpers';
 import { lockLandscape, unlockOrientation } from '@/utils/orientation';
 import { debugLog } from '@/utils/debugLog';
+import { logger } from '@/utils/logger';
 import { CODEC_MIME_MAP, getDeviceCodecs, isCodecSupported, isDolbyVision } from '@/utils/codecDetection';
 import type { MediaSource, MediaStream, SubtitleTrack, AudioTrack, QualityPreset, IntroSegment } from '@/types/jellyfin';
 import { ArrowLeft, Play, Pause, AudioLines, Captions, Gauge, Info, Maximize, Minimize, Loader2 } from 'lucide-vue-next';
@@ -296,7 +297,7 @@ const itemId = route.params.id as string;
 const nextEpisodeId = (route.query.nextEpisodeId as string | undefined) || '';
 const accessToken = store.accessToken || '';
 const serverUrl = store.serverUrl;
-const isNative = Capacitor.isNativePlatform();
+const { isNative } = usePlatform();
 
 // Stable per-browser device ID so Jellyfin can match DELETE /Videos/ActiveEncodings
 // to the session we created. Without it, Jellyfin can't kill the FFmpeg job on demand.
@@ -657,7 +658,7 @@ async function reportPlaybackStart() {
                 CanSeek: true,
             }))
         });
-    } catch (e) { console.error('reportPlaybackStart error', e); }
+    } catch (e) { logger.error('reportPlaybackStart error', e); }
 }
 
 async function reportPlaybackProgress() {
@@ -672,7 +673,7 @@ async function reportPlaybackProgress() {
                 VolumeLevel: Math.floor((video?.volume ?? 1) * 100),
             }))
         });
-    } catch (e) { console.error('reportPlaybackProgress error', e); }
+    } catch (e) { logger.error('reportPlaybackProgress error', e); }
 }
 
 async function reportPlaybackStopped() {
@@ -683,7 +684,7 @@ async function reportPlaybackStopped() {
             body: JSON.stringify(buildReportingPayload()),
             keepalive: true,
         });
-    } catch (e) { console.error('reportPlaybackStopped error', e); }
+    } catch (e) { logger.error('reportPlaybackStopped error', e); }
 }
 
 async function deleteActiveEncodings() {
@@ -695,7 +696,7 @@ async function deleteActiveEncodings() {
             `${serverUrl}/Videos/ActiveEncodings?deviceId=${encodeURIComponent(deviceId)}&playSessionId=${encodeURIComponent(playSessionId.value)}`,
             { method: 'DELETE', headers: { 'Authorization': embyAuthHeader }, signal: controller.signal, keepalive: true }
         );
-    } catch (e) { console.warn('[deleteActiveEncodings] error:', e); }
+    } catch (e) { logger.warn('[deleteActiveEncodings] error:', e); }
     finally { clearTimeout(timer); }
 }
 
@@ -878,7 +879,7 @@ async function applySubtitleTracks() {
             blobUrl = URL.createObjectURL(await resp.blob());
             subtitleBlobCache.set(index, blobUrl);
         } catch (e) {
-            console.error('[subtitle] fetch failed:', e);
+            logger.error('[subtitle] fetch failed:', e);
             return;
         }
     }
@@ -1016,7 +1017,7 @@ function initHls(url: string, video: HTMLVideoElement, startSeconds?: number, on
         });
         hls.on(Hls.Events.ERROR, (_, data) => {
             if (data.fatal) {
-                console.error('[HLS] fatal error:', data.type, data.details);
+                logger.error('[HLS] fatal error:', data.type, data.details);
                 // Always destroy the dead instance so hls is never left as a zombie
                 hls?.destroy();
                 hls = null;
@@ -1284,7 +1285,7 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
                 }
                 // No preference at all — leave ExoPlayer at its default (no subtitles).
             } catch (e) {
-                console.warn('[NativePlayer] Failed to parse tracksReady:', e);
+                logger.warn('[NativePlayer] Failed to parse tracksReady:', e);
             }
         });
 
@@ -1381,7 +1382,7 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
         // Don't clear isLoading here — keep the spinner until tracksReady fires,
         // so fallback restarts (e.g. codec unsupported → transcode) remain invisible.
     } catch (e: any) {
-        console.error('[initNativePlayer] error:', e);
+        logger.error('[initNativePlayer] error:', e);
         error.value = 'Failed to initialize native player';
         isLoading.value = false;
     }
@@ -1562,7 +1563,7 @@ async function initOfflinePlayer(cachedDownload: any, resumeSeconds?: number, it
                         }
                     }
                 } catch (e) {
-                    console.warn('[Offline] Failed to parse tracksReady:', e);
+                    logger.warn('[Offline] Failed to parse tracksReady:', e);
                 }
             });
 
@@ -1665,7 +1666,7 @@ async function initOfflinePlayer(cachedDownload: any, resumeSeconds?: number, it
             isLoading.value = false;
         }
     } catch (e: any) {
-        console.error('[initOfflinePlayer] error:', e);
+        logger.error('[initOfflinePlayer] error:', e);
         error.value = 'Failed to play downloaded file';
         isLoading.value = false;
     }
@@ -1725,7 +1726,7 @@ async function initPlayer(resumeSeconds?: number, preferredAudioIndex?: number) 
             if (container) requestFS(container).then(() => { isFullscreen.value = true; }).catch(() => { });
         }
     } catch (e: any) {
-        console.error('[initPlayer] error:', e);
+        logger.error('[initPlayer] error:', e);
         error.value = 'Failed to initialize player';
         isLoading.value = false;
     }
@@ -1737,7 +1738,7 @@ async function initPlayer(resumeSeconds?: number, preferredAudioIndex?: number) 
 // previousIndex from movieTime and re-initialises the player. Called from both
 // the synchronous catch path and the async HLS.js fatal-error callback.
 async function rollbackAudio(previousIndex: number | null, movieTime: number) {
-    console.warn('[rollbackAudio] reverting to index', previousIndex, 'at', movieTime);
+    logger.warn('[rollbackAudio] reverting to index', previousIndex, 'at', movieTime);
 
     // Ensure any partially-initialised HLS instance is gone before we start fresh
     if (hls) { hls.destroy(); hls = null; }
@@ -1780,7 +1781,7 @@ async function rollbackAudio(previousIndex: number | null, movieTime: number) {
         // Clear the revert notice once the player has recovered
         setTimeout(() => { if (error.value?.startsWith('Audio switch failed')) error.value = null; }, 3000);
     } catch (e) {
-        console.error('[rollbackAudio] failed:', e);
+        logger.error('[rollbackAudio] failed:', e);
         error.value = 'Playback error — please go back and try again';
         isLoading.value = false;
     }
@@ -1847,7 +1848,7 @@ async function switchAudio(index: number) {
         // triggers recovery — not just synchronous errors caught below.
         initHls(hlsUrl.value, video, movieTime, () => rollbackAudio(previousIndex, movieTime));
     } catch (e: any) {
-        console.error('[switchAudio] error:', e);
+        logger.error('[switchAudio] error:', e);
         await rollbackAudio(previousIndex, movieTime);
     } finally {
         isSwitching = false;
@@ -1966,7 +1967,7 @@ async function switchQuality(bitrate: number) {
             }
         }
     } catch (e: any) {
-        console.error('[switchQuality] error:', e);
+        logger.error('[switchQuality] error:', e);
         selectedBitrate.value = previousBitrate;
         error.value = 'Failed to switch quality';
         isLoading.value = false;
@@ -2020,7 +2021,7 @@ async function switchQualityNative(bitrate: number) {
             selectedBitrate: selectedBitrate.value,
         });
     } catch (e: any) {
-        console.error('[switchQualityNative] error:', e);
+        logger.error('[switchQualityNative] error:', e);
         selectedBitrate.value = previousBitrate;
         error.value = 'Failed to switch quality';
         isLoading.value = false;
@@ -2071,7 +2072,7 @@ onMounted(async () => {
     try {
         details = await store.fetchItemDetails(itemId);
     } catch (e) {
-        console.warn('[Player] Failed to load item details:', e);
+        logger.warn('[Player] Failed to load item details:', e);
     }
     mediaTitle.value = buildMediaTitle(details);
 

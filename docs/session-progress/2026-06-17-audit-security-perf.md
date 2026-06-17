@@ -33,29 +33,65 @@ Exploration complète du codebase (3 agents en parallèle) couvrant :
 **PERF-2 — code splitting Vite**
 - `vite.config.ts` : `manualChunks` pour hls.js, @jellyfin/sdk, vue, ui + `sourcemap: false`
 
-## Ce qui reste à faire (plan complet dans `/root/.claude/plans/ok-c-est-bon-je-partitioned-gem.md`)
+### Fixes appliqués (commit `6e4fc97`)
 
-**SEC-2** : Tokens d'auth encore en clair dans `localStorage` via `jellyfin-store` (`persist: true`).
-→ Migrer vers `@capacitor/preferences` pour `accessToken` + `savedServers`
+**SEC-2 — tokens stockés via @capacitor/preferences**
+- `jellyfin-store.ts` : `accessToken` exclu du persist Pinia, stocké via `Preferences.set/get` avec fallback localStorage
+- `initializeApiAsync()` charge le token depuis Preferences au démarrage
 
-**Note SEC-1 incomplète** : `api_key` conservé dans l'URL audio du `<audio>` element (`audioPlayerService.ts:141`) — impossible d'injecter des headers sur un `<audio>` src natif. Limitation connue.
+**PERF-3 — polling stream info**
+- `PlayerPage.vue` : intervalle 2s → 5s
 
-**SMELL-1** : `PlayerPage.vue` (2 284 lignes) — découpage en sous-composants WebVideoPlayer, NativePlayerContainer, TrackSelectionSheet, StreamInfoModal
+**PERF-4 — throttle currentTime watcher**
+- `PlayerPage.vue` : `watch` → `watchThrottled` (@vueuse/core, 500ms)
 
-**SMELL-2** : `ItemDetailsPage.vue` (1 121 lignes) — découpage EpisodeGrid, MediaInfoDialog, ItemHero, SimilarItems
+**SMELL-4 — détection codec centralisée**
+- `src/utils/codecDetection.ts` : `CODEC_MIME_MAP`, `getDeviceCodecs`, `isCodecSupported`, `isDolbyVision`
+- Importé dans `PlayerPage.vue` et `download-store.ts` (code local supprimé)
 
-**SMELL-3** : `jellyfin-store.ts` (631 lignes) — split en jellyfinAuthStore + jellyfinLibraryStore
+**SMELL-6 (partiel) — types Jellyfin**
+- `src/types/jellyfin.ts` : interfaces `MediaStream`, `MediaSource`, `PlaybackInfo`, `JellyfinItem`, etc.
+- Utilisé dans `PlayerPage.vue` pour typer `mediaSource`, `audioList`, `subtitleList`, `videoStream`
 
-**SMELL-4** : Détection codec dupliquée entre `download-store.ts` et `PlayerPage.vue` → extraire dans `src/utils/codecDetection.ts`
+**Mineurs**
+- `src/utils/logger.ts` : wrapper conditionnel dev-only pour console
+- `src/composables/usePlatform.ts` : centralise `Capacitor.isNativePlatform()` detection
+- `src/store/metadata-cache-store.ts` : TTL 7 jours avec `_cachedAt`
 
-**SMELL-5** : Erreurs silencieuses (fire-and-forget) dans ItemDetailsPage, SearchPage, OfflineLibraryPage → système de toast
+### Fixes appliqués (commit `996c8d0`)
 
-**SMELL-6** : 47 occurrences de `any` dans PlayerPage → créer `src/types/jellyfin.ts`
+**LOGS — logger appliqué à tout le codebase**
+- `downloadService.ts`, `offlineDatabase.ts`, `offlineDetection.ts`, `syncService.ts`
+- `offline-store.ts`, `download-store.ts`, `jellyfin-store.ts`, `audioPlayerService.ts`
+- `PlayerPage.vue`, `SearchBar.vue`, `LibraryItemsPage.vue`
 
-**PERF-3** : Polling stream info à 2s → augmenter à 5s
+**usePlatform appliqué**
+- `App.vue` : remplace 3 occurrences de `Capacitor.isNativePlatform()`
+- `PlayerPage.vue` : `const isNative = Capacitor.isNativePlatform()` → `const { isNative } = usePlatform()`
+- `ItemDetailsPage.vue` : `initCast()` utilise `usePlatform()`
 
-**PERF-4** : Watcher `currentTime` non throttlé → `watchThrottled` de VueUse
+**SMELL-5 — toast notifications**
+- `src/composables/useToast.ts` : état global des toasts, `show()`, `showError()`, `showSuccess()`, `showWarning()`
+- `src/components/ui/toast/AppToast.vue` : composant Reka UI Toast avec icônes par type
+- Monté dans `App.vue` comme provider global
+- `ItemDetailsPage.vue` : erreurs de téléchargement (download/bulk/transcode) notifiées via `showError()`
+- `SearchPage.vue` : échec de recherche notifié via `showError()`
+
+**MediaStream types étendus**
+- `src/types/jellyfin.ts` : ajout `RealFrameRate`, `AverageFrameRate`, `ChannelLayout`, `ColorSpace`, `ColorTransfer`, `ColorPrimaries`, `VideoRange`, `VideoRangeType`
+
+## Ce qui reste à faire
+
+**SMELL-1** : `PlayerPage.vue` (~2 300 lignes) — découpage en sous-composants WebVideoPlayer, NativePlayerContainer, TrackSelectionSheet, StreamInfoModal
+→ Risqué sans pouvoir tester l'APK, à faire dans une session dédiée
+
+**SMELL-2** : `ItemDetailsPage.vue` (~1 100 lignes) — découpage EpisodeGrid, MediaInfoDialog, ItemHero, SimilarItems
+→ Même raison
+
+**SMELL-3** : `jellyfin-store.ts` (~630 lignes) — split en jellyfinAuthStore + jellyfinLibraryStore
+→ Impact sur tous les imports, risqué sans tests automatisés
 
 **PERF-5** : Pas de virtualisation dans SearchBar (200+ résultats) → `@tanstack/vue-virtual`
+→ Package non installé, nécessite `npm install @tanstack/vue-virtual`
 
-**Mineurs** : logger conditionnel, expiration cache métadonnées (7j), `usePlatform.ts` composable
+**Note SEC-1 incomplète** : `api_key` conservé dans `audioPlayerService.ts:buildAudioUrl()` pour le `<audio>` element natif — impossible d'injecter des headers sur un src d'élément `<audio>`. Limitation connue, documentée.

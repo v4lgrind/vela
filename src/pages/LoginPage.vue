@@ -143,6 +143,7 @@ import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Eye, EyeOff, ArrowLeft, Loader2 } from 'lucide-vue-next'
 import type { SavedServer } from '@/store/jellyfin-store'
+import { validateServerUrl } from '@/utils/validateServerUrl'
 
 const jellyfin = useJellyfinStore()
 const router = useRouter()
@@ -164,18 +165,6 @@ const quickConnectError = ref<string | null>(null)
 let qcPollTimer: ReturnType<typeof setInterval> | null = null
 let qcTimeoutTimer: ReturnType<typeof setTimeout> | null = null
 let qcAuthenticating = false
-
-function validateServerUrl(url: string): string | null {
-  try {
-    const parsed = new URL(url);
-    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-      return 'Server URL must use http:// or https://';
-    }
-    return null;
-  } catch {
-    return 'Please enter a valid server URL (e.g. http://192.168.1.10:8096)';
-  }
-}
 
 async function onSubmit() {
   error.value = null

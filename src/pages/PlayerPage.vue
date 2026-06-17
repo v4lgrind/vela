@@ -280,6 +280,7 @@ import { lockLandscape, unlockOrientation } from '@/utils/orientation';
 import { debugLog } from '@/utils/debugLog';
 import { logger } from '@/utils/logger';
 import { CODEC_MIME_MAP, getDeviceCodecs, isCodecSupported, isDolbyVision } from '@/utils/codecDetection';
+import { buildPlaybackUrl } from '@/utils/playbackUrl';
 import type { MediaSource, MediaStream, SubtitleTrack, AudioTrack, QualityPreset, IntroSegment } from '@/types/jellyfin';
 import { ArrowLeft, Play, Pause, AudioLines, Captions, Gauge, Info, Maximize, Minimize, Loader2 } from 'lucide-vue-next';
 import PlayerBottomSheet from '@/components/PlayerBottomSheet.vue';
@@ -901,21 +902,11 @@ async function applySubtitleTracks() {
 watch(selectedSubtitleIndex, applySubtitleTracks);
 
 function determinePlaybackMethod(ms: any) {
-    if (ms.SupportsDirectPlay) {
-        playMethod.value = 'DirectPlay';
-        const msId = ms.Id || itemId;
-        // Web plays DirectPlay via video.src, which can't send auth headers, so the
-        // token must ride in the URL. Native passes it via authHeader instead.
-        const auth = isNative ? '' : `&api_key=${accessToken}`;
-        hlsUrl.value = `${serverUrl}/Videos/${itemId}/stream?static=true&mediaSourceId=${msId}${auth}`;
-    } else {
-        playMethod.value = ms.SupportsDirectStream ? 'DirectStream' : 'Transcode';
-        if (ms.TranscodingUrl) {
-            hlsUrl.value = `${serverUrl}${ms.TranscodingUrl}`.replace('?&', '?');
-        } else {
-            hlsUrl.value = `${serverUrl}/Videos/${itemId}/master.m3u8?mediaSourceId=${ms.Id || itemId}&PlaySessionId=${playSessionId.value}`;
-        }
-    }
+    const { method, url } = buildPlaybackUrl(ms, {
+        serverUrl, itemId, accessToken, isNative, playSessionId: playSessionId.value,
+    });
+    playMethod.value = method;
+    hlsUrl.value = url;
     debugLog(`[NativePlayer] determinePlaybackMethod: ${playMethod.value}`);
     debugLog(`[NativePlayer] TranscodingUrl from Jellyfin: ${ms.TranscodingUrl ? 'YES' : 'NO'}`);
 }

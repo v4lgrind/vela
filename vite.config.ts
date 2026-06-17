@@ -1,4 +1,5 @@
-import { defineConfig } from "vite";
+/// <reference types="vitest/config" />
+import { defineConfig } from "vitest/config";
 import vue from "@vitejs/plugin-vue";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
@@ -10,6 +11,12 @@ export default defineConfig({
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
+  },
+  test: {
+    environment: "jsdom",
+    globals: true,
+    include: ["src/**/*.test.ts"],
+    exclude: ["e2e/**", "node_modules/**"],
   },
   server: {
     port: 5173,

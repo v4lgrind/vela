@@ -1,23 +1,27 @@
 @import "tailwindcss";
 
 @theme {
-  /* Custom app colors */
-  --color-surface: #121212;
-  --color-surface-raised: #1e1e1e;
-  --color-surface-hover: #242424;
-  --color-border-default: #232323;
-  --color-border-hover: #2c2c2c;
-  --color-border-input: #2a2a2a;
+  /* ── App colors · "Direction OLED" (dark default) ──
+     Names kept stable; values retuned to the validated OLED palette.
+     accent-purple now carries the blue brand accent (#2f9bff) so every
+     existing `accent-purple` consumer flips to blue without edits. */
+  --color-surface: #121417;
+  --color-surface-raised: #1a1e23;
+  --color-surface-hover: #16191e;
+  --color-border-default: #20242b;
+  --color-border-hover: #2a2f37;
+  --color-border-input: #232830;
 
-  --color-text-primary: #e0e0e0;
-  --color-text-heading: #f0f0f0;
-  --color-text-bright: #f3f3f3;
-  --color-text-muted: #9aa0a6;
-  --color-text-subtle: #777777;
+  --color-text-primary: #c7ced6;
+  --color-text-heading: #ffffff;
+  --color-text-bright: #ffffff;
+  --color-text-muted: #9aa3ad;
+  --color-text-subtle: #6b7280;
 
-  --color-accent-blue: #00a4dc;
-  --color-accent-purple: #7c3aed;
-  --color-accent-purple-light: #8b5cf6;
+  --color-accent-blue: #2f9bff;
+  --color-accent-purple: #2f9bff; /* brand accent (blue); name kept for stability */
+  --color-accent-purple-light: #5bb0ff;
+  --color-accent-ink: #04121f; /* text/icon color on accent fills */
   --color-accent-orange: #ff6b35;
   --color-accent-teal: #38f9d7;
   --color-accent-green: #43e97b;
@@ -27,57 +31,59 @@
 
   --color-rating: #fbbf24;
 
+  --color-nav-bg: rgba(18, 20, 23, 0.82); /* blurred bottom-nav surface */
+
   --radius-card: 12px;
   --radius-button: 8px;
   --radius-input: 8px;
 
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-    sans-serif;
+  --font-sans: "Outfit Variable", "Outfit", -apple-system, BlinkMacSystemFont,
+    "Segoe UI", Roboto, sans-serif;
 
-  /* Shadcn Violet theme - for Tailwind utilities */
-  --color-background: #0a0e1a;
-  --color-foreground: #d4dae6;
-  --color-primary: #8b5cf6;
-  --color-primary-foreground: #f5f8fa;
-  --color-secondary: #1e2433;
+  /* Shadcn theme tokens - for Tailwind utilities */
+  --color-background: #000000;
+  --color-foreground: #e6eaee;
+  --color-primary: #2f9bff;
+  --color-primary-foreground: #04121f;
+  --color-secondary: #1a1e23;
   --color-secondary-foreground: #f5f8fa;
-  --color-muted: #1f2633;
-  --color-muted-foreground: #94a3b8;
-  --color-accent: #232c3f;
+  --color-muted: #16191e;
+  --color-muted-foreground: #9aa3ad;
+  --color-accent: #1a1e23;
   --color-accent-foreground: #f5f8fa;
   --color-destructive: #7f1d1d;
   --color-destructive-foreground: #f5f8fa;
-  --color-border: #232c3f;
-  --color-input: #232c3f;
-  --color-ring: #8b5cf6;
-  --color-card: #0a0e1a;
-  --color-card-foreground: #d4dae6;
-  --color-popover: #0a0e1a;
-  --color-popover-foreground: #d4dae6;
+  --color-border: #20242b;
+  --color-input: #232830;
+  --color-ring: #2f9bff;
+  --color-card: #121417;
+  --color-card-foreground: #e6eaee;
+  --color-popover: #121417;
+  --color-popover-foreground: #e6eaee;
 }
 
 /* shadcn-vue CSS variables - Violet theme */
 @layer base {
   :root {
-    --background: 224 71% 4%;
-    --foreground: 213 31% 91%;
-    --card: 224 71% 4%;
-    --card-foreground: 213 31% 91%;
-    --popover: 224 71% 4%;
-    --popover-foreground: 213 31% 91%;
-    --primary: 263 70% 50%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 222 47% 11%;
+    --background: 0 0% 0%;
+    --foreground: 210 17% 92%;
+    --card: 214 13% 8%;
+    --card-foreground: 210 17% 92%;
+    --popover: 214 13% 8%;
+    --popover-foreground: 210 17% 92%;
+    --primary: 209 100% 59%;
+    --primary-foreground: 209 80% 7%;
+    --secondary: 213 13% 11%;
     --secondary-foreground: 210 40% 98%;
-    --muted: 223 47% 11%;
-    --muted-foreground: 215 20% 65%;
-    --accent: 216 34% 17%;
+    --muted: 214 14% 10%;
+    --muted-foreground: 213 8% 64%;
+    --accent: 213 13% 11%;
     --accent-foreground: 210 40% 98%;
     --destructive: 0 63% 31%;
     --destructive-foreground: 210 40% 98%;
-    --border: 216 34% 17%;
-    --input: 216 34% 17%;
-    --ring: 263 70% 50%;
+    --border: 214 16% 15%;
+    --input: 214 16% 16%;
+    --ring: 209 100% 59%;
     --radius: 0.75rem;
   }
 
@@ -91,54 +97,60 @@
 
 /* Light theme overrides — applied via html.light class */
 html.light {
-  --color-surface: #f5f6f8;
+  --color-surface: #ffffff;
   --color-surface-raised: #ffffff;
-  --color-surface-hover: #eceef1;
-  --color-border-default: #dde0e6;
-  --color-border-hover: #c8ccd4;
-  --color-border-input: #d4d8e0;
+  --color-surface-hover: #e7ebf1;
+  --color-border-default: #e3e6ea;
+  --color-border-hover: #d4d8e0;
+  --color-border-input: #dbe0e7;
 
-  --color-text-primary: #0a0b0f;
-  --color-text-heading: #000000;
-  --color-text-bright: #000000;
-  --color-text-muted: #374151;
-  --color-text-subtle: #4b5563;
+  --color-text-primary: #46505e;
+  --color-text-heading: #0b1220;
+  --color-text-bright: #0b1220;
+  --color-text-muted: #5a6573;
+  --color-text-subtle: #9aa1ab;
 
-  --color-background: #eef0f3;
-  --color-foreground: #000000;
+  --color-accent-blue: #1f6fe0;
+  --color-accent-purple: #1f6fe0;
+  --color-accent-purple-light: #4a8be8;
+  --color-accent-ink: #ffffff;
+  --color-nav-bg: rgba(255, 255, 255, 0.85);
+
+  --color-background: #eef1f5;
+  --color-foreground: #0b1220;
   --color-card: #ffffff;
-  --color-card-foreground: #000000;
+  --color-card-foreground: #0b1220;
   --color-popover: #ffffff;
-  --color-popover-foreground: #000000;
-  --color-muted: #eceef1;
-  --color-muted-foreground: #374151;
-  --color-secondary: #e4e7ec;
-  --color-secondary-foreground: #0a0b0f;
-  --color-accent: #e4e7ec;
-  --color-accent-foreground: #0a0b0f;
-  --color-border: #dde0e6;
-  --color-input: #dde0e6;
+  --color-popover-foreground: #0b1220;
+  --color-muted: #f4f6f9;
+  --color-muted-foreground: #5a6573;
+  --color-secondary: #f4f6f9;
+  --color-secondary-foreground: #0b1220;
+  --color-accent: #f4f6f9;
+  --color-accent-foreground: #0b1220;
+  --color-border: #e3e6ea;
+  --color-input: #dbe0e7;
 
   /* shadcn HSL variables */
-  --background: 220 14% 93%;
-  --foreground: 0 0% 0%;
+  --background: 213 27% 95%;
+  --foreground: 221 47% 9%;
   --card: 0 0% 100%;
-  --card-foreground: 0 0% 0%;
+  --card-foreground: 221 47% 9%;
   --popover: 0 0% 100%;
-  --popover-foreground: 0 0% 0%;
-  --primary: 263 70% 50%;
-  --primary-foreground: 210 40% 98%;
-  --secondary: 220 13% 90%;
-  --secondary-foreground: 222 47% 8%;
-  --muted: 220 13% 90%;
-  --muted-foreground: 215 20% 25%;
-  --accent: 220 13% 90%;
-  --accent-foreground: 222 47% 8%;
+  --popover-foreground: 221 47% 9%;
+  --primary: 215 76% 50%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 213 33% 96%;
+  --secondary-foreground: 221 47% 9%;
+  --muted: 213 33% 96%;
+  --muted-foreground: 213 12% 40%;
+  --accent: 213 33% 96%;
+  --accent-foreground: 221 47% 9%;
   --destructive: 0 84% 60%;
   --destructive-foreground: 0 0% 98%;
-  --border: 220 13% 88%;
-  --input: 220 13% 88%;
-  --ring: 263 70% 50%;
+  --border: 214 20% 90%;
+  --input: 214 25% 89%;
+  --ring: 215 76% 50%;
 }
 
 /* Safe area utilities.
@@ -194,7 +206,7 @@ html.light {
 [tabindex="0"]:focus-visible,
 button:focus-visible,
 a:focus-visible {
-  outline: 2px solid #7c3aed;
+  outline: 2px solid #2f9bff;
   outline-offset: 2px;
   border-radius: 8px;
 }

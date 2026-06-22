@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup · Bibliothèque</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_theme.css">
+</head>
+<body>
+
+<div class="mock-head">
+  <div>
+    <div class="mock-eyebrow">Direction OLED · Bibliothèque</div>
+    <h1 class="mock-title">Grille de films</h1>
+  </div>
+  <div class="mock-toggle">
+    <button data-set="auto">Auto</button>
+    <button data-set="light">Clair</button>
+    <button data-set="dark">Sombre</button>
+  </div>
+</div>
+
+<div class="phone phone--812" data-themed>
+  <div class="statusbar"><span>9:41</span><span class="sig"><span class="bars"><i style="height:5px"></i><i style="height:7px"></i><i style="height:9px"></i><i style="height:11px"></i></span><span class="batt"><i></i></span></span></div>
+
+  <!-- header -->
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 24px 14px;">
+    <div style="display:flex;align-items:center;gap:10px;"><button style="width:34px;height:34px;border-radius:10px;border:1px solid var(--border);background:var(--surface);color:var(--text);display:flex;align-items:center;justify-content:center;cursor:pointer;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"></path></svg></button><span style="font-size:22px;font-weight:700;color:var(--text);letter-spacing:-.02em;">Films</span></div>
+    <span style="font-size:12.5px;color:var(--muted);">248 titres</span>
+  </div>
+
+  <!-- filter row -->
+  <div style="display:flex;gap:8px;padding:0 24px 14px;overflow:hidden;">
+    <span style="flex:none;display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;color:var(--accent-ink);background:var(--accent);padding:8px 14px;border-radius:20px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M7 12h10M10 18h4"></path></svg>Filtres</span>
+    <span style="flex:none;font-size:12.5px;font-weight:500;color:var(--surface-text);background:var(--chip-bg);padding:8px 14px;border-radius:20px;">Non vus</span>
+    <span style="flex:none;font-size:12.5px;font-weight:500;color:var(--surface-text);background:var(--chip-bg);padding:8px 14px;border-radius:20px;">Favoris</span>
+    <span style="flex:none;font-size:12.5px;font-weight:500;color:var(--surface-text);background:var(--chip-bg);padding:8px 14px;border-radius:20px;">A→Z</span>
+  </div>
+
+  <!-- grid -->
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:0 24px;">
+    <div><div style="position:relative;aspect-ratio:2/3;border-radius:12px;overflow:hidden;background:linear-gradient(150deg,#5c4a52,#241b22);"><span style="position:absolute;top:6px;right:6px;width:18px;height:18px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></span></div><div style="font-size:12px;color:var(--text);font-weight:500;margin-top:6px;line-height:1.2;">The Long Coast</div><div style="font-size:10.5px;color:var(--muted);">2022</div></div>
+    <div><div style="position:relative;aspect-ratio:2/3;border-radius:12px;overflow:hidden;background:linear-gradient(150deg,#2f4f4a,#16241f);"></div><div style="font-size:12px;color:var(--text);font-weight:500;margin-top:6px;line-height:1.2;">Glasshouse</div><div style="font-size:10.5px;color:var(--muted);">2023</div></div>
+    <div><div style="position:relative;aspect-ratio:2/3;border-radius:12px;overflow:hidden;background:linear-gradient(150deg,#5a3b2b,#291811);"><span style="position:absolute;top:6px;left:6px;width:20px;height:20px;border-radius:50%;background:rgba(47,155,255,.85);display:flex;align-items:center;justify-content:center;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"></path><path d="m7 11 5 5 5-5"></path><path d="M5 21h14"></path></svg></span></div><div style="font-size:12px;color:var(--text);font-weight:500;margin-top:6px;line-height:1.2;">Northwind</div><div style="font-size:10.5px;color:var(--muted);">2021</div></div>
+    <div><div style="position:relative;aspect-ratio:2/3;border-radius:12px;overflow:hidden;background:linear-gradient(150deg,#3a3556,#1a1726);"></div><div style="font-size:12px;color:var(--text);font-weight:500;margin-top:6px;line-height:1.2;">Halcyon</div><div style="font-size:10.5px;color:var(--muted);">2024</div></div>
+    <div><div style="position:relative;aspect-ratio:2/3;border-radius:12px;overflow:hidden;background:linear-gradient(150deg,#1f4a3f,#0a1410);"></div><div style="font-size:12px;color:var(--text);font-weight:500;margin-top:6px;line-height:1.2;">Tidewater</div><div style="font-size:10.5px;color:var(--muted);">2020</div></div>
+    <div><div style="position:relative;aspect-ratio:2/3;border-radius:12px;overflow:hidden;background:linear-gradient(150deg,#4a2f33,#140a0c);"><span style="position:absolute;top:6px;right:6px;width:18px;height:18px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></span></div><div style="font-size:12px;color:var(--text);font-weight:500;margin-top:6px;line-height:1.2;">Vanishing Pt.</div><div style="font-size:10.5px;color:var(--muted);">2023</div></div>
+    <div><div style="position:relative;aspect-ratio:2/3;border-radius:12px;overflow:hidden;background:linear-gradient(150deg,#2c3e60,#11192b);"></div><div style="font-size:12px;color:var(--text);font-weight:500;margin-top:6px;line-height:1.2;">Solaris Drift</div><div style="font-size:10.5px;color:var(--muted);">2024</div></div>
+    <div><div style="position:relative;aspect-ratio:2/3;border-radius:12px;overflow:hidden;background:linear-gradient(150deg,#604a2c,#2b2011);"></div><div style="font-size:12px;color:var(--text);font-weight:500;margin-top:6px;line-height:1.2;">Ember</div><div style="font-size:10.5px;color:var(--muted);">2019</div></div>
+    <div><div style="position:relative;aspect-ratio:2/3;border-radius:12px;overflow:hidden;background:linear-gradient(150deg,#553a4f,#251521);"></div><div style="font-size:12px;color:var(--text);font-weight:500;margin-top:6px;line-height:1.2;">Lumen</div><div style="font-size:10.5px;color:var(--muted);">2022</div></div>
+  </div>
+
+  <div class="bottomnav">
+    <span><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"></path><path d="M5 9.5V21h14V9.5"></path></svg>Accueil</span>
+    <span><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.4-3.4"></path></svg>Recherche</span>
+    <span class="active"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"></rect><rect x="14" y="3" width="7" height="7" rx="1.5"></rect><rect x="3" y="14" width="7" height="7" rx="1.5"></rect><rect x="14" y="14" width="7" height="7" rx="1.5"></rect></svg>Biblio</span>
+    <span><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"></path><path d="m7 11 5 5 5-5"></path><path d="M5 21h14"></path></svg>Téléch.</span>
+  </div>
+</div>
+
+<script src="_mockup.js"></script>
+</body>
+</html>

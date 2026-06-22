@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup · Recherche</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_theme.css">
+</head>
+<body>
+
+<div class="mock-head">
+  <div>
+    <div class="mock-eyebrow">Direction OLED · Recherche</div>
+    <h1 class="mock-title">Recherche</h1>
+  </div>
+  <div class="mock-toggle">
+    <button data-set="auto">Auto</button>
+    <button data-set="light">Clair</button>
+    <button data-set="dark">Sombre</button>
+  </div>
+</div>
+
+<div class="phone phone--812" data-themed>
+  <div class="statusbar"><span>9:41</span><span class="sig"><span class="bars"><i style="height:5px"></i><i style="height:7px"></i><i style="height:9px"></i><i style="height:11px"></i></span><span class="batt"><i></i></span></span></div>
+
+  <!-- search field -->
+  <div style="padding:12px 22px 18px;display:flex;align-items:center;gap:10px;">
+    <div style="flex:1;display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:13px 16px;color:var(--sub);"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.4-3.4"></path></svg><span style="font-size:14.5px;color:var(--text);">night<span style="display:inline-block;width:2px;height:17px;background:var(--accent);margin-left:1px;vertical-align:-3px;"></span></span></div>
+    <button style="font-size:14px;color:var(--accent);background:none;border:none;cursor:pointer;font-family:'Outfit',sans-serif;font-weight:600;">Annuler</button>
+  </div>
+
+  <!-- top result -->
+  <div style="padding:0 22px 8px;font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);">Top résultat</div>
+  <div style="margin:0 22px 22px;display:flex;gap:14px;align-items:center;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:12px;">
+    <div style="width:58px;height:78px;border-radius:9px;background:linear-gradient(150deg,#5c4a52,#241b22);flex:none;"></div>
+    <div style="flex:1;min-width:0;"><div style="font-size:15px;font-weight:600;color:var(--text);">Nightfall</div><div style="font-size:12px;color:var(--muted);margin-top:2px;">Film · 2023 · 1 h 44</div><div style="display:inline-flex;align-items:center;gap:4px;margin-top:7px;font-size:11px;font-weight:600;color:var(--accent);"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"></path></svg>Lire</div></div>
+  </div>
+
+  <!-- films results -->
+  <div style="padding:0 22px 6px;display:flex;align-items:baseline;justify-content:space-between;"><span style="font-size:15px;font-weight:600;color:var(--text);">Films</span><span style="font-size:12px;color:var(--muted);">6</span></div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:12px 22px 0;">
+    <div><div style="aspect-ratio:2/3;border-radius:11px;background:linear-gradient(150deg,#3a3556,#1a1726);"></div><div style="font-size:11.5px;color:var(--text);margin-top:6px;font-weight:500;">Nightshade</div></div>
+    <div><div style="aspect-ratio:2/3;border-radius:11px;background:linear-gradient(150deg,#2f4f4a,#16241f);"></div><div style="font-size:11.5px;color:var(--text);margin-top:6px;font-weight:500;">Night Bus</div></div>
+    <div><div style="aspect-ratio:2/3;border-radius:11px;background:linear-gradient(150deg,#5a3b2b,#291811);"></div><div style="font-size:11.5px;color:var(--text);margin-top:6px;font-weight:500;">Last Night</div></div>
+  </div>
+
+  <!-- series results -->
+  <div style="padding:20px 22px 6px;display:flex;align-items:baseline;justify-content:space-between;"><span style="font-size:15px;font-weight:600;color:var(--text);">Séries</span><span style="font-size:12px;color:var(--muted);">2</span></div>
+  <div style="display:flex;gap:12px;padding:12px 22px 0;">
+    <div style="flex:none;width:150px;"><div style="width:150px;height:86px;border-radius:11px;background:linear-gradient(150deg,#2c3e60,#11192b);"></div><div style="font-size:11.5px;color:var(--text);margin-top:6px;font-weight:500;">Night Watch</div></div>
+    <div style="flex:none;width:150px;"><div style="width:150px;height:86px;border-radius:11px;background:linear-gradient(150deg,#604a2c,#2b2011);"></div><div style="font-size:11.5px;color:var(--text);margin-top:6px;font-weight:500;">Midnight Line</div></div>
+  </div>
+
+  <div class="bottomnav">
+    <span><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"></path><path d="M5 9.5V21h14V9.5"></path></svg>Accueil</span>
+    <span class="active"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.4-3.4"></path></svg>Recherche</span>
+    <span><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"></rect><rect x="14" y="3" width="7" height="7" rx="1.5"></rect><rect x="3" y="14" width="7" height="7" rx="1.5"></rect><rect x="14" y="14" width="7" height="7" rx="1.5"></rect></svg>Biblio</span>
+    <span><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"></path><path d="m7 11 5 5 5-5"></path><path d="M5 21h14"></path></svg>Téléch.</span>
+  </div>
+</div>
+
+<script src="_mockup.js"></script>
+</body>
+</html>

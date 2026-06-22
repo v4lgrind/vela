@@ -5,6 +5,7 @@
     v-if="isAuthenticated && audioStore.isMiniPlayerVisible && !audioStore.isExpanded"
   />
   <ExpandedAudioPlayer v-if="isAuthenticated && audioStore.isExpanded" />
+  <BottomNav v-if="showBottomNav" />
   <AppToast />
 </template>
 
@@ -14,6 +15,7 @@ import { useRoute, useRouter } from "vue-router";
 import SearchBar from "@/components/SearchBar.vue";
 import MiniAudioPlayer from "@/components/MiniAudioPlayer.vue";
 import ExpandedAudioPlayer from "@/components/ExpandedAudioPlayer.vue";
+import BottomNav from "@/components/BottomNav.vue";
 import AppToast from "@/components/ui/toast/AppToast.vue";
 import { useJellyfinStore } from "@/store/jellyfin-store";
 import { useAudioPlayerStore } from "@/store/audio-player-store";
@@ -21,6 +23,7 @@ import { useOfflineStore } from "@/store/offline-store";
 import { usePreferencesStore } from "@/store/preferences-store";
 import { useDpadNavigation } from "@/composables/useDpadNavigation";
 import { usePlatform } from "@/composables/usePlatform";
+import { useBottomNavVisible } from "@/composables/useBottomNav";
 import { App as CapacitorApp } from "@capacitor/app";
 import { StatusBar, Style } from "@capacitor/status-bar";
 import { NativeVideo } from "@/plugins/NativeVideoPlugin";
@@ -36,6 +39,11 @@ const preferencesStore = usePreferencesStore();
 useDpadNavigation();
 const { isNative } = usePlatform();
 const isAuthenticated = computed(() => store.isAuthenticated);
+
+// Bottom nav: visible on the main authenticated screens. Hidden on the
+// fullscreen player, the login screen, and while the expanded audio player
+// covers the UI. Shared with MiniAudioPlayer so it can stack above the nav.
+const showBottomNav = useBottomNavVisible();
 
 // ── Theme ──────────────────────────────────────────────────────────────────────
 
@@ -165,7 +173,18 @@ onMounted(async () => {
 });
 
 const routerViewStyle = computed(() => {
-  if (audioStore.isMiniPlayerVisible && !audioStore.isExpanded) {
+  const miniVisible = audioStore.isMiniPlayerVisible && !audioStore.isExpanded;
+  // Bottom nav floats ~66px tall with a 16px offset + an 8px gap; reserve that
+  // (plus the gesture-bar inset) so page content never hides behind it. The
+  // mini player stacks above the nav, so add its height on top when both show.
+  const navClear = "98px";
+  if (showBottomNav.value && miniVisible) {
+    return { paddingBottom: `calc(${navClear} + 64px + var(--sab, env(safe-area-inset-bottom, 0px)))` };
+  }
+  if (showBottomNav.value) {
+    return { paddingBottom: `calc(${navClear} + var(--sab, env(safe-area-inset-bottom, 0px)))` };
+  }
+  if (miniVisible) {
     return { paddingBottom: "72px" };
   }
   return {};

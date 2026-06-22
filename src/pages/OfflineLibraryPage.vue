@@ -232,7 +232,7 @@
 
 <script setup lang="ts">
 import { onMounted, computed, ref } from 'vue';
-import { useRouter, onBeforeRouteLeave } from 'vue-router';
+import { onBeforeRouteLeave } from 'vue-router';
 import { useOfflineStore } from '@/store/offline-store';
 import { useJellyfinStore } from '@/store/jellyfin-store';
 import { useDownloadStore } from '@/store/download-store';
@@ -262,7 +262,6 @@ const MediaCard = defineComponent({
   },
 });
 
-const router = useRouter();
 const offlineStore = useOfflineStore();
 const jellyfinStore = useJellyfinStore();
 const downloadStore = useDownloadStore();
@@ -286,20 +285,13 @@ const backLabel = computed(() => {
   return 'Library';
 });
 
-const showBackButton = computed(() => {
-  // At root, only show back button when online (navigates to library)
-  if (view.value === 'root') return offlineStore.isFullyOnline;
-  return true;
-});
+// Back button only appears in sub-views; the root "return to library" is now
+// handled by the bottom nav's Accueil tab.
+const showBackButton = computed(() => view.value !== 'root');
 
 function navigateBack() {
   if (view.value === 'episodes') { view.value = 'seasons'; selectedSeason.value = null; return; }
   if (view.value === 'seasons') { view.value = 'root'; selectedSeries.value = null; return; }
-  // At root: go to online library if reachable, otherwise stay here
-  if (offlineStore.isFullyOnline) {
-    router.push({ name: 'libraries' });
-  }
-  // When offline, there's nowhere to go — stay on the downloads page
 }
 
 // Intercept device back button when in a sub-view — navigate within the component instead of leaving.

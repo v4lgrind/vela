@@ -1,5 +1,5 @@
 <template>
-  <div class="flex flex-col h-dvh bg-surface">
+  <div class="flex flex-col h-dvh bg-background">
     <!-- Header: back + search input -->
     <div class="flex items-center gap-3 px-4 border-b border-border-input bg-surface-raised"
       style="padding-top: calc(12px + var(--sat, env(safe-area-inset-top, 0px))); padding-bottom: 12px">

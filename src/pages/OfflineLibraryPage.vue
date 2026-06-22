@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-dvh bg-surface text-text-primary p-5">
+  <div class="min-h-dvh bg-background text-text-primary p-5">
 
     <!-- Header -->
     <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-3 mb-5">

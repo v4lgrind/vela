@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-dvh bg-surface text-text-body">
+  <div class="min-h-dvh bg-background text-text-body">
     <div class="max-w-4xl mx-auto px-4 py-8">
       <div class="flex items-center justify-between mb-6">
         <div class="flex items-center gap-3">

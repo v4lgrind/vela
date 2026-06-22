@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-dvh bg-surface text-text-body">
+  <div class="min-h-dvh bg-background text-text-body">
     <div class="max-w-2xl mx-auto px-4 py-8">
       <h1 class="text-xl font-bold text-text-heading mb-6">Settings</h1>
 

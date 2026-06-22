@@ -1,5 +1,5 @@
 <template>
-  <div class="grid min-h-dvh place-items-center bg-surface safe-pt safe-pb overflow-auto py-8">
+  <div class="grid min-h-dvh place-items-center bg-background safe-pt safe-pb overflow-auto py-8">
     <div class="w-[min(92vw,420px)] flex flex-col gap-4">
 
       <!-- Saved servers -->

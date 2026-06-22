@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-dvh bg-surface text-text-primary p-5 flex flex-col">
+  <div class="min-h-dvh bg-background text-text-primary p-5 flex flex-col">
     <!-- Filters and Sorting -->
     <section class="mb-4">
       <!-- Toggle row -->

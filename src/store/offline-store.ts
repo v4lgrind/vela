@@ -5,6 +5,7 @@ import { offlineDatabase, type DownloadedMedia } from '../services/offlineDataba
 import { syncService } from '../services/syncService';
 import { useJellyfinStore } from './jellyfin-store';
 import { Capacitor } from '@capacitor/core';
+import { logger } from '@/utils/logger';
 
 interface State {
   downloads: DownloadedMedia[];
@@ -136,9 +137,9 @@ export const useOfflineStore = defineStore('offline', {
         // Initialize the database
         try {
           await offlineDatabase.init();
-          console.log('[OfflineStore] Database initialized');
+          logger.log('[OfflineStore] Database initialized');
         } catch (dbError) {
-          console.error('[OfflineStore] IndexedDB init failed (continuing without offline):', dbError);
+          logger.error('[OfflineStore] IndexedDB init failed (continuing without offline):', dbError);
           this.initialized = true;
           return;
         }
@@ -147,14 +148,14 @@ export const useOfflineStore = defineStore('offline', {
         try {
           await this.loadDownloads();
         } catch (loadError) {
-          console.error('[OfflineStore] Failed to load downloads:', loadError);
+          logger.error('[OfflineStore] Failed to load downloads:', loadError);
         }
 
         // Recover downloads that completed natively while the app was killed
         try {
           await this.reconcileNativeDownloads();
         } catch (reconcileError) {
-          console.error('[OfflineStore] Reconcile failed:', reconcileError);
+          logger.error('[OfflineStore] Reconcile failed:', reconcileError);
         }
 
         // Initialize offline detection with server URL and await the first check
@@ -166,23 +167,23 @@ export const useOfflineStore = defineStore('offline', {
           if (jellyfinStore.serverUrl) {
             offlineDetection.init(jellyfinStore.serverUrl);
             await offlineDetection.checkNow();
-            console.log('[OfflineStore] Offline detection initialized');
+            logger.log('[OfflineStore] Offline detection initialized');
           }
         } catch (detectionError) {
-          console.error('[OfflineStore] Offline detection init failed:', detectionError);
+          logger.error('[OfflineStore] Offline detection init failed:', detectionError);
         }
 
         // Setup auto-sync when coming back online
         try {
           this.setupAutoSync();
         } catch (syncError) {
-          console.error('[OfflineStore] Auto-sync setup failed:', syncError);
+          logger.error('[OfflineStore] Auto-sync setup failed:', syncError);
         }
 
         // Mark as initialized
         this.initialized = true;
       } catch (error) {
-        console.error('[OfflineStore] Failed to initialize:', error);
+        logger.error('[OfflineStore] Failed to initialize:', error);
         // Mark as initialized even on error to prevent UI crashes
         this.initialized = true;
       }
@@ -202,9 +203,9 @@ export const useOfflineStore = defineStore('offline', {
     async loadDownloads() {
       try {
         this.downloads = await offlineDatabase.getAllDownloads();
-        console.log(`[OfflineStore] Loaded ${this.downloads.length} downloads`);
+        logger.log(`[OfflineStore] Loaded ${this.downloads.length} downloads`);
       } catch (error) {
-        console.error('[OfflineStore] Failed to load downloads:', error);
+        logger.error('[OfflineStore] Failed to load downloads:', error);
       }
     },
 
@@ -219,14 +220,14 @@ export const useOfflineStore = defineStore('offline', {
       const { DownloadPlugin } = await import('@/plugins/DownloadPlugin');
       const { items } = await DownloadPlugin.getPendingCompletions();
       if (items.length === 0) return;
-      console.log(`[OfflineStore] Reconciling ${items.length} natively-completed download(s)`);
+      logger.log(`[OfflineStore] Reconciling ${items.length} natively-completed download(s)`);
       for (const item of items) {
         try {
           const existing = await offlineDatabase.getDownload(item.itemId);
           if (existing) continue; // already in DB (e.g. app resumed before kill)
           const savedStr = localStorage.getItem(`dl_meta_${item.itemId}`);
           if (!savedStr) {
-            console.warn('[OfflineStore] No saved metadata for', item.itemId);
+            logger.warn('[OfflineStore] No saved metadata for', item.itemId);
             continue;
           }
           const { metadata, filePath } = JSON.parse(savedStr) as { metadata: any; filePath: string };
@@ -251,9 +252,9 @@ export const useOfflineStore = defineStore('offline', {
           }
           await offlineDatabase.addDownload(media);
           localStorage.removeItem(`dl_meta_${item.itemId}`);
-          console.log('[OfflineStore] Reconciled:', metadata.Name);
+          logger.log('[OfflineStore] Reconciled:', metadata.Name);
         } catch (e) {
-          console.error('[OfflineStore] Failed to reconcile item', item.itemId, e);
+          logger.error('[OfflineStore] Failed to reconcile item', item.itemId, e);
         }
       }
       await this.loadDownloads();
@@ -266,9 +267,9 @@ export const useOfflineStore = defineStore('offline', {
       try {
         await offlineDatabase.addDownload(media);
         await this.loadDownloads(); // Refresh from database
-        console.log('[OfflineStore] Added download:', media.itemId);
+        logger.log('[OfflineStore] Added download:', media.itemId);
       } catch (error) {
-        console.error('[OfflineStore] Failed to add download:', error);
+        logger.error('[OfflineStore] Failed to add download:', error);
         throw error;
       }
     },
@@ -280,9 +281,9 @@ export const useOfflineStore = defineStore('offline', {
       try {
         await offlineDatabase.deleteDownload(itemId);
         await this.loadDownloads(); // Refresh from database
-        console.log('[OfflineStore] Removed download:', itemId);
+        logger.log('[OfflineStore] Removed download:', itemId);
       } catch (error) {
-        console.error('[OfflineStore] Failed to remove download:', error);
+        logger.error('[OfflineStore] Failed to remove download:', error);
         throw error;
       }
     },
@@ -327,7 +328,7 @@ export const useOfflineStore = defineStore('offline', {
 
         // Detect transition from offline to online
         if (!previousOnlineStatus && currentOnlineStatus) {
-          console.log('[OfflineStore] Back online, triggering sync...');
+          logger.log('[OfflineStore] Back online, triggering sync...');
           this.syncWatchProgress();
         }
 
@@ -340,14 +341,14 @@ export const useOfflineStore = defineStore('offline', {
      */
     async syncWatchProgress() {
       if (this.syncInProgress || !offlineDetection.isFullyOnline) {
-        console.log('[OfflineStore] Skipping sync (already in progress or offline)');
+        logger.log('[OfflineStore] Skipping sync (already in progress or offline)');
         return;
       }
 
       const jellyfinStore = useJellyfinStore();
 
       if (!jellyfinStore.serverUrl || !jellyfinStore.accessToken) {
-        console.error('[OfflineStore] Cannot sync: API not initialized');
+        logger.error('[OfflineStore] Cannot sync: API not initialized');
         return;
       }
 
@@ -360,9 +361,9 @@ export const useOfflineStore = defineStore('offline', {
         );
 
         this.lastSyncTime = Date.now();
-        console.log(`[OfflineStore] Sync complete: ${result.synced} synced, ${result.failed} failed`);
+        logger.log(`[OfflineStore] Sync complete: ${result.synced} synced, ${result.failed} failed`);
       } catch (error) {
-        console.error('[OfflineStore] Sync failed:', error);
+        logger.error('[OfflineStore] Sync failed:', error);
       } finally {
         this.syncInProgress = false;
       }
@@ -376,9 +377,9 @@ export const useOfflineStore = defineStore('offline', {
         await offlineDatabase.clearAll();
         await this.loadDownloads();
         this.lastSyncTime = 0;
-        console.log('[OfflineStore] Cleared all offline data');
+        logger.log('[OfflineStore] Cleared all offline data');
       } catch (error) {
-        console.error('[OfflineStore] Failed to clear data:', error);
+        logger.error('[OfflineStore] Failed to clear data:', error);
         throw error;
       }
     },

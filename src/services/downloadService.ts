@@ -3,6 +3,7 @@ import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Capacitor } from '@capacitor/core';
 import type { PluginListenerHandle } from '@capacitor/core';
 import { DownloadPlugin } from '@/plugins/DownloadPlugin';
+import { logger } from '@/utils/logger';
 
 interface DownloadProgress {
   itemId: string;
@@ -42,12 +43,13 @@ class DownloadService {
     const extension = transcodedUrl ? 'ts' : this.getFileExtension(metadata);
     const filename = this.sanitizeFilename(`${metadata.Name || itemId}.${extension}`);
     const filePath = this.buildFilePath(metadata, filename);
-    const downloadUrl = transcodedUrl || `${serverUrl}/Items/${itemId}/Download?api_key=${accessToken}`;
+    const downloadUrl = transcodedUrl || `${serverUrl}/Items/${itemId}/Download`;
+    const authHeaders = { 'X-Emby-Token': accessToken };
 
     if (transcodedUrl) {
-      console.log('📥 Transcoded download:', filename);
+      logger.log('📥 Transcoded download:', filename);
     } else {
-      console.log('📥 Native download:', filename);
+      logger.log('📥 Native download:', filename);
     }
 
     if (onProgress) this.progressCallbacks.set(itemId, onProgress);
@@ -105,6 +107,7 @@ class DownloadService {
           await DownloadPlugin.enqueue({
             itemId,
             url: downloadUrl,
+            headers: authHeaders,
             destPath: filePath,
             itemName: metadata.Name || '',
             estimatedSize: estimatedSize || 0,
@@ -116,7 +119,7 @@ class DownloadService {
         throw Object.assign(new Error('AbortError'), { name: 'AbortError' });
       }
 
-      console.log('💾 Native download complete:', filePath);
+      logger.log('💾 Native download complete:', filePath);
 
       // Actual file size after completion
       let fileSize = 0;
@@ -150,27 +153,29 @@ class DownloadService {
       if (subtitleInfo && subtitleInfo.streamIndex >= 0) {
         try {
           const subPath = filePath.replace(/\.[^.]+$/, '.srt');
-          const subUrl = `${serverUrl}/Videos/${itemId}/${itemId}/Subtitles/${subtitleInfo.streamIndex}/Stream.srt?api_key=${accessToken}`;
-          console.log('📝 Downloading subtitle:', subPath);
+          const subUrl = `${serverUrl}/Videos/${itemId}/${itemId}/Subtitles/${subtitleInfo.streamIndex}/Stream.srt`;
+          logger.log('📝 Downloading subtitle:', subPath);
           await Filesystem.downloadFile({
             url: subUrl,
             path: subPath,
             directory: Directory.Data,
             progress: false,
+            headers: authHeaders,
           });
           downloadedMedia.subtitleFilePath = subPath;
           downloadedMedia.subtitleLabel = subtitleInfo.label;
           downloadedMedia.subtitleLanguage = subtitleInfo.language;
-          console.log('✅ Subtitle downloaded:', subPath);
+          logger.log('✅ Subtitle downloaded:', subPath);
         } catch (e) {
-          console.warn('⚠️ Subtitle download failed (non-critical):', e);
+          logger.warn('⚠️ Subtitle download failed (non-critical):', e);
         }
       }
 
       // Fetch intro/outro segment timestamps so skip-intro works offline
       try {
         const segRes = await fetch(
-          `${serverUrl}/MediaSegments/${itemId}?includeSegmentTypes=Intro&includeSegmentTypes=Outro&api_key=${accessToken}`
+          `${serverUrl}/MediaSegments/${itemId}?includeSegmentTypes=Intro&includeSegmentTypes=Outro`,
+          { headers: authHeaders }
         );
         if (segRes.ok) {
           const segData = await segRes.json();
@@ -186,7 +191,7 @@ class DownloadService {
 
       await offlineDatabase.addDownload(downloadedMedia);
       localStorage.removeItem(`dl_meta_${itemId}`);
-      console.log('✅ Download complete:', filename);
+      logger.log('✅ Download complete:', filename);
 
       // Cache artwork images for offline display (fire-and-forget, don't block)
       this.cacheArtwork(serverUrl, accessToken, metadata).catch(() => {});
@@ -197,12 +202,12 @@ class DownloadService {
 
     } catch (error: any) {
       if (error.name === 'AbortError' || activeDownload.aborted) {
-        console.log('🚫 Download cancelled:', metadata.Name);
+        logger.log('🚫 Download cancelled:', metadata.Name);
         try { await Filesystem.deleteFile({ path: filePath, directory: Directory.Data }); } catch { /* ignore */ }
         const err = Object.assign(new Error('AbortError'), { name: 'AbortError' });
         throw err;
       }
-      console.error('❌ Download error:', error);
+      logger.error('❌ Download error:', error);
       throw error;
     } finally {
       this.downloads.delete(itemId);
@@ -217,7 +222,7 @@ class DownloadService {
       const fileInfo = await Filesystem.getUri({ path: download.filePath, directory: Directory.Data });
       return Capacitor.convertFileSrc(fileInfo.uri);
     } catch (error) {
-      console.error('❌ Error getting local file:', error);
+      logger.error('❌ Error getting local file:', error);
       return null;
     }
   }
@@ -225,11 +230,11 @@ class DownloadService {
   async deleteOfflineFile(itemId: string): Promise<void> {
     try {
       const download = await offlineDatabase.getDownload(itemId);
-      if (!download) { console.warn('File already deleted:', itemId); return; }
+      if (!download) { logger.warn('File already deleted:', itemId); return; }
       try {
         await Filesystem.stat({ path: download.filePath, directory: Directory.Data });
         await Filesystem.deleteFile({ path: download.filePath, directory: Directory.Data });
-        console.log('🗑️ File deleted:', download.filePath);
+        logger.log('🗑️ File deleted:', download.filePath);
       } catch { /* file doesn't exist */ }
       // Also delete sidecar subtitle file if present
       if (download.subtitleFilePath) {
@@ -238,9 +243,9 @@ class DownloadService {
         } catch { /* ignore */ }
       }
       await offlineDatabase.deleteDownload(itemId);
-      console.log('✅ Download removed:', itemId);
+      logger.log('✅ Download removed:', itemId);
     } catch (error) {
-      console.error('❌ Delete error:', error);
+      logger.error('❌ Delete error:', error);
       throw error;
     }
   }
@@ -312,7 +317,7 @@ class DownloadService {
         continue;
       } catch { /* not cached yet */ }
 
-      const imgUrl = `${serverUrl}/Items/${id}/Images/Primary?maxWidth=400&quality=80&api_key=${accessToken}`;
+      const imgUrl = `${serverUrl}/Items/${id}/Images/Primary?maxWidth=400&quality=80`;
       try {
         const dirPath = imgPath.substring(0, imgPath.lastIndexOf('/'));
         try {
@@ -324,6 +329,7 @@ class DownloadService {
           path: imgPath,
           directory: Directory.Data,
           progress: false,
+          headers: { 'X-Emby-Token': accessToken },
         });
       } catch {
         // Non-critical — artwork just won't be available offline
@@ -357,7 +363,7 @@ class DownloadService {
       return;
     } catch { /* not cached yet */ }
 
-    const imgUrl = `${serverUrl}/Items/${itemId}/Images/Primary?maxWidth=400&quality=80&api_key=${accessToken}`;
+    const imgUrl = `${serverUrl}/Items/${itemId}/Images/Primary?maxWidth=400&quality=80`;
     try {
       const dirPath = imgPath.substring(0, imgPath.lastIndexOf('/'));
       try {
@@ -369,6 +375,7 @@ class DownloadService {
         path: imgPath,
         directory: Directory.Data,
         progress: false,
+        headers: { 'X-Emby-Token': accessToken },
       });
     } catch { /* non-critical */ }
   }
@@ -378,7 +385,7 @@ class DownloadService {
     if (download) {
       download.aborted = true;
       DownloadPlugin.cancel({ itemId }).catch(() => {});
-      console.log('🚫 Cancelling:', itemId);
+      logger.log('🚫 Cancelling:', itemId);
     }
   }
 

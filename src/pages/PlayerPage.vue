@@ -263,6 +263,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
+import { watchThrottled } from '@vueuse/core';
 import { useRoute, useRouter } from 'vue-router';
 import { useJellyfinStore } from '@/store/jellyfin-store';
 import { useAudioPlayerStore } from '@/store/audio-player-store';
@@ -271,12 +272,16 @@ import { useOfflineStore } from '@/store/offline-store';
 import { offlineDatabase } from '@/services/offlineDatabase';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import Hls from 'hls.js';
-import { Capacitor } from '@capacitor/core';
 import { NativeVideo } from '@/plugins/NativeVideoPlugin';
+import { usePlatform } from '@/composables/usePlatform';
 import { deviceProfile, nativeAndroidDeviceProfile } from '@/constants';
 import { formatTime } from '@/utils/helpers';
 import { lockLandscape, unlockOrientation } from '@/utils/orientation';
 import { debugLog } from '@/utils/debugLog';
+import { logger } from '@/utils/logger';
+import { CODEC_MIME_MAP, getDeviceCodecs, isCodecSupported, isDolbyVision } from '@/utils/codecDetection';
+import { buildPlaybackUrl } from '@/utils/playbackUrl';
+import type { MediaSource, MediaStream, SubtitleTrack, AudioTrack, QualityPreset, IntroSegment } from '@/types/jellyfin';
 import { ArrowLeft, Play, Pause, AudioLines, Captions, Gauge, Info, Maximize, Minimize, Loader2 } from 'lucide-vue-next';
 import PlayerBottomSheet from '@/components/PlayerBottomSheet.vue';
 
@@ -293,7 +298,7 @@ const itemId = route.params.id as string;
 const nextEpisodeId = (route.query.nextEpisodeId as string | undefined) || '';
 const accessToken = store.accessToken || '';
 const serverUrl = store.serverUrl;
-const isNative = Capacitor.isNativePlatform();
+const { isNative } = usePlatform();
 
 // Stable per-browser device ID so Jellyfin can match DELETE /Videos/ActiveEncodings
 // to the session we created. Without it, Jellyfin can't kill the FFmpeg job on demand.
@@ -328,17 +333,17 @@ const mediaTitle = ref('');
 
 // Jellyfin session
 const playSessionId = ref('');
-const mediaSource = ref<any>(null);
+const mediaSource = ref<MediaSource | null>(null);
 const hlsUrl = ref('');
 const playMethod = ref<'DirectPlay' | 'DirectStream' | 'Transcode'>('Transcode');
 
 // Audio tracks
-const audioList = ref<Array<{ index: number; label: string; language: string }>>([]);
+const audioList = ref<AudioTrack[]>([]);
 const selectedAudioIndex = ref<number | null>(null);
 const audioMenuOpen = ref(false);
 
 // Subtitle tracks
-const subtitleList = ref<Array<{ index: number; label: string; language: string; deliveryUrl: string }>>([]);
+const subtitleList = ref<SubtitleTrack[]>([]);
 const selectedSubtitleIndex = ref<number | null>(null); // null = off
 const subtitleMenuOpen = ref(false);
 
@@ -349,13 +354,13 @@ const activeTrackLabel = ref('');
 const subtitleBlobCache = new Map<number, string>(); // index → blob URL
 
 // Quality / bitrate
-const ALL_QUALITY_PRESETS = [
-    { label: 'Auto',     bitrate: 0,          minHeight: 0    },
-    { label: '4K',      bitrate: 80_000_000, minHeight: 2160 },
-    { label: '1080p',   bitrate: 20_000_000, minHeight: 1080 },
-    { label: '720p',    bitrate:  8_000_000, minHeight: 720  },
-    { label: '480p',    bitrate:  3_000_000, minHeight: 480  },
-    { label: '360p',    bitrate:  1_500_000, minHeight: 360  },
+const ALL_QUALITY_PRESETS: QualityPreset[] = [
+    { label: 'Auto',   bitrate: 0,          minHeight: 0    },
+    { label: '4K',     bitrate: 80_000_000, minHeight: 2160 },
+    { label: '1080p',  bitrate: 20_000_000, minHeight: 1080 },
+    { label: '720p',   bitrate:  8_000_000, minHeight: 720  },
+    { label: '480p',   bitrate:  3_000_000, minHeight: 480  },
+    { label: '360p',   bitrate:  1_500_000, minHeight: 360  },
 ];
 const selectedBitrate = ref(preferencesStore.preferredBitrate); // 0 = Auto (unlimited)
 const qualityMenuOpen = ref(false);
@@ -389,8 +394,8 @@ const infoModalOpen = ref(false);
 const liveTranscodingInfo = ref<any>(null);
 let infoPollingInterval: ReturnType<typeof setInterval> | null = null;
 
-const videoStream = computed(() =>
-    (mediaSource.value?.MediaStreams ?? []).find((s: any) => s.Type === 'Video')
+const videoStream = computed((): MediaStream | undefined =>
+    mediaSource.value?.MediaStreams?.find((s) => s.Type === 'Video')
 );
 const activeAudioStream = computed(() =>
     (mediaSource.value?.MediaStreams ?? []).find((s: any) => s.Type === 'Audio' && s.Index === selectedAudioIndex.value)
@@ -413,11 +418,11 @@ const showSkipIntroButton = computed(() => {
 });
 
 // Reset introSkipped when user seeks back into or before the intro window
-watch(currentTime, (t) => {
+watchThrottled(currentTime, (t) => {
     if (introSkipped.value && skipPromptEnd.value !== null && t < skipPromptEnd.value) {
         introSkipped.value = false;
     }
-});
+}, { throttle: 500 });
 
 let hls: Hls | null = null;
 let controlsTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -426,38 +431,6 @@ let offlineProgressInterval: ReturnType<typeof setInterval> | null = null;
 let isSwitching = false;
 let isOfflinePlayback = false;
 
-// ── Device codec detection (cached) ─────────────────────────────────────────────
-// Maps Jellyfin codec names to Android MIME types for capability checking.
-const CODEC_MIME_MAP: Record<string, string> = {
-    ac3: 'audio/ac3',
-    eac3: 'audio/eac3',
-    dts: 'audio/vnd.dts',
-    truehd: 'audio/true-hd',
-    flac: 'audio/flac',
-    opus: 'audio/opus',
-    vorbis: 'audio/vorbis',
-    aac: 'audio/mp4a-latm',
-    mp3: 'audio/mpeg',
-};
-let deviceCodecsCache: string[] | null = null;
-async function getDeviceCodecs(): Promise<string[]> {
-    if (deviceCodecsCache) return deviceCodecsCache;
-    if (!isNative) return [];
-    try {
-        const result = await NativeVideo.getDeviceCodecs();
-        deviceCodecsCache = result.codecs || [];
-        debugLog(`[Codec] Device audio codecs: ${deviceCodecsCache.join(', ')}`);
-        return deviceCodecsCache;
-    } catch {
-        return [];
-    }
-}
-
-function isCodecSupported(jellyfinCodec: string, deviceCodecs: string[]): boolean {
-    const mime = CODEC_MIME_MAP[jellyfinCodec?.toLowerCase()];
-    if (!mime) return true; // Unknown codec — assume supported
-    return deviceCodecs.includes(mime);
-}
 
 // ── Video event handlers ───────────────────────────────────────────────────────
 
@@ -589,6 +562,8 @@ function getFullscreenElement() {
     return document.fullscreenElement || (document as any).webkitFullscreenElement || null;
 }
 
+function onFullscreenChange() { isFullscreen.value = !!getFullscreenElement(); }
+
 function toggleFullscreen() {
     const container = videoEl.value?.parentElement;
     if (!container) return;
@@ -684,7 +659,7 @@ async function reportPlaybackStart() {
                 CanSeek: true,
             }))
         });
-    } catch (e) { console.error('reportPlaybackStart error', e); }
+    } catch (e) { logger.error('reportPlaybackStart error', e); }
 }
 
 async function reportPlaybackProgress() {
@@ -699,7 +674,7 @@ async function reportPlaybackProgress() {
                 VolumeLevel: Math.floor((video?.volume ?? 1) * 100),
             }))
         });
-    } catch (e) { console.error('reportPlaybackProgress error', e); }
+    } catch (e) { logger.error('reportPlaybackProgress error', e); }
 }
 
 async function reportPlaybackStopped() {
@@ -710,7 +685,7 @@ async function reportPlaybackStopped() {
             body: JSON.stringify(buildReportingPayload()),
             keepalive: true,
         });
-    } catch (e) { console.error('reportPlaybackStopped error', e); }
+    } catch (e) { logger.error('reportPlaybackStopped error', e); }
 }
 
 async function deleteActiveEncodings() {
@@ -722,7 +697,7 @@ async function deleteActiveEncodings() {
             `${serverUrl}/Videos/ActiveEncodings?deviceId=${encodeURIComponent(deviceId)}&playSessionId=${encodeURIComponent(playSessionId.value)}`,
             { method: 'DELETE', headers: { 'Authorization': embyAuthHeader }, signal: controller.signal, keepalive: true }
         );
-    } catch (e) { console.warn('[deleteActiveEncodings] error:', e); }
+    } catch (e) { logger.warn('[deleteActiveEncodings] error:', e); }
     finally { clearTimeout(timer); }
 }
 
@@ -857,7 +832,7 @@ function parseSubtitleStreams(ms: any) {
             // support external delivery, construct the extraction URL ourselves.
             const deliveryUrl = s.DeliveryUrl
                 ? `${serverUrl}${s.DeliveryUrl}`
-                : `${serverUrl}/Videos/${itemId}/${msId}/Subtitles/${s.Index}/0/Stream.vtt?api_key=${accessToken}`;
+                : `${serverUrl}/Videos/${itemId}/${msId}/Subtitles/${s.Index}/0/Stream.vtt`;
             return {
                 index: s.Index as number,
                 language: s.Language || 'und',
@@ -901,11 +876,11 @@ async function applySubtitleTracks() {
     let blobUrl = subtitleBlobCache.get(index);
     if (!blobUrl) {
         try {
-            const resp = await fetch(sub.deliveryUrl);
+            const resp = await fetch(sub.deliveryUrl, { headers: { 'X-Emby-Token': accessToken } });
             blobUrl = URL.createObjectURL(await resp.blob());
             subtitleBlobCache.set(index, blobUrl);
         } catch (e) {
-            console.error('[subtitle] fetch failed:', e);
+            logger.error('[subtitle] fetch failed:', e);
             return;
         }
     }
@@ -927,18 +902,11 @@ async function applySubtitleTracks() {
 watch(selectedSubtitleIndex, applySubtitleTracks);
 
 function determinePlaybackMethod(ms: any) {
-    if (ms.SupportsDirectPlay) {
-        playMethod.value = 'DirectPlay';
-        const msId = ms.Id || itemId;
-        hlsUrl.value = `${serverUrl}/Videos/${itemId}/stream?static=true&mediaSourceId=${msId}&api_key=${accessToken}`;
-    } else {
-        playMethod.value = ms.SupportsDirectStream ? 'DirectStream' : 'Transcode';
-        if (ms.TranscodingUrl) {
-            hlsUrl.value = `${serverUrl}${ms.TranscodingUrl}`.replace('?&', '?');
-        } else {
-            hlsUrl.value = `${serverUrl}/Videos/${itemId}/master.m3u8?mediaSourceId=${ms.Id || itemId}&api_key=${accessToken}&PlaySessionId=${playSessionId.value}`;
-        }
-    }
+    const { method, url } = buildPlaybackUrl(ms, {
+        serverUrl, itemId, accessToken, isNative, playSessionId: playSessionId.value,
+    });
+    playMethod.value = method;
+    hlsUrl.value = url;
     debugLog(`[NativePlayer] determinePlaybackMethod: ${playMethod.value}`);
     debugLog(`[NativePlayer] TranscodingUrl from Jellyfin: ${ms.TranscodingUrl ? 'YES' : 'NO'}`);
 }
@@ -1026,6 +994,9 @@ function initHls(url: string, video: HTMLVideoElement, startSeconds?: number, on
             maxBufferLength: 30,
             maxMaxBufferLength: 60,
             fLoader: makeJellyfinFragmentLoader() as any,
+            xhrSetup: (xhr) => {
+                xhr.setRequestHeader('X-Emby-Token', accessToken);
+            },
         });
         hls.loadSource(url);
         hls.attachMedia(video);
@@ -1040,7 +1011,7 @@ function initHls(url: string, video: HTMLVideoElement, startSeconds?: number, on
         });
         hls.on(Hls.Events.ERROR, (_, data) => {
             if (data.fatal) {
-                console.error('[HLS] fatal error:', data.type, data.details);
+                logger.error('[HLS] fatal error:', data.type, data.details);
                 // Always destroy the dead instance so hls is never left as a zombie
                 hls?.destroy();
                 hls = null;
@@ -1308,7 +1279,7 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
                 }
                 // No preference at all — leave ExoPlayer at its default (no subtitles).
             } catch (e) {
-                console.warn('[NativePlayer] Failed to parse tracksReady:', e);
+                logger.warn('[NativePlayer] Failed to parse tracksReady:', e);
             }
         });
 
@@ -1405,7 +1376,7 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
         // Don't clear isLoading here — keep the spinner until tracksReady fires,
         // so fallback restarts (e.g. codec unsupported → transcode) remain invisible.
     } catch (e: any) {
-        console.error('[initNativePlayer] error:', e);
+        logger.error('[initNativePlayer] error:', e);
         error.value = 'Failed to initialize native player';
         isLoading.value = false;
     }
@@ -1586,7 +1557,7 @@ async function initOfflinePlayer(cachedDownload: any, resumeSeconds?: number, it
                         }
                     }
                 } catch (e) {
-                    console.warn('[Offline] Failed to parse tracksReady:', e);
+                    logger.warn('[Offline] Failed to parse tracksReady:', e);
                 }
             });
 
@@ -1658,14 +1629,14 @@ async function initOfflinePlayer(cachedDownload: any, resumeSeconds?: number, it
 
             // Apply stored intro/outro segments so skip-intro works offline
             if (cachedDownload.introSegments?.length) {
-                const intro = cachedDownload.introSegments.find((s: any) => s.Type === 'Intro');
+                const intro = cachedDownload.introSegments.find((s: IntroSegment) => s.Type === 'Intro');
                 if (intro) {
                     NativeVideo.setIntroTimestamps({
                         introStartMs: Math.floor(intro.StartTicks / 10_000),
                         introEndMs: Math.floor(intro.EndTicks / 10_000),
                     }).catch(() => {});
                 }
-                const outro = cachedDownload.introSegments.find((s: any) => s.Type === 'Outro');
+                const outro = cachedDownload.introSegments.find((s: IntroSegment) => s.Type === 'Outro');
                 if (outro) {
                     creditsStartMs.value = Math.floor(outro.StartTicks / 10_000);
                 }
@@ -1689,7 +1660,7 @@ async function initOfflinePlayer(cachedDownload: any, resumeSeconds?: number, it
             isLoading.value = false;
         }
     } catch (e: any) {
-        console.error('[initOfflinePlayer] error:', e);
+        logger.error('[initOfflinePlayer] error:', e);
         error.value = 'Failed to play downloaded file';
         isLoading.value = false;
     }
@@ -1749,7 +1720,7 @@ async function initPlayer(resumeSeconds?: number, preferredAudioIndex?: number) 
             if (container) requestFS(container).then(() => { isFullscreen.value = true; }).catch(() => { });
         }
     } catch (e: any) {
-        console.error('[initPlayer] error:', e);
+        logger.error('[initPlayer] error:', e);
         error.value = 'Failed to initialize player';
         isLoading.value = false;
     }
@@ -1761,7 +1732,7 @@ async function initPlayer(resumeSeconds?: number, preferredAudioIndex?: number) 
 // previousIndex from movieTime and re-initialises the player. Called from both
 // the synchronous catch path and the async HLS.js fatal-error callback.
 async function rollbackAudio(previousIndex: number | null, movieTime: number) {
-    console.warn('[rollbackAudio] reverting to index', previousIndex, 'at', movieTime);
+    logger.warn('[rollbackAudio] reverting to index', previousIndex, 'at', movieTime);
 
     // Ensure any partially-initialised HLS instance is gone before we start fresh
     if (hls) { hls.destroy(); hls = null; }
@@ -1804,7 +1775,7 @@ async function rollbackAudio(previousIndex: number | null, movieTime: number) {
         // Clear the revert notice once the player has recovered
         setTimeout(() => { if (error.value?.startsWith('Audio switch failed')) error.value = null; }, 3000);
     } catch (e) {
-        console.error('[rollbackAudio] failed:', e);
+        logger.error('[rollbackAudio] failed:', e);
         error.value = 'Playback error — please go back and try again';
         isLoading.value = false;
     }
@@ -1863,7 +1834,7 @@ async function switchAudio(index: number) {
             playMethod.value = ms.SupportsDirectStream ? 'DirectStream' : 'Transcode';
         } else {
             // Jellyfin didn't return a TranscodingUrl — build one manually.
-            hlsUrl.value = `${serverUrl}/Videos/${itemId}/master.m3u8?mediaSourceId=${ms.Id || itemId}&api_key=${accessToken}&AudioStreamIndex=${index}&PlaySessionId=${playSessionId.value}`;
+            hlsUrl.value = `${serverUrl}/Videos/${itemId}/master.m3u8?mediaSourceId=${ms.Id || itemId}&AudioStreamIndex=${index}&PlaySessionId=${playSessionId.value}`;
             playMethod.value = 'Transcode';
         }
 
@@ -1871,7 +1842,7 @@ async function switchAudio(index: number) {
         // triggers recovery — not just synchronous errors caught below.
         initHls(hlsUrl.value, video, movieTime, () => rollbackAudio(previousIndex, movieTime));
     } catch (e: any) {
-        console.error('[switchAudio] error:', e);
+        logger.error('[switchAudio] error:', e);
         await rollbackAudio(previousIndex, movieTime);
     } finally {
         isSwitching = false;
@@ -1920,7 +1891,7 @@ function openInfoModal() {
     infoModalOpen.value = true;
     showControls();
     fetchTranscodingInfo();
-    infoPollingInterval = setInterval(fetchTranscodingInfo, 2000);
+    infoPollingInterval = setInterval(fetchTranscodingInfo, 5000);
 }
 
 function closeInfoModal() {
@@ -1990,7 +1961,7 @@ async function switchQuality(bitrate: number) {
             }
         }
     } catch (e: any) {
-        console.error('[switchQuality] error:', e);
+        logger.error('[switchQuality] error:', e);
         selectedBitrate.value = previousBitrate;
         error.value = 'Failed to switch quality';
         isLoading.value = false;
@@ -2044,7 +2015,7 @@ async function switchQualityNative(bitrate: number) {
             selectedBitrate: selectedBitrate.value,
         });
     } catch (e: any) {
-        console.error('[switchQualityNative] error:', e);
+        logger.error('[switchQualityNative] error:', e);
         selectedBitrate.value = previousBitrate;
         error.value = 'Failed to switch quality';
         isLoading.value = false;
@@ -2083,8 +2054,8 @@ onMounted(async () => {
         await initOfflinePlayer(cachedDownload, resumeSeconds, mediaTitle.value);
         if (!isNative) {
             document.addEventListener('click', handleClickOutside);
-            document.addEventListener('fullscreenchange', () => { isFullscreen.value = !!getFullscreenElement(); });
-            document.addEventListener('webkitfullscreenchange', () => { isFullscreen.value = !!getFullscreenElement(); });
+            document.addEventListener('fullscreenchange', onFullscreenChange);
+            document.addEventListener('webkitfullscreenchange', onFullscreenChange);
             document.addEventListener('keydown', handleKeyDown);
         }
         return;
@@ -2095,7 +2066,7 @@ onMounted(async () => {
     try {
         details = await store.fetchItemDetails(itemId);
     } catch (e) {
-        console.warn('[Player] Failed to load item details:', e);
+        logger.warn('[Player] Failed to load item details:', e);
     }
     mediaTitle.value = buildMediaTitle(details);
 
@@ -2137,16 +2108,8 @@ onMounted(async () => {
                 const videoCodec = (videoStream.Codec || '').toLowerCase();
                 const videoProfile = (videoStream.Profile || '').toLowerCase();
                 // DV detection: Jellyfin may report codec as "hevc" with DV profile
-                const isDV = videoCodec.includes('dvhe') || videoCodec.includes('dvh1') ||
-                             videoProfile.includes('dolby vision');
-                const VIDEO_MIME: Record<string, string> = {
-                    dvhe: 'video/dolby-vision', dvh1: 'video/dolby-vision',
-                    hevc: 'video/hevc', h265: 'video/hevc',
-                    h264: 'video/avc', avc: 'video/avc',
-                    vp8: 'video/x-vnd.on2.vp8', vp9: 'video/x-vnd.on2.vp9',
-                    av1: 'video/av01',
-                };
-                const effectiveMime = isDV ? 'video/dolby-vision' : VIDEO_MIME[videoCodec];
+                const isDV = isDolbyVision(videoCodec, videoProfile);
+                const effectiveMime = isDV ? 'video/dolby-vision' : CODEC_MIME_MAP[videoCodec];
                 if (effectiveMime && !deviceCodecs.includes(effectiveMime)) {
                     debugLog(`[Codec] Video codec "${videoStream.Codec}" (${effectiveMime}) not supported — requesting server transcode`);
                     forceTranscodeVideo = true;
@@ -2179,8 +2142,8 @@ onMounted(async () => {
     } else {
         await initPlayer(resumeSeconds, preferredAudioIndex);
         document.addEventListener('click', handleClickOutside);
-        document.addEventListener('fullscreenchange', () => { isFullscreen.value = !!getFullscreenElement(); });
-        document.addEventListener('webkitfullscreenchange', () => { isFullscreen.value = !!getFullscreenElement(); });
+        document.addEventListener('fullscreenchange', onFullscreenChange);
+        document.addEventListener('webkitfullscreenchange', onFullscreenChange);
         document.addEventListener('keydown', handleKeyDown);
     }
 
@@ -2204,6 +2167,8 @@ onBeforeUnmount(() => {
     }
 
     document.removeEventListener('click', handleClickOutside);
+    document.removeEventListener('fullscreenchange', onFullscreenChange);
+    document.removeEventListener('webkitfullscreenchange', onFullscreenChange);
     document.removeEventListener('keydown', handleKeyDown);
 
     if (controlsTimeout) clearTimeout(controlsTimeout);

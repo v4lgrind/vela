@@ -155,8 +155,8 @@ const currentServerName = computed(() => {
   return saved?.serverName ?? new URL(jellyfinStore.serverUrl || 'http://unknown').hostname;
 });
 
-function signOut() {
-  jellyfinStore.logout();
+async function signOut() {
+  await jellyfinStore.logout();
   router.push({ name: 'login' });
 }
 

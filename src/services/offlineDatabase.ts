@@ -1,3 +1,5 @@
+import { logger } from '@/utils/logger';
+
 /**
  * Offline Database Service
  *
@@ -69,7 +71,7 @@ class OfflineDatabase {
     if (this._initPromise) return this._initPromise;
 
     if (typeof indexedDB === "undefined") {
-      console.warn("[OfflineDB] IndexedDB not available on this platform");
+      logger.warn("[OfflineDB] IndexedDB not available on this platform");
       return;
     }
 
@@ -77,13 +79,13 @@ class OfflineDatabase {
       const request = indexedDB.open(this.DB_NAME, this.DB_VERSION);
 
       request.onerror = () => {
-        console.error("[OfflineDB] Failed to open database:", request.error);
+        logger.error("[OfflineDB] Failed to open database:", request.error);
         reject(request.error);
       };
 
       request.onsuccess = () => {
         this.db = request.result;
-        console.log("[OfflineDB] Database initialized");
+        logger.log("[OfflineDB] Database initialized");
         resolve();
       };
 
@@ -101,7 +103,7 @@ class OfflineDatabase {
             unique: false,
           });
           downloadsStore.createIndex("albumId", "albumId", { unique: false });
-          console.log("[OfflineDB] Created downloads object store");
+          logger.log("[OfflineDB] Created downloads object store");
         }
 
         if (!db.objectStoreNames.contains("watchProgress")) {
@@ -112,7 +114,7 @@ class OfflineDatabase {
           progressStore.createIndex("lastWatched", "lastWatched", {
             unique: false,
           });
-          console.log("[OfflineDB] Created watchProgress object store");
+          logger.log("[OfflineDB] Created watchProgress object store");
         }
       };
     });
@@ -142,12 +144,12 @@ class OfflineDatabase {
       const request = store.put(media);
 
       request.onsuccess = () => {
-        console.log("[OfflineDB] Added download:", media.itemId);
+        logger.log("[OfflineDB] Added download:", media.itemId);
         resolve();
       };
 
       request.onerror = () => {
-        console.error("[OfflineDB] Failed to add download:", request.error);
+        logger.error("[OfflineDB] Failed to add download:", request.error);
         reject(request.error);
       };
     });
@@ -165,7 +167,7 @@ class OfflineDatabase {
       };
 
       request.onerror = () => {
-        console.error("[OfflineDB] Failed to get download:", request.error);
+        logger.error("[OfflineDB] Failed to get download:", request.error);
         reject(request.error);
       };
     });
@@ -183,7 +185,7 @@ class OfflineDatabase {
       };
 
       request.onerror = () => {
-        console.error("[OfflineDB] Failed to get all downloads:", request.error);
+        logger.error("[OfflineDB] Failed to get all downloads:", request.error);
         reject(request.error);
       };
     });
@@ -203,7 +205,7 @@ class OfflineDatabase {
       };
 
       request.onerror = () => {
-        console.error("[OfflineDB] Failed to get downloads by type:", request.error);
+        logger.error("[OfflineDB] Failed to get downloads by type:", request.error);
         reject(request.error);
       };
     });
@@ -223,7 +225,7 @@ class OfflineDatabase {
       };
 
       request.onerror = () => {
-        console.error("[OfflineDB] Failed to get downloads by series:", request.error);
+        logger.error("[OfflineDB] Failed to get downloads by series:", request.error);
         reject(request.error);
       };
     });
@@ -243,7 +245,7 @@ class OfflineDatabase {
       };
 
       request.onerror = () => {
-        console.error("[OfflineDB] Failed to get downloads by season:", request.error);
+        logger.error("[OfflineDB] Failed to get downloads by season:", request.error);
         reject(request.error);
       };
     });
@@ -263,7 +265,7 @@ class OfflineDatabase {
       };
 
       request.onerror = () => {
-        console.error("[OfflineDB] Failed to get downloads by album:", request.error);
+        logger.error("[OfflineDB] Failed to get downloads by album:", request.error);
         reject(request.error);
       };
     });
@@ -282,12 +284,12 @@ class OfflineDatabase {
       const request = store.delete(itemId);
 
       request.onsuccess = () => {
-        console.log("[OfflineDB] Deleted download:", itemId);
+        logger.log("[OfflineDB] Deleted download:", itemId);
         resolve();
       };
 
       request.onerror = () => {
-        console.error("[OfflineDB] Failed to delete download:", request.error);
+        logger.error("[OfflineDB] Failed to delete download:", request.error);
         reject(request.error);
       };
     });
@@ -303,12 +305,12 @@ class OfflineDatabase {
       const request = store.put(progress);
 
       request.onsuccess = () => {
-        console.log("[OfflineDB] Saved watch progress:", progress.itemId);
+        logger.log("[OfflineDB] Saved watch progress:", progress.itemId);
         resolve();
       };
 
       request.onerror = () => {
-        console.error("[OfflineDB] Failed to save watch progress:", request.error);
+        logger.error("[OfflineDB] Failed to save watch progress:", request.error);
         reject(request.error);
       };
     });
@@ -326,7 +328,7 @@ class OfflineDatabase {
       };
 
       request.onerror = () => {
-        console.error("[OfflineDB] Failed to get watch progress:", request.error);
+        logger.error("[OfflineDB] Failed to get watch progress:", request.error);
         reject(request.error);
       };
     });
@@ -345,7 +347,7 @@ class OfflineDatabase {
       };
 
       request.onerror = () => {
-        console.error("[OfflineDB] Failed to get unsynced progress:", request.error);
+        logger.error("[OfflineDB] Failed to get unsynced progress:", request.error);
         reject(request.error);
       };
     });
@@ -367,12 +369,12 @@ class OfflineDatabase {
       const request = store.delete(itemId);
 
       request.onsuccess = () => {
-        console.log("[OfflineDB] Deleted watch progress:", itemId);
+        logger.log("[OfflineDB] Deleted watch progress:", itemId);
         resolve();
       };
 
       request.onerror = () => {
-        console.error("[OfflineDB] Failed to delete watch progress:", request.error);
+        logger.error("[OfflineDB] Failed to delete watch progress:", request.error);
         reject(request.error);
       };
     });
@@ -390,12 +392,12 @@ class OfflineDatabase {
       transaction.objectStore("watchProgress").clear();
 
       transaction.oncomplete = () => {
-        console.log("[OfflineDB] Cleared all data");
+        logger.log("[OfflineDB] Cleared all data");
         resolve();
       };
 
       transaction.onerror = () => {
-        console.error("[OfflineDB] Failed to clear data:", transaction.error);
+        logger.error("[OfflineDB] Failed to clear data:", transaction.error);
         reject(transaction.error);
       };
     });

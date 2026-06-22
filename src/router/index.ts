@@ -1,10 +1,4 @@
 import { createRouter, createWebHashHistory } from "vue-router";
-import LoginPage from "@/pages/LoginPage.vue";
-import MediaList from "@/pages/MediaList.vue";
-import LibraryItemsPage from "@/pages/LibraryItemsPage.vue";
-import ItemDetailsPage from "@/pages/ItemDetailsPage.vue";
-import PlayerPage from "@/pages/PlayerPage.vue";
-import OfflineLibraryPage from "@/pages/OfflineLibraryPage.vue";
 import { useJellyfinStore } from "@/store/jellyfin-store";
 import { useAudioPlayerStore } from "@/store/audio-player-store";
 import { useOfflineStore } from "@/store/offline-store";
@@ -18,31 +12,31 @@ const routes = [
   {
     path: "/login",
     name: "login",
-    component: LoginPage,
+    component: () => import("@/pages/LoginPage.vue"),
     meta: { requiresAuth: false },
   },
   {
     path: "/libraries",
     name: "libraries",
     meta: { requiresAuth: true },
-    component: MediaList,
+    component: () => import("@/pages/MediaList.vue"),
   },
   {
     path: "/offline",
     name: "offline",
     meta: { requiresAuth: true },
-    component: OfflineLibraryPage,
+    component: () => import("@/pages/OfflineLibraryPage.vue"),
   },
   {
     path: "/libraryItem/:name/:id",
     name: "libraryItem",
     meta: { requiresAuth: true },
-    component: LibraryItemsPage,
+    component: () => import("@/pages/LibraryItemsPage.vue"),
   },
   {
     path: "/item/:id",
     name: "ItemDetails",
-    component: ItemDetailsPage,
+    component: () => import("@/pages/ItemDetailsPage.vue"),
     meta: { requiresAuth: true },
     props: true,
   },
@@ -56,7 +50,7 @@ const routes = [
   {
     path: "/play/:id",
     name: "Player",
-    component: PlayerPage,
+    component: () => import("@/pages/PlayerPage.vue"),
     meta: { requiresAuth: true },
     props: true,
   },
@@ -88,9 +82,9 @@ export const router = createRouter({
 router.beforeEach(async (to, _from, next) => {
   const store = useJellyfinStore();
 
-  // Initialiser l'API si on a un token persisté
-  if (store.accessToken && !store.api) {
-    store.initializeApi();
+  // Initialiser l'API si on a un token persisté (charge depuis Preferences si nécessaire)
+  if (!store.api || !store.accessToken) {
+    await store.initializeApiAsync();
   }
 
   const isAuthenticated = store.isAuthenticated;

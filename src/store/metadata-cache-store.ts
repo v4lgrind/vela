@@ -1,5 +1,7 @@
 import { defineStore } from 'pinia';
 
+const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
 /**
  * Lightweight cache for Series and Season item metadata.
  * Populated when episodes are downloaded so that their parent
@@ -11,6 +13,7 @@ import { defineStore } from 'pinia';
 export interface CachedItem {
   Id: string;
   Name: string;
+  _cachedAt?: number;
   Type: string;
   Overview?: string;
   Genres?: string[];
@@ -52,15 +55,32 @@ export const useMetadataCacheStore = defineStore('metadataCache', {
         Studios: item.Studios?.map((s: any) => ({ Name: s.Name })),
         People: item.People?.slice(0, 20), // cap cast list size
       };
+      slim._cachedAt = Date.now();
       this.cache[item.Id] = slim;
     },
 
     get(id: string): CachedItem | null {
-      return this.cache[id] ?? null;
+      const entry = this.cache[id];
+      if (!entry) return null;
+      if (entry._cachedAt && Date.now() - entry._cachedAt > CACHE_TTL_MS) {
+        delete this.cache[id];
+        return null;
+      }
+      return entry;
     },
 
     has(id: string): boolean {
-      return id in this.cache;
+      return this.get(id) !== null;
+    },
+
+    pruneExpired() {
+      const now = Date.now();
+      for (const id in this.cache) {
+        const entry = this.cache[id];
+        if (entry._cachedAt && now - entry._cachedAt > CACHE_TTL_MS) {
+          delete this.cache[id];
+        }
+      }
     },
   },
 });

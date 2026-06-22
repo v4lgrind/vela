@@ -23,6 +23,11 @@ dist-ssr
 *.sln
 *.sw?
 
+# Playwright e2e
+test-results/
+playwright-report/
+playwright/.cache/
+
 # Gradle
 .gradle/
 

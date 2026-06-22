@@ -261,6 +261,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { useJellyfinStore } from '@/store/jellyfin-store';
 import { useOfflineStore } from '@/store/offline-store';
 import { useDownloadStore } from '@/store/download-store';
+import { logger } from '@/utils/logger';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -378,8 +379,8 @@ function onClickOutside(e: MouseEvent) {
     }
 }
 
-function onLogout() {
-    store.logout();
+async function onLogout() {
+    await store.logout();
     router.push({ name: 'login' });
 }
 
@@ -433,7 +434,7 @@ async function searchAll(term: string) {
         });
         activeIndex.value = -1;
     } catch (e) {
-        console.error('Search error:', e);
+        logger.error('Search error:', e);
         results.value = [];
     } finally {
         isSearching.value = false;

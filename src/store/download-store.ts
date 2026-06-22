@@ -3,7 +3,9 @@ import { downloadService } from '@/services/downloadService';
 import { useOfflineStore } from './offline-store';
 import { useJellyfinStore } from './jellyfin-store';
 import { useMetadataCacheStore } from './metadata-cache-store';
+import { CODEC_MIME_MAP, isDolbyVision } from '@/utils/codecDetection';
 import { Capacitor } from '@capacitor/core';
+import { logger } from '@/utils/logger';
 
 const MAX_CONCURRENT = 3;
 
@@ -91,10 +93,10 @@ export const useDownloadStore = defineStore('downloads', {
           // Clear stale task so it can be retried
           this.tasks.delete(itemId);
         } else if (existing.status === 'downloading' && !downloadService.isDownloading(itemId)) {
-          console.warn('[DownloadStore] Stale downloading task for', itemId, '— allowing retry');
+          logger.warn('[DownloadStore] Stale downloading task for', itemId, '— allowing retry');
           this.tasks.delete(itemId);
         } else if (existing.status === 'downloading' || existing.status === 'queued') {
-          console.log('[DownloadStore] Already queued/downloading:', itemId);
+          logger.log('[DownloadStore] Already queued/downloading:', itemId);
           return;
         }
       }
@@ -213,7 +215,7 @@ export const useDownloadStore = defineStore('downloads', {
           this._cacheParentMetadata(metadata, jellyfinStore);
         }
 
-        console.log('[DownloadStore] Completed:', metadata.Name);
+        logger.log('[DownloadStore] Completed:', metadata.Name);
       } catch (error: any) {
         const t = this.tasks.get(itemId);
         if (t) {
@@ -258,26 +260,12 @@ export const useDownloadStore = defineStore('downloads', {
     async checkNeedsTranscode(metadata: any): Promise<boolean> {
       if (!Capacitor.isNativePlatform()) return false;
       try {
+        const { getDeviceCodecs } = await import('@/utils/codecDetection');
         const { NativeVideo } = await import('@/plugins/NativeVideoPlugin');
-        const { codecs: deviceCodecs } = await NativeVideo.getDeviceCodecs();
+        const deviceCodecs = await getDeviceCodecs();
         if (deviceCodecs.length === 0) return false;
 
         const streams: any[] = metadata.MediaStreams || metadata.MediaSources?.[0]?.MediaStreams || [];
-        const CODEC_MIME_MAP: Record<string, string> = {
-          dvhe: 'video/dolby-vision', dvh1: 'video/dolby-vision',
-          hevc: 'video/hevc', h265: 'video/hevc',
-          h264: 'video/avc', avc: 'video/avc',
-          vp8: 'video/x-vnd.on2.vp8', vp9: 'video/x-vnd.on2.vp9',
-          av1: 'video/av01',
-          ac3: 'audio/ac3', eac3: 'audio/eac3',
-          dts: 'audio/vnd.dts', truehd: 'audio/true-hd',
-          flac: 'audio/flac', opus: 'audio/opus',
-          vorbis: 'audio/vorbis', aac: 'audio/mp4a-latm',
-          mp3: 'audio/mpeg',
-        };
-
-        // Only suggest server-side transcoding for resolutions above 1080p.
-        // At 1080p and below, the FFmpeg software decoder handles it fine.
         const MAX_SW_HEIGHT = 1080;
 
         for (const stream of streams) {
@@ -286,9 +274,7 @@ export const useDownloadStore = defineStore('downloads', {
           const mime = CODEC_MIME_MAP[codec];
           if (!mime) continue;
 
-          const isDV = codec.includes('dvhe') || codec.includes('dvh1') ||
-                       profile.includes('dolby vision');
-          const effectiveMime = isDV ? 'video/dolby-vision' : mime;
+          const effectiveMime = isDolbyVision(codec, profile) ? 'video/dolby-vision' : mime;
 
           if (!deviceCodecs.includes(effectiveMime)) {
             if (stream.Type === 'Video' && (stream.Height || 0) <= MAX_SW_HEIGHT) continue;
@@ -325,7 +311,7 @@ export const useDownloadStore = defineStore('downloads', {
         }
 
         // Request a transcoding URL from Jellyfin
-        console.log(`[DownloadStore] Requesting transcoded download for ${itemId}` +
+        logger.log(`[DownloadStore] Requesting transcoded download for ${itemId}` +
           (transcodeOptions ? ` (audio=${transcodeOptions.audioStreamIndex} sub=${transcodeOptions.subtitleStreamIndex})` : ' (auto-detected)'));
         const serverUrl = jellyfinStore.serverUrl!;
         const token = jellyfinStore.accessToken!;
@@ -378,26 +364,26 @@ export const useDownloadStore = defineStore('downloads', {
         );
 
         if (!response.ok) {
-          console.warn(`[DownloadStore] PlaybackInfo request failed: ${response.status} ${response.statusText}`);
+          logger.warn(`[DownloadStore] PlaybackInfo request failed: ${response.status} ${response.statusText}`);
           return undefined;
         }
         const result = await response.json();
         const ms = result.MediaSources?.[0];
-        console.log(`[DownloadStore] PlaybackInfo response: TranscodingUrl=${ms?.TranscodingUrl} SupportsTranscoding=${ms?.SupportsTranscoding} Protocol=${ms?.TranscodingSubProtocol}`);
+        logger.log(`[DownloadStore] PlaybackInfo response: TranscodingUrl=${ms?.TranscodingUrl} SupportsTranscoding=${ms?.SupportsTranscoding} Protocol=${ms?.TranscodingSubProtocol}`);
 
         if (ms?.TranscodingUrl) {
           const url = `${serverUrl}${ms.TranscodingUrl}`;
           const estimatedSize = (ms.Bitrate && ms.RunTimeTicks)
             ? Math.ceil((ms.Bitrate / 8) * (ms.RunTimeTicks / 10_000_000))
             : 0;
-          console.log(`[DownloadStore] Transcoded URL (est. ${Math.round(estimatedSize / 1024 / 1024)}MB): ${url}`);
+          logger.log(`[DownloadStore] Transcoded URL (est. ${Math.round(estimatedSize / 1024 / 1024)}MB): ${url}`);
           return { url, estimatedSize };
         }
 
-        console.warn('[DownloadStore] PlaybackInfo returned no TranscodingUrl — falling back to raw download');
+        logger.warn('[DownloadStore] PlaybackInfo returned no TranscodingUrl — falling back to raw download');
         return undefined;
       } catch (e) {
-        console.warn('[DownloadStore] Codec check failed, downloading raw:', e);
+        logger.warn('[DownloadStore] Codec check failed, downloading raw:', e);
         return undefined;
       }
     },

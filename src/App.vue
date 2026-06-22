@@ -5,23 +5,26 @@
     v-if="isAuthenticated && audioStore.isMiniPlayerVisible && !audioStore.isExpanded"
   />
   <ExpandedAudioPlayer v-if="isAuthenticated && audioStore.isExpanded" />
+  <AppToast />
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, watch } from "vue";
+import { computed, onMounted, onBeforeUnmount, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import SearchBar from "@/components/SearchBar.vue";
 import MiniAudioPlayer from "@/components/MiniAudioPlayer.vue";
 import ExpandedAudioPlayer from "@/components/ExpandedAudioPlayer.vue";
+import AppToast from "@/components/ui/toast/AppToast.vue";
 import { useJellyfinStore } from "@/store/jellyfin-store";
 import { useAudioPlayerStore } from "@/store/audio-player-store";
 import { useOfflineStore } from "@/store/offline-store";
 import { usePreferencesStore } from "@/store/preferences-store";
 import { useDpadNavigation } from "@/composables/useDpadNavigation";
+import { usePlatform } from "@/composables/usePlatform";
 import { App as CapacitorApp } from "@capacitor/app";
-import { Capacitor } from "@capacitor/core";
 import { StatusBar, Style } from "@capacitor/status-bar";
 import { NativeVideo } from "@/plugins/NativeVideoPlugin";
+import { logger } from "@/utils/logger";
 
 
 const route = useRoute();
@@ -31,12 +34,13 @@ const audioStore = useAudioPlayerStore();
 const offlineStore = useOfflineStore();
 const preferencesStore = usePreferencesStore();
 useDpadNavigation();
+const { isNative } = usePlatform();
 const isAuthenticated = computed(() => store.isAuthenticated);
 
 // ── Theme ──────────────────────────────────────────────────────────────────────
 
 async function updateStatusBar(isDark: boolean) {
-  if (!Capacitor.isNativePlatform()) return;
+  if (!isNative) return;
   await StatusBar.setStyle({ style: isDark ? Style.Dark : Style.Light });
 }
 
@@ -86,22 +90,35 @@ watch(isAuthenticated, async (authed) => {
     try {
       await offlineStore.init();
     } catch (error) {
-      console.error("[App] Failed to initialize offline store after login:", error);
+      logger.error("[App] Failed to initialize offline store after login:", error);
     }
   }
 });
 
+
+let colorSchemeQuery: MediaQueryList | null = null;
+let mediaQueryListener: (() => void) | null = null;
+let visibilityListener: (() => void) | null = null;
+let resizeListener: (() => void) | null = null;
+
+onBeforeUnmount(() => {
+  if (colorSchemeQuery && mediaQueryListener) colorSchemeQuery.removeEventListener('change', mediaQueryListener);
+  if (visibilityListener) document.removeEventListener('visibilitychange', visibilityListener);
+  if (resizeListener) window.removeEventListener('resize', resizeListener);
+});
 
 onMounted(async () => {
   // Apply persisted theme immediately
   applyTheme(preferencesStore.colorScheme);
 
   // Track system preference changes for 'system' mode
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+  mediaQueryListener = () => {
     if (preferencesStore.colorScheme === 'system') applyTheme('system');
-  });
+  };
+  colorSchemeQuery = window.matchMedia('(prefers-color-scheme: dark)');
+  colorSchemeQuery.addEventListener('change', mediaQueryListener);
 
-  if (Capacitor.isNativePlatform()) {
+  if (isNative) {
     // Set safe area CSS variables from native insets on initial load
     try {
       const insets = await NativeVideo.getSafeAreaInsets();
@@ -113,13 +130,15 @@ onMounted(async () => {
     } catch { /* non-native fallback, env() handles it */ }
 
     // Re-apply status bar icon style when returning from NativePlayerActivity or rotating
-    document.addEventListener('visibilitychange', () => {
+    visibilityListener = () => {
       if (document.visibilityState === 'visible') applyTheme(preferencesStore.colorScheme);
-    });
-    window.addEventListener('resize', () => applyTheme(preferencesStore.colorScheme), { passive: true });
+    };
+    resizeListener = () => applyTheme(preferencesStore.colorScheme);
+    document.addEventListener('visibilitychange', visibilityListener);
+    window.addEventListener('resize', resizeListener, { passive: true });
   }
 
-  if (Capacitor.isNativePlatform()) {
+  if (isNative) {
     await CapacitorApp.addListener("backButton", ({ canGoBack }) => {
       // On the offline library page in offline mode, back should exit the app
       // (sub-view navigation is handled inside the component)
@@ -140,7 +159,7 @@ onMounted(async () => {
     try {
       await offlineStore.init();
     } catch (error) {
-      console.error("[App] Failed to initialize offline store:", error);
+      logger.error("[App] Failed to initialize offline store:", error);
     }
   }
 });

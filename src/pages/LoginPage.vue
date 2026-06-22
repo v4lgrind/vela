@@ -143,6 +143,7 @@ import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Eye, EyeOff, ArrowLeft, Loader2 } from 'lucide-vue-next'
 import type { SavedServer } from '@/store/jellyfin-store'
+import { validateServerUrl } from '@/utils/validateServerUrl'
 
 const jellyfin = useJellyfinStore()
 const router = useRouter()
@@ -167,6 +168,8 @@ let qcAuthenticating = false
 
 async function onSubmit() {
   error.value = null
+  const urlError = validateServerUrl(serverUrl.value)
+  if (urlError) { error.value = urlError; return; }
   loading.value = true
   try {
     await jellyfin.login(serverUrl.value, username.value, password.value)
@@ -177,13 +180,15 @@ async function onSubmit() {
   }
 }
 
-function quickSwitch(server: SavedServer) {
-  jellyfin.switchServer(server)
+async function quickSwitch(server: SavedServer) {
+  await jellyfin.switchServer(server)
   router.push({ name: 'libraries' })
 }
 
 async function startQuickConnect() {
   quickConnectError.value = null
+  const urlError = validateServerUrl(serverUrl.value)
+  if (urlError) { quickConnectError.value = urlError; return; }
   try {
     const result = await jellyfin.quickConnectInitiate(serverUrl.value)
     quickConnectCode.value = result.Code

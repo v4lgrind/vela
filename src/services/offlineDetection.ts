@@ -1,4 +1,5 @@
 import { ref, type Ref } from 'vue';
+import { logger } from '@/utils/logger';
 
 /**
  * Offline Detection Service
@@ -22,7 +23,7 @@ class OfflineDetectionService {
     try {
       this.setupEventListeners();
     } catch (error) {
-      console.error('[OfflineDetection] Failed to setup event listeners:', error);
+      logger.error('[OfflineDetection] Failed to setup event listeners:', error);
     }
   }
 
@@ -69,7 +70,7 @@ class OfflineDetectionService {
    * Handle browser online event
    */
   private handleOnline = (): void => {
-    console.log('[OfflineDetection] Browser is online');
+    logger.log('[OfflineDetection] Browser is online');
     this.isOnline.value = true;
     this.checkServerReachability();
     this.startPinging();
@@ -79,7 +80,7 @@ class OfflineDetectionService {
    * Handle browser offline event
    */
   private handleOffline = (): void => {
-    console.log('[OfflineDetection] Browser is offline');
+    logger.log('[OfflineDetection] Browser is offline');
     this.isOnline.value = false;
     this.serverReachable.value = false;
     this.stopPinging();
@@ -135,16 +136,16 @@ class OfflineDetectionService {
       this.serverReachable.value = response.ok;
 
       if (!wasReachable && this.serverReachable.value) {
-        console.log('[OfflineDetection] Server is now reachable');
+        logger.log('[OfflineDetection] Server is now reachable');
       } else if (wasReachable && !this.serverReachable.value) {
-        console.log('[OfflineDetection] Server is now unreachable');
+        logger.log('[OfflineDetection] Server is now unreachable');
       }
     } catch (error) {
       const wasReachable = this.serverReachable.value;
       this.serverReachable.value = false;
 
       if (wasReachable) {
-        console.log('[OfflineDetection] Server ping failed:', error);
+        logger.log('[OfflineDetection] Server ping failed:', error);
       }
     }
   }

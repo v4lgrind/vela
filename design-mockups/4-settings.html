@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup · Réglages</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_theme.css">
+<style>
+  [data-seg2]{cursor:pointer;border:none;font-family:'Outfit',sans-serif;background:var(--chip-bg);color:var(--surface-text);font-size:12.5px;font-weight:600;padding:8px 0;border-radius:9px;flex:1;text-align:center;transition:all .15s ease;}
+  [data-seg2][data-active="true"]{background:var(--accent);color:var(--accent-ink);}
+</style>
+</head>
+<body>
+
+<div class="mock-head">
+  <div>
+    <div class="mock-eyebrow">Direction OLED · Réglages</div>
+    <h1 class="mock-title">Réglages</h1>
+  </div>
+  <div class="mock-toggle">
+    <button data-set="auto">Auto</button>
+    <button data-set="light">Clair</button>
+    <button data-set="dark">Sombre</button>
+  </div>
+</div>
+
+<div class="phone phone--tall" data-themed>
+  <div class="statusbar"><span>9:41</span><span class="sig"><span class="bars"><i style="height:5px"></i><i style="height:7px"></i><i style="height:9px"></i><i style="height:11px"></i></span><span class="batt"><i></i></span></span></div>
+  <div style="padding:10px 24px 16px;"><span style="font-size:24px;font-weight:700;color:var(--text);letter-spacing:-.02em;">Réglages</span></div>
+
+  <div style="padding:0 22px 104px;">
+    <!-- Compte -->
+    <div style="font-size:11.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 4px 10px;">Compte</div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-bottom:24px;">
+      <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--border);">
+        <span style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#0a4f8a);flex:none;"></span>
+        <div style="flex:1;min-width:0;"><div style="font-size:14.5px;font-weight:600;color:var(--text);">home.v4lgrind.net</div><div style="font-size:12px;color:var(--muted);margin-top:1px;">Serveur Jellyfin · valgrind</div></div>
+        <span style="font-size:12px;font-weight:600;color:var(--accent);">Actif</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:13px;padding:15px 16px;border-bottom:1px solid var(--border);"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="var(--sub)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="8" rx="2"></rect><rect x="2" y="14" width="20" height="6" rx="2"></rect><path d="M6 8h.01M6 17h.01"></path></svg><span style="flex:1;font-size:14.5px;color:var(--text);">Changer de serveur</span><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg></div>
+      <div style="display:flex;align-items:center;gap:13px;padding:15px 16px;"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#ff6b6b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><path d="m16 17 5-5-5-5"></path><path d="M21 12H9"></path></svg><span style="flex:1;font-size:14.5px;color:#ff6b6b;font-weight:500;">Se déconnecter</span></div>
+    </div>
+
+    <!-- Apparence -->
+    <div style="font-size:11.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 4px 10px;">Apparence <span style="color:var(--accent);font-weight:700;">· nouveau</span></div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:22px;">
+      <div style="display:flex;align-items:center;gap:11px;margin-bottom:13px;"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="var(--sub)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M6.3 17.7l-1.4 1.4M19.1 4.9l-1.4 1.4"></path></svg><span style="font-size:14.5px;font-weight:500;color:var(--text);">Thème</span></div>
+      <div style="display:flex;gap:6px;padding:4px;background:var(--chip-bg);border-radius:12px;">
+        <span data-seg2 data-active="true">Auto</span>
+        <span data-seg2 data-active="false">Clair</span>
+        <span data-seg2 data-active="false">Sombre</span>
+      </div>
+      <div style="font-size:11.5px;color:var(--muted);margin-top:10px;line-height:1.5;">« Auto » suit le mode d'affichage du système Android.</div>
+    </div>
+
+    <!-- Préférences de langue -->
+    <div style="font-size:11.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 4px 4px;">Préférences de langue</div>
+    <div style="font-size:11.5px;color:var(--muted);margin:0 4px 10px;line-height:1.5;">Appliqué aux nouveaux éléments. Les réglages par élément priment.</div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-bottom:24px;">
+      <div style="display:flex;align-items:center;gap:13px;padding:15px 16px;border-bottom:1px solid var(--border);"><span style="flex:1;font-size:14.5px;color:var(--text);">Langue audio</span><span style="font-size:13px;color:var(--muted);">Français</span><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg></div>
+      <div style="display:flex;align-items:center;gap:13px;padding:15px 16px;border-bottom:1px solid var(--border);"><span style="flex:1;font-size:14.5px;color:var(--text);">Langue des sous-titres</span><span style="font-size:13px;color:var(--muted);">Français</span><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg></div>
+      <div style="display:flex;align-items:center;gap:13px;padding:15px 16px;border-bottom:1px solid var(--border);"><span style="flex:1;font-size:14.5px;color:var(--text);">Taille des sous-titres</span><span style="font-size:13px;color:var(--muted);">Normale</span><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg></div>
+      <div style="padding:14px 16px;"><div style="position:relative;height:88px;border-radius:11px;overflow:hidden;display:flex;align-items:flex-end;justify-content:center;background:linear-gradient(135deg,#3b3b42,#0b0b0e);"><p style="position:relative;margin:0 0 10px;padding:0 12px;font-size:15px;font-weight:600;color:#fff;text-align:center;line-height:1.3;text-shadow:-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,1px 1px 0 #000,0 0 4px #000;">The quick brown fox jumps over the lazy dog</p></div></div>
+    </div>
+
+    <!-- Lecture -->
+    <div style="font-size:11.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 4px 10px;">Lecture</div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-bottom:24px;">
+      <div style="display:flex;align-items:center;gap:13px;padding:15px 16px;"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="var(--sub)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m22 8-6 4 6 4V8z"></path><rect x="2" y="6" width="14" height="12" rx="2"></rect></svg><span style="flex:1;font-size:14.5px;color:var(--text);">Résolution max</span><span style="font-size:13px;color:var(--muted);">Auto</span><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg></div>
+    </div>
+
+    <!-- Connexion -->
+    <div style="font-size:11.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 4px 10px;">Connexion</div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;">
+      <div style="display:flex;align-items:center;gap:13px;padding:15px 16px;"><div style="flex:1;"><div style="font-size:14.5px;color:var(--text);">Mode hors-ligne forcé</div><div style="font-size:11.5px;color:var(--muted);margin-top:2px;">Désactive toutes les requêtes Jellyfin</div></div><span style="width:46px;height:27px;border-radius:14px;background:var(--chip-bg);border:1px solid var(--border);position:relative;flex:none;"><span style="position:absolute;top:3px;left:3px;width:21px;height:21px;border-radius:50%;background:var(--muted);"></span></span></div>
+    </div>
+  </div>
+
+  <div class="bottomnav">
+    <span><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"></path><path d="M5 9.5V21h14V9.5"></path></svg>Accueil</span>
+    <span><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.4-3.4"></path></svg>Recherche</span>
+    <span><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"></rect><rect x="14" y="3" width="7" height="7" rx="1.5"></rect><rect x="3" y="14" width="7" height="7" rx="1.5"></rect><rect x="14" y="14" width="7" height="7" rx="1.5"></rect></svg>Biblio</span>
+    <span><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"></path><path d="m7 11 5 5 5-5"></path><path d="M5 21h14"></path></svg>Téléch.</span>
+  </div>
+</div>
+
+<script src="_mockup.js"></script>
+</body>
+</html>

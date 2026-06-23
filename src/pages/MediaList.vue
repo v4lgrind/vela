@@ -1,5 +1,6 @@
 <template>
-  <div class="bg-surface text-text-primary p-4">
+  <div class="bg-background text-text-primary p-4"
+    style="padding-top: calc(16px + var(--sat, env(safe-area-inset-top, 0px)))">
 
     <!-- Continue Watching -->
     <section v-if="resumeItems.length" class="mb-5">

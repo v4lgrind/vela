@@ -1,27 +1,47 @@
 <template>
   <div class="min-h-dvh bg-background text-text-primary p-5 flex flex-col">
+    <!-- Header -->
+    <header class="flex items-center justify-between mb-4">
+      <div class="flex items-center gap-2.5 min-w-0">
+        <button @click="router.back()" title="Back"
+          class="size-9 shrink-0 rounded-[10px] border border-border-default bg-surface flex items-center justify-center text-text-heading active:opacity-70">
+          <ChevronLeft class="size-[18px]" :stroke-width="2" />
+        </button>
+        <h1 class="text-[22px] font-bold text-text-heading tracking-tight truncate">{{ libraryName }}</h1>
+      </div>
+      <span class="text-xs text-text-muted shrink-0 ml-2">{{ items.length }} shown</span>
+    </header>
+
     <!-- Filters and Sorting -->
     <section class="mb-4">
-      <!-- Toggle row -->
-      <div class="flex items-center gap-2">
+      <!-- Quick filter pills -->
+      <div class="flex items-center gap-2 overflow-x-auto scrollbar-hide">
         <button
           @click="showFilters = !showFilters"
-          class="flex items-center gap-1.5 px-3 py-2 rounded-md border text-sm font-medium transition-colors"
-          :class="hasActiveFilters
-            ? 'border-accent-purple text-accent-purple bg-accent-purple/10'
-            : 'border-border-default text-text-primary bg-surface-raised hover:border-accent-purple'">
-          <SlidersHorizontal class="size-4" />
+          class="flex items-center gap-1.5 shrink-0 px-3.5 py-2 rounded-full text-[12.5px] font-semibold transition-colors"
+          :class="hasActiveFilters ? 'bg-accent-purple text-accent-ink' : 'bg-surface-hover text-text-primary'">
+          <SlidersHorizontal class="size-3.5" />
           Filters
-          <span v-if="hasActiveFilters" class="bg-accent-purple text-white text-xs rounded-full w-4 h-4 flex items-center justify-center leading-none">!</span>
-          <ChevronDown class="size-3.5 transition-transform duration-200" :class="showFilters ? 'rotate-180' : ''" />
+          <ChevronDown class="size-3 transition-transform duration-200" :class="showFilters ? 'rotate-180' : ''" />
         </button>
-        <Button v-if="hasActiveFilters" variant="ghost" size="sm" @click="resetFilters" class="text-xs px-2 text-text-muted">Reset</Button>
+        <button
+          @click="quickFilter('IsUnplayed')"
+          class="shrink-0 px-3.5 py-2 rounded-full text-[12.5px] font-medium transition-colors"
+          :class="filter === 'IsUnplayed' ? 'bg-accent-purple text-accent-ink' : 'bg-surface-hover text-text-primary'">
+          Unwatched
+        </button>
+        <button
+          @click="quickFilter('IsFavorite')"
+          class="shrink-0 px-3.5 py-2 rounded-full text-[12.5px] font-medium transition-colors"
+          :class="filter === 'IsFavorite' ? 'bg-accent-purple text-accent-ink' : 'bg-surface-hover text-text-primary'">
+          Favorites
+        </button>
+        <Button v-if="hasActiveFilters" variant="ghost" size="sm" @click="resetFilters" class="text-xs px-2 text-text-muted shrink-0">Reset</Button>
 
-        <!-- Spacer -->
         <div class="flex-1" />
 
         <!-- View mode toggle -->
-        <button @click="toggleViewMode" class="p-2 rounded-md border border-border-default bg-surface-raised hover:border-accent-purple transition-colors" title="Toggle view">
+        <button @click="toggleViewMode" class="shrink-0 size-9 rounded-full bg-surface-hover text-text-primary flex items-center justify-center transition-colors" title="Toggle view">
           <List v-if="viewMode === 'grid'" class="size-4" />
           <LayoutGrid v-else class="size-4" />
         </button>
@@ -29,7 +49,7 @@
 
       <!-- Collapsible filter panel -->
       <div v-show="showFilters" class="flex flex-wrap gap-2 items-center mt-3">
-        <select v-model="sortBy" @change="onFilterChange" class="bg-surface-raised border border-border-default rounded-md px-3 py-2 text-base text-text-primary cursor-pointer hover:border-accent-purple transition-colors">
+        <select v-model="sortBy" @change="onFilterChange" class="bg-surface border border-border-default rounded-xl px-3 py-2 text-sm text-text-primary cursor-pointer focus:border-accent-purple transition-colors">
           <option value="SortName">Name</option>
           <option value="PremiereDate">Release Date</option>
           <option value="DateCreated">Date Added</option>
@@ -38,19 +58,19 @@
           <option value="Random">Random</option>
         </select>
 
-        <select v-model="sortOrder" @change="onFilterChange" class="bg-surface-raised border border-border-default rounded-md px-3 py-2 text-base text-text-primary cursor-pointer hover:border-accent-purple transition-colors">
+        <select v-model="sortOrder" @change="onFilterChange" class="bg-surface border border-border-default rounded-xl px-3 py-2 text-sm text-text-primary cursor-pointer focus:border-accent-purple transition-colors">
           <option value="Ascending">↑ Asc</option>
           <option value="Descending">↓ Desc</option>
         </select>
 
-        <select v-model="filter" @change="onFilterChange" class="bg-surface-raised border border-border-default rounded-md px-3 py-2 text-base text-text-primary cursor-pointer hover:border-accent-purple transition-colors">
+        <select v-model="filter" @change="onFilterChange" class="bg-surface border border-border-default rounded-xl px-3 py-2 text-sm text-text-primary cursor-pointer focus:border-accent-purple transition-colors">
           <option value="">All Items</option>
           <option value="IsUnplayed">Unwatched</option>
           <option value="IsPlayed">Watched</option>
           <option value="IsFavorite">Favorites</option>
         </select>
 
-        <select v-model="selectedGenre" @change="onFilterChange" class="bg-surface-raised border border-border-default rounded-md px-3 py-2 text-base text-text-primary cursor-pointer hover:border-accent-purple transition-colors">
+        <select v-model="selectedGenre" @change="onFilterChange" class="bg-surface border border-border-default rounded-xl px-3 py-2 text-sm text-text-primary cursor-pointer focus:border-accent-purple transition-colors">
           <option value="">All Genres</option>
           <option v-for="genre in availableGenres" :key="genre" :value="genre">{{ genre }}</option>
         </select>
@@ -60,62 +80,60 @@
     <section class="flex-1 relative">
       <!-- Grid view -->
       <ul v-if="viewMode === 'grid'" class="list-none p-0 m-0 grid grid-cols-3 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(150px,1fr))] sm:gap-4">
-        <li v-for="item in items" :key="item.Id">
-          <Card class="bg-surface-raised border-border-default hover:-translate-y-1 hover:bg-surface-hover hover:border-border-hover hover:shadow-xl transition-all duration-200 flex flex-col items-center p-2.5 pb-3 overflow-hidden active:scale-[0.97] active:opacity-80">
-            <!-- Poster with overlay -->
-            <div class="relative group w-full rounded-[10px] overflow-hidden bg-black/60 shadow-lg"
-              :class="isAudioType(item.Type) ? 'aspect-square' : 'aspect-[2/3]'">
-              <router-link
-                :to="item.Type === 'BoxSet'
-                  ? { name: 'libraryItem', params: { id: item.Id, name: item.Name } }
-                  : { name: 'ItemDetails', params: { id: item.Id } }"
-                class="block w-full h-full">
-                <LazyImg :src="getImageUrl(item.Id, item.Type)" :alt="item.Name" :item-type="item.Type"
-                  class="w-full h-full object-cover block" />
-              </router-link>
+        <li v-for="item in items" :key="item.Id" class="group">
+          <!-- Poster with overlay -->
+          <div class="relative w-full rounded-xl overflow-hidden bg-surface shadow-lg"
+            :class="isAudioType(item.Type) ? 'aspect-square' : 'aspect-[2/3]'">
+            <router-link
+              :to="item.Type === 'BoxSet'
+                ? { name: 'libraryItem', params: { id: item.Id, name: item.Name } }
+                : { name: 'ItemDetails', params: { id: item.Id } }"
+              class="block w-full h-full">
+              <LazyImg :src="getImageUrl(item.Id, item.Type)" :alt="item.Name" :item-type="item.Type"
+                class="w-full h-full object-cover block" />
+            </router-link>
 
-              <!-- Watched badge -->
-              <div v-if="item.UserData?.Played"
-                class="absolute top-1.5 right-1.5 bg-accent-purple rounded-full p-0.5 shadow pointer-events-none">
-                <Check class="size-3 text-white" />
-              </div>
-              <!-- Download badge -->
-              <div v-if="offlineStore.isItemDownloaded(item.Id)"
-                class="absolute top-1.5 left-1.5 bg-accent-purple/80 rounded-full p-1 shadow pointer-events-none">
-                <DownloadIcon class="size-3 text-white" />
-              </div>
-              <div v-else-if="downloadStore.isDownloading(item.Id)"
-                class="absolute top-1.5 left-1.5 bg-accent-purple/80 rounded-full p-1 shadow pointer-events-none animate-pulse">
-                <Loader2 class="size-3 text-white animate-spin" />
-              </div>
-
-              <!-- Action overlay: always visible on mobile, hover-only on desktop -->
-              <div v-if="!isAudioType(item.Type) && item.Type !== 'BoxSet'"
-                class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent flex items-end justify-center gap-2 pb-2 transition-opacity duration-200 sm:opacity-0 sm:group-hover:opacity-100 pointer-events-none">
-                <button
-                  @click.prevent.stop="playItem(item)"
-                  :disabled="playingId === item.Id"
-                  class="bg-white/90 hover:bg-white text-black rounded-full p-1.5 shadow-lg transition-all active:scale-95 disabled:opacity-60 pointer-events-auto"
-                  title="Play">
-                  <Loader2 v-if="playingId === item.Id" class="size-3 animate-spin" />
-                  <Play v-else class="size-3 fill-black stroke-none" />
-                </button>
-                <button
-                  @click.prevent.stop="toggleWatched(item)"
-                  :disabled="watchingId === item.Id"
-                  class="rounded-full p-1.5 shadow-lg transition-all active:scale-95 disabled:opacity-60 pointer-events-auto"
-                  :class="item.UserData?.Played ? 'bg-accent-purple text-white' : 'bg-white/90 hover:bg-white text-black'"
-                  :title="item.UserData?.Played ? 'Mark as unwatched' : 'Mark as watched'">
-                  <Check class="size-3" />
-                </button>
-              </div>
+            <!-- Watched badge -->
+            <div v-if="item.UserData?.Played"
+              class="absolute top-1.5 right-1.5 size-[18px] rounded-full bg-accent-purple flex items-center justify-center shadow pointer-events-none">
+              <Check class="size-[11px] text-accent-ink" :stroke-width="3" />
+            </div>
+            <!-- Download badge -->
+            <div v-if="offlineStore.isItemDownloaded(item.Id)"
+              class="absolute top-1.5 left-1.5 size-5 rounded-full bg-accent-purple/85 flex items-center justify-center shadow pointer-events-none">
+              <DownloadIcon class="size-[11px] text-accent-ink" />
+            </div>
+            <div v-else-if="downloadStore.isDownloading(item.Id)"
+              class="absolute top-1.5 left-1.5 size-5 rounded-full bg-accent-purple/85 flex items-center justify-center shadow pointer-events-none animate-pulse">
+              <Loader2 class="size-[11px] text-accent-ink animate-spin" />
             </div>
 
-            <div class="w-full text-center mt-2.5">
-              <div class="text-[0.95rem] font-semibold text-text-heading truncate" :title="item.Name">{{ item.Name }}</div>
-              <Badge variant="secondary" class="mt-1 text-xs">{{ item.Type }}</Badge>
+            <!-- Action overlay: always visible on mobile, hover-only on desktop -->
+            <div v-if="!isAudioType(item.Type) && item.Type !== 'BoxSet'"
+              class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent flex items-end justify-center gap-2 pb-2 transition-opacity duration-200 sm:opacity-0 sm:group-hover:opacity-100 pointer-events-none">
+              <button
+                @click.prevent.stop="playItem(item)"
+                :disabled="playingId === item.Id"
+                class="bg-white/90 hover:bg-white text-black rounded-full p-1.5 shadow-lg transition-all active:scale-95 disabled:opacity-60 pointer-events-auto"
+                title="Play">
+                <Loader2 v-if="playingId === item.Id" class="size-3 animate-spin" />
+                <Play v-else class="size-3 fill-black stroke-none" />
+              </button>
+              <button
+                @click.prevent.stop="toggleWatched(item)"
+                :disabled="watchingId === item.Id"
+                class="rounded-full p-1.5 shadow-lg transition-all active:scale-95 disabled:opacity-60 pointer-events-auto"
+                :class="item.UserData?.Played ? 'bg-accent-purple text-accent-ink' : 'bg-white/90 hover:bg-white text-black'"
+                :title="item.UserData?.Played ? 'Mark as unwatched' : 'Mark as watched'">
+                <Check class="size-3" />
+              </button>
             </div>
-          </Card>
+          </div>
+
+          <div class="mt-1.5 px-0.5">
+            <div class="text-xs font-medium text-text-heading truncate leading-tight" :title="item.Name">{{ item.Name }}</div>
+            <div v-if="item.ProductionYear" class="text-[10.5px] text-text-muted mt-0.5">{{ item.ProductionYear }}</div>
+          </div>
         </li>
       </ul>
 
@@ -208,10 +226,8 @@ import { useJellyfinStore } from '@/store/jellyfin-store';
 import { usePreferencesStore } from '@/store/preferences-store';
 import LazyImg from '@/components/LazyImg.vue';
 import { isAudioType } from '@/utils/helpers';
-import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ArrowRight, Play, Check, Download as DownloadIcon, Loader2, SlidersHorizontal, ChevronDown, LayoutGrid, List } from 'lucide-vue-next';
+import { ArrowLeft, ArrowRight, Play, Check, Download as DownloadIcon, Loader2, SlidersHorizontal, ChevronDown, ChevronLeft, LayoutGrid, List } from 'lucide-vue-next';
 import { useOfflineStore } from '@/store/offline-store';
 import { useDownloadStore } from '@/store/download-store';
 
@@ -222,6 +238,7 @@ const prefs = usePreferencesStore();
 const route = useRoute();
 const router = useRouter();
 const libraryId = route.params.id as string;
+const libraryName = computed(() => (route.params.name as string) || 'Library');
 
 const playingId = ref<string | null>(null);
 const watchingId = ref<string | null>(null);
@@ -311,6 +328,11 @@ function onFilterChange() {
   nameStartsWith.value = '';
   startIndex.value = 0;
   loadPage();
+}
+
+function quickFilter(value: string) {
+  filter.value = filter.value === value ? '' : value;
+  onFilterChange();
 }
 
 function resetFilters() {

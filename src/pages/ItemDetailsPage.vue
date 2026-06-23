@@ -1,19 +1,6 @@
 <template>
     <div class="min-h-dvh text-foreground bg-background relative isolate">
 
-        <!-- ── Ambient backdrop ──────────────────────────────── -->
-        <!-- absolute (not fixed) so it stays within the page area below the nav bar.
-             isolate on root creates a stacking context; -z-10 is scoped inside it,
-             above the root's bg-color but below all page content. -->
-        <div aria-hidden="true" class="absolute inset-x-0 top-0 h-screen overflow-hidden pointer-events-none -z-10">
-            <template v-if="backdropUrl">
-                <img :src="backdropUrl"
-                    class="w-full h-full object-cover scale-110 blur-2xl opacity-100 select-none" />
-                <div class="absolute inset-0" style="background-color: var(--item-backdrop-tint)" />
-                <div class="absolute inset-0 item-page-overlay" />
-            </template>
-        </div>
-
         <!-- Loading -->
         <section v-if="loading"
             class="flex items-center justify-center min-h-dvh text-text-muted text-lg">Loading…</section>
@@ -24,182 +11,180 @@
 
         <template v-else>
 
-            <!-- ── HERO ──────────────────────────────────────── -->
-            <section class="relative px-4 pt-8 pb-10 sm:px-6 md:px-10 lg:px-16 text-white">
-                <div class="mx-auto max-w-5xl flex flex-col sm:flex-row gap-7 sm:gap-10 items-start">
+            <!-- ── CINEMATIC HERO ────────────────────────────── -->
+            <Dialog v-model:open="showMediaInfo">
+                <section class="relative">
 
-                    <!-- Poster -->
-                    <div class="shrink-0 mx-auto sm:mx-0">
-                        <div class="rounded-2xl overflow-hidden shadow-[0_25px_70px_rgba(0,0,0,0.85)] ring-1 ring-border-default"
-                            :class="isAudioType(item.Type)
-                                ? 'w-40 h-40 sm:w-48 sm:h-48'
-                                : isLandscapePoster
-                                    ? 'w-full max-w-xs aspect-video'
-                                    : 'w-36 sm:w-48'">
-                            <LazyImg :src="posterUrl" :alt="item.Name" :item-type="item.Type"
-                                class="w-full h-full object-cover block" />
+                    <!-- Backdrop -->
+                    <div class="relative w-full aspect-[16/10] max-h-[58vh] overflow-hidden">
+                        <LazyImg v-if="heroImageUrl" :src="heroImageUrl" :alt="item.Name" :item-type="item.Type"
+                            class="w-full h-full object-cover" />
+                        <div v-else class="absolute inset-0 bg-gradient-to-br from-surface-raised to-background" />
+                        <!-- Fades: bottom into page bg, subtle top darken for buttons -->
+                        <div class="absolute inset-0 bg-gradient-to-t from-background via-background/35 to-transparent" />
+                        <div class="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/45 to-transparent" />
+
+                        <!-- Floating glass top buttons -->
+                        <div class="absolute inset-x-0 top-0 flex items-center justify-between px-3.5 pb-2"
+                            style="padding-top: calc(10px + var(--sat, env(safe-area-inset-top, 0px)))">
+                            <button @click="router.back()" title="Back"
+                                class="size-9 rounded-full bg-black/35 backdrop-blur-md text-white flex items-center justify-center active:scale-95 transition cursor-pointer">
+                                <ChevronLeft class="size-5" />
+                            </button>
+                            <div class="flex gap-2">
+                                <button v-if="isPlayable(item) && castState !== 'NO_DEVICES_AVAILABLE'" @click="castItem"
+                                    :title="castState === 'CONNECTED' ? 'Casting' : 'Cast to TV'"
+                                    class="size-9 rounded-full backdrop-blur-md flex items-center justify-center active:scale-95 transition cursor-pointer"
+                                    :class="castState === 'CONNECTED' ? 'bg-accent-purple text-accent-ink' : 'bg-black/35 text-white'">
+                                    <Tv2 class="size-[18px]" />
+                                </button>
+                                <DialogTrigger v-if="videoDetails.length || sourceDetails.length || fileSizeHuman" as-child>
+                                    <button title="Media info"
+                                        class="size-9 rounded-full bg-black/35 backdrop-blur-md text-white flex items-center justify-center active:scale-95 transition cursor-pointer">
+                                        <Info class="size-[18px]" />
+                                    </button>
+                                </DialogTrigger>
+                            </div>
                         </div>
-                    </div>
 
-                    <!-- Info -->
-                    <Dialog v-model:open="showMediaInfo">
-                        <div class="flex-1 min-w-0 w-full">
-
+                        <!-- Title + meta overlaid on backdrop bottom -->
+                        <div class="absolute inset-x-0 bottom-0 px-5 pb-1">
                             <!-- Breadcrumb -->
                             <div v-if="item.SeriesId || item.SeasonId"
-                                class="flex items-center gap-1.5 text-sm text-white/70 mb-2">
+                                class="flex items-center gap-1.5 text-sm text-white/70 mb-1.5">
                                 <button v-if="item.SeriesId" @click="goToItem(item.SeriesId)"
                                     class="hover:text-white transition-colors cursor-pointer">{{ item.SeriesName }}</button>
                                 <span v-if="item.SeriesId && item.SeasonId" class="text-white/40">/</span>
                                 <button v-if="item.SeasonId" @click="goToItem(item.SeasonId)"
                                     class="hover:text-white transition-colors cursor-pointer">{{ item.SeasonName }}</button>
                             </div>
-
-                            <!-- Title -->
-                            <h1 class="text-3xl sm:text-4xl font-bold text-white leading-tight mb-3">{{ item.Name }}</h1>
-
-                            <!-- Metadata row -->
-                            <div class="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-sm mb-5">
-                                <span v-if="year" class="text-white/80">{{ year }}</span>
-                                <span v-if="year && duration" class="text-white/35">·</span>
-                                <span v-if="duration" class="text-white/80">{{ duration }}</span>
+                            <h1 class="text-[2rem] sm:text-4xl font-bold text-white leading-none tracking-tight mb-2">{{ item.Name }}</h1>
+                            <div class="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[12.5px] text-white/80">
+                                <span v-if="year">{{ year }}</span>
+                                <span v-if="year && duration" class="text-white/40">·</span>
+                                <span v-if="duration">{{ duration }}</span>
                                 <template v-if="item.CommunityRating">
-                                    <span class="text-white/35">·</span>
-                                    <span class="text-yellow-400 font-semibold">★ {{ item.CommunityRating.toFixed(1) }}</span>
+                                    <span class="text-white/40">·</span>
+                                    <span class="text-yellow-300 font-semibold">★ {{ item.CommunityRating.toFixed(1) }}</span>
                                 </template>
-                                <span v-if="item.Type === 'Season' && episodes.length" class="text-white/70">
-                                    {{ episodes.length }} episodes
-                                </span>
-                                <span v-if="item.Type === 'Season' && item.PremiereDate" class="text-white/70">
-                                    {{ new Date(item.PremiereDate).getFullYear() }}
-                                </span>
-                                <span v-if="videoResolution"
-                                    class="px-2 py-0.5 rounded-md bg-white/10 text-xs font-medium text-white/80">{{ videoResolution }}</span>
-                                <span v-if="videoCodec"
-                                    class="px-2 py-0.5 rounded-md bg-white/10 text-xs font-medium text-white/80 uppercase">{{ videoCodec }}</span>
+                                <span v-if="item.Type === 'Season' && episodes.length" class="text-white/70">{{ episodes.length }} episodes</span>
+                                <span v-if="item.Type === 'Season' && item.PremiereDate" class="text-white/70">{{ new Date(item.PremiereDate).getFullYear() }}</span>
+                                <span v-if="videoResolution" class="ml-1 px-2 py-0.5 rounded-md bg-white/16 text-[10.5px] font-semibold">{{ videoResolution }}</span>
+                                <span v-if="videoCodec" class="px-2 py-0.5 rounded-md bg-white/16 text-[10.5px] font-semibold uppercase">{{ videoCodec }}</span>
                             </div>
+                        </div>
+                    </div>
 
-                            <!-- Actions -->
-                            <div class="flex flex-wrap gap-2 mb-6">
-                                <button v-if="isPlayable(item)" @click="playMedia"
-                                    class="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white text-black font-bold text-sm hover:bg-white/90 active:scale-95 transition-all shadow-lg shadow-black/30 cursor-pointer">
-                                    <Play class="size-4 fill-black stroke-none" />
-                                    {{ resumePositionLabel ? `Resume · ${resumePositionLabel}` : 'Play' }}
-                                </button>
+                    <!-- Body below backdrop -->
+                    <div class="px-5 pt-4 max-w-5xl mx-auto">
 
-                                <button v-if="item.Type === 'MusicAlbum' && audioTracks.length" @click="playAlbum"
-                                    class="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white text-black font-bold text-sm hover:bg-white/90 transition-all cursor-pointer">
-                                    <Play class="size-4 fill-black stroke-none" /> Play album
-                                </button>
+                        <!-- Actions -->
+                        <div class="flex flex-wrap items-center gap-2.5 mb-4">
+                            <button v-if="isPlayable(item)" @click="playMedia"
+                                class="flex-1 min-w-[180px] flex items-center justify-center gap-2 h-[50px] rounded-2xl bg-accent-purple text-accent-ink font-bold text-[15px] active:scale-[0.98] transition shadow-lg cursor-pointer">
+                                <Play class="size-4 fill-current stroke-none" />
+                                {{ resumePositionLabel ? `Resume · ${resumePositionLabel}` : 'Play' }}
+                            </button>
 
-                                <!-- Cast button -->
-                                <button
-                                    v-if="isPlayable(item) && castState !== 'NO_DEVICES_AVAILABLE'"
-                                    @click="castItem"
-                                    :class="castState === 'CONNECTED' ? 'bg-accent-blue/20 border-accent-blue/50 text-accent-blue' : 'bg-white/10 border-white/10 text-white/90 hover:bg-white/15'"
-                                    class="flex items-center justify-center w-11 h-11 rounded-xl border transition-all cursor-pointer"
-                                    :title="castState === 'CONNECTED' ? 'Casting' : 'Cast to TV'">
-                                    <Tv2 class="size-4" />
-                                </button>
+                            <button v-if="item.Type === 'MusicAlbum' && audioTracks.length" @click="playAlbum"
+                                class="flex-1 min-w-[180px] flex items-center justify-center gap-2 h-[50px] rounded-2xl bg-accent-purple text-accent-ink font-bold text-[15px] active:scale-[0.98] transition cursor-pointer">
+                                <Play class="size-4 fill-current stroke-none" /> Play album
+                            </button>
 
-                                <button v-if="isItemDownloaded && !isDownloading" @click="deleteDownload"
-                                    class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-accent-purple/20 border border-accent-purple/40 text-accent-purple text-sm font-medium hover:bg-accent-purple/30 transition-all cursor-pointer">
-                                    <Check class="size-4" /> Downloaded
-                                </button>
-                                <button v-else-if="canDownload(item) && !isItemDownloaded && !isDownloading"
-                                    @click="handleDownload"
-                                    class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 border border-white/10 text-white/90 text-sm font-medium hover:bg-white/15 transition-all cursor-pointer">
-                                    <DownloadIcon class="size-4" /> Download
-                                </button>
-                                <button v-if="isDownloading" disabled
-                                    class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 text-white/65 text-sm cursor-wait">
-                                    Downloading… {{ downloadProgress }}%
-                                </button>
-                                <button v-if="isDownloading" @click="cancelDownload"
-                                    class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-red-500/15 border border-red-500/30 text-red-400 text-sm hover:bg-red-500/25 transition-all cursor-pointer">
-                                    <X class="size-4" /> Cancel
-                                </button>
+                            <!-- Download (single item) -->
+                            <button v-if="isItemDownloaded && !isDownloading" @click="deleteDownload"
+                                title="Downloaded — tap to delete"
+                                class="flex items-center justify-center size-[50px] rounded-2xl bg-accent-purple/15 border border-accent-purple/40 text-accent-purple active:scale-95 transition cursor-pointer">
+                                <Check class="size-5" />
+                            </button>
+                            <button v-else-if="canDownload(item) && !isItemDownloaded && !isDownloading" @click="handleDownload"
+                                title="Download"
+                                class="flex items-center justify-center size-[50px] rounded-2xl bg-surface border border-border-default text-text-heading active:scale-95 transition cursor-pointer">
+                                <DownloadIcon class="size-5" />
+                            </button>
+                            <button v-if="isDownloading" @click="cancelDownload"
+                                :title="`Downloading ${downloadProgress}% — tap to cancel`"
+                                class="flex items-center justify-center size-[50px] rounded-2xl bg-red-500/10 border border-red-500/30 text-red-400 active:scale-95 transition cursor-pointer">
+                                <Loader2 class="size-5 animate-spin" />
+                            </button>
 
-                                <!-- Bulk download buttons for Season / Series -->
-                                <button v-if="item.Type === 'Season'"
-                                    @click="openBulkDialog('season')"
-                                    class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 border border-white/10 text-white/90 text-sm font-medium hover:bg-white/15 transition-all cursor-pointer">
-                                    <DownloadIcon class="size-4" /> Download Season
-                                </button>
-                                <button v-if="item.Type === 'Series'"
-                                    @click="openBulkDialog('series')"
-                                    class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 border border-white/10 text-white/90 text-sm font-medium hover:bg-white/15 transition-all cursor-pointer">
-                                    <DownloadIcon class="size-4" /> Download Series
-                                </button>
+                            <!-- Bulk download Season / Series -->
+                            <button v-if="item.Type === 'Season'" @click="openBulkDialog('season')"
+                                class="flex items-center gap-2 px-4 h-[50px] rounded-2xl bg-surface border border-border-default text-text-heading text-sm font-medium active:scale-95 transition cursor-pointer">
+                                <DownloadIcon class="size-4" /> Season
+                            </button>
+                            <button v-if="item.Type === 'Series'" @click="openBulkDialog('series')"
+                                class="flex items-center gap-2 px-4 h-[50px] rounded-2xl bg-surface border border-border-default text-text-heading text-sm font-medium active:scale-95 transition cursor-pointer">
+                                <DownloadIcon class="size-4" /> Series
+                            </button>
 
-                                <!-- Mark all watched for Series / Season -->
-                                <button v-if="item.Type === 'Series' || item.Type === 'Season'"
-                                    :disabled="togglingWatched" @click="toggleWatched"
-                                    :title="item.UserData?.Played ? 'Mark all as unwatched' : 'Mark all as watched'"
-                                    class="flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-medium transition-all cursor-pointer"
-                                    :class="item.UserData?.Played
-                                        ? 'bg-accent-purple/20 border-accent-purple/50 text-accent-purple hover:bg-accent-purple/30'
-                                        : 'bg-white/10 border-white/10 text-white/90 hover:bg-white/15'">
-                                    <Loader2 v-if="togglingWatched" class="size-4 animate-spin" />
-                                    <Check v-else class="size-4" />
-                                    {{ item.UserData?.Played ? 'All watched' : 'Mark all watched' }}
-                                </button>
+                            <!-- Mark all watched (Series / Season) -->
+                            <button v-if="item.Type === 'Series' || item.Type === 'Season'"
+                                :disabled="togglingWatched" @click="toggleWatched"
+                                :title="item.UserData?.Played ? 'Mark all as unwatched' : 'Mark all as watched'"
+                                class="flex items-center gap-2 px-4 h-[50px] rounded-2xl border text-sm font-medium active:scale-95 transition cursor-pointer"
+                                :class="item.UserData?.Played
+                                    ? 'bg-accent-purple/15 border-accent-purple/40 text-accent-purple'
+                                    : 'bg-surface border-border-default text-text-heading'">
+                                <Loader2 v-if="togglingWatched" class="size-4 animate-spin" />
+                                <Check v-else class="size-4" />
+                                {{ item.UserData?.Played ? 'Watched' : 'Mark watched' }}
+                            </button>
 
-                                <button
-                                    v-if="item.Type !== 'Series' && item.Type !== 'Season' && item.Type !== 'MusicAlbum' && item.Type !== 'BoxSet'"
-                                    :disabled="togglingWatched" @click="toggleWatched"
-                                    :title="item.UserData?.Played ? 'Mark as unwatched' : 'Mark as watched'"
-                                    class="flex items-center justify-center w-11 h-11 rounded-xl border transition-all cursor-pointer"
-                                    :class="item.UserData?.Played
-                                        ? 'bg-accent-purple/20 border-accent-purple/50 text-accent-purple'
-                                        : 'bg-white/10 border-white/10 text-white/75 hover:bg-white/15 hover:text-white'">
-                                    <Loader2 v-if="togglingWatched" class="size-4 animate-spin" />
-                                    <Check v-else class="size-4" />
-                                </button>
+                            <!-- Watched toggle (single playable) -->
+                            <button
+                                v-if="item.Type !== 'Series' && item.Type !== 'Season' && item.Type !== 'MusicAlbum' && item.Type !== 'BoxSet'"
+                                :disabled="togglingWatched" @click="toggleWatched"
+                                :title="item.UserData?.Played ? 'Mark as unwatched' : 'Mark as watched'"
+                                class="flex items-center justify-center size-[50px] rounded-2xl border active:scale-95 transition cursor-pointer"
+                                :class="item.UserData?.Played
+                                    ? 'bg-accent-purple/15 border-accent-purple/40 text-accent-purple'
+                                    : 'bg-surface border-border-default text-text-heading'">
+                                <Loader2 v-if="togglingWatched" class="size-5 animate-spin" />
+                                <Check v-else class="size-5" />
+                            </button>
+                        </div>
 
-                                <DialogTrigger v-if="videoDetails.length || sourceDetails.length || fileSizeHuman"
-                                    as-child>
-                                    <button
-                                        class="flex items-center justify-center w-11 h-11 rounded-xl bg-white/10 border border-white/10 text-white/75 hover:bg-white/15 hover:text-white transition-all cursor-pointer"
-                                        title="Media info">
-                                        <Info class="size-4" />
-                                    </button>
-                                </DialogTrigger>
-                            </div>
+                        <!-- Resume progress bar -->
+                        <div v-if="resumePercent > 0 && resumePercent < 100"
+                            class="h-1 rounded-full bg-surface-hover overflow-hidden mb-4">
+                            <div class="h-full bg-accent-purple rounded-full" :style="{ width: resumePercent + '%' }" />
+                        </div>
 
-                            <!-- Overview -->
-                            <div v-if="item.Overview" class="mb-5 max-w-2xl">
-                                <p class="text-sm leading-relaxed text-white/85 m-0 transition-all"
-                                    :class="overviewExpanded ? '' : 'line-clamp-3'">
-                                    {{ item.Overview }}
-                                </p>
-                                <button @click="overviewExpanded = !overviewExpanded"
-                                    class="mt-1.5 text-xs text-accent-purple hover:text-accent-purple-light transition-colors cursor-pointer">
-                                    {{ overviewExpanded ? 'Show less' : 'Show more' }}
-                                </button>
-                            </div>
+                        <!-- Overview -->
+                        <div v-if="item.Overview" class="mb-4 max-w-2xl">
+                            <p class="text-[13.5px] leading-relaxed text-text-body m-0 transition-all"
+                                :class="overviewExpanded ? '' : 'line-clamp-3'">
+                                {{ item.Overview }}
+                            </p>
+                            <button @click="overviewExpanded = !overviewExpanded"
+                                class="mt-1.5 text-xs text-accent-purple hover:text-accent-purple-light transition-colors cursor-pointer">
+                                {{ overviewExpanded ? 'Show less' : 'Show more' }}
+                            </button>
+                        </div>
 
-                            <!-- Genres -->
-                            <div v-if="genres.length" class="flex flex-wrap gap-1.5 mb-4">
-                                <span v-for="g in genres" :key="g"
-                                    class="px-3 py-1 rounded-full text-xs text-white/80 border border-white/20 bg-white/10">
-                                    {{ g }}
-                                </span>
-                            </div>
+                        <!-- Genres -->
+                        <div v-if="genres.length" class="flex flex-wrap gap-2 mb-4">
+                            <span v-for="g in genres" :key="g"
+                                class="px-3.5 py-1.5 rounded-full text-xs font-medium text-text-primary bg-surface-hover">
+                                {{ g }}
+                            </span>
+                        </div>
 
-                            <!-- Director / Studio inline -->
-                            <div class="flex flex-wrap gap-x-5 gap-y-1 text-xs">
-                                <span v-if="directorNames.length">
-                                    <span class="text-white/50 uppercase tracking-wider text-[10px] mr-1.5">Director</span>
-                                    <span class="text-white/80">{{ directorNames.join(', ') }}</span>
-                                </span>
-                                <span v-if="studioNames.length">
-                                    <span class="text-white/50 uppercase tracking-wider text-[10px] mr-1.5">Studio</span>
-                                    <span class="text-white/80">{{ studioNames.join(', ') }}</span>
-                                </span>
-                            </div>
+                        <!-- Director / Studio inline -->
+                        <div class="flex flex-wrap gap-x-5 gap-y-1 text-xs">
+                            <span v-if="directorNames.length">
+                                <span class="text-text-subtle uppercase tracking-wider text-[10px] mr-1.5">Director</span>
+                                <span class="text-text-primary">{{ directorNames.join(', ') }}</span>
+                            </span>
+                            <span v-if="studioNames.length">
+                                <span class="text-text-subtle uppercase tracking-wider text-[10px] mr-1.5">Studio</span>
+                                <span class="text-text-primary">{{ studioNames.join(', ') }}</span>
+                            </span>
+                        </div>
+                    </div>
 
-                            <!-- Media Info dialog content -->
+                    <!-- Media Info dialog content -->
                             <DialogContent
                                 class="max-w-lg max-h-[85dvh] overflow-y-auto bg-surface-raised border-border-default">
                                 <DialogHeader>
@@ -245,10 +230,8 @@
                                     </DialogClose>
                                 </DialogFooter>
                             </DialogContent>
-                        </div>
-                    </Dialog>
-                </div>
-            </section>
+                </section>
+            </Dialog>
 
             <!-- ── SECTIONS ──────────────────────────────────── -->
             <div class="px-4 sm:px-6 md:px-10 lg:px-16 pb-12 max-w-5xl mx-auto space-y-5">
@@ -516,11 +499,11 @@ import { useMetadataCacheStore } from '@/store/metadata-cache-store';
 import { downloadService } from '@/services/downloadService';
 import { offlineDatabase } from '@/services/offlineDatabase';
 import LazyImg from '@/components/LazyImg.vue';
-import { isAudioType, formatTicksDuration, formatTicksHuman, formatBytes } from '@/utils/helpers';
+import { formatTicksDuration, formatTicksHuman, formatBytes } from '@/utils/helpers';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose, DialogTrigger } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
-import { Play, Check, Download as DownloadIcon, X, ArrowLeft, ArrowRight, Loader2, Info, Tv2 } from 'lucide-vue-next';
+import { Play, Check, Download as DownloadIcon, ArrowLeft, ArrowRight, ChevronLeft, Loader2, Info, Tv2 } from 'lucide-vue-next';
 import CastPlugin, { type CastState } from '@/plugins/CastPlugin';
 import { usePlatform } from '@/composables/usePlatform';
 import { useToast } from '@/composables/useToast';
@@ -723,6 +706,21 @@ const backdropUrl = computed(() => {
         return store.getImageUrl(item.value.SeriesId, 'Backdrop', 1920, 1080) || '';
     }
     return store.getImageUrl(item.value.Id, 'Backdrop', 1920, 1080) || '';
+});
+
+// Cinematic hero image: prefer a wide backdrop, fall back to the poster so
+// items without a backdrop (most albums) still render a header.
+const heroImageUrl = computed(() => backdropUrl.value || posterUrl.value);
+
+const resumePercent = computed(() => {
+    const runtime = item.value?.RunTimeTicks;
+    if (!runtime) return 0;
+    let posTicks = item.value?.UserData?.PlaybackPositionTicks ?? 0;
+    if (offlineProgressSeconds.value && offlineProgressSeconds.value > 0) {
+        posTicks = Math.floor(offlineProgressSeconds.value * 10_000_000);
+    }
+    if (posTicks <= 0) return 0;
+    return Math.min(100, (posTicks / runtime) * 100);
 });
 
 const resumePositionLabel = computed(() => {

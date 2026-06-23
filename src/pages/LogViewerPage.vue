@@ -1,6 +1,7 @@
 <template>
   <div class="min-h-dvh bg-background text-text-body">
-    <div class="max-w-4xl mx-auto px-4 py-8">
+    <div class="max-w-4xl mx-auto px-4 py-8"
+      style="padding-top: calc(32px + var(--sat, env(safe-area-inset-top, 0px)))">
       <div class="flex items-center justify-between mb-6">
         <div class="flex items-center gap-3">
           <button @click="$router.back()" class="p-2 -ml-2 text-text-muted hover:text-text-heading">

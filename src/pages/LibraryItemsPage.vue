@@ -1,5 +1,6 @@
 <template>
-  <div class="min-h-dvh bg-background text-text-primary p-5 flex flex-col">
+  <div class="min-h-dvh bg-background text-text-primary p-5 flex flex-col"
+    style="padding-top: calc(20px + var(--sat, env(safe-area-inset-top, 0px)))">
     <!-- Header -->
     <header class="flex items-center justify-between mb-4">
       <div class="flex items-center gap-2.5 min-w-0">

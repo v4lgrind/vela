@@ -1,5 +1,6 @@
 <template>
-  <div class="min-h-dvh bg-background text-text-primary p-5">
+  <div class="min-h-dvh bg-background text-text-primary p-5"
+    style="padding-top: calc(20px + var(--sat, env(safe-area-inset-top, 0px)))">
 
     <!-- Header -->
     <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-3 mb-5">

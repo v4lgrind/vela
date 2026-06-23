@@ -5,8 +5,15 @@
     </div>
 
     <template v-else>
+      <!-- Back -->
+      <header class="px-4 pt-5" style="padding-top: calc(20px + var(--sat, env(safe-area-inset-top, 0px)))">
+        <button @click="router.back()" title="Back"
+          class="size-9 rounded-[10px] border border-border-default bg-surface flex items-center justify-center text-text-heading active:opacity-70">
+          <ChevronLeft class="size-[18px]" :stroke-width="2" />
+        </button>
+      </header>
       <!-- Hero -->
-      <div class="px-4 py-6 flex gap-5 items-start">
+      <div class="px-4 pt-4 pb-6 flex gap-5 items-start">
         <div class="shrink-0 w-28 aspect-[2/3] rounded-2xl overflow-hidden bg-surface-raised shadow-lg">
           <LazyImg
             :src="person?.Id ? store.getImageUrl(person.Id, 'Primary', 300) : ''"
@@ -70,7 +77,7 @@ import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useJellyfinStore } from '@/store/jellyfin-store';
 import LazyImg from '@/components/LazyImg.vue';
-import { Download as DownloadIcon, Loader2 } from 'lucide-vue-next';
+import { Download as DownloadIcon, Loader2, ChevronLeft } from 'lucide-vue-next';
 import { useOfflineStore } from '@/store/offline-store';
 import { useDownloadStore } from '@/store/download-store';
 

@@ -1,6 +1,7 @@
 <template>
   <div class="min-h-dvh bg-background text-text-body">
-    <div class="max-w-2xl mx-auto px-5 pt-6 pb-4">
+    <div class="max-w-2xl mx-auto px-5 pt-6 pb-4"
+      style="padding-top: calc(24px + var(--sat, env(safe-area-inset-top, 0px)))">
       <h1 class="text-2xl font-bold text-text-heading tracking-tight mb-7">Settings</h1>
 
       <!-- Account -->

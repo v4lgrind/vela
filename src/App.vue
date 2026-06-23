@@ -1,5 +1,4 @@
 <template>
-  <SearchBar v-if="isAuthenticated && route.name !== 'search' && route.name !== 'ItemDetails'" />
   <router-view :key="route.path" :style="routerViewStyle" />
   <MiniAudioPlayer
     v-if="isAuthenticated && audioStore.isMiniPlayerVisible && !audioStore.isExpanded"
@@ -12,7 +11,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import SearchBar from "@/components/SearchBar.vue";
 import MiniAudioPlayer from "@/components/MiniAudioPlayer.vue";
 import ExpandedAudioPlayer from "@/components/ExpandedAudioPlayer.vue";
 import BottomNav from "@/components/BottomNav.vue";

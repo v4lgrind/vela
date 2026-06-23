@@ -1329,7 +1329,7 @@ class NativePlayerActivity : AppCompatActivity() {
                 val color = when (method) {
                     "DirectPlay" -> 0xFF43E97B.toInt()
                     "DirectStream" -> 0xFF00A4DC.toInt()
-                    else -> 0xFF7C3AED.toInt()
+                    else -> 0xFF2F9BFF.toInt()
                 }
                 badgeRow.addView(makeInfoBadge(method, color))
             }

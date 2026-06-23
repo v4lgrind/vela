@@ -1,6 +1,6 @@
 <template>
   <SearchBar v-if="isAuthenticated && route.name !== 'search'" />
-  <router-view :key="route.fullPath" :style="routerViewStyle" />
+  <router-view :key="route.path" :style="routerViewStyle" />
   <MiniAudioPlayer
     v-if="isAuthenticated && audioStore.isMiniPlayerVisible && !audioStore.isExpanded"
   />

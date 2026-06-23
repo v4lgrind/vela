@@ -113,6 +113,7 @@ class NativePlayerActivity : AppCompatActivity() {
     private var playerNotificationManager: PlayerNotificationManager? = null
     private lateinit var playerView: PlayerView
     private lateinit var controlsOverlay: View
+    private lateinit var controlsInset: View
     private lateinit var btnBack: ImageButton
     private lateinit var btnPlayPause: ImageButton
     private lateinit var btnAudio: ImageButton
@@ -368,6 +369,7 @@ class NativePlayerActivity : AppCompatActivity() {
         playerView = findViewById(R.id.player_view)
         playerView.visibility = View.INVISIBLE  // Hide until playback is ready
         controlsOverlay = findViewById(R.id.controls_overlay)
+        controlsInset = findViewById(R.id.controls_inset)
         btnBack = findViewById(R.id.btn_back)
         btnPlayPause = findViewById(R.id.btn_play_pause)
         btnAudio = findViewById(R.id.btn_audio)
@@ -458,8 +460,10 @@ class NativePlayerActivity : AppCompatActivity() {
         val srtPath = intent.getStringExtra(EXTRA_SRT_FILE_PATH) ?: ""
         setupSrtSubtitle(srtPath)
 
-        // Pad the controls overlay to keep all UI outside the display cutout and system bars.
-        ViewCompat.setOnApplyWindowInsetsListener(controlsOverlay) { view, windowInsets ->
+        // Pad only the inner control container so buttons stay outside the
+        // display cutout / system bars. The scrims live outside this container
+        // and remain full-bleed, covering every edge of the screen.
+        ViewCompat.setOnApplyWindowInsetsListener(controlsInset) { view, windowInsets ->
             val cutout = windowInsets.getInsets(WindowInsetsCompat.Type.displayCutout())
             val sysBars = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
             view.setPadding(

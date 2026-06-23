@@ -29,7 +29,7 @@
         android:layout_height="match_parent"
         android:background="#00000000">
 
-        <!-- Top scrim — keeps the title/back readable against bright content -->
+        <!-- Top scrim — full-bleed (NOT inset) so it always reaches every edge -->
         <View
             android:id="@+id/top_scrim"
             android:layout_width="0dp"
@@ -39,7 +39,7 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent" />
 
-        <!-- Bottom scrim — keeps the transport row readable -->
+        <!-- Bottom scrim — full-bleed -->
         <View
             android:id="@+id/bottom_scrim"
             android:layout_width="0dp"
@@ -48,6 +48,13 @@
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent" />
+
+        <!-- Inset container: holds the interactive controls, padded for the
+             display cutout / system bars. The scrims above stay full-bleed. -->
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:id="@+id/controls_inset"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
 
         <!-- Top row: back + title -->
         <ImageButton
@@ -228,6 +235,8 @@
                 android:contentDescription="Toggle fullscreen" />
 
         </LinearLayout>
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 

@@ -276,6 +276,7 @@ import { NativeVideo } from '@/plugins/NativeVideoPlugin';
 import { usePlatform } from '@/composables/usePlatform';
 import { deviceProfile, nativeAndroidDeviceProfile } from '@/constants';
 import { formatTime } from '@/utils/helpers';
+import { languageMatches } from '@/utils/language';
 import { lockLandscape, unlockOrientation } from '@/utils/orientation';
 import { debugLog } from '@/utils/debugLog';
 import { logger } from '@/utils/logger';
@@ -1235,7 +1236,7 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
                     nativeAudio.forEach((t: any) => debugLog(`[AudioCrash]   ExoPlayer track: groupIndex=${t.groupIndex} lang="${t.language}" codec="${t.codec}" ch=${t.channelCount}`));
                     const preferredAudio =
                         (savedLang ? nativeAudio.find((t: any) => t.language === savedLang) : null) ||
-                        (globalLang ? nativeAudio.find((t: any) => t.language === globalLang) : null);
+                        (globalLang ? nativeAudio.find((t: any) => languageMatches(globalLang, t.language)) : null);
                     if (preferredAudio) {
                         debugLog(`[AudioCrash] tracksReady: auto-switching to groupIndex=${preferredAudio.groupIndex} lang="${preferredAudio.language}"`);
                         NativeVideo.selectAudioTrack({ groupIndex: preferredAudio.groupIndex });
@@ -1269,7 +1270,7 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
                     }
                     // If track not found, leave ExoPlayer at its default — don't touch localStorage.
                 } else if (globalSubLang) {
-                    const nativeSub = nativeSubtitle.find((t: any) => t.language === globalSubLang);
+                    const nativeSub = nativeSubtitle.find((t: any) => languageMatches(globalSubLang, t.language));
                     if (nativeSub) {
                         restoringSubtitle = true;
                         NativeVideo.selectSubtitleTrack({ groupIndex: nativeSub.groupIndex });
@@ -1518,7 +1519,7 @@ async function initOfflinePlayer(cachedDownload: any, resumeSeconds?: number, it
 
                         const preferredAudio =
                             (savedLang ? audioList.value.find((t: any) => t.language === savedLang && t.index !== skipAudioGroupIndex) : null) ||
-                            (globalLang ? audioList.value.find((t: any) => t.language === globalLang && t.index !== skipAudioGroupIndex) : null);
+                            (globalLang ? audioList.value.find((t: any) => languageMatches(globalLang, t.language) && t.index !== skipAudioGroupIndex) : null);
                         if (preferredAudio) {
                             debugLog(`[Offline] tracksReady: auto-switching to groupIndex=${preferredAudio.index} lang="${preferredAudio.language}"`);
                             NativeVideo.selectAudioTrack({ groupIndex: preferredAudio.index });
@@ -1549,7 +1550,7 @@ async function initOfflinePlayer(cachedDownload: any, resumeSeconds?: number, it
                             selectedSubtitleIndex.value = nativeSub.groupIndex;
                         }
                     } else if (globalSubLang) {
-                        const nativeSub = enrichedSubs.find((t: any) => t.language === globalSubLang);
+                        const nativeSub = enrichedSubs.find((t: any) => languageMatches(globalSubLang, t.language));
                         if (nativeSub) {
                             restoringSubtitle = true;
                             NativeVideo.selectSubtitleTrack({ groupIndex: nativeSub.groupIndex });

@@ -1,34 +1,36 @@
 <template>
   <div class="flex flex-col h-dvh bg-background">
-    <!-- Header: back + search input -->
-    <div class="flex items-center gap-3 px-4 border-b border-border-input bg-surface-raised"
-      style="padding-top: calc(12px + var(--sat, env(safe-area-inset-top, 0px))); padding-bottom: 12px">
-      <button class="shrink-0 p-1.5 rounded-lg hover:bg-surface-hover transition-colors cursor-pointer"
-        @click="router.back()">
-        <ArrowLeft class="size-5 text-text-heading" />
+    <!-- Header: pill search field + cancel -->
+    <div class="flex items-center gap-2.5 px-5 pb-3.5"
+      style="padding-top: calc(12px + var(--sat, env(safe-area-inset-top, 0px)))">
+      <div class="flex-1 flex items-center gap-2.5 bg-surface border border-border-default rounded-2xl px-4 py-3 focus-within:border-accent-purple transition-colors">
+        <Search class="size-[19px] text-text-muted shrink-0" :stroke-width="1.9" />
+        <input
+          ref="inputEl"
+          v-model="searchQuery"
+          type="search"
+          placeholder="Search movies, shows, episodes..."
+          class="flex-1 min-w-0 bg-transparent text-[14.5px] text-text-heading placeholder:text-text-muted outline-none"
+          @input="onInput"
+          @keydown.esc="router.back()"
+        />
+      </div>
+      <button class="shrink-0 text-sm font-semibold text-accent-purple cursor-pointer" @click="router.back()">
+        Cancel
       </button>
-      <input
-        ref="inputEl"
-        v-model="searchQuery"
-        type="search"
-        placeholder="Search movies, shows, episodes..."
-        class="flex-1 bg-surface border border-border-input rounded-lg px-3 py-2 text-sm text-text-heading placeholder:text-text-muted outline-none focus:border-accent-purple transition-colors"
-        @input="onInput"
-        @keydown.esc="router.back()"
-      />
     </div>
 
     <!-- Filter tabs -->
-    <div class="flex gap-2 px-4 py-2.5 border-b border-border-input overflow-x-auto scrollbar-hide shrink-0">
+    <div class="flex gap-2 px-5 pb-3 overflow-x-auto scrollbar-hide shrink-0">
       <button
         v-for="tab in tabs" :key="tab.value"
-        class="shrink-0 px-3 py-1.5 rounded-full text-sm font-medium transition-colors cursor-pointer"
+        class="shrink-0 px-3.5 py-2 rounded-full text-[12.5px] font-semibold transition-colors cursor-pointer"
         :class="activeTab === tab.value
-          ? 'bg-accent-purple text-white'
-          : 'bg-surface-hover text-text-muted hover:text-text-heading'"
+          ? 'bg-accent-purple text-accent-ink'
+          : 'bg-surface-hover text-text-primary'"
         @click="activeTab = tab.value">
         {{ tab.label }}
-        <span v-if="tab.value !== 'all' && tabCount(tab.value) > 0" class="ml-1 opacity-70 text-xs">
+        <span v-if="tab.value !== 'all' && tabCount(tab.value) > 0" class="ml-1 opacity-70">
           {{ tabCount(tab.value) }}
         </span>
       </button>
@@ -57,53 +59,49 @@
       <!-- Grid -->
       <ul v-else class="list-none p-4 m-0 grid grid-cols-3 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(140px,1fr))] sm:gap-4"
         style="padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px))">
-        <li v-for="item in filteredResults" :key="item.Id">
-          <div
-            class="bg-surface-raised border border-border-default hover:border-border-hover rounded-xl overflow-hidden active:scale-[0.97] active:opacity-80 transition-all duration-200 cursor-pointer flex flex-col"
-            @click="goToItem(item)">
-            <!-- Poster -->
-            <div class="relative w-full overflow-hidden bg-black/60"
-              :class="item.Type === 'Episode' ? 'aspect-video' : 'aspect-[2/3]'">
-              <LazyImg
-                :src="itemImageUrl(item)"
-                :alt="item.Name"
-                :item-type="item.Type"
-                class="w-full h-full object-cover block"
-              />
-              <!-- Download badge -->
-              <div v-if="offlineStore.isItemDownloaded(item.Id)"
-                class="absolute top-1 left-1 z-10 bg-accent-purple/80 rounded-full p-1 shadow pointer-events-none">
-                <DownloadIcon class="size-3 text-white" />
-              </div>
-              <div v-else-if="downloadStore.isDownloading(item.Id)"
-                class="absolute top-1 left-1 z-10 bg-accent-purple/80 rounded-full p-1 shadow pointer-events-none animate-pulse">
-                <Loader2 class="size-3 text-white animate-spin" />
-              </div>
-              <!-- Watched toggle -->
-              <button
-                @click.stop="toggleWatched(item)"
-                :disabled="watchingId === item.Id"
-                class="absolute top-1 right-1 z-10 rounded-full p-1 transition-all active:scale-95 disabled:opacity-60 pointer-events-auto"
-                :class="item.UserData?.Played ? 'bg-accent-purple text-white' : 'bg-black/50 text-white/60 hover:bg-black/75 hover:text-white'">
-                <Loader2 v-if="watchingId === item.Id" class="size-3 animate-spin" />
-                <Check v-else class="size-3" />
-              </button>
-              <!-- Episode label -->
-              <div v-if="item.Type === 'Episode' && (item.ParentIndexNumber || item.IndexNumber)"
-                class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-2 py-1.5">
-                <p class="text-white text-xs font-semibold">
-                  S{{ item.ParentIndexNumber }}E{{ item.IndexNumber }}
-                </p>
-              </div>
+        <li v-for="item in filteredResults" :key="item.Id" class="cursor-pointer" @click="goToItem(item)">
+          <!-- Poster -->
+          <div class="relative w-full rounded-xl overflow-hidden bg-surface shadow-lg active:opacity-80 transition-opacity"
+            :class="item.Type === 'Episode' ? 'aspect-video' : 'aspect-[2/3]'">
+            <LazyImg
+              :src="itemImageUrl(item)"
+              :alt="item.Name"
+              :item-type="item.Type"
+              class="w-full h-full object-cover block"
+            />
+            <!-- Download badge -->
+            <div v-if="offlineStore.isItemDownloaded(item.Id)"
+              class="absolute top-1.5 left-1.5 size-5 rounded-full bg-accent-purple/85 flex items-center justify-center shadow pointer-events-none">
+              <DownloadIcon class="size-[11px] text-accent-ink" />
             </div>
-            <!-- Info -->
-            <div class="px-2 py-2">
-              <p class="text-text-heading text-xs font-semibold line-clamp-2 leading-tight">{{ item.Name }}</p>
-              <p v-if="item.Type === 'Episode' && item.SeriesName"
-                class="text-text-muted text-xs mt-0.5 truncate">{{ item.SeriesName }}</p>
-              <p v-else-if="item.ProductionYear"
-                class="text-text-muted text-xs mt-0.5">{{ item.ProductionYear }}</p>
+            <div v-else-if="downloadStore.isDownloading(item.Id)"
+              class="absolute top-1.5 left-1.5 size-5 rounded-full bg-accent-purple/85 flex items-center justify-center shadow pointer-events-none animate-pulse">
+              <Loader2 class="size-[11px] text-accent-ink animate-spin" />
             </div>
+            <!-- Watched toggle -->
+            <button
+              @click.stop="toggleWatched(item)"
+              :disabled="watchingId === item.Id"
+              class="absolute top-1.5 right-1.5 size-[18px] rounded-full flex items-center justify-center shadow transition-all active:scale-95 disabled:opacity-60"
+              :class="item.UserData?.Played ? 'bg-accent-purple text-accent-ink' : 'bg-black/50 text-white/60 hover:bg-black/75 hover:text-white'">
+              <Loader2 v-if="watchingId === item.Id" class="size-[11px] animate-spin" />
+              <Check v-else class="size-[11px]" :stroke-width="3" />
+            </button>
+            <!-- Episode label -->
+            <div v-if="item.Type === 'Episode' && (item.ParentIndexNumber || item.IndexNumber)"
+              class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-2 py-1.5">
+              <p class="text-white text-xs font-semibold">
+                S{{ item.ParentIndexNumber }}E{{ item.IndexNumber }}
+              </p>
+            </div>
+          </div>
+          <!-- Info -->
+          <div class="mt-1.5 px-0.5">
+            <p class="text-xs font-medium text-text-heading line-clamp-2 leading-tight" :title="item.Name">{{ item.Name }}</p>
+            <p v-if="item.Type === 'Episode' && item.SeriesName"
+              class="text-[10.5px] text-text-muted mt-0.5 truncate">{{ item.SeriesName }}</p>
+            <p v-else-if="item.ProductionYear"
+              class="text-[10.5px] text-text-muted mt-0.5">{{ item.ProductionYear }}</p>
           </div>
         </li>
       </ul>
@@ -116,7 +114,7 @@ import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useJellyfinStore } from '@/store/jellyfin-store';
 import LazyImg from '@/components/LazyImg.vue';
-import { ArrowLeft, Download as DownloadIcon, Loader2, Search, Check } from 'lucide-vue-next';
+import { Download as DownloadIcon, Loader2, Search, Check } from 'lucide-vue-next';
 import { useOfflineStore } from '@/store/offline-store';
 import { useDownloadStore } from '@/store/download-store';
 import { useToast } from '@/composables/useToast';

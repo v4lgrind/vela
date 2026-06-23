@@ -8,7 +8,10 @@ android {
         applicationId "com.jellyfin_v4lgrind_client.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
+        // Auto-increment from the CI run number so each published build is seen
+        // as newer; falls back to 1 for local builds.
+        def ciRunNumber = System.getenv("GITHUB_RUN_NUMBER")
+        versionCode ciRunNumber ? ciRunNumber.toInteger() : 1
         versionName "0.1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
@@ -24,10 +27,25 @@ android {
     kotlinOptions {
         jvmTarget = '21'
     }
+    // Fixed signing key so in-place updates work across builds. Without a stable
+    // key, Android rejects the update (signature mismatch) and forces a reinstall.
+    // This is a debug-grade key for a self-distributed homelab app, not a Play key.
+    signingConfigs {
+        fixed {
+            storeFile file('signing.keystore')
+            storePassword 'mediaserver'
+            keyAlias 'mediaserver'
+            keyPassword 'mediaserver'
+        }
+    }
     buildTypes {
+        debug {
+            signingConfig signingConfigs.fixed
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.fixed
         }
     }
     applicationVariants.all { variant ->

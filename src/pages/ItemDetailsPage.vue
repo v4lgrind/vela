@@ -76,7 +76,7 @@
                     </div>
 
                     <!-- Body below backdrop -->
-                    <div class="px-5 pt-4 max-w-5xl mx-auto">
+                    <div class="px-5 pt-4 pb-6 max-w-5xl mx-auto">
 
                         <!-- Actions -->
                         <div class="flex flex-wrap items-center gap-2.5 mb-4">

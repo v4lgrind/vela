@@ -5,6 +5,7 @@ import { offlineDatabase, type DownloadedMedia } from '../services/offlineDataba
 import { syncService } from '../services/syncService';
 import { useJellyfinStore } from './jellyfin-store';
 import { Capacitor } from '@capacitor/core';
+import { DownloadPlugin } from '@/plugins/DownloadPlugin';
 import { logger } from '@/utils/logger';
 
 interface State {
@@ -217,7 +218,6 @@ export const useOfflineStore = defineStore('offline', {
      */
     async reconcileNativeDownloads() {
       if (!Capacitor.isNativePlatform()) return;
-      const { DownloadPlugin } = await import('@/plugins/DownloadPlugin');
       const { items } = await DownloadPlugin.getPendingCompletions();
       if (items.length === 0) return;
       logger.log(`[OfflineStore] Reconciling ${items.length} natively-completed download(s)`);

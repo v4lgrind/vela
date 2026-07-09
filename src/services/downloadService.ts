@@ -1,4 +1,4 @@
-import { offlineDatabase, type DownloadedMedia } from './offlineDatabase';
+import { buildDownloadedMedia, offlineDatabase, type DownloadedMedia } from './offlineDatabase';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Capacitor } from '@capacitor/core';
 import type { PluginListenerHandle } from '@capacitor/core';
@@ -128,26 +128,7 @@ class DownloadService {
         fileSize = stat.size ?? 0;
       } catch { /* ignore */ }
 
-      const downloadedMedia: DownloadedMedia = {
-        itemId: metadata.Id,
-        type: this.getMediaType(metadata.Type),
-        name: metadata.Name || 'Unknown',
-        filePath,
-        fileSize,
-        downloadDate: Date.now(),
-        jellyfinItem: metadata,
-      };
-
-      if (metadata.Type === 'Episode') {
-        downloadedMedia.seriesId = metadata.SeriesId;
-        downloadedMedia.seriesName = metadata.SeriesName;
-        downloadedMedia.seasonId = metadata.SeasonId;
-        downloadedMedia.seasonNumber = metadata.ParentIndexNumber;
-        downloadedMedia.episodeNumber = metadata.IndexNumber;
-      } else if (metadata.Type === 'Audio') {
-        downloadedMedia.albumId = metadata.AlbumId;
-        downloadedMedia.albumName = metadata.Album;
-      }
+      const downloadedMedia: DownloadedMedia = buildDownloadedMedia(metadata, filePath, fileSize);
 
       // Download sidecar subtitle file for transcoded downloads
       if (subtitleInfo && subtitleInfo.streamIndex >= 0) {
@@ -260,16 +241,6 @@ class DownloadService {
     }
   }
 
-  private getMediaType(type: string): DownloadedMedia['type'] {
-    switch (type) {
-      case 'Movie': return 'Movie';
-      case 'Episode': return 'Episode';
-      case 'MusicAlbum': return 'MusicAlbum';
-      case 'Audio': return 'Audio';
-      default: return 'Movie';
-    }
-  }
-
   private sanitizeFilename(filename: string): string {
     return filename.replace(/[/\\?%*:|"<>]/g, '-');
   }
@@ -310,30 +281,7 @@ class DownloadService {
     }
 
     for (const id of imageIds) {
-      const imgPath = `Jellyfin V4lgrind/Images/${id}_Primary.jpg`;
-      try {
-        // Skip if already cached
-        await Filesystem.stat({ path: imgPath, directory: Directory.Data });
-        continue;
-      } catch { /* not cached yet */ }
-
-      const imgUrl = `${serverUrl}/Items/${id}/Images/Primary?maxWidth=400&quality=80`;
-      try {
-        const dirPath = imgPath.substring(0, imgPath.lastIndexOf('/'));
-        try {
-          await Filesystem.mkdir({ path: dirPath, directory: Directory.Data, recursive: true });
-        } catch { /* may exist */ }
-
-        await Filesystem.downloadFile({
-          url: imgUrl,
-          path: imgPath,
-          directory: Directory.Data,
-          progress: false,
-          headers: { 'X-Emby-Token': accessToken },
-        });
-      } catch {
-        // Non-critical — artwork just won't be available offline
-      }
+      await this.cacheArtworkById(serverUrl, accessToken, id);
     }
   }
 
@@ -352,8 +300,9 @@ class DownloadService {
   }
 
   /**
-   * Cache a single artwork image by item ID. Used to backfill artwork for
-   * downloads that were created before artwork caching was added.
+   * Cache a single artwork image by item ID (skips if already cached).
+   * Also exposed publicly to backfill artwork for downloads created before
+   * artwork caching was added.
    */
   async cacheArtworkById(serverUrl: string, accessToken: string, itemId: string): Promise<void> {
     const imgPath = `Jellyfin V4lgrind/Images/${itemId}_Primary.jpg`;

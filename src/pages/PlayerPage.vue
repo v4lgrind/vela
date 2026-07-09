@@ -318,8 +318,6 @@ const reportingHeaders = { 'Content-Type': 'application/json', 'Authorization': 
 // ── Refs ──────────────────────────────────────────────────────────────────────
 
 const videoEl = ref<HTMLVideoElement | null>(null);
-const audioDropdown = ref<HTMLElement | null>(null);
-const subtitleDropdown = ref<HTMLElement | null>(null);
 
 const isLoading = ref(true);
 const isPlaying = ref(false);
@@ -366,8 +364,6 @@ const ALL_QUALITY_PRESETS: QualityPreset[] = [
 const selectedBitrate = ref(preferencesStore.preferredBitrate); // 0 = Auto (unlimited)
 const qualityMenuOpen = ref(false);
 let nativeSwitchingQuality = false; // suppress 'stopped' → router.back() during native quality switch
-const qualityDropdown = ref<HTMLElement | null>(null);
-const qualityDropdownNative = ref<HTMLElement | null>(null);
 // Only show presets that make sense for the source resolution
 const availablePresets = computed(() => {
     const sourceHeight = videoStream.value?.Height ?? 0;
@@ -483,7 +479,7 @@ function hideControls() {
 function handleVideoTap() {
     const isTouchDevice = navigator.maxTouchPoints > 0 && window.innerWidth < 1024;
     if (isTouchDevice) {
-        if (controlsVisible.value == true) {
+        if (controlsVisible.value) {
             hideControls();
         } else {
             showControls();
@@ -609,16 +605,6 @@ function handleKeyDown(e: KeyboardEvent) {
     const tag = (e.target as HTMLElement)?.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
     if (e.code === 'Space') { e.preventDefault(); togglePlayPause(); }
-}
-
-function handleClickOutside(e: MouseEvent) {
-    if (audioDropdown.value && !audioDropdown.value.contains(e.target as Node))
-        audioMenuOpen.value = false;
-    if (subtitleDropdown.value && !subtitleDropdown.value.contains(e.target as Node))
-        subtitleMenuOpen.value = false;
-    const qEl = qualityDropdown.value ?? qualityDropdownNative.value;
-    if (qEl && !qEl.contains(e.target as Node))
-        qualityMenuOpen.value = false;
 }
 
 function goBack() { router.back(); }
@@ -1032,6 +1018,26 @@ function initHls(url: string, video: HTMLVideoElement, startSeconds?: number, on
     } else {
         error.value = 'HLS playback is not supported on this device';
         isLoading.value = false;
+    }
+}
+
+/**
+ * Start DirectPlay on the raw file URL (hlsUrl). When resuming, the seek runs
+ * after metadata loads to avoid a brief flash from position 0.
+ */
+function startDirectPlay(video: HTMLVideoElement, startSeconds?: number) {
+    video.src = hlsUrl.value;
+    if (startSeconds && startSeconds > 0) {
+        const seekOnce = () => {
+            video.removeEventListener('loadedmetadata', seekOnce);
+            video.currentTime = startSeconds;
+            video.play().catch(() => { });
+            startProgressReporting();
+        };
+        video.addEventListener('loadedmetadata', seekOnce);
+    } else {
+        video.play().catch(() => { });
+        startProgressReporting();
     }
 }
 
@@ -1692,20 +1698,7 @@ async function initPlayer(resumeSeconds?: number, preferredAudioIndex?: number) 
         determinePlaybackMethod(mediaSource.value);
 
         if (playMethod.value === 'DirectPlay') {
-            video.src = hlsUrl.value;
-            if (resumeSeconds && resumeSeconds > 0) {
-                // Seek after metadata loads to avoid a brief flash from position 0
-                const seekOnce = () => {
-                    video.removeEventListener('loadedmetadata', seekOnce);
-                    video.currentTime = resumeSeconds;
-                    video.play().catch(() => { });
-                    startProgressReporting();
-                };
-                video.addEventListener('loadedmetadata', seekOnce);
-            } else {
-                video.play().catch(() => { });
-                startProgressReporting();
-            }
+            startDirectPlay(video, resumeSeconds);
         } else {
             // Jellyfin serves a full VOD HLS stream starting from t=0 regardless of
             // StartTimeTicks. Pre-seed the timer and seek via video.currentTime in
@@ -1756,19 +1749,7 @@ async function rollbackAudio(previousIndex: number | null, movieTime: number) {
         determinePlaybackMethod(mediaSource.value);
 
         if (playMethod.value === 'DirectPlay') {
-            video.src = hlsUrl.value;
-            if (movieTime > 0) {
-                const seekOnce = () => {
-                    video.removeEventListener('loadedmetadata', seekOnce);
-                    video.currentTime = movieTime;
-                    video.play().catch(() => { });
-                    startProgressReporting();
-                };
-                video.addEventListener('loadedmetadata', seekOnce);
-            } else {
-                video.play().catch(() => { });
-                startProgressReporting();
-            }
+            startDirectPlay(video, movieTime);
         } else {
             initHls(hlsUrl.value, video, movieTime); // if rollback itself fails, show a plain error
         }
@@ -1953,10 +1934,7 @@ async function switchQuality(bitrate: number) {
         } else {
             determinePlaybackMethod(ms);
             if (playMethod.value === 'DirectPlay') {
-                video.src = hlsUrl.value;
-                video.currentTime = movieTime;
-                video.play().catch(() => { });
-                startProgressReporting();
+                startDirectPlay(video, movieTime);
             } else {
                 initHls(hlsUrl.value, video, movieTime);
             }
@@ -2054,7 +2032,6 @@ onMounted(async () => {
         mediaTitle.value = buildMediaTitle(cachedDownload.jellyfinItem);
         await initOfflinePlayer(cachedDownload, resumeSeconds, mediaTitle.value);
         if (!isNative) {
-            document.addEventListener('click', handleClickOutside);
             document.addEventListener('fullscreenchange', onFullscreenChange);
             document.addEventListener('webkitfullscreenchange', onFullscreenChange);
             document.addEventListener('keydown', handleKeyDown);
@@ -2142,7 +2119,6 @@ onMounted(async () => {
         await initNativePlayer(resumeSeconds, preferredAudioIndex, buildMediaTitle(details), forceTranscodeAudio, forceTranscodeVideo, chapters, stripHevcFromProfile);
     } else {
         await initPlayer(resumeSeconds, preferredAudioIndex);
-        document.addEventListener('click', handleClickOutside);
         document.addEventListener('fullscreenchange', onFullscreenChange);
         document.addEventListener('webkitfullscreenchange', onFullscreenChange);
         document.addEventListener('keydown', handleKeyDown);
@@ -2167,7 +2143,6 @@ onBeforeUnmount(() => {
         return;
     }
 
-    document.removeEventListener('click', handleClickOutside);
     document.removeEventListener('fullscreenchange', onFullscreenChange);
     document.removeEventListener('webkitfullscreenchange', onFullscreenChange);
     document.removeEventListener('keydown', handleKeyDown);

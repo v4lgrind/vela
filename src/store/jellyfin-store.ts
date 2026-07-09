@@ -10,8 +10,13 @@ import {
   getSystemApi,
 } from "@jellyfin/sdk/lib/utils/api";
 import { Preferences } from "@capacitor/preferences";
-import { downloadService } from "../services/downloadService";
-import { logger } from "@/utils/logger";
+
+/** Build an Error carrying the HTTP status in `response.status`, axios-style. */
+function httpError(message: string, status: number): Error {
+  const err: any = new Error(message);
+  err.response = { status };
+  return err;
+}
 
 async function getStoredToken(): Promise<string | null> {
   try {
@@ -93,8 +98,8 @@ interface State {
   items: any[];
   api: Api;
   accessToken: string | null | undefined;
-  downloadProgress: Record<string, number>;
   savedServers: SavedServer[];
+  currentItem: any | null;
   _qcDeviceId: string;
 }
 
@@ -106,8 +111,8 @@ export const useJellyfinStore = defineStore("jellyfin", {
     libraries: [],
     items: [],
     api: {} as Api,
-    downloadProgress: {} as Record<string, number>,
     savedServers: [],
+    currentItem: null,
     _qcDeviceId: '',
   }),
   persist: {
@@ -123,35 +128,23 @@ export const useJellyfinStore = defineStore("jellyfin", {
       if (!this.userId) {
         this.userId = (await getStoredUserId()) ?? '';
       }
-      this._buildApi();
-    },
-    _buildApi() {
-      if (!this.serverUrl || !this.accessToken) return;
-      if (!this._qcDeviceId) this._qcDeviceId = `jellyfin-android-${Date.now()}`;
-      const jellyfin = new Jellyfin({
-        clientInfo: { name: "Client", version: "1.0.0" },
-        deviceInfo: { name: "Android", id: this._qcDeviceId },
-      });
-      this.api = jellyfin.createApi(this.serverUrl, this.accessToken);
+      this.initializeApi();
     },
     initializeApi() {
       if (!this.serverUrl || !this.accessToken) return;
+      this.api = this._createJellyfin().createApi(this.serverUrl, this.accessToken);
+    },
+    _createJellyfin(): Jellyfin {
       if (!this._qcDeviceId) this._qcDeviceId = `jellyfin-android-${Date.now()}`;
-      const jellyfin = new Jellyfin({
+      return new Jellyfin({
         clientInfo: { name: "Client", version: "1.0.0" },
         deviceInfo: { name: "Android", id: this._qcDeviceId },
       });
-      this.api = jellyfin.createApi(this.serverUrl, this.accessToken);
     },
 
     async login(serverUrl: string, username: string, password: string) {
       this.serverUrl = serverUrl;
-      if (!this._qcDeviceId) this._qcDeviceId = `jellyfin-android-${Date.now()}`;
-      const jellyfin = new Jellyfin({
-        clientInfo: { name: "Client", version: "1.0.0" },
-        deviceInfo: { name: "Android", id: this._qcDeviceId },
-      });
-      this.api = jellyfin.createApi(serverUrl);
+      this.api = this._createJellyfin().createApi(serverUrl);
 
       const resp = await this.api.authenticateUserByName(username, password);
       this.accessToken = resp.data.AccessToken;
@@ -160,26 +153,24 @@ export const useJellyfinStore = defineStore("jellyfin", {
       await setStoredUserId(this.userId ?? null);
       await setTokenForUser(this.userId!, this.accessToken!);
       this.initializeApi();
+      await this._registerSavedServer(serverUrl, username);
+    },
 
-      // Persist this server in the saved servers list
+    /** Fetch the server name (best effort) and upsert this server in the saved list. */
+    async _registerSavedServer(serverUrl: string, userName: string) {
+      let serverName = new URL(serverUrl).hostname;
       try {
         const infoResp = await getSystemApi(this.api).getPublicSystemInfo();
-        const serverName = infoResp.data.ServerName ?? new URL(serverUrl).hostname;
-        this._upsertSavedServer({
-          serverUrl,
-          userId: this.userId!,
-          userName: username,
-          serverName,
-        });
+        serverName = infoResp.data.ServerName ?? serverName;
       } catch {
-        // Non-fatal: still works without server name
-        this._upsertSavedServer({
-          serverUrl,
-          userId: this.userId!,
-          userName: username,
-          serverName: new URL(serverUrl).hostname,
-        });
+        // Non-fatal: fall back to the hostname
       }
+      this._upsertSavedServer({
+        serverUrl,
+        userId: this.userId!,
+        userName,
+        serverName,
+      });
     },
 
     _upsertSavedServer(server: SavedServer) {
@@ -232,9 +223,7 @@ export const useJellyfinStore = defineStore("jellyfin", {
         },
       });
       if (!resp.ok) {
-        const err: any = new Error(`Request failed with status code ${resp.status}`);
-        err.response = { status: resp.status };
-        throw err;
+        throw httpError(`Request failed with status code ${resp.status}`, resp.status);
       }
       return resp.json() as Promise<{ Code: string; Secret: string; Authenticated: boolean }>;
     },
@@ -244,9 +233,7 @@ export const useJellyfinStore = defineStore("jellyfin", {
         headers: { 'Authorization': this._quickConnectAuthHeader(this._qcDeviceId ?? '') },
       });
       if (!resp.ok) {
-        const err: any = new Error(`Request failed with status code ${resp.status}`);
-        err.response = { status: resp.status };
-        throw err;
+        throw httpError(`Request failed with status code ${resp.status}`, resp.status);
       }
       return resp.json() as Promise<{ Authenticated: boolean }>;
     },
@@ -263,9 +250,7 @@ export const useJellyfinStore = defineStore("jellyfin", {
         body: JSON.stringify({ Secret: secret }),
       });
       if (!fetchResp.ok) {
-        const err: any = new Error(`Authentication failed with status code ${fetchResp.status}`);
-        err.response = { status: fetchResp.status };
-        throw err;
+        throw httpError(`Authentication failed with status code ${fetchResp.status}`, fetchResp.status);
       }
       const data = await fetchResp.json();
       this.accessToken = data.AccessToken;
@@ -274,25 +259,7 @@ export const useJellyfinStore = defineStore("jellyfin", {
       await setStoredUserId(this.userId ?? null);
       await setTokenForUser(this.userId!, this.accessToken!);
       this.initializeApi();
-      const resp = { data };
-
-      try {
-        const infoResp = await getSystemApi(this.api).getPublicSystemInfo();
-        const serverName = infoResp.data.ServerName ?? new URL(serverUrl).hostname;
-        this._upsertSavedServer({
-          serverUrl,
-          userId: this.userId!,
-          userName: resp.data.User?.Name ?? '',
-          serverName,
-        });
-      } catch {
-        this._upsertSavedServer({
-          serverUrl,
-          userId: this.userId!,
-          userName: resp.data.User?.Name ?? '',
-          serverName: new URL(serverUrl).hostname,
-        });
-      }
+      await this._registerSavedServer(serverUrl, data.User?.Name ?? '');
     },
     async fetchLibraries() {
       this.initializeApi();
@@ -382,7 +349,6 @@ export const useJellyfinStore = defineStore("jellyfin", {
       await setStoredToken(null);
       await setStoredUserId(null);
     },
-    currentItem: null as any | null,
     async fetchItemDetails(itemId: string) {
       this.initializeApi();
 
@@ -604,102 +570,6 @@ export const useJellyfinStore = defineStore("jellyfin", {
     },
     getPlaceholderImage(itemType?: string): string {
       return generatePlaceholderImage(itemType || "default");
-    },
-
-    async downloadItem(
-      itemId: string,
-      onProgress?: (progress: {
-        percentage: number;
-        loaded: number;
-        total: number;
-      }) => void
-    ) {
-      try {
-        // Récupérer les infos de l'item
-        const item = await this.fetchItemDetails(itemId);
-
-        // Télécharger via le service natif
-        await downloadService.downloadForOffline(
-          this.serverUrl,
-          itemId,
-          this.accessToken || "",
-          item,
-          (progress: { percentage: number; loaded: number; total: number }) => {
-            // Mettre à jour le state
-            this.downloadProgress[itemId] = progress.percentage;
-
-            // Callback externe
-            if (onProgress) {
-              onProgress({
-                percentage: progress.percentage,
-                loaded: progress.loaded,
-                total: progress.total,
-              });
-            }
-          }
-        );
-
-        // Nettoyer après téléchargement
-        delete this.downloadProgress[itemId];
-      } catch (error: any) {
-        logger.error("Erreur téléchargement:", error);
-        delete this.downloadProgress[itemId];
-        throw error;
-      }
-    },
-
-    async downloadItemForOffline(
-      itemId: string,
-      onProgress?: (progress: {
-        percentage: number;
-        loaded: number;
-        total: number;
-      }) => void
-    ) {
-      try {
-        // Récupérer les infos de l'item
-        const item = await this.fetchItemDetails(itemId);
-
-        // Télécharger pour usage hors ligne
-        await downloadService.downloadForOffline(
-          this.serverUrl,
-          itemId,
-          this.accessToken || "",
-          item,
-          (progress) => {
-            // Mettre à jour le state
-            this.downloadProgress[itemId] = progress.percentage;
-
-            // Callback externe
-            if (onProgress) {
-              onProgress({
-                percentage: progress.percentage,
-                loaded: progress.loaded,
-                total: progress.total,
-              });
-            }
-          }
-        );
-
-        // Nettoyer après téléchargement
-        delete this.downloadProgress[itemId];
-
-        // Mettre à jour le store offline (il se rafraîchira automatiquement)
-        logger.log("✅ Item téléchargé pour usage hors ligne:", itemId);
-      } catch (error: any) {
-        logger.error("Erreur téléchargement offline:", error);
-        delete this.downloadProgress[itemId];
-        throw error;
-      }
-    },
-
-    cancelDownload(itemId: string) {
-      downloadService.cancelDownload(itemId);
-      delete this.downloadProgress[itemId];
-    },
-
-    isDownloading(itemId: string): boolean {
-      return downloadService.isDownloading(itemId);
     },
   },
   getters: {

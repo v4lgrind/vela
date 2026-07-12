@@ -1,10 +1,11 @@
 import { defineStore } from 'pinia';
 import { offlineDetection } from '../services/offlineDetection';
 import { usePreferencesStore } from './preferences-store';
-import { offlineDatabase, type DownloadedMedia } from '../services/offlineDatabase';
+import { buildDownloadedMedia, offlineDatabase, type DownloadedMedia } from '../services/offlineDatabase';
 import { syncService } from '../services/syncService';
 import { useJellyfinStore } from './jellyfin-store';
 import { Capacitor } from '@capacitor/core';
+import { DownloadPlugin } from '@/plugins/DownloadPlugin';
 import { logger } from '@/utils/logger';
 
 interface State {
@@ -217,7 +218,6 @@ export const useOfflineStore = defineStore('offline', {
      */
     async reconcileNativeDownloads() {
       if (!Capacitor.isNativePlatform()) return;
-      const { DownloadPlugin } = await import('@/plugins/DownloadPlugin');
       const { items } = await DownloadPlugin.getPendingCompletions();
       if (items.length === 0) return;
       logger.log(`[OfflineStore] Reconciling ${items.length} natively-completed download(s)`);
@@ -231,25 +231,7 @@ export const useOfflineStore = defineStore('offline', {
             continue;
           }
           const { metadata, filePath } = JSON.parse(savedStr) as { metadata: any; filePath: string };
-          const media: DownloadedMedia = {
-            itemId: metadata.Id,
-            type: (['Movie', 'Episode', 'MusicAlbum', 'Audio'].includes(metadata.Type) ? metadata.Type : 'Movie') as DownloadedMedia['type'],
-            name: metadata.Name || 'Unknown',
-            filePath,
-            fileSize: item.fileSize,
-            downloadDate: Date.now(),
-            jellyfinItem: metadata,
-          };
-          if (metadata.Type === 'Episode') {
-            media.seriesId     = metadata.SeriesId;
-            media.seriesName   = metadata.SeriesName;
-            media.seasonId     = metadata.SeasonId;
-            media.seasonNumber = metadata.ParentIndexNumber;
-            media.episodeNumber = metadata.IndexNumber;
-          } else if (metadata.Type === 'Audio') {
-            media.albumId   = metadata.AlbumId;
-            media.albumName = metadata.Album;
-          }
+          const media = buildDownloadedMedia(metadata, filePath, item.fileSize);
           await offlineDatabase.addDownload(media);
           localStorage.removeItem(`dl_meta_${item.itemId}`);
           logger.log('[OfflineStore] Reconciled:', metadata.Name);

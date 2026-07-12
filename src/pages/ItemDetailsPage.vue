@@ -372,7 +372,7 @@
                             <div class="flex items-center gap-1.5 justify-end">
                                 <DownloadIcon v-if="offlineStore.isItemDownloaded(track.Id)" class="size-3.5 text-accent-purple" title="Downloaded" />
                                 <Loader2 v-else-if="downloadStore.isDownloading(track.Id)" class="size-3.5 text-accent-purple animate-spin" />
-                                <span class="text-text-subtle text-xs tabular-nums">{{ formatTrackDuration(track.RunTimeTicks) }}</span>
+                                <span class="text-text-subtle text-xs tabular-nums">{{ formatTicksDuration(track.RunTimeTicks) }}</span>
                             </div>
                         </div>
                     </div>
@@ -507,6 +507,7 @@ import { Play, Check, Download as DownloadIcon, ArrowLeft, ArrowRight, ChevronLe
 import CastPlugin, { type CastState } from '@/plugins/CastPlugin';
 import { usePlatform } from '@/composables/usePlatform';
 import { useToast } from '@/composables/useToast';
+import { logger } from '@/utils/logger';
 import TranscodeDownloadDialog from '@/components/TranscodeDownloadDialog.vue';
 import type { TranscodeOptions } from '@/store/download-store';
 
@@ -803,18 +804,23 @@ function playEpisode(ep: any) {
     });
 }
 
+/** Toggle the Played flag on the server and mirror the change on the local object. */
+async function togglePlayedState(target: any) {
+    if (target.UserData?.Played) {
+        await store.markUnplayed(target.Id);
+        if (target.UserData) target.UserData.Played = false;
+    } else {
+        await store.markPlayed(target.Id);
+        if (!target.UserData) target.UserData = {};
+        target.UserData.Played = true;
+    }
+}
+
 async function toggleWatched() {
     if (togglingWatched.value || !item.value) return;
     togglingWatched.value = true;
     try {
-        if (item.value.UserData?.Played) {
-            await store.markUnplayed(item.value.Id);
-            if (item.value.UserData) item.value.UserData.Played = false;
-        } else {
-            await store.markPlayed(item.value.Id);
-            if (!item.value.UserData) item.value.UserData = {};
-            item.value.UserData.Played = true;
-        }
+        await togglePlayedState(item.value);
     } finally {
         togglingWatched.value = false;
     }
@@ -824,14 +830,7 @@ async function toggleWatchedSeason(season: any) {
     if (watchingSeasonId.value) return;
     watchingSeasonId.value = season.Id;
     try {
-        if (season.UserData?.Played) {
-            await store.markUnplayed(season.Id);
-            if (season.UserData) season.UserData.Played = false;
-        } else {
-            await store.markPlayed(season.Id);
-            if (!season.UserData) season.UserData = {};
-            season.UserData.Played = true;
-        }
+        await togglePlayedState(season);
     } finally {
         watchingSeasonId.value = null;
     }
@@ -841,14 +840,7 @@ async function toggleWatchedEpisode(ep: any) {
     if (watchingEpId.value) return;
     watchingEpId.value = ep.Id;
     try {
-        if (ep.UserData?.Played) {
-            await store.markUnplayed(ep.Id);
-            if (ep.UserData) ep.UserData.Played = false;
-        } else {
-            await store.markPlayed(ep.Id);
-            if (!ep.UserData) ep.UserData = {};
-            ep.UserData.Played = true;
-        }
+        await togglePlayedState(ep);
     } finally {
         watchingEpId.value = null;
     }
@@ -857,8 +849,6 @@ async function toggleWatchedEpisode(ep: any) {
 function getImageUrl(id: string, type: string, w: number, h: number) {
     return store.getImageUrl(id, type, w, h) || '';
 }
-
-const formatTrackDuration = formatTicksDuration;
 
 function itemToAudioTrack(raw: any): AudioTrack {
     return {
@@ -883,21 +873,22 @@ function playAlbum() {
 }
 
 const castRail = ref<HTMLDivElement | null>(null);
-function scrollCast(dir: 'left' | 'right') {
-    const el = castRail.value;
-    if (!el) return;
+const similarRail = ref<HTMLDivElement | null>(null);
+
+/** Scroll a horizontal card rail by three cards in the given direction. */
+function scrollRail(rail: HTMLDivElement | null, dir: 'left' | 'right') {
+    if (!rail) return;
     const cardWidth = 160;
     const delta = dir === 'left' ? -cardWidth * 3 : cardWidth * 3;
-    el.scrollBy({ left: delta, behavior: 'smooth' });
+    rail.scrollBy({ left: delta, behavior: 'smooth' });
 }
 
-const similarRail = ref<HTMLDivElement | null>(null);
+function scrollCast(dir: 'left' | 'right') {
+    scrollRail(castRail.value, dir);
+}
+
 function scrollSimilar(dir: 'left' | 'right') {
-    const el = similarRail.value;
-    if (!el) return;
-    const cardWidth = 160;
-    const delta = dir === 'left' ? -cardWidth * 3 : cardWidth * 3;
-    el.scrollBy({ left: delta, behavior: 'smooth' });
+    scrollRail(similarRail.value, dir);
 }
 
 const mediaStreams = computed<any[]>(() => item.value?.MediaStreams ?? []);
@@ -992,23 +983,35 @@ const downloadProgress = computed(() => {
     return task?.progress ?? 0;
 });
 
-async function handleDownload() {
-    if (!item.value) return;
-    const needsTranscode = await downloadStore.checkNeedsTranscode(item.value);
+/** Start a download, or open the transcode dialog first when the codec needs it. */
+async function requestDownload(id: string, metadata: any, failMessage: string) {
+    const needsTranscode = await downloadStore.checkNeedsTranscode(metadata);
     if (needsTranscode) {
-        pendingTranscodeTarget.value = { itemId: itemId.value, metadata: item.value };
+        pendingTranscodeTarget.value = { itemId: id, metadata };
         pendingBulkTranscode.value = null;
         showTranscodeDialog.value = true;
     } else {
-        downloadStore.startDownload(itemId.value, item.value).catch((error: any) => {
-            if (error.name !== 'AbortError') {
-                showError('Download failed. Please try again.');
-            }
+        downloadStore.startDownload(id, metadata).catch((error: any) => {
+            if (error.name !== 'AbortError') showError(failMessage);
         });
     }
 }
 
-function onTranscodeConfirm(options: TranscodeOptions) {
+async function handleDownload() {
+    if (!item.value) return;
+    await requestDownload(itemId.value, item.value, 'Download failed. Please try again.');
+}
+
+async function handleEpisodeDownload(ep: any) {
+    await requestDownload(ep.Id, ep, `Failed to download "${ep.Name}"`);
+}
+
+/**
+ * Launch the download(s) that were waiting on the transcode dialog.
+ * Called with options when the user confirms a transcode, without options
+ * when they choose to keep the original quality.
+ */
+function startPendingDownloads(options?: TranscodeOptions) {
     if (pendingBulkTranscode.value) {
         for (const ep of pendingBulkTranscode.value) {
             downloadStore.startDownload(ep.Id, ep, options).catch((err: any) => {
@@ -1025,34 +1028,12 @@ function onTranscodeConfirm(options: TranscodeOptions) {
     }
 }
 
-async function handleEpisodeDownload(ep: any) {
-    const needsTranscode = await downloadStore.checkNeedsTranscode(ep);
-    if (needsTranscode) {
-        pendingTranscodeTarget.value = { itemId: ep.Id, metadata: ep };
-        pendingBulkTranscode.value = null;
-        showTranscodeDialog.value = true;
-    } else {
-        downloadStore.startDownload(ep.Id, ep).catch((error: any) => {
-            if (error.name !== 'AbortError') showError(`Failed to download "${ep.Name}"`);
-        });
-    }
+function onTranscodeConfirm(options: TranscodeOptions) {
+    startPendingDownloads(options);
 }
 
 function onTranscodeOriginal() {
-    if (pendingBulkTranscode.value) {
-        for (const ep of pendingBulkTranscode.value) {
-            downloadStore.startDownload(ep.Id, ep).catch((err: any) => {
-                if (err?.name !== 'AbortError') showError(`Failed to download "${ep.Name}"`);
-            });
-        }
-        pendingBulkTranscode.value = null;
-    } else if (pendingTranscodeTarget.value) {
-        const { itemId: id, metadata } = pendingTranscodeTarget.value;
-        downloadStore.startDownload(id, metadata).catch((error: any) => {
-            if (error.name !== 'AbortError') showError('Download failed. Please try again.');
-        });
-        pendingTranscodeTarget.value = null;
-    }
+    startPendingDownloads();
 }
 
 async function deleteDownload() {
@@ -1061,8 +1042,8 @@ async function deleteDownload() {
     try {
         await downloadService.deleteOfflineFile(itemId.value);
         await offlineStore.removeDownload(itemId.value);
-    } catch (error: any) {
-        alert('Failed to delete');
+    } catch {
+        showError('Failed to delete');
     }
 }
 
@@ -1088,7 +1069,7 @@ async function startBulkDownload(mode: 'all' | 'unwatched') {
         try {
             candidates = await store.fetchAllSeriesEpisodes(item.value.Id);
         } catch (e) {
-            console.error('[BulkDownload] Failed to fetch series episodes:', e);
+            logger.error('[BulkDownload] Failed to fetch series episodes:', e);
             return;
         }
     }
@@ -1099,7 +1080,7 @@ async function startBulkDownload(mode: 'all' | 'unwatched') {
     candidates = candidates.filter(ep => !offlineStore.isItemDownloaded(ep.Id));
     if (candidates.length === 0) return;
 
-    console.log(`[BulkDownload] Queueing ${candidates.length} episodes (mode: ${mode})`);
+    logger.log(`[BulkDownload] Queueing ${candidates.length} episodes (mode: ${mode})`);
 
     // Check first episode to see if transcode is needed — apply same choice to all
     const firstWithStreams = candidates.find(ep => ep.MediaStreams?.length > 0) || candidates[0];
@@ -1114,7 +1095,7 @@ async function startBulkDownload(mode: 'all' | 'unwatched') {
     for (const ep of candidates) {
         downloadStore.startDownload(ep.Id, ep).catch((err: any) => {
             if (err?.name !== 'AbortError') {
-                console.error('[BulkDownload] Failed:', ep.Name, err);
+                logger.error('[BulkDownload] Failed:', ep.Name, err);
             }
         });
     }

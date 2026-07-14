@@ -6,6 +6,7 @@ import { deviceProfile, nativeAndroidDeviceProfile } from '@/constants';
 import { debugLog } from '@/utils/debugLog';
 import { logger } from '@/utils/logger';
 import { buildPlaybackUrl } from '@/utils/playbackUrl';
+import { createSubtitleTracks } from '@/utils/subtitleTracks';
 import type { MediaSource, MediaStream, SubtitleTrack, AudioTrack, QualityPreset } from '@/types/jellyfin';
 
 // Stable per-browser device ID so Jellyfin can match DELETE /Videos/ActiveEncodings
@@ -72,6 +73,10 @@ export function usePlayerSession(videoEl: Ref<HTMLVideoElement | null>, isNative
     // Subtitle tracks
     const subtitleList = ref<SubtitleTrack[]>([]);
     const selectedSubtitleIndex = ref<number | null>(null); // null = off
+    // Jellyfin stream index of the PGS/image subtitle currently burned into the
+    // transcoded video (null = none). Owned here so the native path can restart
+    // playback with a new SubtitleStreamIndex.
+    const activeBurnInSubtitleIndex = ref<number | null>(null);
 
     // Quality / bitrate
     const selectedBitrate = ref(preferencesStore.preferredBitrate); // 0 = Auto (unlimited)
@@ -202,7 +207,7 @@ export function usePlayerSession(videoEl: Ref<HTMLVideoElement | null>, isNative
 
     // ── Jellyfin API ───────────────────────────────────────────────────────────
 
-    async function fetchPlaybackInfo(startTimeTicks?: number, audioStreamIndex?: number, forceTranscode = false, useNativeProfile = false, transcodeAudio = false, stripHevc = false) {
+    async function fetchPlaybackInfo(startTimeTicks?: number, audioStreamIndex?: number, forceTranscode = false, useNativeProfile = false, transcodeAudio = false, stripHevc = false, subtitleStreamIndex?: number) {
         const bitrateCap = selectedBitrate.value || 1_000_000_000;
         // When a quality cap is active we must force a real video re-encode.
         // Stripping DirectPlayProfiles prevents DirectPlay, but Jellyfin can still
@@ -249,9 +254,12 @@ export function usePlayerSession(videoEl: Ref<HTMLVideoElement | null>, isNative
             MediaSourceId: itemId,
             ...(startTimeTicks !== undefined ? { StartTimeTicks: startTimeTicks } : {}),
             ...(audioStreamIndex !== undefined ? { AudioStreamIndex: audioStreamIndex } : {}),
+            // Burn-in for PGS/image subtitles: Jellyfin re-encodes the video with the
+            // subtitle rendered in when a SubtitleStreamIndex with Encode delivery is set.
+            ...(subtitleStreamIndex !== undefined ? { SubtitleStreamIndex: subtitleStreamIndex } : {}),
         };
 
-        debugLog(`[AudioCrash] fetchPlaybackInfo: forceTranscode=${forceTranscode} transcodeAudio=${transcodeAudio} shouldForce=${shouldForce} stripDirectPlay=${stripDirectPlay} stripHevc=${stripHevc} audioStreamIndex=${audioStreamIndex}`);
+        debugLog(`[AudioCrash] fetchPlaybackInfo: forceTranscode=${forceTranscode} transcodeAudio=${transcodeAudio} shouldForce=${shouldForce} stripDirectPlay=${stripDirectPlay} stripHevc=${stripHevc} audioStreamIndex=${audioStreamIndex} subtitleStreamIndex=${subtitleStreamIndex ?? 'off'}`);
         debugLog(`[AudioCrash]   DirectPlayProfiles count=${baseProfile.DirectPlayProfiles?.length ?? 'N/A'} AllowAudioStreamCopy=${transcodeAudio ? false : 'unset'} AllowVideoStreamCopy=${shouldForce ? false : 'unset'}`);
 
         // Pass StartTimeTicks as both a query parameter and in the body.
@@ -308,23 +316,18 @@ export function usePlayerSession(videoEl: Ref<HTMLVideoElement | null>, isNative
     }
 
     function parseSubtitleStreams(ms: any) {
-        const streams: any[] = ms.MediaStreams || [];
         const msId = ms.Id || itemId;
-        subtitleList.value = streams
-            .filter(s => s.Type === 'Subtitle' && (s.DeliveryUrl || (s.IsTextSubtitleStream && s.SupportsExternalStream)))
-            .map(s => {
-                // Jellyfin omits DeliveryUrl in DirectPlay mode. For text subtitles that
-                // support external delivery, construct the extraction URL ourselves.
-                const deliveryUrl = s.DeliveryUrl
-                    ? `${serverUrl}${s.DeliveryUrl}`
-                    : `${serverUrl}/Videos/${itemId}/${msId}/Subtitles/${s.Index}/0/Stream.vtt`;
-                return {
-                    index: s.Index as number,
-                    language: s.Language || 'und',
-                    label: s.DisplayTitle || `${(s.Language || 'und').toUpperCase()}${s.IsForced ? ' (Forced)' : ''}`,
-                    deliveryUrl,
-                };
-            });
+        const tracks = createSubtitleTracks({
+            streams: ms.MediaStreams || [],
+            serverUrl,
+            itemId,
+            mediaSourceId: msId,
+        });
+        // The native player can burn image subtitles (PGS) into the video server-side,
+        // so it keeps every track. The web player can only render external text sidecars.
+        subtitleList.value = isNative
+            ? tracks
+            : tracks.filter((track) => track.playbackMode === 'external');
 
         // Per-item saved choice (null = never set) → global language preference → off
         // Stored value: 'off' = explicitly off, numeric string = exact stream index
@@ -390,6 +393,7 @@ export function usePlayerSession(videoEl: Ref<HTMLVideoElement | null>, isNative
         selectedAudioIndex,
         subtitleList,
         selectedSubtitleIndex,
+        activeBurnInSubtitleIndex,
         selectedBitrate,
         availablePresets,
         currentQualityLabel,

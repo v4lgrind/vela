@@ -291,6 +291,7 @@ import { formatTime } from '@/utils/helpers';
 import { buildMediaTitle } from '@/utils/mediaTitle';
 import { lockLandscape, unlockOrientation } from '@/utils/orientation';
 import { logger } from '@/utils/logger';
+import { isBurnInSubtitleStream, parseSavedBurnInSubtitleIndex } from '@/utils/subtitleTracks';
 import { ArrowLeft, Play, Pause, AudioLines, Captions, Gauge, Info, Maximize, Minimize, Loader2 } from 'lucide-vue-next';
 import PlayerBottomSheet from '@/components/PlayerBottomSheet.vue';
 
@@ -311,6 +312,7 @@ const {
     itemId,
     isLoading, isPlaying, currentTime, duration, progressPct, error, mediaTitle,
     playMethod, audioList, selectedAudioIndex, subtitleList, selectedSubtitleIndex,
+    activeBurnInSubtitleIndex,
     selectedBitrate, availablePresets, currentQualityLabel,
     videoStream, activeAudioStream, posterUrl, isOfflinePlayback,
 } = session;
@@ -414,6 +416,16 @@ onMounted(async () => {
 
     // Determine preferred audio: saved user choice → global preferred lang → marked default → first track.
     const allStreams: any[] = details?.MediaStreams || [];
+
+    // Restore a saved PGS burn-in choice so the initial native init requests it.
+    if (isNative) {
+        const savedBurnInIndex = parseSavedBurnInSubtitleIndex(localStorage.getItem(`msplayer-subtitle-native-${itemId}`));
+        const hasSavedBurnInTrack = savedBurnInIndex !== null && allStreams.some((stream) =>
+            stream.Index === savedBurnInIndex && isBurnInSubtitleStream(stream)
+        );
+        activeBurnInSubtitleIndex.value = hasSavedBurnInTrack ? savedBurnInIndex : null;
+    }
+
     const audioStreams = allStreams.filter(s => s.Type === 'Audio');
     const savedLang = localStorage.getItem(`msplayer-audio-${itemId}`);
     const globalLang = preferencesStore.preferredAudioLanguage;

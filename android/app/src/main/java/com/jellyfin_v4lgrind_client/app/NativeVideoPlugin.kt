@@ -33,6 +33,9 @@ class NativeVideoPlugin : Plugin() {
         // Subtitle tracks: array of {url, lang, label}
         val subtitleTracksJs = call.getArray("subtitleTracks")
         val subtitleTracksJson = subtitleTracksJs?.toString() ?: "[]"
+        val burnInSubtitleTracksJs = call.getArray("burnInSubtitleTracks")
+        val burnInSubtitleTracksJson = burnInSubtitleTracksJs?.toString() ?: "[]"
+        val selectedBurnInSubtitleIndex = call.data.optInt("selectedBurnInSubtitleIndex", -1)
 
         // Always start with a clean receiver so a stale one from a previous session
         // (e.g. quality switch) can never prevent the new receiver from being registered.
@@ -57,6 +60,11 @@ class NativeVideoPlugin : Plugin() {
             putExtra(NativePlayerActivity.EXTRA_TITLE, title)
             putExtra(NativePlayerActivity.EXTRA_PLAY_METHOD, playMethod)
             putExtra(NativePlayerActivity.EXTRA_SUBTITLE_TRACKS, subtitleTracksJson)
+            putExtra(NativePlayerActivity.EXTRA_BURN_IN_SUBTITLE_TRACKS, burnInSubtitleTracksJson)
+            putExtra(
+                NativePlayerActivity.EXTRA_SELECTED_BURN_IN_SUBTITLE_INDEX,
+                selectedBurnInSubtitleIndex
+            )
             putExtra(NativePlayerActivity.EXTRA_QUALITY_PRESETS, qualityPresetsJson)
             putExtra(NativePlayerActivity.EXTRA_SELECTED_BITRATE, selectedBitrate)
             putExtra(NativePlayerActivity.EXTRA_STREAM_INFO, streamInfo)
@@ -367,10 +375,19 @@ class NativeVideoPlugin : Plugin() {
                     NativePlayerActivity.ACTION_SUBTITLE_SELECTED -> {
                         val groupIndex = intent.getIntExtra("groupIndex", -1)
                         val label = intent.getStringExtra("label") ?: ""
-                        android.util.Log.d("NativePlayer", "[Subtitles] plugin.subtitleSelected event: groupIndex=$groupIndex label=$label")
+                        android.util.Log.d(
+                            "NativePlayer",
+                            "[Subtitles] plugin.subtitleSelected event: groupIndex=$groupIndex label=$label"
+                        )
                         val data = JSObject()
                         data.put("groupIndex", groupIndex)
                         data.put("label", label)
+                        if (intent.hasExtra("burnInSubtitleIndex")) {
+                            data.put(
+                                "burnInSubtitleIndex",
+                                intent.getIntExtra("burnInSubtitleIndex", -1)
+                            )
+                        }
                         notifyListeners("subtitleSelected", data)
                     }
                     NativePlayerActivity.ACTION_QUALITY_SELECTED -> {

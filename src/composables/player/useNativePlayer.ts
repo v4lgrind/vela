@@ -24,6 +24,7 @@ export function useNativePlayer(
         isLoading, currentTime, duration, progressPct, error,
         playSessionId, mediaSource, hlsUrl, playMethod,
         audioList, selectedAudioIndex, subtitleList, selectedSubtitleIndex,
+        activeBurnInSubtitleIndex,
         selectedBitrate, availablePresets, nativeResumeOffsetMs,
         isSwitching, restartInProgress,
         reportPlaybackStart, reportPlaybackProgress, reportPlaybackStopped,
@@ -36,6 +37,14 @@ export function useNativePlayer(
     const preferencesStore = usePreferencesStore();
 
     let nativeSwitchingQuality = false; // suppress 'stopped' → router.back() during native quality switch
+
+    // Remember the transcode context of the current native session so restarts
+    // (audio crash, quality switch, subtitle burn-in) preserve it instead of
+    // silently reverting to DirectPlay.
+    let activeNativeTranscodeAudio = false;
+    let activeNativeForceTranscodeVideo = false;
+    let activeNativeStripHevc = false;
+    let activeNativeChapters: Array<{ name: string; startMs: number }> | undefined;
 
     async function restartWithAudio(resumeSeconds: number, jellyfinAudioIndex: number | undefined, title?: string) {
         if (restartInProgress.value) {
@@ -66,8 +75,63 @@ export function useNativePlayer(
         }
     }
 
-    async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: number, title?: string, transcodeAudio = false, forceTranscodeVideo = false, chapters?: Array<{ name: string; startMs: number }>, stripHevc = false) {
+    // Switch the burned-in image subtitle by restarting playback with a new
+    // SubtitleStreamIndex (null = turn burn-in off). The transcode context is
+    // preserved through initNativePlayer's sticky defaults.
+    async function restartWithBurnInSubtitle(
+        resumeSeconds: number,
+        subtitleStreamIndex: number | null,
+        title: string | undefined,
+        targetTextLabel?: string,
+    ) {
+        if (restartInProgress.value) return;
+        restartInProgress.value = true;
+        nativeSwitchingQuality = true;
         isLoading.value = true;
+
+        const preferenceKey = `msplayer-subtitle-native-${itemId}`;
+        const previousPreference = localStorage.getItem(preferenceKey);
+        const previousBurnInIndex = activeBurnInSubtitleIndex.value;
+        const nextPreference = subtitleStreamIndex !== null
+            ? `burn-in:${subtitleStreamIndex}`
+            : targetTextLabel || 'off';
+
+        try {
+            localStorage.setItem(preferenceKey, nextPreference);
+            activeBurnInSubtitleIndex.value = subtitleStreamIndex;
+            selectedSubtitleIndex.value = subtitleStreamIndex;
+            await NativeVideo.removeAllListeners();
+            await NativeVideo.stop();
+            await deleteActiveEncodings();
+            await initNativePlayer(resumeSeconds, selectedAudioIndex.value ?? undefined, title);
+        } catch (e) {
+            activeBurnInSubtitleIndex.value = previousBurnInIndex;
+            if (previousPreference === null) localStorage.removeItem(preferenceKey);
+            else localStorage.setItem(preferenceKey, previousPreference);
+            logger.error('[Subtitles] Failed to restart with burn-in subtitle:', e);
+            error.value = 'Failed to switch subtitle track';
+            isLoading.value = false;
+        } finally {
+            nativeSwitchingQuality = false;
+            restartInProgress.value = false;
+        }
+    }
+
+    async function initNativePlayer(
+        resumeSeconds?: number,
+        preferredAudioIndex?: number,
+        title?: string,
+        transcodeAudio = activeNativeTranscodeAudio,
+        forceTranscodeVideo = activeNativeForceTranscodeVideo,
+        chapters = activeNativeChapters,
+        stripHevc = activeNativeStripHevc,
+        subtitleStreamIndex: number | undefined = activeBurnInSubtitleIndex.value ?? undefined,
+    ) {
+        isLoading.value = true;
+        activeNativeTranscodeAudio = transcodeAudio;
+        activeNativeForceTranscodeVideo = forceTranscodeVideo;
+        activeNativeChapters = chapters;
+        activeNativeStripHevc = stripHevc;
 
         try {
             const startTicks = resumeSeconds && resumeSeconds > 0
@@ -75,7 +139,7 @@ export function useNativePlayer(
                 : undefined;
 
             const [data, resolvedNextEpisodeId] = await Promise.all([
-                fetchPlaybackInfo(startTicks, preferredAudioIndex, forceTranscodeVideo, true, transcodeAudio, stripHevc),
+                fetchPlaybackInfo(startTicks, preferredAudioIndex, forceTranscodeVideo, true, transcodeAudio, stripHevc, subtitleStreamIndex),
                 nextEpisodeId ? Promise.resolve(nextEpisodeId) : fetchNextEpisodeForItem(itemId),
             ]);
             mediaSource.value = data.MediaSources?.[0];
@@ -84,6 +148,8 @@ export function useNativePlayer(
             if (data.PlaySessionId) playSessionId.value = data.PlaySessionId;
             parseAudioStreams(mediaSource.value, preferredAudioIndex);
             parseSubtitleStreams(mediaSource.value);
+            activeBurnInSubtitleIndex.value = subtitleStreamIndex ?? null;
+            selectedSubtitleIndex.value = subtitleStreamIndex ?? null;
             determinePlaybackMethod(mediaSource.value);
 
             // Pre-seed currentTime so reportPlaybackStart sends the correct resume position.
@@ -117,8 +183,19 @@ export function useNativePlayer(
             // manifest, so we pass them as external sidecar tracks.
             const subtitleTracks = isDirectPlayRaw
                 ? []
-                : subtitleList.value.map(s => ({
-                    url: s.deliveryUrl,
+                : subtitleList.value
+                    .filter(s => s.playbackMode === 'external' && s.deliveryUrl)
+                    .map(s => ({
+                        url: s.deliveryUrl!,
+                        lang: s.language,
+                        label: s.label,
+                    }));
+            // Image subtitles (PGS) can't be rendered by ExoPlayer — offer them as
+            // burn-in choices the native picker restarts playback to apply.
+            const burnInSubtitleTracks = subtitleList.value
+                .filter(s => s.playbackMode === 'burn-in')
+                .map(s => ({
+                    index: s.index,
                     lang: s.language,
                     label: s.label,
                 }));
@@ -256,8 +333,18 @@ export function useNativePlayer(
                 selectedAudioIndex.value = data.groupIndex;
             });
 
-            await NativeVideo.addListener('subtitleSelected', (data) => {
+            await NativeVideo.addListener('subtitleSelected', async (data) => {
                 NativeVideo.nativeLog({ message: `[Subtitles] selected groupIndex=${data.groupIndex} label=${data.label} restoringSubtitle=${restoringSubtitle}` });
+                // A burnInSubtitleIndex means the native picker toggled an image (PGS)
+                // subtitle: restart with the new SubtitleStreamIndex for server-side burn-in.
+                if (data.burnInSubtitleIndex !== undefined) {
+                    const streamIndex = data.burnInSubtitleIndex >= 0
+                        ? data.burnInSubtitleIndex
+                        : null;
+                    const targetTextLabel = data.groupIndex >= 0 ? data.label : undefined;
+                    await restartWithBurnInSubtitle(lastGoodPositionSec, streamIndex, title, targetTextLabel);
+                    return;
+                }
                 // Ignore events that originated from our own restore calls in tracksReady.
                 if (restoringSubtitle) {
                     restoringSubtitle = false;
@@ -326,6 +413,8 @@ export function useNativePlayer(
                 title: title || (mediaSource.value as any)?.Name || '',
                 playMethod: playMethod.value,
                 subtitleTracks,
+                burnInSubtitleTracks,
+                selectedBurnInSubtitleIndex: subtitleStreamIndex,
                 qualityPresets: JSON.stringify(availablePresets.value.map(p => ({ bitrate: p.bitrate, label: p.label }))),
                 selectedBitrate: selectedBitrate.value,
                 streamInfo: streamInfo.buildStreamInfoJson(),

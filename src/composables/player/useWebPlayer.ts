@@ -175,7 +175,7 @@ export function useWebPlayer(
             return;
         }
         const sub = subtitleList.value.find(s => s.index === index);
-        if (!sub) { activeTrackBlobUrl.value = null; return; }
+        if (!sub?.deliveryUrl) { activeTrackBlobUrl.value = null; return; }
 
         // Fetch and cache as a blob: URL — bypasses the browser's cross-origin <track> block
         let blobUrl = subtitleBlobCache.get(index);

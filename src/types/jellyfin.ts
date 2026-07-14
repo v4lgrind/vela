@@ -121,7 +121,8 @@ export interface SubtitleTrack {
   index: number;
   language: string;
   label: string;
-  deliveryUrl: string;
+  playbackMode: 'external' | 'burn-in';
+  deliveryUrl?: string;
 }
 
 export interface AudioTrack {

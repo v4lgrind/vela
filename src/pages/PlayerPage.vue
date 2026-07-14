@@ -282,6 +282,7 @@ import { debugLog } from '@/utils/debugLog';
 import { logger } from '@/utils/logger';
 import { CODEC_MIME_MAP, getDeviceCodecs, isCodecSupported, isDolbyVision } from '@/utils/codecDetection';
 import { buildPlaybackUrl } from '@/utils/playbackUrl';
+import { createSubtitleTracks, isBurnInSubtitleStream, parseSavedBurnInSubtitleIndex } from '@/utils/subtitleTracks';
 import type { MediaSource, MediaStream, SubtitleTrack, AudioTrack, QualityPreset, IntroSegment } from '@/types/jellyfin';
 import { ArrowLeft, Play, Pause, AudioLines, Captions, Gauge, Info, Maximize, Minimize, Loader2 } from 'lucide-vue-next';
 import PlayerBottomSheet from '@/components/PlayerBottomSheet.vue';
@@ -346,7 +347,12 @@ const audioMenuOpen = ref(false);
 // Subtitle tracks
 const subtitleList = ref<SubtitleTrack[]>([]);
 const selectedSubtitleIndex = ref<number | null>(null); // null = off
+const activeBurnInSubtitleIndex = ref<number | null>(null);
 const subtitleMenuOpen = ref(false);
+let activeNativeTranscodeAudio = false;
+let activeNativeForceTranscodeVideo = false;
+let activeNativeStripHevc = false;
+let activeNativeChapters: Array<{ name: string; startMs: number }> | undefined;
 
 // Active track — blob: URL so the browser never hits the cross-origin <track> restriction
 const activeTrackBlobUrl = ref<string | null>(null);
@@ -718,7 +724,15 @@ function stopProgressReporting() {
 
 // ── Jellyfin API ───────────────────────────────────────────────────────────────
 
-async function fetchPlaybackInfo(startTimeTicks?: number, audioStreamIndex?: number, forceTranscode = false, useNativeProfile = false, transcodeAudio = false, stripHevc = false) {
+async function fetchPlaybackInfo(
+    startTimeTicks?: number,
+    audioStreamIndex?: number,
+    forceTranscode = false,
+    useNativeProfile = false,
+    transcodeAudio = false,
+    stripHevc = false,
+    subtitleStreamIndex?: number,
+) {
     const bitrateCap = selectedBitrate.value || 1_000_000_000;
     // When a quality cap is active we must force a real video re-encode.
     // Stripping DirectPlayProfiles prevents DirectPlay, but Jellyfin can still
@@ -765,9 +779,14 @@ async function fetchPlaybackInfo(startTimeTicks?: number, audioStreamIndex?: num
         MediaSourceId: itemId,
         ...(startTimeTicks !== undefined ? { StartTimeTicks: startTimeTicks } : {}),
         ...(audioStreamIndex !== undefined ? { AudioStreamIndex: audioStreamIndex } : {}),
+        ...(subtitleStreamIndex !== undefined ? { SubtitleStreamIndex: subtitleStreamIndex } : {}),
     };
 
-    debugLog(`[AudioCrash] fetchPlaybackInfo: forceTranscode=${forceTranscode} transcodeAudio=${transcodeAudio} shouldForce=${shouldForce} stripDirectPlay=${stripDirectPlay} stripHevc=${stripHevc} audioStreamIndex=${audioStreamIndex}`);
+    debugLog(
+        `[PlaybackInfo] forceTranscode=${forceTranscode} transcodeAudio=${transcodeAudio} `
+        + `subtitleStreamIndex=${subtitleStreamIndex ?? 'off'} stripHevc=${stripHevc} `
+        + `audioStreamIndex=${audioStreamIndex}`,
+    );
     debugLog(`[AudioCrash]   DirectPlayProfiles count=${baseProfile.DirectPlayProfiles?.length ?? 'N/A'} AllowAudioStreamCopy=${transcodeAudio ? false : 'unset'} AllowVideoStreamCopy=${shouldForce ? false : 'unset'}`);
 
     // Pass StartTimeTicks as both a query parameter and in the body.
@@ -824,23 +843,16 @@ function parseAudioStreams(ms: any, preferredIndex?: number) {
 }
 
 function parseSubtitleStreams(ms: any) {
-    const streams: any[] = ms.MediaStreams || [];
     const msId = ms.Id || itemId;
-    subtitleList.value = streams
-        .filter(s => s.Type === 'Subtitle' && (s.DeliveryUrl || (s.IsTextSubtitleStream && s.SupportsExternalStream)))
-        .map(s => {
-            // Jellyfin omits DeliveryUrl in DirectPlay mode. For text subtitles that
-            // support external delivery, construct the extraction URL ourselves.
-            const deliveryUrl = s.DeliveryUrl
-                ? `${serverUrl}${s.DeliveryUrl}`
-                : `${serverUrl}/Videos/${itemId}/${msId}/Subtitles/${s.Index}/0/Stream.vtt`;
-            return {
-                index: s.Index as number,
-                language: s.Language || 'und',
-                label: s.DisplayTitle || `${(s.Language || 'und').toUpperCase()}${s.IsForced ? ' (Forced)' : ''}`,
-                deliveryUrl,
-            };
-        });
+    const tracks = createSubtitleTracks({
+        streams: ms.MediaStreams || [],
+        serverUrl,
+        itemId,
+        mediaSourceId: msId,
+    });
+    subtitleList.value = isNative
+        ? tracks
+        : tracks.filter((track) => track.playbackMode === 'external');
 
     // Per-item saved choice (null = never set) → global language preference → off
     // Stored value: 'off' = explicitly off, numeric string = exact stream index
@@ -871,7 +883,7 @@ async function applySubtitleTracks() {
         return;
     }
     const sub = subtitleList.value.find(s => s.index === index);
-    if (!sub) { activeTrackBlobUrl.value = null; return; }
+    if (!sub?.deliveryUrl) { activeTrackBlobUrl.value = null; return; }
 
     // Fetch and cache as a blob: URL — bypasses the browser's cross-origin <track> block
     let blobUrl = subtitleBlobCache.get(index);
@@ -1066,6 +1078,45 @@ async function restartWithAudio(resumeSeconds: number, jellyfinAudioIndex: numbe
     }
 }
 
+async function restartWithBurnInSubtitle(
+    resumeSeconds: number,
+    subtitleStreamIndex: number | null,
+    title: string | undefined,
+    targetTextLabel?: string,
+) {
+    if (restartInProgress) return;
+    restartInProgress = true;
+    nativeSwitchingQuality = true;
+    isLoading.value = true;
+
+    const preferenceKey = `msplayer-subtitle-native-${itemId}`;
+    const previousPreference = localStorage.getItem(preferenceKey);
+    const previousBurnInIndex = activeBurnInSubtitleIndex.value;
+    const nextPreference = subtitleStreamIndex !== null
+        ? `burn-in:${subtitleStreamIndex}`
+        : targetTextLabel || 'off';
+
+    try {
+        localStorage.setItem(preferenceKey, nextPreference);
+        activeBurnInSubtitleIndex.value = subtitleStreamIndex;
+        selectedSubtitleIndex.value = subtitleStreamIndex;
+        await NativeVideo.removeAllListeners();
+        await NativeVideo.stop();
+        await deleteActiveEncodings();
+        await initNativePlayer(resumeSeconds, selectedAudioIndex.value ?? undefined, title);
+    } catch (e) {
+        activeBurnInSubtitleIndex.value = previousBurnInIndex;
+        if (previousPreference === null) localStorage.removeItem(preferenceKey);
+        else localStorage.setItem(preferenceKey, previousPreference);
+        logger.error('[Subtitles] Failed to restart with burn-in subtitle:', e);
+        error.value = 'Failed to switch subtitle track';
+        isLoading.value = false;
+    } finally {
+        nativeSwitchingQuality = false;
+        restartInProgress = false;
+    }
+}
+
 function buildMediaTitle(item: any): string {
     if (!item) return '';
     if (item.Type === 'Episode') {
@@ -1099,8 +1150,21 @@ async function fetchNextEpisodeForItem(epItemId: string): Promise<string> {
 
 // ── Native player init (Android ExoPlayer) ─────────────────────────────────────
 
-async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: number, title?: string, transcodeAudio = false, forceTranscodeVideo = false, chapters?: Array<{ name: string; startMs: number }>, stripHevc = false) {
+async function initNativePlayer(
+    resumeSeconds?: number,
+    preferredAudioIndex?: number,
+    title?: string,
+    transcodeAudio = activeNativeTranscodeAudio,
+    forceTranscodeVideo = activeNativeForceTranscodeVideo,
+    chapters = activeNativeChapters,
+    stripHevc = activeNativeStripHevc,
+    subtitleStreamIndex: number | undefined = activeBurnInSubtitleIndex.value ?? undefined,
+) {
     isLoading.value = true;
+    activeNativeTranscodeAudio = transcodeAudio;
+    activeNativeForceTranscodeVideo = forceTranscodeVideo;
+    activeNativeChapters = chapters;
+    activeNativeStripHevc = stripHevc;
 
     try {
         const startTicks = resumeSeconds && resumeSeconds > 0
@@ -1108,7 +1172,15 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
             : undefined;
 
         const [data, resolvedNextEpisodeId] = await Promise.all([
-            fetchPlaybackInfo(startTicks, preferredAudioIndex, forceTranscodeVideo, true, transcodeAudio, stripHevc),
+            fetchPlaybackInfo(
+                startTicks,
+                preferredAudioIndex,
+                forceTranscodeVideo,
+                true,
+                transcodeAudio,
+                stripHevc,
+                subtitleStreamIndex,
+            ),
             nextEpisodeId ? Promise.resolve(nextEpisodeId) : fetchNextEpisodeForItem(itemId),
         ]);
         mediaSource.value = data.MediaSources?.[0];
@@ -1117,6 +1189,8 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
         if (data.PlaySessionId) playSessionId.value = data.PlaySessionId;
         parseAudioStreams(mediaSource.value, preferredAudioIndex);
         parseSubtitleStreams(mediaSource.value);
+        activeBurnInSubtitleIndex.value = subtitleStreamIndex ?? null;
+        selectedSubtitleIndex.value = subtitleStreamIndex ?? null;
         determinePlaybackMethod(mediaSource.value);
 
         // Pre-seed currentTime so reportPlaybackStart sends the correct resume position.
@@ -1150,8 +1224,17 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
         // manifest, so we pass them as external sidecar tracks.
         const subtitleTracks = isDirectPlayRaw
             ? []
-            : subtitleList.value.map(s => ({
-                url: s.deliveryUrl,
+            : subtitleList.value
+                .filter(s => s.playbackMode === 'external' && s.deliveryUrl)
+                .map(s => ({
+                    url: s.deliveryUrl!,
+                    lang: s.language,
+                    label: s.label,
+                }));
+        const burnInSubtitleTracks = subtitleList.value
+            .filter(s => s.playbackMode === 'burn-in')
+            .map(s => ({
+                index: s.index,
                 lang: s.language,
                 label: s.label,
             }));
@@ -1289,8 +1372,21 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
             selectedAudioIndex.value = data.groupIndex;
         });
 
-        await NativeVideo.addListener('subtitleSelected', (data) => {
+        await NativeVideo.addListener('subtitleSelected', async (data) => {
             NativeVideo.nativeLog({ message: `[Subtitles] selected groupIndex=${data.groupIndex} label=${data.label} restoringSubtitle=${restoringSubtitle}` });
+            if (data.burnInSubtitleIndex !== undefined) {
+                const streamIndex = data.burnInSubtitleIndex >= 0
+                    ? data.burnInSubtitleIndex
+                    : null;
+                const targetTextLabel = data.groupIndex >= 0 ? data.label : undefined;
+                await restartWithBurnInSubtitle(
+                    lastGoodPositionSec,
+                    streamIndex,
+                    title,
+                    targetTextLabel,
+                );
+                return;
+            }
             // Ignore events that originated from our own restore calls in tracksReady.
             if (restoringSubtitle) {
                 restoringSubtitle = false;
@@ -1359,6 +1455,8 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
             title: title || (mediaSource.value as any)?.Name || '',
             playMethod: playMethod.value,
             subtitleTracks,
+            burnInSubtitleTracks,
+            selectedBurnInSubtitleIndex: subtitleStreamIndex,
             qualityPresets: JSON.stringify(availablePresets.value.map(p => ({ bitrate: p.bitrate, label: p.label }))),
             selectedBitrate: selectedBitrate.value,
             streamInfo: buildStreamInfoJson(),
@@ -2079,6 +2177,14 @@ onMounted(async () => {
 
     // Determine preferred audio: saved user choice → global preferred lang → marked default → first track.
     const allStreams: any[] = details?.MediaStreams || [];
+    if (isNative) {
+        const savedSubtitle = localStorage.getItem(`msplayer-subtitle-native-${itemId}`);
+        const savedBurnInIndex = parseSavedBurnInSubtitleIndex(savedSubtitle);
+        const hasSavedBurnInTrack = savedBurnInIndex !== null && allStreams.some((stream) =>
+            stream.Index === savedBurnInIndex && isBurnInSubtitleStream(stream)
+        );
+        activeBurnInSubtitleIndex.value = hasSavedBurnInTrack ? savedBurnInIndex : null;
+    }
     const audioStreams = allStreams.filter(s => s.Type === 'Audio');
     const savedLang = localStorage.getItem(`msplayer-audio-${itemId}`);
     const globalLang = preferencesStore.preferredAudioLanguage;

@@ -28,7 +28,7 @@ export function useOfflinePlayer(
         itemId, nextEpisodeId,
         isLoading, currentTime, duration, progressPct, error,
         hlsUrl, playMethod,
-        audioList, selectedAudioIndex, selectedSubtitleIndex,
+        audioList, selectedAudioIndex, subtitleList, selectedSubtitleIndex,
         isOfflinePlayback, restartInProgress,
     } = session;
 
@@ -299,6 +299,32 @@ export function useOfflinePlayer(
             } else {
                 const video = videoEl.value;
                 if (!video) return;
+
+                // Desktop sidecar subtitle (.vtt): expose it as an external track so
+                // the web player's <track> pipeline renders it — Chromium exposes no
+                // embedded subtitle tracks from the media file itself.
+                if (isDesktop && window.desktopRuntime
+                    && cachedDownload.subtitleFilePath?.endsWith('.vtt')) {
+                    subtitleList.value = [{
+                        index: 0,
+                        language: cachedDownload.subtitleLanguage || 'und',
+                        label: cachedDownload.subtitleLabel || 'Subtitles',
+                        playbackMode: 'external',
+                        deliveryUrl: window.desktopRuntime.getMediaUrl(cachedDownload.subtitleFilePath),
+                    }];
+
+                    // Auto-show: per-item choice wins; otherwise the global language
+                    // preference decides. "off" stays off, but the track remains
+                    // selectable from the subtitle menu.
+                    const saved = localStorage.getItem(`msplayer-subtitle-${itemId}`);
+                    const globalSubLang = preferencesStore.preferredSubtitleLanguage;
+                    const wantsSubtitles = saved !== null
+                        ? saved !== 'off'
+                        : Boolean(globalSubLang
+                            && languageMatches(globalSubLang, cachedDownload.subtitleLanguage || ''));
+                    if (wantsSubtitles) selectedSubtitleIndex.value = 0;
+                }
+
                 video.src = playUrl;
                 if (resumeSeconds && resumeSeconds > 0) {
                     const seekOnce = () => {

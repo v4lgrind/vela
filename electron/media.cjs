@@ -30,6 +30,7 @@ const MIME_TYPES = {
   ".png": "image/png",
   ".srt": "application/x-subrip",
   ".ts": "video/mp2t",
+  ".vtt": "text/vtt",
   ".wav": "audio/wav",
   ".webm": "video/webm",
   ".webp": "image/webp",

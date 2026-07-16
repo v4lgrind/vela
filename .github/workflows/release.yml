@@ -113,7 +113,7 @@ jobs:
         run: |
           mkdir -p release-assets
           cp android/app/build/outputs/apk/debug/mediaserver-client.apk \
-             "release-assets/homelab-${{ needs.prepare.outputs.tag }}.apk"
+             "release-assets/Jellyfin.V4lgrind-${{ needs.prepare.outputs.version }}-android.apk"
 
       - name: Upload Android release asset
         uses: actions/upload-artifact@v4
@@ -190,7 +190,7 @@ jobs:
         run: |
           gh release create "${{ needs.prepare.outputs.tag }}" \
             --target "${{ github.sha }}" \
-            --title "Homelab ${{ needs.prepare.outputs.tag }}" \
+            --title "Jellyfin V4lgrind ${{ needs.prepare.outputs.tag }}" \
             --generate-notes \
             ${{ inputs.prerelease && '--prerelease' || '' }} \
             release-assets/*

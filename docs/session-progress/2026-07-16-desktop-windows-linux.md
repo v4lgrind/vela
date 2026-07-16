@@ -24,6 +24,8 @@ Android application, and keep the shared Vue frontend functional on desktop.
     Windows, and Linux instead of keeping only two artifacts globally.
   - The manual versioned release workflow publishes the Android APK, Windows
     NSIS installer, and Linux AppImage together in one GitHub release.
+  - Release titles and every platform asset use the `Jellyfin V4lgrind`
+    product name; the previously published `v1.0.0` release was corrected too.
 - Added desktop platform detection and platform-specific Jellyfin client/device
   identity while retaining Android-only behavior for ExoPlayer, StatusBar, Cast,
   and the Android back button.

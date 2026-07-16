@@ -1033,7 +1033,7 @@ function onTranscodeConfirm(options: TranscodeOptions) {
 }
 
 function onTranscodeOriginal() {
-    startPendingDownloads();
+    startPendingDownloads({ forceOriginal: true });
 }
 
 async function deleteDownload() {

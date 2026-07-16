@@ -606,6 +606,8 @@ export const deviceProfile = {
       { Format: "vtt", Method: "External" },
       { Format: "ass", Method: "External" },
       { Format: "ssa", Method: "External" },
+      { Format: "pgs", Method: "Encode" },
+      { Format: "pgssub", Method: "Encode" },
     ],
     ResponseProfiles: [
       { Type: "Video", Container: "m4v", MimeType: "video/mp4" },

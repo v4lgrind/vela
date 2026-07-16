@@ -37,6 +37,7 @@ android/.gradle/
 android/local.properties
 electron/dist/
 electron/node_modules/
+release/
 
 # Keep for version control
 !android/app/src/

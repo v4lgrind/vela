@@ -1,12 +1,14 @@
 # Jellyfin V4lgrind Client
 
-A modern Jellyfin media client built with Vue 3 + Capacitor, targeting **Android only**. Stream your media library and download content for offline viewing on Android devices.
+A modern Jellyfin media client built with Vue 3, Capacitor, and Electron. Android uses
+native playback while Windows and Linux use the shared web player.
 
 ## Tech Stack
 
 - **Frontend:** Vue 3 + TypeScript + Vite
 - **Mobile:** Capacitor v8 (Android)
-- **Media Playback:** ExoPlayer (Media3) for native Android, HLS.js for dev-server web preview
+- **Desktop:** Electron (Windows and Linux)
+- **Media Playback:** ExoPlayer (Media3) on Android, HLS.js/Chromium on desktop and web
 - **State Management:** Pinia with persistence
 - **API Client:** Jellyfin SDK
 - **UI Components:** Reka UI (headless) + Lucide icons
@@ -17,6 +19,7 @@ A modern Jellyfin media client built with Vue 3 + Capacitor, targeting **Android
 
 - 🎬 Browse and stream Movies, TV Shows, and Music
 - 📱 Native Android app support
+- Windows and Linux desktop packages
 - 💾 Offline downloads for media playback
 - 🎵 Background audio playback
 - 🔍 Search across your media library
@@ -82,6 +85,33 @@ cd android
 
 **Output:** `android/app/build/outputs/apk/debug/mediaserver-client-debug.apk`
 
+### Desktop Development
+
+```bash
+# Run Vite and Electron together
+npm run desktop:dev
+
+# Build an unpacked desktop application for the current OS
+npm run desktop:package
+
+# Build installers for the current OS
+npm run desktop:dist
+```
+
+Desktop builds are platform-specific:
+
+- Windows produces an NSIS `.exe` installer.
+- Linux produces `.AppImage` and `.deb` packages.
+
+The GitHub Actions desktop workflow builds both platforms independently.
+
+Desktop downloads are stored under Electron's application data directory. Unsupported
+offline video formats are requested from Jellyfin as H.264/AAC MP4 files so they remain
+playable on both Windows and Linux.
+
+Windows development installers are currently unsigned. Smart App Control or an
+organization policy may block them until they are code signed or explicitly allowed.
+
 ### Installing on Android Device
 
 ```bash
@@ -102,7 +132,9 @@ mediaserver-client/
 │   ├── stores/         # Pinia stores
 │   └── router/         # Vue Router config
 ├── android/            # Capacitor Android platform
-├── dist/              # Built web app
+├── electron/           # Electron main process, preload, and media backend
+├── dist/               # Built web app
+├── electron-builder.yml # Windows and Linux packaging
 ├── capacitor.config.ts # Capacitor configuration
 └── vite.config.ts     # Vite configuration
 ```
@@ -129,19 +161,22 @@ mediaserver-client/
 
 ## CI/CD
 
-GitHub Actions workflow (`.github/workflows/android-build.yml`) automatically builds Android APKs on push to main.
+GitHub Actions builds:
 
-**Build time:** ~8 minutes (vs ~15 min with previous Tauri setup)
+- Android APKs with `.github/workflows/android-build.yml`.
+- Windows NSIS installers and Linux AppImage/DEB packages with
+  `.github/workflows/desktop-build.yml`.
 
 ## Migration from Tauri
 
-This project was migrated from Tauri v2 to Capacitor for:
+The Android application was migrated from Tauri v2 to Capacitor for:
 - Simpler build process (no Rust/Cargo)
 - Faster CI builds
 - Better mobile-first ecosystem
 - Smaller bundle sizes
 
-All functionality preserved, including offline downloads via Capacitor Filesystem API.
+Electron now provides the Windows and Linux desktop targets while the Vue frontend
+remains shared across all platforms.
 
 ## License
 

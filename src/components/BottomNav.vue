@@ -16,9 +16,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
-import { useRoute } from "vue-router";
 import { Home, Search, Download, Settings } from "lucide-vue-next";
+import { useRoute } from "vue-router";
 
 const route = useRoute();
 
@@ -30,7 +29,8 @@ const tabs = [
 ] as const;
 
 function isActive(tab: (typeof tabs)[number]): boolean {
-  return tab.match.includes(route.name as string);
+  const activeRouteName = route.name?.toString();
+  return tab.match.some((routeName) => routeName === activeRouteName);
 }
 
 // Float above the gesture bar; --sab is the measured inset, env() is the web fallback.

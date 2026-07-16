@@ -153,7 +153,7 @@
                     :items="subtitleSheetItems"
                     @select="(k) => switchSubtitle(k === 'off' ? null : Number(k))"
                     @close="subtitleMenuOpen = false">
-                    <template v-if="selectedSubtitleIndex !== null" #footer>
+                    <template v-if="selectedSubtitleIndex !== null && !selectedSubtitleIsBitmap" #footer>
                         <div class="flex items-center justify-between">
                             <span class="text-[0.9rem] text-white/60">Size</span>
                             <div class="flex items-center gap-3">
@@ -282,6 +282,7 @@ import { debugLog } from '@/utils/debugLog';
 import { logger } from '@/utils/logger';
 import { CODEC_MIME_MAP, getDeviceCodecs, isCodecSupported, isDolbyVision } from '@/utils/codecDetection';
 import { buildPlaybackUrl } from '@/utils/playbackUrl';
+import { requiresSubtitleBurnIn } from '@/utils/subtitlePlayback';
 import type { MediaSource, MediaStream, SubtitleTrack, AudioTrack, QualityPreset, IntroSegment } from '@/types/jellyfin';
 import { ArrowLeft, Play, Pause, AudioLines, Captions, Gauge, Info, Maximize, Minimize, Loader2 } from 'lucide-vue-next';
 import PlayerBottomSheet from '@/components/PlayerBottomSheet.vue';
@@ -299,7 +300,7 @@ const itemId = route.params.id as string;
 const nextEpisodeId = (route.query.nextEpisodeId as string | undefined) || '';
 const accessToken = store.accessToken || '';
 const serverUrl = store.serverUrl;
-const { isNative } = usePlatform();
+const { isDesktop, isNative } = usePlatform();
 
 // Stable per-browser device ID so Jellyfin can match DELETE /Videos/ActiveEncodings
 // to the session we created. Without it, Jellyfin can't kill the FFmpeg job on demand.
@@ -346,6 +347,7 @@ const audioMenuOpen = ref(false);
 // Subtitle tracks
 const subtitleList = ref<SubtitleTrack[]>([]);
 const selectedSubtitleIndex = ref<number | null>(null); // null = off
+const burnedSubtitleIndex = ref<number | null>(null);
 const subtitleMenuOpen = ref(false);
 
 // Active track — blob: URL so the browser never hits the cross-origin <track> restriction
@@ -386,6 +388,9 @@ const subtitleSheetItems = computed(() => [
     { key: 'off', label: 'Off', selected: selectedSubtitleIndex.value === null },
     ...subtitleList.value.map(s => ({ key: s.index, label: s.label, selected: s.index === selectedSubtitleIndex.value })),
 ]);
+const selectedSubtitleIsBitmap = computed(() =>
+    subtitleList.value.some(s => s.index === selectedSubtitleIndex.value && s.isBitmap)
+);
 const qualitySheetItems = computed(() =>
     availablePresets.value.map(p => ({ key: p.bitrate, label: p.label, selected: p.bitrate === selectedBitrate.value }))
 );
@@ -718,14 +723,23 @@ function stopProgressReporting() {
 
 // ── Jellyfin API ───────────────────────────────────────────────────────────────
 
-async function fetchPlaybackInfo(startTimeTicks?: number, audioStreamIndex?: number, forceTranscode = false, useNativeProfile = false, transcodeAudio = false, stripHevc = false) {
+async function fetchPlaybackInfo(
+    startTimeTicks?: number,
+    audioStreamIndex?: number,
+    forceTranscode = false,
+    useNativeProfile = false,
+    transcodeAudio = false,
+    stripHevc = false,
+    subtitleStreamIndex?: number,
+    burnSubtitle = false,
+) {
     const bitrateCap = selectedBitrate.value || 1_000_000_000;
     // When a quality cap is active we must force a real video re-encode.
     // Stripping DirectPlayProfiles prevents DirectPlay, but Jellyfin can still
     // fall back to DirectStream (remux without re-encoding), which ignores the
     // bitrate cap completely. AllowVideoStreamCopy: false tells Jellyfin it MUST
     // re-encode the video, so the bitrate/resolution cap is actually honoured.
-    const shouldForce = forceTranscode || selectedBitrate.value > 0;
+    const shouldForce = forceTranscode || selectedBitrate.value > 0 || burnSubtitle;
 
     const baseDeviceProfile = useNativeProfile ? nativeAndroidDeviceProfile : deviceProfile;
     const stripDirectPlay = shouldForce || transcodeAudio;
@@ -752,7 +766,7 @@ async function fetchPlaybackInfo(startTimeTicks?: number, audioStreamIndex?: num
     // TranscodingUrl when AllowVideoStreamCopy=false. So when we have a resume
     // position, skip the flag — MaxStreamingBitrate + stripped DirectPlayProfiles
     // still force transcoding, and StartTimeTicks is preserved.
-    const blockVideoCopy = shouldForce && !startTimeTicks;
+    const blockVideoCopy = burnSubtitle || (shouldForce && !startTimeTicks);
 
     const profile: any = {
         ...baseDeviceProfile,
@@ -761,13 +775,18 @@ async function fetchPlaybackInfo(startTimeTicks?: number, audioStreamIndex?: num
         // transcodeAudio: keep video copy (DirectStream) but force Jellyfin to re-encode audio
         // (used when the device can't decode a specific audio format like E-AC3+Atmos)
         ...(transcodeAudio ? { AllowAudioStreamCopy: false } : {}),
+        ...(burnSubtitle ? {
+            AllowSubtitleStreamCopy: false,
+            AlwaysBurnInSubtitleWhenTranscoding: true,
+        } : {}),
         DeviceProfile: baseProfile,
         MediaSourceId: itemId,
         ...(startTimeTicks !== undefined ? { StartTimeTicks: startTimeTicks } : {}),
         ...(audioStreamIndex !== undefined ? { AudioStreamIndex: audioStreamIndex } : {}),
+        ...(subtitleStreamIndex !== undefined ? { SubtitleStreamIndex: subtitleStreamIndex } : {}),
     };
 
-    debugLog(`[AudioCrash] fetchPlaybackInfo: forceTranscode=${forceTranscode} transcodeAudio=${transcodeAudio} shouldForce=${shouldForce} stripDirectPlay=${stripDirectPlay} stripHevc=${stripHevc} audioStreamIndex=${audioStreamIndex}`);
+    debugLog(`[AudioCrash] fetchPlaybackInfo: forceTranscode=${forceTranscode} transcodeAudio=${transcodeAudio} shouldForce=${shouldForce} stripDirectPlay=${stripDirectPlay} stripHevc=${stripHevc} audioStreamIndex=${audioStreamIndex} subtitleStreamIndex=${subtitleStreamIndex} burnSubtitle=${burnSubtitle}`);
     debugLog(`[AudioCrash]   DirectPlayProfiles count=${baseProfile.DirectPlayProfiles?.length ?? 'N/A'} AllowAudioStreamCopy=${transcodeAudio ? false : 'unset'} AllowVideoStreamCopy=${shouldForce ? false : 'unset'}`);
 
     // Pass StartTimeTicks as both a query parameter and in the body.
@@ -775,6 +794,9 @@ async function fetchPlaybackInfo(startTimeTicks?: number, audioStreamIndex?: num
     // but honour it from the query string.
     const pbQuery = new URLSearchParams({ userId: store.userId! });
     if (startTimeTicks !== undefined) pbQuery.set('StartTimeTicks', String(startTimeTicks));
+    if (subtitleStreamIndex !== undefined) {
+        pbQuery.set('SubtitleStreamIndex', String(subtitleStreamIndex));
+    }
     const response = await fetch(
         `${serverUrl}/Items/${itemId}/PlaybackInfo?${pbQuery}`,
         {
@@ -823,45 +845,78 @@ function parseAudioStreams(ms: any, preferredIndex?: number) {
     }
 }
 
+function resolvePreferredSubtitleStream(streams: any[]) {
+    const subtitleStreams = streams.filter(s => s.Type === 'Subtitle');
+    const savedValue = localStorage.getItem(`msplayer-subtitle-${itemId}`);
+
+    if (savedValue === 'off') return null;
+    if (savedValue !== null) {
+        const savedIndex = Number.parseInt(savedValue, 10);
+        if (!Number.isNaN(savedIndex)) {
+            return subtitleStreams.find(s => s.Index === savedIndex) ?? null;
+        }
+    }
+
+    const preferredLanguage = preferencesStore.preferredSubtitleLanguage;
+    return preferredLanguage
+        ? subtitleStreams.find(s => languageMatches(preferredLanguage, s.Language || 'und')) ?? null
+        : null;
+}
+
 function parseSubtitleStreams(ms: any) {
     const streams: any[] = ms.MediaStreams || [];
-    const msId = ms.Id || itemId;
+    const mediaSourceId = ms.Id || itemId;
     subtitleList.value = streams
-        .filter(s => s.Type === 'Subtitle' && (s.DeliveryUrl || (s.IsTextSubtitleStream && s.SupportsExternalStream)))
+        .filter(s => {
+            if (s.Type !== 'Subtitle') return false;
+            return requiresSubtitleBurnIn(s)
+                || Boolean(s.DeliveryUrl)
+                || Boolean(s.IsTextSubtitleStream && s.SupportsExternalStream);
+        })
         .map(s => {
-            // Jellyfin omits DeliveryUrl in DirectPlay mode. For text subtitles that
-            // support external delivery, construct the extraction URL ourselves.
-            const deliveryUrl = s.DeliveryUrl
-                ? `${serverUrl}${s.DeliveryUrl}`
-                : `${serverUrl}/Videos/${itemId}/${msId}/Subtitles/${s.Index}/0/Stream.vtt`;
+            const isBitmap = requiresSubtitleBurnIn(s);
+            const language = s.Language || 'und';
+            const baseLabel = s.DisplayTitle
+                || `${language.toUpperCase()}${s.IsForced ? ' (Forced)' : ''}`;
+            const deliveryUrl = isBitmap
+                ? null
+                : s.DeliveryUrl
+                    ? `${serverUrl}${s.DeliveryUrl}`
+                    : `${serverUrl}/Videos/${itemId}/${mediaSourceId}/Subtitles/${s.Index}/0/Stream.vtt`;
+
             return {
-                index: s.Index as number,
-                language: s.Language || 'und',
-                label: s.DisplayTitle || `${(s.Language || 'und').toUpperCase()}${s.IsForced ? ' (Forced)' : ''}`,
+                codec: s.Codec || '',
                 deliveryUrl,
+                index: s.Index as number,
+                isBitmap,
+                language,
+                label: isBitmap ? `${baseLabel} (Burn-in)` : baseLabel,
             };
         });
 
-    // Per-item saved choice (null = never set) → global language preference → off
-    // Stored value: 'off' = explicitly off, numeric string = exact stream index
-    const savedVal = localStorage.getItem(`msplayer-subtitle-${itemId}`);
-    const globalSubLang = preferencesStore.preferredSubtitleLanguage;
-    let preferred = null;
-    if (savedVal !== null) {
-        if (savedVal !== 'off') {
-            const savedIdx = parseInt(savedVal, 10);
-            preferred = !isNaN(savedIdx) ? subtitleList.value.find(s => s.index === savedIdx) ?? null : null;
-        }
-    } else if (globalSubLang) {
-        preferred = subtitleList.value.find(s => s.language === globalSubLang) ?? null;
-    }
-    selectedSubtitleIndex.value = preferred?.index ?? null;
+    const preferred = resolvePreferredSubtitleStream(streams);
+    selectedSubtitleIndex.value = subtitleList.value.some(s => s.index === preferred?.Index)
+        ? preferred.Index
+        : null;
 }
 
-function switchSubtitle(index: number | null) {
-    selectedSubtitleIndex.value = index;
-    subtitleMenuOpen.value = false;
+function persistSubtitleSelection(index: number | null) {
     localStorage.setItem(`msplayer-subtitle-${itemId}`, index !== null ? String(index) : 'off');
+}
+
+async function switchSubtitle(index: number | null) {
+    subtitleMenuOpen.value = false;
+    const nextSubtitle = subtitleList.value.find(s => s.index === index);
+    const requiresRestart = !isNative
+        && (Boolean(nextSubtitle?.isBitmap) || burnedSubtitleIndex.value !== null);
+
+    if (requiresRestart) {
+        await switchWebSubtitle(index);
+        return;
+    }
+
+    selectedSubtitleIndex.value = index;
+    persistSubtitleSelection(index);
 }
 
 async function applySubtitleTracks() {
@@ -871,7 +926,10 @@ async function applySubtitleTracks() {
         return;
     }
     const sub = subtitleList.value.find(s => s.index === index);
-    if (!sub) { activeTrackBlobUrl.value = null; return; }
+    if (!sub || isSwitching || sub.isBitmap || !sub.deliveryUrl) {
+        activeTrackBlobUrl.value = null;
+        return;
+    }
 
     // Fetch and cache as a blob: URL — bypasses the browser's cross-origin <track> block
     let blobUrl = subtitleBlobCache.get(index);
@@ -901,6 +959,111 @@ async function applySubtitleTracks() {
 }
 
 watch(selectedSubtitleIndex, applySubtitleTracks);
+
+async function switchWebSubtitle(index: number | null) {
+    if (isSwitching) return;
+
+    const video = videoEl.value;
+    if (!video) return;
+
+    const nextSubtitle = subtitleList.value.find(s => s.index === index);
+    const burnSubtitle = Boolean(nextSubtitle?.isBitmap);
+    const previousIndex = selectedSubtitleIndex.value;
+    const previousBurnedIndex = burnedSubtitleIndex.value;
+    const movieTime = video.currentTime;
+
+    isSwitching = true;
+    isLoading.value = true;
+    video.pause();
+    stopProgressReporting();
+    if (hls) { hls.destroy(); hls = null; }
+    video.removeAttribute('src');
+    video.load();
+    await deleteActiveEncodings();
+
+    try {
+        const startTicks = movieTime > 0
+            ? Math.floor(movieTime * 10_000_000)
+            : undefined;
+        const data = await fetchPlaybackInfo(
+            startTicks,
+            selectedAudioIndex.value ?? undefined,
+            true,
+            false,
+            false,
+            false,
+            burnSubtitle ? index ?? undefined : undefined,
+            burnSubtitle,
+        );
+
+        mediaSource.value = data.MediaSources?.[0];
+        if (!mediaSource.value) throw new Error('No media source');
+        ensureBurnedSubtitleInTranscodingUrl(
+            mediaSource.value,
+            burnSubtitle ? index ?? undefined : undefined,
+        );
+        if (data.PlaySessionId) playSessionId.value = data.PlaySessionId;
+
+        selectedSubtitleIndex.value = index;
+        burnedSubtitleIndex.value = burnSubtitle ? index : null;
+        persistSubtitleSelection(index);
+        parseAudioStreams(mediaSource.value, selectedAudioIndex.value ?? undefined);
+        parseSubtitleStreams(mediaSource.value);
+
+        const ms = mediaSource.value;
+        if (burnSubtitle && !ms.TranscodingUrl) {
+            throw new Error('Jellyfin did not return a transcoded stream for bitmap subtitles');
+        }
+        if (ms.TranscodingUrl) {
+            let url = ms.TranscodingUrl.replace('?&', '?');
+            if (burnSubtitle && index !== null) {
+                url = /SubtitleStreamIndex=-?\d+/.test(url)
+                    ? url.replace(/SubtitleStreamIndex=-?\d+/, `SubtitleStreamIndex=${index}`)
+                    : `${url}&SubtitleStreamIndex=${index}`;
+            }
+            hlsUrl.value = `${serverUrl}${url}`;
+            playMethod.value = 'Transcode';
+            initHls(hlsUrl.value, video, movieTime);
+        } else {
+            determinePlaybackMethod(ms);
+            if (playMethod.value === 'DirectPlay') {
+                video.src = hlsUrl.value;
+                const resumePlayback = () => {
+                    video.removeEventListener('loadedmetadata', resumePlayback);
+                    if (movieTime > 0) video.currentTime = movieTime;
+                    video.play().catch(() => { });
+                    startProgressReporting();
+                    applySubtitleTracks();
+                };
+                video.addEventListener('loadedmetadata', resumePlayback);
+            } else {
+                initHls(hlsUrl.value, video, movieTime);
+            }
+        }
+    } catch (e) {
+        logger.error('[switchWebSubtitle] error:', e);
+        selectedSubtitleIndex.value = previousIndex;
+        burnedSubtitleIndex.value = previousBurnedIndex;
+        persistSubtitleSelection(previousIndex);
+        error.value = 'Subtitle switch failed — reverting to previous track';
+        await initPlayer(movieTime, selectedAudioIndex.value ?? undefined, previousBurnedIndex ?? undefined);
+    } finally {
+        isSwitching = false;
+    }
+}
+
+function ensureBurnedSubtitleInTranscodingUrl(ms: MediaSource, subtitleIndex?: number) {
+    if (subtitleIndex === undefined || !ms.TranscodingUrl) return;
+
+    let url = ms.TranscodingUrl.replace('?&', '?');
+    url = /SubtitleStreamIndex=-?\d+/.test(url)
+        ? url.replace(/SubtitleStreamIndex=-?\d+/, `SubtitleStreamIndex=${subtitleIndex}`)
+        : `${url}&SubtitleStreamIndex=${subtitleIndex}`;
+    if (!/[?&]SubtitleMethod=Encode(?:&|$)/i.test(url)) {
+        url = `${url}&SubtitleMethod=Encode`;
+    }
+    ms.TranscodingUrl = url;
+}
 
 function determinePlaybackMethod(ms: any) {
     const { method, url } = buildPlaybackUrl(ms, {
@@ -1150,8 +1313,8 @@ async function initNativePlayer(resumeSeconds?: number, preferredAudioIndex?: nu
         // manifest, so we pass them as external sidecar tracks.
         const subtitleTracks = isDirectPlayRaw
             ? []
-            : subtitleList.value.map(s => ({
-                url: s.deliveryUrl,
+            : subtitleList.value.filter(s => Boolean(s.deliveryUrl)).map(s => ({
+                url: s.deliveryUrl!,
                 lang: s.language,
                 label: s.label,
             }));
@@ -1417,6 +1580,8 @@ async function initOfflinePlayer(cachedDownload: any, resumeSeconds?: number, it
                 directory: Directory.Data,
             });
             playUrl = fileInfo.uri; // file:///data/user/0/...
+        } else if (isDesktop && window.desktopRuntime) {
+            playUrl = window.desktopRuntime.getMediaUrl(cachedDownload.filePath);
         } else {
             const fileData = await Filesystem.readFile({
                 path: cachedDownload.filePath,
@@ -1669,7 +1834,11 @@ async function initOfflinePlayer(cachedDownload: any, resumeSeconds?: number, it
 
 // ── Player init ────────────────────────────────────────────────────────────────
 
-async function initPlayer(resumeSeconds?: number, preferredAudioIndex?: number) {
+async function initPlayer(
+    resumeSeconds?: number,
+    preferredAudioIndex?: number,
+    burnedSubtitleStreamIndex?: number,
+) {
     const video = videoEl.value;
     if (!video) return;
     isLoading.value = true;
@@ -1682,11 +1851,23 @@ async function initPlayer(resumeSeconds?: number, preferredAudioIndex?: number) 
         // Force transcode when resuming so Jellyfin always returns an HLS stream.
         // DirectPlay serves the raw file and relies on video.currentTime seeking, which
         // is unreliable for MKV/HEVC content. HLS + StartTimeTicks is the reliable path.
-        const data = await fetchPlaybackInfo(startTicks, preferredAudioIndex, !!(startTicks && startTicks > 0));
+        const shouldBurnSubtitle = burnedSubtitleStreamIndex !== undefined;
+        const data = await fetchPlaybackInfo(
+            startTicks,
+            preferredAudioIndex,
+            Boolean(startTicks && startTicks > 0) || shouldBurnSubtitle,
+            false,
+            false,
+            false,
+            burnedSubtitleStreamIndex,
+            shouldBurnSubtitle,
+        );
         mediaSource.value = data.MediaSources?.[0];
         if (!mediaSource.value) throw new Error('No media source available');
+        ensureBurnedSubtitleInTranscodingUrl(mediaSource.value, burnedSubtitleStreamIndex);
 
         if (data.PlaySessionId) playSessionId.value = data.PlaySessionId;
+        burnedSubtitleIndex.value = burnedSubtitleStreamIndex ?? null;
         parseAudioStreams(mediaSource.value, preferredAudioIndex);
         parseSubtitleStreams(mediaSource.value);
         determinePlaybackMethod(mediaSource.value);
@@ -1747,10 +1928,23 @@ async function rollbackAudio(previousIndex: number | null, movieTime: number) {
 
     try {
         const startTicks = movieTime > 0 ? Math.floor(movieTime * 10_000_000) : undefined;
-        const data = await fetchPlaybackInfo(startTicks, previousIndex ?? undefined);
+        const data = await fetchPlaybackInfo(
+            startTicks,
+            previousIndex ?? undefined,
+            burnedSubtitleIndex.value !== null,
+            false,
+            false,
+            false,
+            burnedSubtitleIndex.value ?? undefined,
+            burnedSubtitleIndex.value !== null,
+        );
 
         mediaSource.value = data.MediaSources?.[0];
         if (!mediaSource.value) throw new Error('No media source for rollback');
+        ensureBurnedSubtitleInTranscodingUrl(
+            mediaSource.value,
+            burnedSubtitleIndex.value ?? undefined,
+        );
 
         if (data.PlaySessionId) playSessionId.value = data.PlaySessionId;
         determinePlaybackMethod(mediaSource.value);
@@ -1808,10 +2002,23 @@ async function switchAudio(index: number) {
         const startTicks = Math.floor(movieTime * 10_000_000);
         // forceTranscode=true strips DirectPlay profiles — ensures Jellyfin always
         // returns a TranscodingUrl so we can select the specific audio stream.
-        const data = await fetchPlaybackInfo(startTicks, index, true);
+        const data = await fetchPlaybackInfo(
+            startTicks,
+            index,
+            true,
+            false,
+            false,
+            false,
+            burnedSubtitleIndex.value ?? undefined,
+            burnedSubtitleIndex.value !== null,
+        );
 
         mediaSource.value = data.MediaSources?.[0];
         if (!mediaSource.value) throw new Error('No media source');
+        ensureBurnedSubtitleInTranscodingUrl(
+            mediaSource.value,
+            burnedSubtitleIndex.value ?? undefined,
+        );
 
         if (data.PlaySessionId) playSessionId.value = data.PlaySessionId;
         selectedAudioIndex.value = index;
@@ -1831,11 +2038,21 @@ async function switchAudio(index: number) {
             url = /AudioStreamIndex=\d+/.test(url)
                 ? url.replace(/AudioStreamIndex=\d+/, `AudioStreamIndex=${index}`)
                 : url + `&AudioStreamIndex=${index}`;
+            if (burnedSubtitleIndex.value !== null) {
+                url = /SubtitleStreamIndex=-?\d+/.test(url)
+                    ? url.replace(/SubtitleStreamIndex=-?\d+/, `SubtitleStreamIndex=${burnedSubtitleIndex.value}`)
+                    : `${url}&SubtitleStreamIndex=${burnedSubtitleIndex.value}`;
+            }
             hlsUrl.value = `${serverUrl}${url}`;
-            playMethod.value = ms.SupportsDirectStream ? 'DirectStream' : 'Transcode';
+            playMethod.value = burnedSubtitleIndex.value !== null
+                ? 'Transcode'
+                : ms.SupportsDirectStream ? 'DirectStream' : 'Transcode';
         } else {
             // Jellyfin didn't return a TranscodingUrl — build one manually.
-            hlsUrl.value = `${serverUrl}/Videos/${itemId}/master.m3u8?mediaSourceId=${ms.Id || itemId}&AudioStreamIndex=${index}&PlaySessionId=${playSessionId.value}`;
+            const subtitleQuery = burnedSubtitleIndex.value !== null
+                ? `&SubtitleStreamIndex=${burnedSubtitleIndex.value}&SubtitleMethod=Encode`
+                : '';
+            hlsUrl.value = `${serverUrl}/Videos/${itemId}/master.m3u8?mediaSourceId=${ms.Id || itemId}&AudioStreamIndex=${index}${subtitleQuery}&PlaySessionId=${playSessionId.value}`;
             playMethod.value = 'Transcode';
         }
 
@@ -1935,9 +2152,22 @@ async function switchQuality(bitrate: number) {
         preferencesStore.preferredBitrate = bitrate;
         const startTicks = Math.floor(movieTime * 10_000_000);
         // bitrate > 0 forces transcode (DirectPlay can't honour a bitrate cap)
-        const data = await fetchPlaybackInfo(startTicks, selectedAudioIndex.value ?? undefined, bitrate > 0);
+        const data = await fetchPlaybackInfo(
+            startTicks,
+            selectedAudioIndex.value ?? undefined,
+            bitrate > 0 || burnedSubtitleIndex.value !== null,
+            false,
+            false,
+            false,
+            burnedSubtitleIndex.value ?? undefined,
+            burnedSubtitleIndex.value !== null,
+        );
         mediaSource.value = data.MediaSources?.[0];
         if (!mediaSource.value) throw new Error('No media source');
+        ensureBurnedSubtitleInTranscodingUrl(
+            mediaSource.value,
+            burnedSubtitleIndex.value ?? undefined,
+        );
         if (data.PlaySessionId) playSessionId.value = data.PlaySessionId;
 
         parseAudioStreams(mediaSource.value, selectedAudioIndex.value ?? undefined);
@@ -1945,10 +2175,18 @@ async function switchQuality(bitrate: number) {
 
         const ms = mediaSource.value;
         if (ms.TranscodingUrl) {
-            hlsUrl.value = `${serverUrl}${ms.TranscodingUrl.replace('?&', '?')}`;
+            let url = ms.TranscodingUrl.replace('?&', '?');
+            if (burnedSubtitleIndex.value !== null) {
+                url = /SubtitleStreamIndex=-?\d+/.test(url)
+                    ? url.replace(/SubtitleStreamIndex=-?\d+/, `SubtitleStreamIndex=${burnedSubtitleIndex.value}`)
+                    : `${url}&SubtitleStreamIndex=${burnedSubtitleIndex.value}`;
+            }
+            hlsUrl.value = `${serverUrl}${url}`;
             // If we requested AllowVideoStreamCopy:false (bitrate > 0), it's a real transcode.
             // Otherwise fall back to what Jellyfin reports.
-            playMethod.value = bitrate > 0 ? 'Transcode' : (ms.SupportsDirectStream ? 'DirectStream' : 'Transcode');
+            playMethod.value = bitrate > 0 || burnedSubtitleIndex.value !== null
+                ? 'Transcode'
+                : (ms.SupportsDirectStream ? 'DirectStream' : 'Transcode');
             initHls(hlsUrl.value, video, movieTime);
         } else {
             determinePlaybackMethod(ms);
@@ -2088,6 +2326,10 @@ onMounted(async () => {
         audioStreams.find((s: any) => s.IsDefault) ||
         audioStreams[0];
     const preferredAudioIndex: number | undefined = preferred?.Index;
+    const preferredSubtitle = resolvePreferredSubtitleStream(allStreams);
+    const preferredBurnedSubtitleIndex = preferredSubtitle && requiresSubtitleBurnIn(preferredSubtitle)
+        ? preferredSubtitle.Index as number
+        : undefined;
 
     // Proactive codec detection: if the preferred audio codec is not natively
     // supported by the device, request server-side transcoding upfront instead
@@ -2141,7 +2383,7 @@ onMounted(async () => {
         }));
         await initNativePlayer(resumeSeconds, preferredAudioIndex, buildMediaTitle(details), forceTranscodeAudio, forceTranscodeVideo, chapters, stripHevcFromProfile);
     } else {
-        await initPlayer(resumeSeconds, preferredAudioIndex);
+        await initPlayer(resumeSeconds, preferredAudioIndex, preferredBurnedSubtitleIndex);
         document.addEventListener('click', handleClickOutside);
         document.addEventListener('fullscreenchange', onFullscreenChange);
         document.addEventListener('webkitfullscreenchange', onFullscreenChange);

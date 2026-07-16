@@ -52,11 +52,12 @@ jobs:
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         with:
-          name: mediaserver-client-debug-${{ github.sha }}
-          path: android/app/build/outputs/apk/debug/mediaserver-client-debug.apk
-          retention-days: 3
+          name: jellyfin-v4lgrind-android-${{ github.sha }}
+          path: android/app/build/outputs/apk/debug/mediaserver-client.apk
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Publish nightly release
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'

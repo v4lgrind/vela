@@ -10,8 +10,31 @@ import {
   getSystemApi,
 } from "@jellyfin/sdk/lib/utils/api";
 import { Preferences } from "@capacitor/preferences";
-import { downloadService } from "../services/downloadService";
+
+import { getClientDeviceInfo } from "@/composables/usePlatform";
 import { logger } from "@/utils/logger";
+
+import { downloadService } from "../services/downloadService";
+
+const CLIENT_VERSION = "1.0.0";
+const clientDeviceInfo = getClientDeviceInfo();
+
+function createDeviceId(suffix: string | number): string {
+  return `${clientDeviceInfo.deviceIdPrefix}-${suffix}`;
+}
+
+function createJellyfinClient(deviceId: string): Jellyfin {
+  return new Jellyfin({
+    clientInfo: {
+      name: clientDeviceInfo.clientName,
+      version: CLIENT_VERSION,
+    },
+    deviceInfo: {
+      name: clientDeviceInfo.deviceName,
+      id: deviceId,
+    },
+  });
+}
 
 async function getStoredToken(): Promise<string | null> {
   try {
@@ -127,30 +150,21 @@ export const useJellyfinStore = defineStore("jellyfin", {
     },
     _buildApi() {
       if (!this.serverUrl || !this.accessToken) return;
-      if (!this._qcDeviceId) this._qcDeviceId = `jellyfin-android-${Date.now()}`;
-      const jellyfin = new Jellyfin({
-        clientInfo: { name: "Client", version: "1.0.0" },
-        deviceInfo: { name: "Android", id: this._qcDeviceId },
-      });
+      if (!this._qcDeviceId) this._qcDeviceId = createDeviceId(Date.now());
+      const jellyfin = createJellyfinClient(this._qcDeviceId);
       this.api = jellyfin.createApi(this.serverUrl, this.accessToken);
     },
     initializeApi() {
       if (!this.serverUrl || !this.accessToken) return;
-      if (!this._qcDeviceId) this._qcDeviceId = `jellyfin-android-${Date.now()}`;
-      const jellyfin = new Jellyfin({
-        clientInfo: { name: "Client", version: "1.0.0" },
-        deviceInfo: { name: "Android", id: this._qcDeviceId },
-      });
+      if (!this._qcDeviceId) this._qcDeviceId = createDeviceId(Date.now());
+      const jellyfin = createJellyfinClient(this._qcDeviceId);
       this.api = jellyfin.createApi(this.serverUrl, this.accessToken);
     },
 
     async login(serverUrl: string, username: string, password: string) {
       this.serverUrl = serverUrl;
-      if (!this._qcDeviceId) this._qcDeviceId = `jellyfin-android-${Date.now()}`;
-      const jellyfin = new Jellyfin({
-        clientInfo: { name: "Client", version: "1.0.0" },
-        deviceInfo: { name: "Android", id: this._qcDeviceId },
-      });
+      if (!this._qcDeviceId) this._qcDeviceId = createDeviceId(Date.now());
+      const jellyfin = createJellyfinClient(this._qcDeviceId);
       this.api = jellyfin.createApi(serverUrl);
 
       const resp = await this.api.authenticateUserByName(username, password);
@@ -218,12 +232,17 @@ export const useJellyfinStore = defineStore("jellyfin", {
     },
 
     _quickConnectAuthHeader(deviceId: string): string {
-      return `MediaBrowser Client="Jellyfin Android", Device="Android", DeviceId="${deviceId}", Version="1.0.0"`;
+      return [
+        `MediaBrowser Client="${clientDeviceInfo.clientName}"`,
+        `Device="${clientDeviceInfo.deviceName}"`,
+        `DeviceId="${deviceId}"`,
+        `Version="${CLIENT_VERSION}"`,
+      ].join(", ");
     },
 
     async quickConnectInitiate(serverUrl: string) {
       // Generate a stable deviceId for the entire Quick Connect session and store it
-      this._qcDeviceId = `jellyfin-android-${Math.random().toString(36).slice(2, 11)}`;
+      this._qcDeviceId = createDeviceId(Math.random().toString(36).slice(2, 11));
       const resp = await fetch(`${serverUrl}/QuickConnect/Initiate`, {
         method: 'POST',
         headers: {

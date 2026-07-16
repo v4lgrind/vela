@@ -1,9 +1,21 @@
-import { offlineDatabase, type DownloadedMedia } from './offlineDatabase';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Capacitor } from '@capacitor/core';
 import type { PluginListenerHandle } from '@capacitor/core';
+
+import { usePlatform } from '@/composables/usePlatform';
 import { DownloadPlugin } from '@/plugins/DownloadPlugin';
 import { logger } from '@/utils/logger';
+
+import {
+  cancelDesktopMediaDownload,
+  deleteDesktopMedia,
+  downloadDesktopMedia,
+  getDesktopMediaUrl,
+  statDesktopMedia,
+} from './desktopMedia';
+import { offlineDatabase, type DownloadedMedia } from './offlineDatabase';
+
+const { isDesktop } = usePlatform();
 
 interface DownloadProgress {
   itemId: string;
@@ -34,13 +46,16 @@ class DownloadService {
     transcodedUrl?: string,
     estimatedSize?: number,
     subtitleInfo?: { streamIndex: number; label: string; language: string },
+    transcodedContainer?: string,
   ): Promise<void> {
     if (this.downloads.has(itemId)) {
       throw new Error(`Download already in progress for ${itemId}`);
     }
 
-    // When transcoding, the server outputs a TS container (MPEG Transport Stream — seekable without index)
-    const extension = transcodedUrl ? 'ts' : this.getFileExtension(metadata);
+    // Android uses TS; desktop uses MP4 for Chromium-compatible offline playback.
+    const extension = transcodedUrl
+      ? (transcodedContainer || 'ts')
+      : this.getFileExtension(metadata);
     const filename = this.sanitizeFilename(`${metadata.Name || itemId}.${extension}`);
     const filePath = this.buildFilePath(metadata, filename);
     const downloadUrl = transcodedUrl || `${serverUrl}/Items/${itemId}/Download`;
@@ -58,73 +73,92 @@ class DownloadService {
     this.downloads.set(itemId, activeDownload);
 
     try {
-      // Download via native Android ForegroundService (keeps CPU awake, shows notification)
-      await new Promise<void>((resolve, reject) => {
-        const handles: PluginListenerHandle[] = [];
-
-        const cleanup = async () => {
-          for (const h of handles) {
-            try { await h.remove(); } catch { /* ignore */ }
-          }
-        };
-
-        (async () => {
-          handles.push(await DownloadPlugin.addListener('downloadProgress', (evt) => {
-            if (evt.itemId !== itemId) return;
-            if (activeDownload.aborted) {
-              DownloadPlugin.cancel({ itemId }).catch(() => {});
-              return;
-            }
+      if (isDesktop) {
+        await downloadDesktopMedia({
+          estimatedSize,
+          headers: authHeaders,
+          operationId: itemId,
+          relativePath: filePath,
+          url: downloadUrl,
+          onProgress: (progress) => {
             const callback = this.progressCallbacks.get(itemId);
-            if (callback) {
-              const total = evt.total > 0 ? evt.total : (estimatedSize || 0);
-              const pct = total > 0 ? Math.min(99, Math.round((evt.loaded / total) * 100)) : -1;
-              callback({ itemId, filename, loaded: evt.loaded, total, percentage: pct });
+            if (!callback) return;
+            callback({
+              filename,
+              itemId,
+              loaded: progress.loaded,
+              percentage: progress.percentage,
+              total: progress.total,
+            });
+          },
+        });
+      } else {
+        // Android ForegroundService keeps downloads alive while the app is backgrounded.
+        await new Promise<void>((resolve, reject) => {
+          const handles: PluginListenerHandle[] = [];
+
+          const cleanup = async () => {
+            for (const h of handles) {
+              try { await h.remove(); } catch { /* ignore */ }
             }
-          }));
+          };
 
-          handles.push(await DownloadPlugin.addListener('downloadComplete', async (evt) => {
-            if (evt.itemId !== itemId) return;
-            await cleanup();
-            resolve();
-          }));
+          (async () => {
+            handles.push(await DownloadPlugin.addListener('downloadProgress', (evt) => {
+              if (evt.itemId !== itemId) return;
+              if (activeDownload.aborted) {
+                DownloadPlugin.cancel({ itemId }).catch(() => {});
+                return;
+              }
+              const callback = this.progressCallbacks.get(itemId);
+              if (callback) {
+                const total = evt.total > 0 ? evt.total : (estimatedSize || 0);
+                const pct = total > 0 ? Math.min(99, Math.round((evt.loaded / total) * 100)) : -1;
+                callback({ itemId, filename, loaded: evt.loaded, total, percentage: pct });
+              }
+            }));
 
-          handles.push(await DownloadPlugin.addListener('downloadFailed', async (evt) => {
-            if (evt.itemId !== itemId) return;
-            await cleanup();
-            if (activeDownload.aborted || evt.error === 'AbortError') {
-              reject(Object.assign(new Error('AbortError'), { name: 'AbortError' }));
-            } else {
-              reject(new Error(evt.error));
-            }
-          }));
+            handles.push(await DownloadPlugin.addListener('downloadComplete', async (evt) => {
+              if (evt.itemId !== itemId) return;
+              await cleanup();
+              resolve();
+            }));
 
-          // Persist metadata so offline-store can reconstruct the DB record if the
-          // app is killed after the native download completes but before this JS
-          // completion logic runs.
-          localStorage.setItem(`dl_meta_${itemId}`, JSON.stringify({ metadata, filePath }));
+            handles.push(await DownloadPlugin.addListener('downloadFailed', async (evt) => {
+              if (evt.itemId !== itemId) return;
+              await cleanup();
+              if (activeDownload.aborted || evt.error === 'AbortError') {
+                reject(Object.assign(new Error('AbortError'), { name: 'AbortError' }));
+              } else {
+                reject(new Error(evt.error));
+              }
+            }));
 
-          await DownloadPlugin.enqueue({
-            itemId,
-            url: downloadUrl,
-            headers: authHeaders,
-            destPath: filePath,
-            itemName: metadata.Name || '',
-            estimatedSize: estimatedSize || 0,
-          });
-        })().catch(reject);
-      });
+            // Persist metadata so offline-store can reconcile a completed native download.
+            localStorage.setItem(`dl_meta_${itemId}`, JSON.stringify({ metadata, filePath }));
+
+            await DownloadPlugin.enqueue({
+              destPath: filePath,
+              estimatedSize: estimatedSize || 0,
+              headers: authHeaders,
+              itemId,
+              itemName: metadata.Name || '',
+              url: downloadUrl,
+            });
+          })().catch(reject);
+        });
+      }
 
       if (activeDownload.aborted) {
         throw Object.assign(new Error('AbortError'), { name: 'AbortError' });
       }
 
-      logger.log('💾 Native download complete:', filePath);
+      logger.log('💾 Download complete:', filePath);
 
       // Actual file size after completion
       let fileSize = 0;
       try {
-        const stat = await Filesystem.stat({ path: filePath, directory: Directory.Data });
+        const stat = await this.statFile(filePath);
         fileSize = stat.size ?? 0;
       } catch { /* ignore */ }
 
@@ -155,13 +189,7 @@ class DownloadService {
           const subPath = filePath.replace(/\.[^.]+$/, '.srt');
           const subUrl = `${serverUrl}/Videos/${itemId}/${itemId}/Subtitles/${subtitleInfo.streamIndex}/Stream.srt`;
           logger.log('📝 Downloading subtitle:', subPath);
-          await Filesystem.downloadFile({
-            url: subUrl,
-            path: subPath,
-            directory: Directory.Data,
-            progress: false,
-            headers: authHeaders,
-          });
+          await this.downloadFile(`subtitle-${itemId}`, subUrl, subPath, authHeaders);
           downloadedMedia.subtitleFilePath = subPath;
           downloadedMedia.subtitleLabel = subtitleInfo.label;
           downloadedMedia.subtitleLanguage = subtitleInfo.language;
@@ -203,7 +231,7 @@ class DownloadService {
     } catch (error: any) {
       if (error.name === 'AbortError' || activeDownload.aborted) {
         logger.log('🚫 Download cancelled:', metadata.Name);
-        try { await Filesystem.deleteFile({ path: filePath, directory: Directory.Data }); } catch { /* ignore */ }
+        try { await this.deleteFile(filePath); } catch { /* ignore */ }
         const err = Object.assign(new Error('AbortError'), { name: 'AbortError' });
         throw err;
       }
@@ -219,8 +247,8 @@ class DownloadService {
     try {
       const download = await offlineDatabase.getDownload(itemId);
       if (!download) return null;
-      const fileInfo = await Filesystem.getUri({ path: download.filePath, directory: Directory.Data });
-      return Capacitor.convertFileSrc(fileInfo.uri);
+      await this.statFile(download.filePath);
+      return this.getFileUrl(download.filePath);
     } catch (error) {
       logger.error('❌ Error getting local file:', error);
       return null;
@@ -232,14 +260,14 @@ class DownloadService {
       const download = await offlineDatabase.getDownload(itemId);
       if (!download) { logger.warn('File already deleted:', itemId); return; }
       try {
-        await Filesystem.stat({ path: download.filePath, directory: Directory.Data });
-        await Filesystem.deleteFile({ path: download.filePath, directory: Directory.Data });
+        await this.statFile(download.filePath);
+        await this.deleteFile(download.filePath);
         logger.log('🗑️ File deleted:', download.filePath);
       } catch { /* file doesn't exist */ }
       // Also delete sidecar subtitle file if present
       if (download.subtitleFilePath) {
         try {
-          await Filesystem.deleteFile({ path: download.subtitleFilePath, directory: Directory.Data });
+          await this.deleteFile(download.subtitleFilePath);
         } catch { /* ignore */ }
       }
       await offlineDatabase.deleteDownload(itemId);
@@ -248,6 +276,65 @@ class DownloadService {
       logger.error('❌ Delete error:', error);
       throw error;
     }
+  }
+
+  private async statFile(filePath: string): Promise<{ size: number }> {
+    if (isDesktop) {
+      const result = await statDesktopMedia(filePath);
+      if (!result.exists) throw new Error(`Media file not found: ${filePath}`);
+      return { size: result.size };
+    }
+
+    const result = await Filesystem.stat({ path: filePath, directory: Directory.Data });
+    return { size: result.size ?? 0 };
+  }
+
+  private async deleteFile(filePath: string): Promise<void> {
+    if (isDesktop) {
+      await deleteDesktopMedia(filePath);
+      return;
+    }
+    await Filesystem.deleteFile({ path: filePath, directory: Directory.Data });
+  }
+
+  private async ensureDirectory(directoryPath: string): Promise<void> {
+    if (isDesktop) return;
+    await Filesystem.mkdir({
+      directory: Directory.Data,
+      path: directoryPath,
+      recursive: true,
+    });
+  }
+
+  private async downloadFile(
+    operationId: string,
+    url: string,
+    filePath: string,
+    headers: Record<string, string>,
+  ): Promise<void> {
+    if (isDesktop) {
+      await downloadDesktopMedia({
+        headers,
+        operationId,
+        relativePath: filePath,
+        url,
+      });
+      return;
+    }
+
+    await Filesystem.downloadFile({
+      directory: Directory.Data,
+      headers,
+      path: filePath,
+      progress: false,
+      url,
+    });
+  }
+
+  private async getFileUrl(filePath: string): Promise<string> {
+    if (isDesktop) return getDesktopMediaUrl(filePath);
+    const fileInfo = await Filesystem.getUri({ path: filePath, directory: Directory.Data });
+    return Capacitor.convertFileSrc(fileInfo.uri);
   }
 
   private getFileExtension(metadata: any): string {
@@ -313,7 +400,7 @@ class DownloadService {
       const imgPath = `Jellyfin V4lgrind/Images/${id}_Primary.jpg`;
       try {
         // Skip if already cached
-        await Filesystem.stat({ path: imgPath, directory: Directory.Data });
+        await this.statFile(imgPath);
         continue;
       } catch { /* not cached yet */ }
 
@@ -321,16 +408,15 @@ class DownloadService {
       try {
         const dirPath = imgPath.substring(0, imgPath.lastIndexOf('/'));
         try {
-          await Filesystem.mkdir({ path: dirPath, directory: Directory.Data, recursive: true });
+          await this.ensureDirectory(dirPath);
         } catch { /* may exist */ }
 
-        await Filesystem.downloadFile({
-          url: imgUrl,
-          path: imgPath,
-          directory: Directory.Data,
-          progress: false,
-          headers: { 'X-Emby-Token': accessToken },
-        });
+        await this.downloadFile(
+          `artwork-${id}`,
+          imgUrl,
+          imgPath,
+          { 'X-Emby-Token': accessToken },
+        );
       } catch {
         // Non-critical — artwork just won't be available offline
       }
@@ -344,8 +430,8 @@ class DownloadService {
   async getCachedImageUrl(itemId: string): Promise<string | null> {
     const imgPath = `Jellyfin V4lgrind/Images/${itemId}_Primary.jpg`;
     try {
-      const fileInfo = await Filesystem.getUri({ path: imgPath, directory: Directory.Data });
-      return Capacitor.convertFileSrc(fileInfo.uri);
+      await this.statFile(imgPath);
+      return await this.getFileUrl(imgPath);
     } catch {
       return null;
     }
@@ -359,7 +445,7 @@ class DownloadService {
     const imgPath = `Jellyfin V4lgrind/Images/${itemId}_Primary.jpg`;
     try {
       // Skip if already cached
-      await Filesystem.stat({ path: imgPath, directory: Directory.Data });
+      await this.statFile(imgPath);
       return;
     } catch { /* not cached yet */ }
 
@@ -367,16 +453,15 @@ class DownloadService {
     try {
       const dirPath = imgPath.substring(0, imgPath.lastIndexOf('/'));
       try {
-        await Filesystem.mkdir({ path: dirPath, directory: Directory.Data, recursive: true });
+        await this.ensureDirectory(dirPath);
       } catch { /* may exist */ }
 
-      await Filesystem.downloadFile({
-        url: imgUrl,
-        path: imgPath,
-        directory: Directory.Data,
-        progress: false,
-        headers: { 'X-Emby-Token': accessToken },
-      });
+      await this.downloadFile(
+        `artwork-${itemId}`,
+        imgUrl,
+        imgPath,
+        { 'X-Emby-Token': accessToken },
+      );
     } catch { /* non-critical */ }
   }
 
@@ -384,7 +469,11 @@ class DownloadService {
     const download = this.downloads.get(itemId);
     if (download) {
       download.aborted = true;
-      DownloadPlugin.cancel({ itemId }).catch(() => {});
+      if (isDesktop) {
+        cancelDesktopMediaDownload(itemId).catch(() => {});
+      } else {
+        DownloadPlugin.cancel({ itemId }).catch(() => {});
+      }
       logger.log('🚫 Cancelling:', itemId);
     }
   }

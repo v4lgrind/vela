@@ -118,10 +118,12 @@ export interface IntroSegment {
 }
 
 export interface SubtitleTrack {
+  codec: string;
+  deliveryUrl: string | null;
   index: number;
+  isBitmap: boolean;
   language: string;
   label: string;
-  deliveryUrl: string;
 }
 
 export interface AudioTrack {

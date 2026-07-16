@@ -5,15 +5,42 @@ import { getClientPlatform } from '@/composables/usePlatform';
 import { downloadService } from '@/services/downloadService';
 import { CODEC_MIME_MAP, isDolbyVision } from '@/utils/codecDetection';
 import { needsDesktopTranscode } from '@/utils/desktopCodec';
+import { languageMatches } from '@/utils/language';
 import { logger } from '@/utils/logger';
 
 import { useJellyfinStore } from './jellyfin-store';
 import { useMetadataCacheStore } from './metadata-cache-store';
 import { useOfflineStore } from './offline-store';
+import { usePreferencesStore } from './preferences-store';
 
 const MAX_CONCURRENT = 3;
 const clientPlatform = getClientPlatform();
 const isDesktopPlatform = ['linux', 'macos', 'windows'].includes(clientPlatform);
+
+/**
+ * Pick a text subtitle stream for a sidecar download: the user's preferred
+ * language first, then the default-flagged stream, then the first text stream.
+ */
+function pickSidecarSubtitle(
+  metadata: any,
+): { streamIndex: number; label: string; language: string } | undefined {
+  const streams: any[] = metadata.MediaStreams || metadata.MediaSources?.[0]?.MediaStreams || [];
+  const textSubs = streams.filter((s: any) => s.Type === 'Subtitle' && s.IsTextSubtitleStream);
+  if (textSubs.length === 0) return undefined;
+
+  const preferredLanguage = usePreferencesStore().preferredSubtitleLanguage;
+  const stream = (preferredLanguage
+    ? textSubs.find((s: any) => languageMatches(preferredLanguage, s.Language || ''))
+    : undefined)
+    || textSubs.find((s: any) => s.IsDefault)
+    || textSubs[0];
+
+  return {
+    streamIndex: stream.Index,
+    label: stream.DisplayTitle || stream.Language || 'Unknown',
+    language: stream.Language || 'und',
+  };
+}
 
 export interface DownloadTask {
   itemId: string;
@@ -188,6 +215,11 @@ export const useDownloadStore = defineStore('downloads', {
             label: subStream?.DisplayTitle || subStream?.Language || 'Unknown',
             language: subStream?.Language || 'und',
           };
+        } else if (isDesktopPlatform && !transcodedUrl) {
+          // Desktop direct downloads: auto-pick a text subtitle. Chromium's
+          // <video> exposes no embedded subtitle tracks, so without a sidecar
+          // a directly downloaded file has no subtitles offline at all.
+          subtitleInfo = pickSidecarSubtitle(metadata);
         }
 
         await downloadService.downloadForOffline(

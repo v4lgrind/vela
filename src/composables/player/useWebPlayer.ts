@@ -207,7 +207,12 @@ export function useWebPlayer(
         let blobUrl = subtitleBlobCache.get(index);
         if (!blobUrl) {
             try {
-                const resp = await fetch(sub.deliveryUrl, { headers: { 'X-Emby-Token': accessToken } });
+                // Local media:// sidecars need no token — and the custom header
+                // would trigger a CORS preflight the protocol handler rejects.
+                const init = sub.deliveryUrl.startsWith('http')
+                    ? { headers: { 'X-Emby-Token': accessToken } }
+                    : undefined;
+                const resp = await fetch(sub.deliveryUrl, init);
                 blobUrl = URL.createObjectURL(await resp.blob());
                 subtitleBlobCache.set(index, blobUrl);
             } catch (e) {

@@ -15,6 +15,12 @@ const MP4_AUDIO_CODECS = new Set(['aac', 'mp3']);
 const MP4_VIDEO_CODECS = new Set(['avc', 'h264']);
 const WEBM_AUDIO_CODECS = new Set(['opus', 'vorbis']);
 const WEBM_VIDEO_CODECS = new Set(['av1', 'vp8', 'vp9']);
+// Chromium demuxes Matroska natively, so MKV direct-plays in Electron as long
+// as the codecs are ones Chromium ships decoders for. HEVC (platform-dependent
+// hardware decode only) and ac3/eac3/dts (excluded from Chromium's FFmpeg) are
+// deliberately absent — those still go through the server transcode.
+const MKV_AUDIO_CODECS = new Set(['aac', 'flac', 'mp3', 'opus', 'vorbis']);
+const MKV_VIDEO_CODECS = new Set(['av1', 'avc', 'h264', 'vp8', 'vp9']);
 
 function hasUnsupportedCodec(codecs: string[], supportedCodecs: Set<string>): boolean {
   return codecs.some((codec) => !supportedCodecs.has(codec));
@@ -30,6 +36,15 @@ function getContainers(metadata: DesktopMediaMetadata): string[] {
     .split(',')
     .map((token) => token.trim())
     .filter(Boolean);
+}
+
+/**
+ * Normalized primary container (e.g. "mp4", "mkv"), suitable as a file
+ * extension. Undefined when the metadata carries no container at all.
+ */
+export function getPrimaryContainer(metadata: DesktopMediaMetadata): string | undefined {
+  const [first] = getContainers(metadata);
+  return first === 'matroska' ? 'mkv' : first;
 }
 
 export function needsDesktopTranscode(metadata: DesktopMediaMetadata): boolean {
@@ -50,6 +65,13 @@ export function needsDesktopTranscode(metadata: DesktopMediaMetadata): boolean {
   if (containers.includes('mp4') || containers.includes('m4v')) {
     return !MP4_VIDEO_CODECS.has(videoCodec)
       || hasUnsupportedCodec(audioCodecs, MP4_AUDIO_CODECS);
+  }
+
+  // Checked before webm: ffprobe reports MKV files as "matroska,webm", and the
+  // webm profile would wrongly reject their h264 video.
+  if (containers.includes('mkv') || containers.includes('matroska')) {
+    return !MKV_VIDEO_CODECS.has(videoCodec)
+      || hasUnsupportedCodec(audioCodecs, MKV_AUDIO_CODECS);
   }
 
   if (containers.includes('webm')) {

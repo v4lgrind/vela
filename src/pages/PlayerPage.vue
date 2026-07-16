@@ -153,7 +153,7 @@
                     :items="subtitleSheetItems"
                     @select="(k) => switchSubtitle(k === 'off' ? null : Number(k))"
                     @close="subtitleMenuOpen = false">
-                    <template v-if="selectedSubtitleIndex !== null" #footer>
+                    <template v-if="selectedSubtitleIndex !== null && !selectedSubtitleIsBurnIn" #footer>
                         <div class="flex items-center justify-between">
                             <span class="text-[0.9rem] text-white/60">Size</span>
                             <div class="flex items-center gap-3">
@@ -353,6 +353,11 @@ const subtitleSheetItems = computed(() => [
     { key: 'off', label: 'Off', selected: selectedSubtitleIndex.value === null },
     ...subtitleList.value.map(s => ({ key: s.index, label: s.label, selected: s.index === selectedSubtitleIndex.value })),
 ]);
+const selectedSubtitleIsBurnIn = computed(() =>
+    subtitleList.value.some(track =>
+        track.index === selectedSubtitleIndex.value && track.playbackMode === 'burn-in'
+    )
+);
 const qualitySheetItems = computed(() =>
     availablePresets.value.map(p => ({ key: p.bitrate, label: p.label, selected: p.bitrate === selectedBitrate.value }))
 );
@@ -363,6 +368,27 @@ function openInfoModal() {
 }
 
 function goBack() { router.back(); }
+
+function resolveInitialBurnInSubtitleIndex(streams: any[]): number | null {
+    const preferenceKey = isNative
+        ? `msplayer-subtitle-native-${itemId}`
+        : `msplayer-subtitle-${itemId}`;
+    const savedValue = localStorage.getItem(preferenceKey);
+    const savedIndex = parseSavedBurnInSubtitleIndex(savedValue);
+    const savedTrack = savedIndex === null
+        ? null
+        : streams.find(stream => stream.Index === savedIndex && isBurnInSubtitleStream(stream));
+
+    if (savedTrack) return savedTrack.Index;
+    if (savedValue !== null) return null;
+
+    const preferredLanguage = preferencesStore.preferredSubtitleLanguage;
+    if (!preferredLanguage) return null;
+    const preferredTrack = streams.find(stream =>
+        isBurnInSubtitleStream(stream) && stream.Language === preferredLanguage
+    );
+    return preferredTrack?.Index ?? null;
+}
 
 // ── Lifecycle ──────────────────────────────────────────────────────────────────
 
@@ -417,14 +443,9 @@ onMounted(async () => {
     // Determine preferred audio: saved user choice → global preferred lang → marked default → first track.
     const allStreams: any[] = details?.MediaStreams || [];
 
-    // Restore a saved PGS burn-in choice so the initial native init requests it.
-    if (isNative) {
-        const savedBurnInIndex = parseSavedBurnInSubtitleIndex(localStorage.getItem(`msplayer-subtitle-native-${itemId}`));
-        const hasSavedBurnInTrack = savedBurnInIndex !== null && allStreams.some((stream) =>
-            stream.Index === savedBurnInIndex && isBurnInSubtitleStream(stream)
-        );
-        activeBurnInSubtitleIndex.value = hasSavedBurnInTrack ? savedBurnInIndex : null;
-    }
+    // Restore a saved/global bitmap subtitle before PlaybackInfo negotiation so
+    // Jellyfin returns a video stream with the subtitle burned in from the start.
+    activeBurnInSubtitleIndex.value = resolveInitialBurnInSubtitleIndex(allStreams);
 
     const audioStreams = allStreams.filter(s => s.Type === 'Audio');
     const savedLang = localStorage.getItem(`msplayer-audio-${itemId}`);
@@ -445,7 +466,11 @@ onMounted(async () => {
         }));
         await nativePlayer.initNativePlayer(resumeSeconds, preferredAudioIndex, buildMediaTitle(details), forceTranscodeAudio, forceTranscodeVideo, chapters, stripHevc);
     } else {
-        await webPlayer.initPlayer(resumeSeconds, preferredAudioIndex);
+        await webPlayer.initPlayer(
+            resumeSeconds,
+            preferredAudioIndex,
+            activeBurnInSubtitleIndex.value ?? undefined,
+        );
         document.addEventListener('fullscreenchange', onFullscreenChange);
         document.addEventListener('webkitfullscreenchange', onFullscreenChange);
         document.addEventListener('keydown', handleKeyDown);

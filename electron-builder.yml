@@ -1,0 +1,32 @@
+appId: com.v4lgrind.jellyfinclient
+productName: Jellyfin V4lgrind
+asar: true
+npmRebuild: false
+
+directories:
+  output: release
+
+files:
+  - dist/**/*
+  - electron/*.cjs
+  - package.json
+  - "!node_modules/**/*"
+
+win:
+  icon: icons/icon-512.png
+  target:
+    - nsis
+  artifactName: ${productName}-${version}-windows-${arch}.${ext}
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+
+linux:
+  category: AudioVideo
+  icon: icons/icon-512.png
+  target:
+    - AppImage
+  artifactName: ${productName}-${version}-linux-${arch}.${ext}

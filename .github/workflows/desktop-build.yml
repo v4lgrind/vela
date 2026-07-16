@@ -1,0 +1,46 @@
+name: Build Desktop Apps
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artifact-name: jellyfin-v4lgrind-windows
+          - os: ubuntu-22.04
+            artifact-name: jellyfin-v4lgrind-linux
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build desktop distributables
+        run: npm run desktop:dist -- --publish never
+
+      - name: Upload desktop distributables
+        uses: actions/upload-artifact@v4
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        with:
+          name: ${{ matrix.artifact-name }}-${{ github.sha }}
+          path: |
+            release/*.exe
+            release/*.AppImage
+          if-no-files-found: error
+          retention-days: 7

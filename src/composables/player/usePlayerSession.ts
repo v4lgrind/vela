@@ -6,7 +6,7 @@ import { deviceProfile, nativeAndroidDeviceProfile } from '@/constants';
 import { debugLog } from '@/utils/debugLog';
 import { logger } from '@/utils/logger';
 import { buildPlaybackUrl } from '@/utils/playbackUrl';
-import { createSubtitleTracks } from '@/utils/subtitleTracks';
+import { createSubtitleTracks, parseSavedBurnInSubtitleIndex } from '@/utils/subtitleTracks';
 import type { MediaSource, MediaStream, SubtitleTrack, AudioTrack, QualityPreset } from '@/types/jellyfin';
 
 // Stable per-browser device ID so Jellyfin can match DELETE /Videos/ActiveEncodings
@@ -207,14 +207,23 @@ export function usePlayerSession(videoEl: Ref<HTMLVideoElement | null>, isNative
 
     // ── Jellyfin API ───────────────────────────────────────────────────────────
 
-    async function fetchPlaybackInfo(startTimeTicks?: number, audioStreamIndex?: number, forceTranscode = false, useNativeProfile = false, transcodeAudio = false, stripHevc = false, subtitleStreamIndex?: number) {
+    async function fetchPlaybackInfo(
+        startTimeTicks?: number,
+        audioStreamIndex?: number,
+        forceTranscode = false,
+        useNativeProfile = false,
+        transcodeAudio = false,
+        stripHevc = false,
+        subtitleStreamIndex?: number,
+    ) {
         const bitrateCap = selectedBitrate.value || 1_000_000_000;
+        const shouldBurnSubtitle = subtitleStreamIndex !== undefined;
         // When a quality cap is active we must force a real video re-encode.
         // Stripping DirectPlayProfiles prevents DirectPlay, but Jellyfin can still
         // fall back to DirectStream (remux without re-encoding), which ignores the
         // bitrate cap completely. AllowVideoStreamCopy: false tells Jellyfin it MUST
         // re-encode the video, so the bitrate/resolution cap is actually honoured.
-        const shouldForce = forceTranscode || selectedBitrate.value > 0;
+        const shouldForce = forceTranscode || selectedBitrate.value > 0 || shouldBurnSubtitle;
 
         const baseDeviceProfile = useNativeProfile ? nativeAndroidDeviceProfile : deviceProfile;
         const stripDirectPlay = shouldForce || transcodeAudio;
@@ -241,7 +250,7 @@ export function usePlayerSession(videoEl: Ref<HTMLVideoElement | null>, isNative
         // TranscodingUrl when AllowVideoStreamCopy=false. So when we have a resume
         // position, skip the flag — MaxStreamingBitrate + stripped DirectPlayProfiles
         // still force transcoding, and StartTimeTicks is preserved.
-        const blockVideoCopy = shouldForce && !startTimeTicks;
+        const blockVideoCopy = shouldBurnSubtitle || (shouldForce && !startTimeTicks);
 
         const profile: any = {
             ...baseDeviceProfile,
@@ -250,6 +259,10 @@ export function usePlayerSession(videoEl: Ref<HTMLVideoElement | null>, isNative
             // transcodeAudio: keep video copy (DirectStream) but force Jellyfin to re-encode audio
             // (used when the device can't decode a specific audio format like E-AC3+Atmos)
             ...(transcodeAudio ? { AllowAudioStreamCopy: false } : {}),
+            ...(shouldBurnSubtitle ? {
+                AllowSubtitleStreamCopy: false,
+                AlwaysBurnInSubtitleWhenTranscoding: true,
+            } : {}),
             DeviceProfile: baseProfile,
             MediaSourceId: itemId,
             ...(startTimeTicks !== undefined ? { StartTimeTicks: startTimeTicks } : {}),
@@ -267,6 +280,9 @@ export function usePlayerSession(videoEl: Ref<HTMLVideoElement | null>, isNative
         // but honour it from the query string.
         const pbQuery = new URLSearchParams({ userId: store.userId! });
         if (startTimeTicks !== undefined) pbQuery.set('StartTimeTicks', String(startTimeTicks));
+        if (subtitleStreamIndex !== undefined) {
+            pbQuery.set('SubtitleStreamIndex', String(subtitleStreamIndex));
+        }
         const response = await fetch(
             `${serverUrl}/Items/${itemId}/PlaybackInfo?${pbQuery}`,
             {
@@ -323,11 +339,7 @@ export function usePlayerSession(videoEl: Ref<HTMLVideoElement | null>, isNative
             itemId,
             mediaSourceId: msId,
         });
-        // The native player can burn image subtitles (PGS) into the video server-side,
-        // so it keeps every track. The web player can only render external text sidecars.
-        subtitleList.value = isNative
-            ? tracks
-            : tracks.filter((track) => track.playbackMode === 'external');
+        subtitleList.value = tracks;
 
         // Per-item saved choice (null = never set) → global language preference → off
         // Stored value: 'off' = explicitly off, numeric string = exact stream index
@@ -336,7 +348,8 @@ export function usePlayerSession(videoEl: Ref<HTMLVideoElement | null>, isNative
         let preferred = null;
         if (savedVal !== null) {
             if (savedVal !== 'off') {
-                const savedIdx = parseInt(savedVal, 10);
+                const savedIdx = parseSavedBurnInSubtitleIndex(savedVal)
+                    ?? Number.parseInt(savedVal, 10);
                 preferred = !isNaN(savedIdx) ? subtitleList.value.find(s => s.index === savedIdx) ?? null : null;
             }
         } else if (globalSubLang) {

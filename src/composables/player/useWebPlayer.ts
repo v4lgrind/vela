@@ -48,6 +48,7 @@ export function useWebPlayer(
         isLoading, isPlaying, currentTime, duration, progressPct, error,
         playSessionId, mediaSource, hlsUrl, playMethod,
         audioList, selectedAudioIndex, subtitleList, selectedSubtitleIndex,
+        activeBurnInSubtitleIndex,
         selectedBitrate, isSwitching, isOfflinePlayback,
         reportPlaybackProgress, startProgressReporting, stopProgressReporting,
         deleteActiveEncodings, fetchPlaybackInfo,
@@ -162,10 +163,28 @@ export function useWebPlayer(
 
     // ── Subtitles ──────────────────────────────────────────────────────────────
 
-    function switchSubtitle(index: number | null) {
-        selectedSubtitleIndex.value = index;
+    function persistSubtitleSelection(index: number | null) {
+        const selectedTrack = subtitleList.value.find(track => track.index === index);
+        const storedValue = selectedTrack?.playbackMode === 'burn-in'
+            ? `burn-in:${index}`
+            : index !== null ? String(index) : 'off';
+        localStorage.setItem(`msplayer-subtitle-${itemId}`, storedValue);
+    }
+
+    async function switchSubtitle(index: number | null) {
+        if (index === selectedSubtitleIndex.value || isSwitching.value) return;
         controls.subtitleMenuOpen.value = false;
-        localStorage.setItem(`msplayer-subtitle-${itemId}`, index !== null ? String(index) : 'off');
+        const selectedTrack = subtitleList.value.find(track => track.index === index);
+        const requiresRestart = selectedTrack?.playbackMode === 'burn-in'
+            || activeBurnInSubtitleIndex.value !== null;
+
+        if (requiresRestart) {
+            await restartWithSubtitle(index);
+            return;
+        }
+
+        selectedSubtitleIndex.value = index;
+        persistSubtitleSelection(index);
     }
 
     async function applySubtitleTracks() {
@@ -175,7 +194,14 @@ export function useWebPlayer(
             return;
         }
         const sub = subtitleList.value.find(s => s.index === index);
-        if (!sub?.deliveryUrl) { activeTrackBlobUrl.value = null; return; }
+        if (
+            !sub?.deliveryUrl
+            || sub.playbackMode === 'burn-in'
+            || isSwitching.value
+        ) {
+            activeTrackBlobUrl.value = null;
+            return;
+        }
 
         // Fetch and cache as a blob: URL — bypasses the browser's cross-origin <track> block
         let blobUrl = subtitleBlobCache.get(index);
@@ -274,17 +300,108 @@ export function useWebPlayer(
                 video.currentTime = startSeconds;
                 video.play().catch(() => { });
                 startProgressReporting();
+                applySubtitleTracks();
             };
             video.addEventListener('loadedmetadata', seekOnce);
         } else {
             video.play().catch(() => { });
             startProgressReporting();
+            applySubtitleTracks();
+        }
+    }
+
+    function ensureBurnInUrl(ms: { TranscodingUrl?: string }, subtitleIndex?: number) {
+        if (subtitleIndex === undefined || !ms.TranscodingUrl) return;
+
+        let url = ms.TranscodingUrl.replace('?&', '?');
+        url = /SubtitleStreamIndex=-?\d+/.test(url)
+            ? url.replace(/SubtitleStreamIndex=-?\d+/, `SubtitleStreamIndex=${subtitleIndex}`)
+            : `${url}&SubtitleStreamIndex=${subtitleIndex}`;
+        if (!/[?&]SubtitleMethod=Encode(?:&|$)/i.test(url)) {
+            url = `${url}&SubtitleMethod=Encode`;
+        }
+        ms.TranscodingUrl = url;
+    }
+
+    async function restartWithSubtitle(index: number | null) {
+        if (isSwitching.value) return;
+        const video = videoEl.value;
+        if (!video) return;
+
+        const selectedTrack = subtitleList.value.find(track => track.index === index);
+        const nextBurnInIndex = selectedTrack?.playbackMode === 'burn-in'
+            ? index ?? undefined
+            : undefined;
+        const previousIndex = selectedSubtitleIndex.value;
+        const previousBurnInIndex = activeBurnInSubtitleIndex.value;
+        const movieTime = video.currentTime;
+
+        isSwitching.value = true;
+        isLoading.value = true;
+        video.pause();
+        stopProgressReporting();
+        if (hls) { hls.destroy(); hls = null; }
+        video.removeAttribute('src');
+        video.load();
+        await deleteActiveEncodings();
+
+        try {
+            const startTicks = movieTime > 0
+                ? Math.floor(movieTime * 10_000_000)
+                : undefined;
+            const data = await fetchPlaybackInfo(
+                startTicks,
+                selectedAudioIndex.value ?? undefined,
+                true,
+                false,
+                false,
+                false,
+                nextBurnInIndex,
+            );
+
+            mediaSource.value = data.MediaSources?.[0];
+            if (!mediaSource.value) throw new Error('No media source');
+            ensureBurnInUrl(mediaSource.value, nextBurnInIndex);
+            if (nextBurnInIndex !== undefined && !mediaSource.value.TranscodingUrl) {
+                throw new Error('Jellyfin did not return a burn-in stream');
+            }
+
+            if (data.PlaySessionId) playSessionId.value = data.PlaySessionId;
+            selectedSubtitleIndex.value = index;
+            activeBurnInSubtitleIndex.value = nextBurnInIndex ?? null;
+            persistSubtitleSelection(index);
+            parseAudioStreams(mediaSource.value, selectedAudioIndex.value ?? undefined);
+            parseSubtitleStreams(mediaSource.value);
+            determinePlaybackMethod(mediaSource.value);
+
+            if (playMethod.value === 'DirectPlay') {
+                startDirectPlay(video, movieTime);
+            } else {
+                initHls(hlsUrl.value, video, movieTime);
+            }
+        } catch (switchError) {
+            logger.error('[switchWebSubtitle] error:', switchError);
+            selectedSubtitleIndex.value = previousIndex;
+            activeBurnInSubtitleIndex.value = previousBurnInIndex;
+            persistSubtitleSelection(previousIndex);
+            error.value = 'Subtitle switch failed — reverting to previous track';
+            await initPlayer(
+                movieTime,
+                selectedAudioIndex.value ?? undefined,
+                previousBurnInIndex ?? undefined,
+            );
+        } finally {
+            isSwitching.value = false;
         }
     }
 
     // ── Player init ────────────────────────────────────────────────────────────
 
-    async function initPlayer(resumeSeconds?: number, preferredAudioIndex?: number) {
+    async function initPlayer(
+        resumeSeconds?: number,
+        preferredAudioIndex?: number,
+        burnInSubtitleIndex?: number,
+    ) {
         const video = videoEl.value;
         if (!video) return;
         isLoading.value = true;
@@ -297,11 +414,24 @@ export function useWebPlayer(
             // Force transcode when resuming so Jellyfin always returns an HLS stream.
             // DirectPlay serves the raw file and relies on video.currentTime seeking, which
             // is unreliable for MKV/HEVC content. HLS + StartTimeTicks is the reliable path.
-            const data = await fetchPlaybackInfo(startTicks, preferredAudioIndex, !!(startTicks && startTicks > 0));
+            const data = await fetchPlaybackInfo(
+                startTicks,
+                preferredAudioIndex,
+                Boolean(startTicks && startTicks > 0) || burnInSubtitleIndex !== undefined,
+                false,
+                false,
+                false,
+                burnInSubtitleIndex,
+            );
             mediaSource.value = data.MediaSources?.[0];
             if (!mediaSource.value) throw new Error('No media source available');
+            ensureBurnInUrl(mediaSource.value, burnInSubtitleIndex);
+            if (burnInSubtitleIndex !== undefined && !mediaSource.value.TranscodingUrl) {
+                throw new Error('Jellyfin did not return a burn-in stream');
+            }
 
             if (data.PlaySessionId) playSessionId.value = data.PlaySessionId;
+            activeBurnInSubtitleIndex.value = burnInSubtitleIndex ?? null;
             parseAudioStreams(mediaSource.value, preferredAudioIndex);
             parseSubtitleStreams(mediaSource.value);
             determinePlaybackMethod(mediaSource.value);
@@ -349,10 +479,22 @@ export function useWebPlayer(
 
         try {
             const startTicks = movieTime > 0 ? Math.floor(movieTime * 10_000_000) : undefined;
-            const data = await fetchPlaybackInfo(startTicks, previousIndex ?? undefined);
+            const data = await fetchPlaybackInfo(
+                startTicks,
+                previousIndex ?? undefined,
+                activeBurnInSubtitleIndex.value !== null,
+                false,
+                false,
+                false,
+                activeBurnInSubtitleIndex.value ?? undefined,
+            );
 
             mediaSource.value = data.MediaSources?.[0];
             if (!mediaSource.value) throw new Error('No media source for rollback');
+            ensureBurnInUrl(
+                mediaSource.value,
+                activeBurnInSubtitleIndex.value ?? undefined,
+            );
 
             if (data.PlaySessionId) playSessionId.value = data.PlaySessionId;
             determinePlaybackMethod(mediaSource.value);
@@ -398,10 +540,22 @@ export function useWebPlayer(
             const startTicks = Math.floor(movieTime * 10_000_000);
             // forceTranscode=true strips DirectPlay profiles — ensures Jellyfin always
             // returns a TranscodingUrl so we can select the specific audio stream.
-            const data = await fetchPlaybackInfo(startTicks, index, true);
+            const data = await fetchPlaybackInfo(
+                startTicks,
+                index,
+                true,
+                false,
+                false,
+                false,
+                activeBurnInSubtitleIndex.value ?? undefined,
+            );
 
             mediaSource.value = data.MediaSources?.[0];
             if (!mediaSource.value) throw new Error('No media source');
+            ensureBurnInUrl(
+                mediaSource.value,
+                activeBurnInSubtitleIndex.value ?? undefined,
+            );
 
             if (data.PlaySessionId) playSessionId.value = data.PlaySessionId;
             selectedAudioIndex.value = index;
@@ -422,10 +576,15 @@ export function useWebPlayer(
                     ? url.replace(/AudioStreamIndex=\d+/, `AudioStreamIndex=${index}`)
                     : url + `&AudioStreamIndex=${index}`;
                 hlsUrl.value = `${serverUrl}${url}`;
-                playMethod.value = ms.SupportsDirectStream ? 'DirectStream' : 'Transcode';
+                playMethod.value = activeBurnInSubtitleIndex.value !== null
+                    ? 'Transcode'
+                    : ms.SupportsDirectStream ? 'DirectStream' : 'Transcode';
             } else {
                 // Jellyfin didn't return a TranscodingUrl — build one manually.
-                hlsUrl.value = `${serverUrl}/Videos/${itemId}/master.m3u8?mediaSourceId=${ms.Id || itemId}&AudioStreamIndex=${index}&PlaySessionId=${playSessionId.value}`;
+                const subtitleQuery = activeBurnInSubtitleIndex.value !== null
+                    ? `&SubtitleStreamIndex=${activeBurnInSubtitleIndex.value}&SubtitleMethod=Encode`
+                    : '';
+                hlsUrl.value = `${serverUrl}/Videos/${itemId}/master.m3u8?mediaSourceId=${ms.Id || itemId}&AudioStreamIndex=${index}${subtitleQuery}&PlaySessionId=${playSessionId.value}`;
                 playMethod.value = 'Transcode';
             }
 
@@ -466,9 +625,21 @@ export function useWebPlayer(
             preferencesStore.preferredBitrate = bitrate;
             const startTicks = Math.floor(movieTime * 10_000_000);
             // bitrate > 0 forces transcode (DirectPlay can't honour a bitrate cap)
-            const data = await fetchPlaybackInfo(startTicks, selectedAudioIndex.value ?? undefined, bitrate > 0);
+            const data = await fetchPlaybackInfo(
+                startTicks,
+                selectedAudioIndex.value ?? undefined,
+                bitrate > 0 || activeBurnInSubtitleIndex.value !== null,
+                false,
+                false,
+                false,
+                activeBurnInSubtitleIndex.value ?? undefined,
+            );
             mediaSource.value = data.MediaSources?.[0];
             if (!mediaSource.value) throw new Error('No media source');
+            ensureBurnInUrl(
+                mediaSource.value,
+                activeBurnInSubtitleIndex.value ?? undefined,
+            );
             if (data.PlaySessionId) playSessionId.value = data.PlaySessionId;
 
             parseAudioStreams(mediaSource.value, selectedAudioIndex.value ?? undefined);
@@ -479,7 +650,9 @@ export function useWebPlayer(
                 hlsUrl.value = `${serverUrl}${ms.TranscodingUrl.replace('?&', '?')}`;
                 // If we requested AllowVideoStreamCopy:false (bitrate > 0), it's a real transcode.
                 // Otherwise fall back to what Jellyfin reports.
-                playMethod.value = bitrate > 0 ? 'Transcode' : (ms.SupportsDirectStream ? 'DirectStream' : 'Transcode');
+                playMethod.value = bitrate > 0 || activeBurnInSubtitleIndex.value !== null
+                    ? 'Transcode'
+                    : (ms.SupportsDirectStream ? 'DirectStream' : 'Transcode');
                 initHls(hlsUrl.value, video, movieTime);
             } else {
                 determinePlaybackMethod(ms);

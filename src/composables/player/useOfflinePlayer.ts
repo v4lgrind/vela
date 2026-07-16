@@ -1,6 +1,7 @@
 import { type Ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { Filesystem, Directory } from '@capacitor/filesystem';
+import { usePlatform } from '@/composables/usePlatform';
 import { usePreferencesStore } from '@/store/preferences-store';
 import { offlineDatabase } from '@/services/offlineDatabase';
 import { NativeVideo } from '@/plugins/NativeVideoPlugin';
@@ -33,6 +34,7 @@ export function useOfflinePlayer(
 
     const router = useRouter();
     const preferencesStore = usePreferencesStore();
+    const { isDesktop } = usePlatform();
 
     let offlineProgressInterval: ReturnType<typeof setInterval> | null = null;
 
@@ -66,6 +68,8 @@ export function useOfflinePlayer(
                     directory: Directory.Data,
                 });
                 playUrl = fileInfo.uri; // file:///data/user/0/...
+            } else if (isDesktop && window.desktopRuntime) {
+                playUrl = window.desktopRuntime.getMediaUrl(cachedDownload.filePath);
             } else {
                 const fileData = await Filesystem.readFile({
                     path: cachedDownload.filePath,

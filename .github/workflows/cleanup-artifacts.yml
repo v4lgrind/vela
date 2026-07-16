@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       keep_count:
-        description: 'Number of most recent artifacts to keep'
+        description: 'Number of recent artifacts to keep for each platform'
         required: false
         default: '2'
 
@@ -26,7 +26,7 @@ jobs:
           script: |
             const keepCount = parseInt('${{ github.event.inputs.keep_count || 2 }}');
 
-            console.log(`Keeping ${keepCount} most recent artifacts, deleting the rest...`);
+            console.log(`Keeping ${keepCount} recent artifacts for each platform...`);
 
             // Get all artifacts
             const artifacts = await github.paginate(github.rest.actions.listArtifactsForRepo, {
@@ -37,11 +37,30 @@ jobs:
 
             console.log(`Found ${artifacts.length} total artifacts`);
 
-            // Sort by created_at descending (newest first)
-            artifacts.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            const artifactGroup = (name) => {
+              const withoutCommit = name.replace(/-[0-9a-f]{40}$/i, '');
+              if (withoutCommit.startsWith('jellyfin-v4lgrind-android')) return 'android';
+              if (withoutCommit.startsWith('mediaserver-client-debug')) return 'android';
+              if (withoutCommit.startsWith('jellyfin-v4lgrind-windows')) return 'windows';
+              if (withoutCommit.startsWith('jellyfin-v4lgrind-linux')) return 'linux';
+              return withoutCommit;
+            };
 
-            // Get artifacts to delete (all except the most recent ones)
-            const artifactsToDelete = artifacts.slice(keepCount);
+            const groups = new Map();
+            for (const artifact of artifacts) {
+              const group = artifactGroup(artifact.name);
+              const groupArtifacts = groups.get(group) || [];
+              groupArtifacts.push(artifact);
+              groups.set(group, groupArtifacts);
+            }
+
+            const artifactsToDelete = [];
+            for (const [group, groupArtifacts] of groups) {
+              groupArtifacts.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+              const expired = groupArtifacts.slice(keepCount);
+              artifactsToDelete.push(...expired);
+              console.log(`${group}: keeping ${Math.min(groupArtifacts.length, keepCount)}, deleting ${expired.length}`);
+            }
 
             console.log(`Will delete ${artifactsToDelete.length} artifacts`);
 
@@ -62,4 +81,4 @@ jobs:
             }
 
             console.log(`\nCleanup complete! Deleted ${deletedCount} of ${artifactsToDelete.length} artifacts.`);
-            console.log(`Kept ${keepCount} most recent artifacts.`);
+            console.log(`Kept up to ${keepCount} recent artifacts for each platform.`);

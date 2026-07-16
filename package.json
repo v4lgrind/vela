@@ -2,7 +2,11 @@
   "name": "jellyfin-v4lgrind-client",
   "private": true,
   "version": "0.1.0",
+  "description": "A cross-platform Jellyfin media client for Android, Windows, and Linux.",
+  "author": "V4lgrind",
+  "license": "MIT",
   "type": "module",
+  "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
@@ -14,7 +18,11 @@
     "cap:sync": "npx cap sync",
     "cap:android": "npx cap open android",
     "android:build": "npm run build:skip-types && npx cap sync android && cd android && ./gradlew assembleDebug",
-    "android:release": "npm run build:skip-types && npx cap sync android && cd android && ./gradlew assembleRelease"
+    "android:release": "npm run build:skip-types && npx cap sync android && cd android && ./gradlew assembleRelease",
+    "desktop:runtime": "node node_modules/electron/install.js",
+    "desktop:dev": "npm run desktop:runtime && concurrently -k \"vite --host 127.0.0.1\" \"wait-on http://127.0.0.1:5173 && electron .\"",
+    "desktop:package": "npm run build && electron-builder --dir",
+    "desktop:dist": "npm run build && electron-builder"
   },
   "dependencies": {
     "@capacitor/android": "^8.0.2",
@@ -48,11 +56,15 @@
     "@vitejs/plugin-vue": "^5.2.1",
     "@vitest/coverage-v8": "^3.2.6",
     "@vue/test-utils": "^2.4.11",
+    "concurrently": "^10.0.3",
+    "electron": "^43.1.1",
+    "electron-builder": "^26.15.3",
     "jsdom": "^25.0.1",
     "tailwindcss": "^4.1.18",
     "typescript": "~5.6.2",
     "vite": "^6.0.3",
     "vitest": "^3.2.6",
-    "vue-tsc": "^2.1.10"
+    "vue-tsc": "^2.1.10",
+    "wait-on": "^9.0.10"
   }
 }

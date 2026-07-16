@@ -11,11 +11,33 @@ import {
 } from "@jellyfin/sdk/lib/utils/api";
 import { Preferences } from "@capacitor/preferences";
 
+import { getClientDeviceInfo } from "@/composables/usePlatform";
+
+const CLIENT_VERSION = "1.0.0";
+const clientDeviceInfo = getClientDeviceInfo();
+
+function createDeviceId(suffix: string | number): string {
+  return `${clientDeviceInfo.deviceIdPrefix}-${suffix}`;
+}
+
+function createJellyfinClient(deviceId: string): Jellyfin {
+  return new Jellyfin({
+    clientInfo: {
+      name: clientDeviceInfo.clientName,
+      version: CLIENT_VERSION,
+    },
+    deviceInfo: {
+      name: clientDeviceInfo.deviceName,
+      id: deviceId,
+    },
+  });
+}
+
 /** Build an Error carrying the HTTP status in `response.status`, axios-style. */
 function httpError(message: string, status: number): Error {
-  const err: any = new Error(message);
-  err.response = { status };
-  return err;
+  const error = new Error(message) as Error & { response?: { status: number } };
+  error.response = { status };
+  return error;
 }
 
 async function getStoredToken(): Promise<string | null> {
@@ -135,11 +157,8 @@ export const useJellyfinStore = defineStore("jellyfin", {
       this.api = this._createJellyfin().createApi(this.serverUrl, this.accessToken);
     },
     _createJellyfin(): Jellyfin {
-      if (!this._qcDeviceId) this._qcDeviceId = `jellyfin-android-${Date.now()}`;
-      return new Jellyfin({
-        clientInfo: { name: "Client", version: "1.0.0" },
-        deviceInfo: { name: "Android", id: this._qcDeviceId },
-      });
+      if (!this._qcDeviceId) this._qcDeviceId = createDeviceId(Date.now());
+      return createJellyfinClient(this._qcDeviceId);
     },
 
     async login(serverUrl: string, username: string, password: string) {
@@ -209,12 +228,17 @@ export const useJellyfinStore = defineStore("jellyfin", {
     },
 
     _quickConnectAuthHeader(deviceId: string): string {
-      return `MediaBrowser Client="Jellyfin Android", Device="Android", DeviceId="${deviceId}", Version="1.0.0"`;
+      return [
+        `MediaBrowser Client="${clientDeviceInfo.clientName}"`,
+        `Device="${clientDeviceInfo.deviceName}"`,
+        `DeviceId="${deviceId}"`,
+        `Version="${CLIENT_VERSION}"`,
+      ].join(", ");
     },
 
     async quickConnectInitiate(serverUrl: string) {
       // Generate a stable deviceId for the entire Quick Connect session and store it
-      this._qcDeviceId = `jellyfin-android-${Math.random().toString(36).slice(2, 11)}`;
+      this._qcDeviceId = createDeviceId(Math.random().toString(36).slice(2, 11));
       const resp = await fetch(`${serverUrl}/QuickConnect/Initiate`, {
         method: 'POST',
         headers: {

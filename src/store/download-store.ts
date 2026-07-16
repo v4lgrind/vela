@@ -1,13 +1,19 @@
 import { defineStore } from 'pinia';
-import { downloadService } from '@/services/downloadService';
-import { useOfflineStore } from './offline-store';
-import { useJellyfinStore } from './jellyfin-store';
-import { useMetadataCacheStore } from './metadata-cache-store';
-import { CODEC_MIME_MAP, isDolbyVision } from '@/utils/codecDetection';
 import { Capacitor } from '@capacitor/core';
+
+import { getClientPlatform } from '@/composables/usePlatform';
+import { downloadService } from '@/services/downloadService';
+import { CODEC_MIME_MAP, isDolbyVision } from '@/utils/codecDetection';
+import { needsDesktopTranscode } from '@/utils/desktopCodec';
 import { logger } from '@/utils/logger';
 
+import { useJellyfinStore } from './jellyfin-store';
+import { useMetadataCacheStore } from './metadata-cache-store';
+import { useOfflineStore } from './offline-store';
+
 const MAX_CONCURRENT = 3;
+const clientPlatform = getClientPlatform();
+const isDesktopPlatform = ['linux', 'macos', 'windows'].includes(clientPlatform);
 
 export interface DownloadTask {
   itemId: string;
@@ -160,11 +166,13 @@ export const useDownloadStore = defineStore('downloads', {
       try {
         // Check if video codec needs transcoding before downloading
         let transcodedUrl: string | undefined;
+        let transcodedContainer: string | undefined;
         let estimatedTranscodeSize = 0;
-        if (Capacitor.isNativePlatform()) {
+        if (Capacitor.isNativePlatform() || isDesktopPlatform) {
           const transcodeResult = await this._getTranscodeUrlIfNeeded(itemId, metadata, jellyfinStore, transcodeOptions);
           if (transcodeResult) {
             transcodedUrl = transcodeResult.url;
+            transcodedContainer = transcodeResult.container;
             estimatedTranscodeSize = transcodeResult.estimatedSize;
             task.transcoding = true;
           }
@@ -202,6 +210,7 @@ export const useDownloadStore = defineStore('downloads', {
           transcodedUrl,
           estimatedTranscodeSize || undefined,
           subtitleInfo,
+          transcodedContainer,
         );
 
         const t = this.tasks.get(itemId);
@@ -253,6 +262,7 @@ export const useDownloadStore = defineStore('downloads', {
      * Returns true if transcoding would be beneficial.
      */
     async checkNeedsTranscode(metadata: any): Promise<boolean> {
+      if (isDesktopPlatform) return needsDesktopTranscode(metadata);
       if (!Capacitor.isNativePlatform()) return false;
       try {
         const { getDeviceCodecs } = await import('@/utils/codecDetection');
@@ -294,7 +304,7 @@ export const useDownloadStore = defineStore('downloads', {
       metadata: any,
       jellyfinStore: ReturnType<typeof useJellyfinStore>,
       transcodeOptions?: TranscodeOptions,
-    ): Promise<{ url: string; estimatedSize: number } | undefined> {
+    ): Promise<{ container: string; url: string; estimatedSize: number } | undefined> {
       try {
         // If user explicitly chose transcode options, always transcode.
         // Otherwise, auto-detect based on device codec capabilities.
@@ -310,16 +320,17 @@ export const useDownloadStore = defineStore('downloads', {
           (transcodeOptions ? ` (audio=${transcodeOptions.audioStreamIndex} sub=${transcodeOptions.subtitleStreamIndex})` : ' (auto-detected)'));
         const serverUrl = jellyfinStore.serverUrl!;
         const token = jellyfinStore.accessToken!;
+        const transcodeContainer = isDesktopPlatform ? 'mp4' : 'ts';
 
         const requestBody: any = {
           DeviceProfile: {
             DirectPlayProfiles: [],
             TranscodingProfiles: [
               {
-                Container: 'ts',
+                Container: transcodeContainer,
                 Type: 'Video',
                 VideoCodec: 'h264',
-                AudioCodec: 'aac,mp3,ac3',
+                AudioCodec: isDesktopPlatform ? 'aac' : 'aac,mp3,ac3',
                 Context: 'Streaming',
                 Protocol: 'http',
                 CopyTimestamps: true,
@@ -338,7 +349,7 @@ export const useDownloadStore = defineStore('downloads', {
           },
           MediaSourceId: itemId,
           AllowVideoStreamCopy: false,
-          AllowAudioStreamCopy: true,
+          AllowAudioStreamCopy: !isDesktopPlatform,
         };
 
         if (transcodeOptions?.audioStreamIndex != null) {
@@ -372,7 +383,7 @@ export const useDownloadStore = defineStore('downloads', {
             ? Math.ceil((ms.Bitrate / 8) * (ms.RunTimeTicks / 10_000_000))
             : 0;
           logger.log(`[DownloadStore] Transcoded URL (est. ${Math.round(estimatedSize / 1024 / 1024)}MB): ${url}`);
-          return { url, estimatedSize };
+          return { container: transcodeContainer, url, estimatedSize };
         }
 
         logger.warn('[DownloadStore] PlaybackInfo returned no TranscodingUrl — falling back to raw download');

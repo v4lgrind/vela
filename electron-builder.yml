@@ -29,5 +29,4 @@ linux:
   icon: icons/icon-512.png
   target:
     - AppImage
-    - deb
   artifactName: ${productName}-${version}-linux-${arch}.${ext}

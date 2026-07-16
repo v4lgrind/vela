@@ -101,7 +101,7 @@ npm run desktop:dist
 Desktop builds are platform-specific:
 
 - Windows produces an NSIS `.exe` installer.
-- Linux produces `.AppImage` and `.deb` packages.
+- Linux produces a portable `.AppImage` package.
 
 The GitHub Actions desktop workflow builds both platforms independently.
 
@@ -164,7 +164,7 @@ mediaserver-client/
 GitHub Actions builds:
 
 - Android APKs with `.github/workflows/android-build.yml`.
-- Windows NSIS installers and Linux AppImage/DEB packages with
+- Windows NSIS installers and Linux AppImage packages with
   `.github/workflows/desktop-build.yml`.
 
 ## Migration from Tauri

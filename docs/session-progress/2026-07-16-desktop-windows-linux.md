@@ -14,12 +14,12 @@ Android application, and keep the shared Vue frontend functional on desktop.
   navigation protection, and no Node.js access in the renderer.
 - Added electron-builder targets:
   - Windows x64 NSIS installer.
-  - Linux AppImage and DEB packages.
+  - Linux AppImage package.
 - Added a GitHub Actions matrix that builds Windows and Linux artifacts.
   - Pull requests build Android, Windows, and Linux to validate the branch but
     do not upload build artifacts.
-  - Builds on `main` upload the APK, Windows installer, Linux AppImage, and
-    Linux DEB artifacts for seven days.
+  - Builds on `main` upload the APK, Windows installer, and Linux AppImage
+    artifacts for seven days.
   - Artifact cleanup keeps the latest builds independently for Android,
     Windows, and Linux instead of keeping only two artifacts globally.
 - Added desktop platform detection and platform-specific Jellyfin client/device

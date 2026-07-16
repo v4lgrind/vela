@@ -42,6 +42,5 @@ jobs:
           path: |
             release/*.exe
             release/*.AppImage
-            release/*.deb
           if-no-files-found: error
           retention-days: 7

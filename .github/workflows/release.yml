@@ -1,11 +1,11 @@
 name: Release
 
-# Manual, versioned release: you give a version number, this builds the APK,
-# tags the commit, and publishes a GitHub release with the APK attached.
+# Manual, versioned release. Builds Android, Windows and Linux from the selected
+# commit, then publishes every platform artifact in one GitHub release.
 #
-# The APK is debug-signed with the committed fixed keystore (same signature as
-# the nightly build), so it installs over an existing install without an
-# uninstall. versionCode is derived from semver so upgrades are monotonic.
+# The APK remains debug-signed with the committed fixed keystore so it installs
+# over an existing build. Android versionCode and all package versions are
+# derived from the requested semantic version.
 on:
   workflow_dispatch:
     inputs:
@@ -23,34 +23,48 @@ permissions:
   contents: write
 
 jobs:
-  release:
+  prepare:
     runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.version.outputs.code }}
+      tag: ${{ steps.version.outputs.tag }}
+      version: ${{ steps.version.outputs.version }}
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: Validate version + compute versionCode
-        id: ver
+      - name: Validate version and compute Android versionCode
+        id: version
+        shell: bash
         run: |
-          V="${{ inputs.version }}"
-          V="${V#v}"                       # tolerate a leading "v"
-          if ! [[ "$V" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::Version invalide '$V' — attendu MAJOR.MINOR.PATCH (ex. 1.0.0)"
+          VERSION="${{ inputs.version }}"
+          VERSION="${VERSION#v}"
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Version invalide '$VERSION' — attendu MAJOR.MINOR.PATCH (ex. 1.0.0)"
             exit 1
           fi
-          IFS=. read -r MA MI PA <<< "$V"
-          CODE=$(( MA * 10000 + MI * 100 + PA ))
-          echo "version=$V"       >> "$GITHUB_OUTPUT"
-          echo "code=$CODE"       >> "$GITHUB_OUTPUT"
-          echo "tag=v$V"          >> "$GITHUB_OUTPUT"
+
+          IFS=. read -r MAJOR MINOR PATCH <<< "$VERSION"
+          VERSION_CODE=$((MAJOR * 10000 + MINOR * 100 + PATCH))
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Fail if tag already exists
-        run: |
-          if gh release view "${{ steps.ver.outputs.tag }}" >/dev/null 2>&1; then
-            echo "::error::La release ${{ steps.ver.outputs.tag }} existe déjà."
-            exit 1
-          fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view "${{ steps.version.outputs.tag }}" >/dev/null 2>&1; then
+            echo "::error::La release ${{ steps.version.outputs.tag }} existe déjà."
+            exit 1
+          fi
+
+  android:
+    needs: prepare
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4
@@ -69,13 +83,14 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Setup Gradle cache
+      - name: Set up Gradle cache
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Apply version to build.gradle
+      - name: Apply Android version
+        shell: bash
         run: |
-          sed -i "s/versionCode [0-9]\+/versionCode ${{ steps.ver.outputs.code }}/" android/app/build.gradle
-          sed -i "s/versionName \"[^\"]*\"/versionName \"${{ steps.ver.outputs.version }}\"/" android/app/build.gradle
+          sed -i -E "s/versionCode .*/versionCode ${{ needs.prepare.outputs.code }}/" android/app/build.gradle
+          sed -i -E "s/versionName \"[^\"]*\"/versionName \"${{ needs.prepare.outputs.version }}\"/" android/app/build.gradle
           grep -nE "versionCode|versionName" android/app/build.gradle
 
       - name: Install dependencies
@@ -87,24 +102,95 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
-      - name: Build debug APK
+      - name: Build Android APK
         working-directory: android
         run: |
           chmod +x gradlew
           ./gradlew assembleDebug
 
-      - name: Rename APK
+      - name: Prepare Android release asset
+        shell: bash
         run: |
-          cp android/app/build/outputs/apk/debug/app-debug.apk \
-             "homelab-${{ steps.ver.outputs.tag }}.apk"
+          mkdir -p release-assets
+          cp android/app/build/outputs/apk/debug/mediaserver-client.apk \
+             "release-assets/homelab-${{ needs.prepare.outputs.tag }}.apk"
 
-      - name: Create release
+      - name: Upload Android release asset
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-android
+          path: release-assets/*.apk
+          if-no-files-found: error
+          retention-days: 3
+
+  desktop:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artifact-name: release-windows
+            artifact-path: release/*.exe
+          - os: ubuntu-22.04
+            artifact-name: release-linux
+            artifact-path: release/*.AppImage
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Apply desktop version
+        run: npm version "${{ needs.prepare.outputs.version }}" --no-git-tag-version --allow-same-version
+
+      - name: Build desktop distributable
+        run: npm run desktop:dist -- --publish never
+
+      - name: Upload desktop release asset
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact-name }}
+          path: ${{ matrix.artifact-path }}
+          if-no-files-found: error
+          retention-days: 3
+
+  publish:
+    needs:
+      - prepare
+      - android
+      - desktop
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download release assets
+        uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: List release assets
+        run: ls -lah release-assets
+
+      - name: Create GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "${{ steps.ver.outputs.tag }}" \
+          gh release create "${{ needs.prepare.outputs.tag }}" \
             --target "${{ github.sha }}" \
-            --title "Homelab ${{ steps.ver.outputs.tag }}" \
+            --title "Homelab ${{ needs.prepare.outputs.tag }}" \
             --generate-notes \
             ${{ inputs.prerelease && '--prerelease' || '' }} \
-            "homelab-${{ steps.ver.outputs.tag }}.apk"
+            release-assets/*

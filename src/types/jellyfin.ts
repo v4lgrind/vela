@@ -118,12 +118,11 @@ export interface IntroSegment {
 }
 
 export interface SubtitleTrack {
-  codec: string;
-  deliveryUrl: string | null;
   index: number;
-  isBitmap: boolean;
   language: string;
   label: string;
+  playbackMode: 'external' | 'burn-in';
+  deliveryUrl?: string;
 }
 
 export interface AudioTrack {

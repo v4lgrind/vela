@@ -42,3 +42,7 @@ release/
 # Keep for version control
 !android/app/src/
 !android/app/build.gradle
+
+# Local agent config
+.codex/
+AGENTS.md

@@ -63,6 +63,8 @@ class NativePlayerActivity : AppCompatActivity() {
         const val EXTRA_TITLE = "title"
         const val EXTRA_PLAY_METHOD = "playMethod"
         const val EXTRA_SUBTITLE_TRACKS = "subtitleTracks"
+        const val EXTRA_BURN_IN_SUBTITLE_TRACKS = "burnInSubtitleTracks"
+        const val EXTRA_SELECTED_BURN_IN_SUBTITLE_INDEX = "selectedBurnInSubtitleIndex"
 
         const val ACTION_COMMAND = "com.jellyfin_v4lgrind_client.app.PLAYER_COMMAND"
         const val ACTION_PROGRESS = "com.jellyfin_v4lgrind_client.app.PLAYER_PROGRESS"
@@ -149,6 +151,9 @@ class NativePlayerActivity : AppCompatActivity() {
     private var sidecarSubtitleCount = 0
     // Fallback subtitle info from Vue when ExoPlayer doesn't expose sidecar tracks
     private val sidecarSubtitles = mutableListOf<Pair<String, String>>() // (label, language)
+    private data class BurnInSubtitleTrack(val index: Int, val label: String)
+    private val burnInSubtitleTracks = mutableListOf<BurnInSubtitleTrack>()
+    private var selectedBurnInSubtitleIndex = -1
 
     // Subtitle size scale (persisted via preferencesStore on Vue side; passed via intent)
     private var currentSubtitleScale = 1.0f
@@ -424,6 +429,12 @@ class NativePlayerActivity : AppCompatActivity() {
         val title = intent.getStringExtra(EXTRA_TITLE) ?: ""
         val playMethod = intent.getStringExtra(EXTRA_PLAY_METHOD) ?: "Transcode"
         val subtitleTracksJson = intent.getStringExtra(EXTRA_SUBTITLE_TRACKS) ?: "[]"
+        parseBurnInSubtitleTracks(intent.getStringExtra(EXTRA_BURN_IN_SUBTITLE_TRACKS) ?: "[]")
+        selectedBurnInSubtitleIndex = intent.getIntExtra(EXTRA_SELECTED_BURN_IN_SUBTITLE_INDEX, -1)
+        if (burnInSubtitleTracks.isNotEmpty()) btnSubtitle.visibility = View.VISIBLE
+        if (selectedBurnInSubtitleIndex >= 0) {
+            btnSubtitle.setBackgroundResource(R.drawable.bg_player_button_selected)
+        }
 
         // Quality presets & stream info
         val qualityPresetsJson = intent.getStringExtra(EXTRA_QUALITY_PRESETS) ?: "[]"
@@ -987,7 +998,14 @@ class NativePlayerActivity : AppCompatActivity() {
 
         // Show/hide buttons based on track availability
         if (audioTrackGroups.size > 1 || jellyfinAudioTracks.size > 1) btnAudio.visibility = View.VISIBLE
-        if (subtitleTrackGroups.isNotEmpty() || sidecarSubtitleCount > 0 || srtCues.isNotEmpty()) btnSubtitle.visibility = View.VISIBLE
+        if (
+            subtitleTrackGroups.isNotEmpty()
+            || sidecarSubtitleCount > 0
+            || burnInSubtitleTracks.isNotEmpty()
+            || srtCues.isNotEmpty()
+        ) {
+            btnSubtitle.visibility = View.VISIBLE
+        }
 
         android.util.Log.d("NativePlayer", "[Subtitles] reportTracks: ${audioTrackGroups.size} audio, ${subtitleTrackGroups.size} subtitle")
         subtitleTrackGroups.forEach { (idx, group) ->
@@ -1225,6 +1243,25 @@ class NativePlayerActivity : AppCompatActivity() {
         }
     }
 
+    private fun parseBurnInSubtitleTracks(json: String) {
+        burnInSubtitleTracks.clear()
+        try {
+            val arr = JSONArray(json)
+            for (i in 0 until arr.length()) {
+                val obj = arr.getJSONObject(i)
+                burnInSubtitleTracks.add(
+                    BurnInSubtitleTrack(
+                        obj.getInt("index"),
+                        obj.getString("label")
+                    )
+                )
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("NativePlayer", "parseBurnInSubtitleTracks error", e)
+            burnInSubtitleTracks.clear()
+        }
+    }
+
     private fun showSubtitlePicker() {
         // SRT subtitle (offline transcoded downloads) — on/off toggle with size stepper
         if (srtCues.isNotEmpty()) {
@@ -1245,42 +1282,94 @@ class NativePlayerActivity : AppCompatActivity() {
             return
         }
 
-        if (subtitleTrackGroups.isEmpty() && sidecarSubtitles.isEmpty()) return
+        val hasNoSubtitleTracks = subtitleTrackGroups.isEmpty()
+            && sidecarSubtitles.isEmpty()
+            && burnInSubtitleTracks.isEmpty()
+        if (hasNoSubtitleTracks) return
 
-        if (subtitleTrackGroups.isNotEmpty()) {
-            // ExoPlayer has track groups — use them directly
-            val options = buildList {
-                add(SheetOption("Off", selectedSubtitleGroupIndex < 0) { selectSubtitleTrack(-1) })
-                subtitleTrackGroups.forEach { (groupIndex, group) ->
-                    val format = group.getFormat(0)
-                    val label = format.label ?: (format.language ?: "und")
-                    add(SheetOption(label.toString(), groupIndex == selectedSubtitleGroupIndex) {
-                        selectSubtitleTrack(groupIndex)
-                    })
-                }
-            }
-            showOptionSheet("Subtitles", options) { footer -> buildSubtitleSizeFooter(footer) }
-        } else {
-            // Transcoded stream: ExoPlayer didn't report text tracks.
-            // Show sidecar labels and broadcast selection to Vue for server-side burn-in.
-            val options = buildList {
-                add(SheetOption("Off", selectedSubtitleGroupIndex < 0) { selectSubtitleTrack(-1) })
-                sidecarSubtitles.forEachIndexed { i, sub ->
-                    add(SheetOption(sub.first, selectedSubtitleGroupIndex == i) {
-                        sendSubtitleSelectedBroadcast(i, sub.first)
-                        selectedSubtitleGroupIndex = i
-                        btnSubtitle.setBackgroundResource(R.drawable.bg_player_button_selected)
-                    })
-                }
-            }
-            showOptionSheet("Subtitles", options) { footer -> buildSubtitleSizeFooter(footer) }
+        val options = buildList {
+            addOffSubtitleOption()
+            if (subtitleTrackGroups.isNotEmpty()) addNativeSubtitleOptions()
+            else addSidecarSubtitleOptions()
+            addBurnInSubtitleOptions()
+        }
+        showOptionSheet("Subtitles", options) { footer -> buildSubtitleSizeFooter(footer) }
+    }
+
+    private fun MutableList<SheetOption>.addOffSubtitleOption() {
+        val isOff = selectedSubtitleGroupIndex < 0 && selectedBurnInSubtitleIndex < 0
+        add(SheetOption("Off", isOff) { selectSubtitleOff() })
+    }
+
+    private fun selectSubtitleOff() {
+        if (selectedBurnInSubtitleIndex >= 0) {
+            selectedBurnInSubtitleIndex = -1
+            sendSubtitleSelectedBroadcast(-1, "Off", -1)
+            return
+        }
+        selectSubtitleTrack(-1)
+    }
+
+    private fun MutableList<SheetOption>.addNativeSubtitleOptions() {
+        subtitleTrackGroups.forEach { (groupIndex, group) ->
+            val format = group.getFormat(0)
+            val label = format.label ?: (format.language ?: "und")
+            add(SheetOption(label.toString(), groupIndex == selectedSubtitleGroupIndex) {
+                selectNativeSubtitle(groupIndex, label.toString())
+            })
         }
     }
 
-    private fun sendSubtitleSelectedBroadcast(groupIndex: Int, label: String) {
+    private fun selectNativeSubtitle(groupIndex: Int, label: String) {
+        if (selectedBurnInSubtitleIndex >= 0) {
+            selectedBurnInSubtitleIndex = -1
+            sendSubtitleSelectedBroadcast(groupIndex, label, -1)
+            return
+        }
+        selectSubtitleTrack(groupIndex)
+    }
+
+    private fun MutableList<SheetOption>.addSidecarSubtitleOptions() {
+        sidecarSubtitles.forEachIndexed { index, subtitle ->
+            add(SheetOption(subtitle.first, selectedSubtitleGroupIndex == index) {
+                selectSidecarSubtitle(index, subtitle.first)
+            })
+        }
+    }
+
+    private fun selectSidecarSubtitle(index: Int, label: String) {
+        if (selectedBurnInSubtitleIndex >= 0) {
+            selectedBurnInSubtitleIndex = -1
+            sendSubtitleSelectedBroadcast(index, label, -1)
+            return
+        }
+        sendSubtitleSelectedBroadcast(index, label)
+        selectedSubtitleGroupIndex = index
+        btnSubtitle.setBackgroundResource(R.drawable.bg_player_button_selected)
+    }
+
+    private fun MutableList<SheetOption>.addBurnInSubtitleOptions() {
+        burnInSubtitleTracks.forEach { subtitle ->
+            add(SheetOption(subtitle.label, subtitle.index == selectedBurnInSubtitleIndex) {
+                selectedBurnInSubtitleIndex = subtitle.index
+                selectedSubtitleGroupIndex = -1
+                btnSubtitle.setBackgroundResource(R.drawable.bg_player_button_selected)
+                sendSubtitleSelectedBroadcast(-1, subtitle.label, subtitle.index)
+            })
+        }
+    }
+
+    private fun sendSubtitleSelectedBroadcast(
+        groupIndex: Int,
+        label: String,
+        burnInSubtitleIndex: Int? = null
+    ) {
         val broadcastIntent = Intent(ACTION_SUBTITLE_SELECTED)
         broadcastIntent.putExtra("groupIndex", groupIndex)
         broadcastIntent.putExtra("label", label)
+        if (burnInSubtitleIndex != null) {
+            broadcastIntent.putExtra("burnInSubtitleIndex", burnInSubtitleIndex)
+        }
         broadcastIntent.setPackage(packageName)
         sendBroadcast(broadcastIntent)
     }

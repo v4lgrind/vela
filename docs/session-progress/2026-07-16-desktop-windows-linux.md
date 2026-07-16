@@ -45,6 +45,11 @@ Android application, and keep the shared Vue frontend functional on desktop.
   - The selected bitmap subtitle is preserved when changing audio or quality.
   - Switching back to a text subtitle or turning subtitles off restarts without
     burn-in.
+- Resolved the PR against the latest `main` player refactor:
+  - Kept `PlayerPage.vue` as the thin orchestrator from `main`.
+  - Moved desktop PGS playback into `usePlayerSession` and `useWebPlayer`.
+  - Moved desktop offline file playback into `useOfflinePlayer`.
+  - Preserved the native Android PGS implementation already merged on `main`.
 - Fixed the pre-existing `BottomNav.vue` TypeScript errors that prevented the
   strict build.
 - Updated README documentation and package scripts.
@@ -52,7 +57,7 @@ Android application, and keep the shared Vue frontend functional on desktop.
 ## Verification
 
 - `npm run build` passes.
-- `npm test` passes: 12 files, 77 tests.
+- `npm test` passes: 12 files, 69 tests.
 - Production dependency audit: 0 vulnerabilities with `npm audit --omit=dev`.
 - Electron Node entry files pass `node --check`.
 - Windows unpacked application and NSIS installer build successfully.

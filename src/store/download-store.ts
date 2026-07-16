@@ -259,11 +259,6 @@ export const useDownloadStore = defineStore('downloads', {
 
     /**
      * Check if any video or audio codec in the media is unsupported by the device.
-     * If so, request a transcoding URL from Jellyfin's PlaybackInfo API.
-     * Returns the URL and an estimated file size (bytes) derived from Bitrate × duration.
-     */
-    /**
-     * Check if any video or audio codec in the media is unsupported by the device.
      * Returns true if transcoding would be beneficial.
      */
     async checkNeedsTranscode(metadata: any): Promise<boolean> {
@@ -418,6 +413,7 @@ export const useDownloadStore = defineStore('downloads', {
         if (task.status === 'queued') {
           task.status = 'cancelled';
           this._metadataQueue.delete(task.itemId);
+          this._transcodeOptionsQueue.delete(task.itemId);
         } else if (task.status === 'downloading') {
           downloadService.cancelDownload(task.itemId);
           task.status = 'cancelled';
@@ -428,6 +424,7 @@ export const useDownloadStore = defineStore('downloads', {
     removeTask(itemId: string) {
       this.tasks.delete(itemId);
       this._metadataQueue.delete(itemId);
+      this._transcodeOptionsQueue.delete(itemId);
       if (this.tasks.size === 0) this.showIndicator = false;
     },
 

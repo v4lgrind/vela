@@ -7,6 +7,12 @@ export interface SubtitleTrack {
     label: string;
 }
 
+export interface BurnInSubtitleTrack {
+    index: number;
+    lang: string;
+    label: string;
+}
+
 export interface NativeVideoStartOptions {
     url: string;
     authHeader: string;
@@ -14,6 +20,8 @@ export interface NativeVideoStartOptions {
     title?: string;
     playMethod?: 'DirectPlay' | 'DirectStream' | 'Transcode';
     subtitleTracks?: SubtitleTrack[];
+    burnInSubtitleTracks?: BurnInSubtitleTrack[];
+    selectedBurnInSubtitleIndex?: number;
     qualityPresets?: string;
     selectedBitrate?: number;
     streamInfo?: string;
@@ -54,6 +62,7 @@ export interface NativeVideoAudioSelectedEvent {
 export interface NativeVideoSubtitleSelectedEvent {
     groupIndex: number;
     label: string;
+    burnInSubtitleIndex?: number;
 }
 
 export interface NativeVideoQualitySelectedEvent {

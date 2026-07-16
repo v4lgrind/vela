@@ -36,6 +36,39 @@ export interface DownloadedMedia {
   introSegments?: Array<{ Type: string; StartTicks: number; EndTicks: number }>;
 }
 
+/**
+ * Build a DownloadedMedia record from a Jellyfin item, filling in the
+ * series/album organization fields for episodes and music tracks.
+ * Shared by the download service and the native-download reconciliation.
+ */
+export function buildDownloadedMedia(
+  metadata: any,
+  filePath: string,
+  fileSize: number,
+): DownloadedMedia {
+  const knownTypes: DownloadedMedia["type"][] = ["Movie", "Episode", "MusicAlbum", "Audio"];
+  const media: DownloadedMedia = {
+    itemId: metadata.Id,
+    type: knownTypes.includes(metadata.Type) ? metadata.Type : "Movie",
+    name: metadata.Name || "Unknown",
+    filePath,
+    fileSize,
+    downloadDate: Date.now(),
+    jellyfinItem: metadata,
+  };
+  if (metadata.Type === "Episode") {
+    media.seriesId = metadata.SeriesId;
+    media.seriesName = metadata.SeriesName;
+    media.seasonId = metadata.SeasonId;
+    media.seasonNumber = metadata.ParentIndexNumber;
+    media.episodeNumber = metadata.IndexNumber;
+  } else if (metadata.Type === "Audio") {
+    media.albumId = metadata.AlbumId;
+    media.albumName = metadata.Album;
+  }
+  return media;
+}
+
 export interface WatchProgress {
   itemId: string; // Primary key
   position: number; // seconds
@@ -191,84 +224,50 @@ class OfflineDatabase {
     });
   }
 
-  public async getDownloadsByType(
-    type: DownloadedMedia["type"],
+  /** Shared reader for all "downloads by <index>" queries. */
+  private async getDownloadsByIndex(
+    indexName: "type" | "seriesId" | "seasonId" | "albumId",
+    value: string,
   ): Promise<DownloadedMedia[]> {
     const db = await this.ensureDB();
     return new Promise((resolve, reject) => {
       const transaction = db.transaction(["downloads"], "readonly");
       const store = transaction.objectStore("downloads");
-      const request = store.index("type").getAll(type);
+      const request = store.index(indexName).getAll(value);
 
       request.onsuccess = () => {
         resolve(request.result || []);
       };
 
       request.onerror = () => {
-        logger.error("[OfflineDB] Failed to get downloads by type:", request.error);
+        logger.error(`[OfflineDB] Failed to get downloads by ${indexName}:`, request.error);
         reject(request.error);
       };
     });
+  }
+
+  public async getDownloadsByType(
+    type: DownloadedMedia["type"],
+  ): Promise<DownloadedMedia[]> {
+    return this.getDownloadsByIndex("type", type);
   }
 
   public async getDownloadsBySeries(
     seriesId: string,
   ): Promise<DownloadedMedia[]> {
-    const db = await this.ensureDB();
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction(["downloads"], "readonly");
-      const store = transaction.objectStore("downloads");
-      const request = store.index("seriesId").getAll(seriesId);
-
-      request.onsuccess = () => {
-        resolve(request.result || []);
-      };
-
-      request.onerror = () => {
-        logger.error("[OfflineDB] Failed to get downloads by series:", request.error);
-        reject(request.error);
-      };
-    });
+    return this.getDownloadsByIndex("seriesId", seriesId);
   }
 
   public async getDownloadsBySeason(
     seasonId: string,
   ): Promise<DownloadedMedia[]> {
-    const db = await this.ensureDB();
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction(["downloads"], "readonly");
-      const store = transaction.objectStore("downloads");
-      const request = store.index("seasonId").getAll(seasonId);
-
-      request.onsuccess = () => {
-        resolve(request.result || []);
-      };
-
-      request.onerror = () => {
-        logger.error("[OfflineDB] Failed to get downloads by season:", request.error);
-        reject(request.error);
-      };
-    });
+    return this.getDownloadsByIndex("seasonId", seasonId);
   }
 
   public async getDownloadsByAlbum(
     albumId: string,
   ): Promise<DownloadedMedia[]> {
-    const db = await this.ensureDB();
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction(["downloads"], "readonly");
-      const store = transaction.objectStore("downloads");
-      const request = store.index("albumId").getAll(albumId);
-
-      request.onsuccess = () => {
-        resolve(request.result || []);
-      };
-
-      request.onerror = () => {
-        logger.error("[OfflineDB] Failed to get downloads by album:", request.error);
-        reject(request.error);
-      };
-    });
+    return this.getDownloadsByIndex("albumId", albumId);
   }
 
   public async isDownloaded(itemId: string): Promise<boolean> {

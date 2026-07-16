@@ -31,6 +31,8 @@ export interface DownloadTask {
 export interface TranscodeOptions {
   audioStreamIndex?: number;
   subtitleStreamIndex?: number;
+  /** User explicitly chose to download the original file — never transcode. */
+  forceOriginal?: boolean;
 }
 
 interface DownloadStoreState {
@@ -306,8 +308,11 @@ export const useDownloadStore = defineStore('downloads', {
       transcodeOptions?: TranscodeOptions,
     ): Promise<{ container: string; url: string; estimatedSize: number } | undefined> {
       try {
-        // If user explicitly chose transcode options, always transcode.
+        // If user explicitly chose to keep the original, never transcode.
+        // If they chose transcode options, always transcode.
         // Otherwise, auto-detect based on device codec capabilities.
+        if (transcodeOptions?.forceOriginal) return undefined;
+
         const forceTranscode = transcodeOptions != null;
 
         if (!forceTranscode) {

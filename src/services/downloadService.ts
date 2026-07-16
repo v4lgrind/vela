@@ -5,6 +5,7 @@ import type { PluginListenerHandle } from '@capacitor/core';
 
 import { usePlatform } from '@/composables/usePlatform';
 import { DownloadPlugin } from '@/plugins/DownloadPlugin';
+import { getPrimaryContainer } from '@/utils/desktopCodec';
 import { logger } from '@/utils/logger';
 
 import {
@@ -319,7 +320,10 @@ class DownloadService {
   }
 
   private getFileExtension(metadata: any): string {
-    if (metadata.Container) return metadata.Container;
+    // Normalized single container — the raw item-level Container can be an
+    // ffprobe CSV like "mov,mp4,m4a,3gp,3g2,mj2", which is no file extension.
+    const container = getPrimaryContainer(metadata);
+    if (container) return container;
     switch (metadata.Type) {
       case 'Movie':
       case 'Episode': return 'mkv';

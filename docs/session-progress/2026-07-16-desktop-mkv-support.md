@@ -34,9 +34,30 @@ the forced transcode for MKV downloads unnecessary.
 - `src/utils/desktopCodec.test.ts`: MKV-transcode test inverted (intentional
   behavior change) + 5 new cases. 77/77 pass, `vue-tsc --noEmit` clean.
 
+## Follow-up in the same PR: sidecar subtitles for direct desktop downloads
+
+Chromium's `<video>` exposes no embedded subtitle tracks, so direct downloads
+(MP4 or MKV) had no offline subtitles on desktop. Added in a second commit:
+
+- `download-store.ts`: direct desktop downloads auto-pick a text subtitle
+  stream (preferred language → default-flagged → first text stream).
+- `downloadService.ts`: desktop sidecars fetched as WebVTT (only format
+  Chromium's `<track>` renders); Android keeps SRT for ExoPlayer.
+- `useOfflinePlayer.ts`: desktop offline playback exposes the `.vtt` sidecar
+  through the web player's `<track>` pipeline; auto-shown per saved/global
+  subtitle preference, always selectable from the menu.
+- `useWebPlayer.ts`: subtitle fetch sends the auth header only to http(s)
+  URLs — on `media://` it would trigger a CORS preflight the protocol
+  handler rejects.
+- `electron/media.cjs`: `.vtt` → `text/vtt` MIME mapping.
+
+Runtime-verified (Electron 43.1.1): MKV via `media://` + `media://`-served VTT
+sidecar as `<track>` — cues parsed and displayed during playback.
+
 ## Next steps
 
 - PR #35 awaiting review (auto-created by repo workflow on branch push; body
   filled in via `gh pr edit`).
-- Possible follow-up: sidecar subtitle download for direct (non-transcoded)
-  desktop downloads, since Chromium exposes no embedded MKV subtitle tracks.
+- Pre-existing `.srt` sidecars from old desktop transcoded downloads are still
+  ignored by the desktop offline player (`.vtt` only); re-download to get
+  subtitles there.

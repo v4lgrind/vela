@@ -166,6 +166,8 @@ GitHub Actions builds:
 - Android APKs with `.github/workflows/android-build.yml`.
 - Windows NSIS installers and Linux AppImage packages with
   `.github/workflows/desktop-build.yml`.
+- Manual versioned releases with `.github/workflows/release.yml`; a single
+  release contains the Android APK, Windows installer, and Linux AppImage.
 
 ## Migration from Tauri
 

@@ -1,20 +1,35 @@
 package com.jellyfin_v4lgrind_client.app
 
+import android.Manifest
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.os.Build
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.getcapacitor.JSArray
 import com.getcapacitor.JSObject
+import com.getcapacitor.PermissionState
 import com.getcapacitor.Plugin
 import com.getcapacitor.PluginCall
 import com.getcapacitor.PluginMethod
 import com.getcapacitor.annotation.CapacitorPlugin
+import com.getcapacitor.annotation.Permission
+import com.getcapacitor.annotation.PermissionCallback
 import org.json.JSONArray
 import org.json.JSONObject
 
-@CapacitorPlugin(name = "Download")
+private const val STORAGE_PERMISSION = "publicDownloads"
+
+@CapacitorPlugin(
+    name = "Download",
+    permissions = [
+        Permission(
+            alias = STORAGE_PERMISSION,
+            strings = [Manifest.permission.WRITE_EXTERNAL_STORAGE],
+        ),
+    ],
+)
 class DownloadPlugin : Plugin() {
 
     private var broadcastReceiver: BroadcastReceiver? = null
@@ -27,6 +42,25 @@ class DownloadPlugin : Plugin() {
 
     @PluginMethod
     fun enqueue(call: PluginCall) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
+            getPermissionState(STORAGE_PERMISSION) != PermissionState.GRANTED
+        ) {
+            requestPermissionForAlias(STORAGE_PERMISSION, call, "storagePermissionCallback")
+            return
+        }
+        enqueueDownload(call)
+    }
+
+    @PermissionCallback
+    private fun storagePermissionCallback(call: PluginCall) {
+        if (getPermissionState(STORAGE_PERMISSION) != PermissionState.GRANTED) {
+            call.reject("Storage permission is required to save downloads")
+            return
+        }
+        enqueueDownload(call)
+    }
+
+    private fun enqueueDownload(call: PluginCall) {
         val itemId   = call.getString("itemId")   ?: run { call.reject("itemId is required");   return }
         val url      = call.getString("url")      ?: run { call.reject("url is required");      return }
         val destPath = call.getString("destPath") ?: run { call.reject("destPath is required"); return }

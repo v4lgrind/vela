@@ -1,5 +1,6 @@
 const { createReadStream } = require("node:fs");
 const {
+  cp,
   mkdir,
   open,
   rename,
@@ -52,16 +53,28 @@ function registerMediaScheme() {
 }
 
 function getMediaRoot() {
+  return process.platform === "win32"
+    ? app.getPath("videos")
+    : app.getPath("downloads");
+}
+
+function getLegacyMediaRoot() {
   return path.join(app.getPath("userData"), "media");
 }
 
-function resolveMediaPath(relativePath) {
+function getFallbackMediaRoots() {
+  const currentRoot = path.resolve(getMediaRoot());
+  return [app.getPath("downloads"), getLegacyMediaRoot()]
+    .filter((root) => path.resolve(root) !== currentRoot);
+}
+
+function resolveMediaPathFromRoot(relativePath, root) {
   if (typeof relativePath !== "string" || relativePath.includes("\0")) {
     throw new Error("Invalid media path");
   }
 
   const normalizedPath = relativePath.replaceAll("\\", "/");
-  const mediaRoot = path.resolve(getMediaRoot());
+  const mediaRoot = path.resolve(root);
   const absolutePath = path.resolve(mediaRoot, normalizedPath);
   const pathFromRoot = path.relative(mediaRoot, absolutePath);
 
@@ -70,6 +83,46 @@ function resolveMediaPath(relativePath) {
   }
 
   return absolutePath;
+}
+
+function resolveMediaPath(relativePath) {
+  return resolveMediaPathFromRoot(relativePath, getMediaRoot());
+}
+
+async function findMediaPath(relativePath) {
+  const candidates = [
+    resolveMediaPath(relativePath),
+    ...getFallbackMediaRoots().map((root) => resolveMediaPathFromRoot(relativePath, root)),
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      await stat(candidate);
+      return candidate;
+    } catch {
+      // Try the next known desktop storage location.
+    }
+  }
+
+  return candidates[0];
+}
+
+async function migrateLegacyMedia() {
+  const relativeRoot = "Jellyfin V4lgrind";
+  const currentRoot = resolveMediaPath(relativeRoot);
+
+  for (const fallbackRoot of getFallbackMediaRoots()) {
+    const sourceRoot = resolveMediaPathFromRoot(relativeRoot, fallbackRoot);
+    try {
+      const sourceStat = await stat(sourceRoot);
+      if (!sourceStat.isDirectory()) continue;
+      await mkdir(path.dirname(currentRoot), { recursive: true });
+      await cp(sourceRoot, currentRoot, { recursive: true, force: false });
+      await rm(sourceRoot, { recursive: true, force: true });
+    } catch {
+      // Keep the fallback readable when migration is not possible.
+    }
+  }
 }
 
 function validateDownloadRequest(request) {
@@ -165,7 +218,7 @@ function cancelDownload(operationId) {
 
 async function statMedia(relativePath) {
   try {
-    const fileStat = await stat(resolveMediaPath(relativePath));
+    const fileStat = await stat(await findMediaPath(relativePath));
     return { exists: fileStat.isFile(), size: fileStat.size };
   } catch {
     return { exists: false, size: 0 };
@@ -173,7 +226,10 @@ async function statMedia(relativePath) {
 }
 
 async function deleteMedia(relativePath) {
-  await rm(resolveMediaPath(relativePath), { force: true });
+  const roots = [getMediaRoot(), ...getFallbackMediaRoots()];
+  await Promise.all(
+    roots.map((root) => rm(resolveMediaPathFromRoot(relativePath, root), { force: true })),
+  );
 }
 
 function parseRange(rangeHeader, fileSize) {
@@ -196,7 +252,7 @@ async function createMediaResponse(request) {
   if (url.hostname !== "local") return new Response("Not found", { status: 404 });
 
   const relativePath = decodeURIComponent(url.pathname.replace(/^\/+/, ""));
-  const absolutePath = resolveMediaPath(relativePath);
+  const absolutePath = await findMediaPath(relativePath);
   const fileStat = await stat(absolutePath);
   if (!fileStat.isFile()) return new Response("Not found", { status: 404 });
 
@@ -244,6 +300,7 @@ function registerMediaProtocol() {
 }
 
 module.exports = {
+  migrateLegacyMedia,
   registerMediaIpc,
   registerMediaProtocol,
   registerMediaScheme,

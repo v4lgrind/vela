@@ -5,17 +5,25 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.ContentValues
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.media.MediaScannerConnection
+import android.net.Uri
+import android.os.Build
+import android.os.Environment
 import android.os.IBinder
 import android.os.PowerManager
+import android.provider.MediaStore
+import android.webkit.MimeTypeMap
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import org.json.JSONObject
 import org.json.JSONArray
+import java.io.BufferedOutputStream
 import java.io.File
-import java.io.FileOutputStream
+import java.io.OutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.Collections
@@ -45,6 +53,12 @@ class DownloadService : Service() {
         val destPath: String,
         val itemName: String,
         val estimatedSize: Long,
+    )
+
+    private data class DownloadDestination(
+        val uri: Uri,
+        val output: OutputStream,
+        val legacyFile: File? = null,
     )
 
     private val queue = LinkedBlockingDeque<Task>()
@@ -154,9 +168,6 @@ class DownloadService : Service() {
     private fun doDownload(task: Task) {
         if (task.itemId in cancelledIds) throw InterruptedException()
 
-        val destFile = File(filesDir, task.destPath)
-        destFile.parentFile?.mkdirs()
-
         val conn = (URL(task.url).openConnection() as HttpURLConnection).apply {
             requestMethod = "GET"
             connectTimeout = 30_000
@@ -175,10 +186,11 @@ class DownloadService : Service() {
 
         var downloaded = 0L
         var lastBroadcast = 0L
+        val destination = createDownloadDestination(task.destPath)
 
         try {
             conn.inputStream.buffered(65_536).use { input ->
-                FileOutputStream(destFile, false).use { output ->
+                BufferedOutputStream(destination.output, 65_536).use { output ->
                     val buf = ByteArray(65_536)
                     while (true) {
                         if (task.itemId in cancelledIds) throw InterruptedException()
@@ -195,20 +207,90 @@ class DownloadService : Service() {
                     }
                 }
             }
+            if (task.itemId in cancelledIds) throw InterruptedException()
+            publishDownload(destination)
+        } catch (error: Exception) {
+            discardDownload(destination)
+            throw error
         } finally {
             conn.disconnect()
         }
 
-        if (task.itemId in cancelledIds) throw InterruptedException()
-
-        val fileSize = destFile.length()
+        val fileSize = downloaded
+        val publicPath = destination.uri.toString()
         lbm.sendBroadcast(Intent(ACTION_COMPLETE).apply {
             putExtra("itemId", task.itemId)
-            putExtra("filePath", destFile.absolutePath)
+            putExtra("filePath", publicPath)
             putExtra("fileSize", fileSize)
         })
-        savePendingComplete(task.itemId, destFile.absolutePath, fileSize)
+        if (!task.itemId.startsWith("subtitle-")) {
+            savePendingComplete(task.itemId, publicPath, fileSize)
+        }
         android.util.Log.d("DownloadService", "Complete: ${task.itemName} ($fileSize bytes)")
+    }
+
+    private fun createDownloadDestination(destPath: String): DownloadDestination {
+        val safePath = sanitizeDestinationPath(destPath)
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            val root = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+            val file = File(root, safePath)
+            file.parentFile?.mkdirs()
+            return DownloadDestination(Uri.fromFile(file), file.outputStream(), file)
+        }
+
+        val displayName = safePath.substringAfterLast('/')
+        val parentPath = safePath.substringBeforeLast('/', "")
+        val relativePath = listOf(Environment.DIRECTORY_DOWNLOADS, parentPath)
+            .filter { it.isNotBlank() }
+            .joinToString("/")
+        val values = ContentValues().apply {
+            put(MediaStore.Downloads.DISPLAY_NAME, displayName)
+            put(MediaStore.Downloads.MIME_TYPE, getMimeType(displayName))
+            put(MediaStore.Downloads.RELATIVE_PATH, "$relativePath/")
+            put(MediaStore.Downloads.IS_PENDING, 1)
+        }
+        val uri = contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+            ?: throw java.io.IOException("Unable to create public download")
+        val output = contentResolver.openOutputStream(uri, "w")
+            ?: run {
+                contentResolver.delete(uri, null, null)
+                throw java.io.IOException("Unable to open public download")
+            }
+        return DownloadDestination(uri, output)
+    }
+
+    private fun sanitizeDestinationPath(destPath: String): String {
+        val parts = destPath.replace('\\', '/').split('/').filter { it.isNotBlank() }
+        if (parts.isEmpty() || parts.any { it == "." || it == ".." }) {
+            throw java.io.IOException("Invalid download destination")
+        }
+        return parts.joinToString("/")
+    }
+
+    private fun getMimeType(filename: String): String {
+        val extension = filename.substringAfterLast('.', "").lowercase()
+        return MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension)
+            ?: "application/octet-stream"
+    }
+
+    private fun publishDownload(destination: DownloadDestination) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val values = ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) }
+            contentResolver.update(destination.uri, values, null, null)
+            return
+        }
+        destination.legacyFile?.let { file ->
+            MediaScannerConnection.scanFile(this, arrayOf(file.absolutePath), null, null)
+        }
+    }
+
+    private fun discardDownload(destination: DownloadDestination) {
+        runCatching { destination.output.close() }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            contentResolver.delete(destination.uri, null, null)
+        } else {
+            destination.legacyFile?.delete()
+        }
     }
 
     // ── Notification ─────────────────────────────────────────────────────────────

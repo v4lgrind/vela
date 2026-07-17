@@ -232,7 +232,7 @@ class DownloadService : Service() {
     private fun createDownloadDestination(destPath: String): DownloadDestination {
         val safePath = sanitizeDestinationPath(destPath)
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-            val root = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+            val root = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
             val file = File(root, safePath)
             file.parentFile?.mkdirs()
             return DownloadDestination(Uri.fromFile(file), file.outputStream(), file)
@@ -240,16 +240,17 @@ class DownloadService : Service() {
 
         val displayName = safePath.substringAfterLast('/')
         val parentPath = safePath.substringBeforeLast('/', "")
-        val relativePath = listOf(Environment.DIRECTORY_DOWNLOADS, parentPath)
+        val relativePath = listOf(Environment.DIRECTORY_DOCUMENTS, parentPath)
             .filter { it.isNotBlank() }
             .joinToString("/")
         val values = ContentValues().apply {
-            put(MediaStore.Downloads.DISPLAY_NAME, displayName)
-            put(MediaStore.Downloads.MIME_TYPE, getMimeType(displayName))
-            put(MediaStore.Downloads.RELATIVE_PATH, "$relativePath/")
-            put(MediaStore.Downloads.IS_PENDING, 1)
+            put(MediaStore.MediaColumns.DISPLAY_NAME, displayName)
+            put(MediaStore.MediaColumns.MIME_TYPE, getMimeType(displayName))
+            put(MediaStore.MediaColumns.RELATIVE_PATH, "$relativePath/")
+            put(MediaStore.MediaColumns.IS_PENDING, 1)
         }
-        val uri = contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+        val collection = MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+        val uri = contentResolver.insert(collection, values)
             ?: throw java.io.IOException("Unable to create public download")
         val output = contentResolver.openOutputStream(uri, "w")
             ?: run {
@@ -275,7 +276,7 @@ class DownloadService : Service() {
 
     private fun publishDownload(destination: DownloadDestination) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val values = ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) }
+            val values = ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }
             contentResolver.update(destination.uri, values, null, null)
             return
         }

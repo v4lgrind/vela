@@ -26,6 +26,8 @@
 - `npm test`: 12 files and 77 tests passed.
 - `gradlew assembleDebug`: passed with SDK 36.
 - `electron-builder --dir`: passed using `release/validation` because the existing `release/win-unpacked` was locked.
+- Merged the latest `main` (`17cd758`) and resolved PR #37 conflicts while preserving
+  Android's `Documents/Jellyfin V4lgrind` destination; tests and `assembleDebug` passed again.
 
 ## Next steps
 

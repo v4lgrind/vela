@@ -53,11 +53,19 @@ function registerMediaScheme() {
 }
 
 function getMediaRoot() {
-  return app.getPath("downloads");
+  return process.platform === "win32"
+    ? app.getPath("videos")
+    : app.getPath("downloads");
 }
 
 function getLegacyMediaRoot() {
   return path.join(app.getPath("userData"), "media");
+}
+
+function getFallbackMediaRoots() {
+  const currentRoot = path.resolve(getMediaRoot());
+  return [app.getPath("downloads"), getLegacyMediaRoot()]
+    .filter((root) => path.resolve(root) !== currentRoot);
 }
 
 function resolveMediaPathFromRoot(relativePath, root) {
@@ -81,33 +89,39 @@ function resolveMediaPath(relativePath) {
   return resolveMediaPathFromRoot(relativePath, getMediaRoot());
 }
 
-function resolveLegacyMediaPath(relativePath) {
-  return resolveMediaPathFromRoot(relativePath, getLegacyMediaRoot());
-}
-
 async function findMediaPath(relativePath) {
-  const currentPath = resolveMediaPath(relativePath);
-  try {
-    await stat(currentPath);
-    return currentPath;
-  } catch {
-    return resolveLegacyMediaPath(relativePath);
+  const candidates = [
+    resolveMediaPath(relativePath),
+    ...getFallbackMediaRoots().map((root) => resolveMediaPathFromRoot(relativePath, root)),
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      await stat(candidate);
+      return candidate;
+    } catch {
+      // Try the next known desktop storage location.
+    }
   }
+
+  return candidates[0];
 }
 
 async function migrateLegacyMedia() {
   const relativeRoot = "Jellyfin V4lgrind";
-  const legacyRoot = resolveLegacyMediaPath(relativeRoot);
   const currentRoot = resolveMediaPath(relativeRoot);
 
-  try {
-    const legacyStat = await stat(legacyRoot);
-    if (!legacyStat.isDirectory()) return;
-    await mkdir(path.dirname(currentRoot), { recursive: true });
-    await cp(legacyRoot, currentRoot, { recursive: true, force: false });
-    await rm(legacyRoot, { recursive: true, force: true });
-  } catch {
-    // Keep the legacy fallback available when migration is not possible.
+  for (const fallbackRoot of getFallbackMediaRoots()) {
+    const sourceRoot = resolveMediaPathFromRoot(relativeRoot, fallbackRoot);
+    try {
+      const sourceStat = await stat(sourceRoot);
+      if (!sourceStat.isDirectory()) continue;
+      await mkdir(path.dirname(currentRoot), { recursive: true });
+      await cp(sourceRoot, currentRoot, { recursive: true, force: false });
+      await rm(sourceRoot, { recursive: true, force: true });
+    } catch {
+      // Keep the fallback readable when migration is not possible.
+    }
   }
 }
 
@@ -212,8 +226,10 @@ async function statMedia(relativePath) {
 }
 
 async function deleteMedia(relativePath) {
-  await rm(resolveMediaPath(relativePath), { force: true });
-  await rm(resolveLegacyMediaPath(relativePath), { force: true });
+  const roots = [getMediaRoot(), ...getFallbackMediaRoots()];
+  await Promise.all(
+    roots.map((root) => rm(resolveMediaPathFromRoot(relativePath, root), { force: true })),
+  );
 }
 
 function parseRange(rangeHeader, fileSize) {

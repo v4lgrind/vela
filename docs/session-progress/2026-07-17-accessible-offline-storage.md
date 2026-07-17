@@ -8,8 +8,10 @@
 
 ## Changes
 
-- Desktop downloads now target the system `Downloads/Jellyfin V4lgrind` directory.
-- Electron migrates the legacy `userData/media/Jellyfin V4lgrind` tree at startup and keeps a legacy read fallback.
+- Windows downloads target the system `Videos/Jellyfin V4lgrind` directory; Linux keeps
+  `Downloads/Jellyfin V4lgrind`.
+- Electron migrates both `userData/media/Jellyfin V4lgrind` and the previous desktop
+  `Downloads/Jellyfin V4lgrind` location at startup, while keeping readable fallbacks.
 - Android 10+ publishes media and subtitle sidecars through `MediaStore.Downloads` under
   `Download/Jellyfin V4lgrind`.
 - Android 7-9 writes to the public Downloads directory after requesting the legacy storage permission.

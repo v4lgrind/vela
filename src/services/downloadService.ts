@@ -28,6 +28,18 @@ interface DownloadProgress {
 
 interface ActiveDownload {
   aborted: boolean;
+  nativeOperationId?: string;
+}
+
+interface NativeDownloadOptions {
+  activeDownload?: ActiveDownload;
+  estimatedSize?: number;
+  headers: Record<string, string>;
+  itemName: string;
+  onProgress?: (loaded: number, total: number) => void;
+  operationId: string;
+  relativePath: string;
+  url: string;
 }
 
 class DownloadService {
@@ -72,6 +84,7 @@ class DownloadService {
 
     const activeDownload: ActiveDownload = { aborted: false };
     this.downloads.set(itemId, activeDownload);
+    let storedFilePath = filePath;
 
     try {
       if (isDesktop) {
@@ -95,58 +108,23 @@ class DownloadService {
         });
       } else {
         // Android ForegroundService keeps downloads alive while the app is backgrounded.
-        await new Promise<void>((resolve, reject) => {
-          const handles: PluginListenerHandle[] = [];
-
-          const cleanup = async () => {
-            for (const h of handles) {
-              try { await h.remove(); } catch { /* ignore */ }
-            }
-          };
-
-          (async () => {
-            handles.push(await DownloadPlugin.addListener('downloadProgress', (evt) => {
-              if (evt.itemId !== itemId) return;
-              if (activeDownload.aborted) {
-                DownloadPlugin.cancel({ itemId }).catch(() => {});
-                return;
-              }
-              const callback = this.progressCallbacks.get(itemId);
-              if (callback) {
-                const total = evt.total > 0 ? evt.total : (estimatedSize || 0);
-                const pct = total > 0 ? Math.min(99, Math.round((evt.loaded / total) * 100)) : -1;
-                callback({ itemId, filename, loaded: evt.loaded, total, percentage: pct });
-              }
-            }));
-
-            handles.push(await DownloadPlugin.addListener('downloadComplete', async (evt) => {
-              if (evt.itemId !== itemId) return;
-              await cleanup();
-              resolve();
-            }));
-
-            handles.push(await DownloadPlugin.addListener('downloadFailed', async (evt) => {
-              if (evt.itemId !== itemId) return;
-              await cleanup();
-              if (activeDownload.aborted || evt.error === 'AbortError') {
-                reject(Object.assign(new Error('AbortError'), { name: 'AbortError' }));
-              } else {
-                reject(new Error(evt.error));
-              }
-            }));
-
-            // Persist metadata so offline-store can reconcile a completed native download.
-            localStorage.setItem(`dl_meta_${itemId}`, JSON.stringify({ metadata, filePath }));
-
-            await DownloadPlugin.enqueue({
-              destPath: filePath,
-              estimatedSize: estimatedSize || 0,
-              headers: authHeaders,
-              itemId,
-              itemName: metadata.Name || '',
-              url: downloadUrl,
-            });
-          })().catch(reject);
+        // Persist metadata so offline-store can reconcile a completed native download.
+        localStorage.setItem(`dl_meta_${itemId}`, JSON.stringify({ metadata, filePath }));
+        storedFilePath = await this.downloadAndroidFile({
+          activeDownload,
+          estimatedSize,
+          headers: authHeaders,
+          itemName: metadata.Name || '',
+          operationId: itemId,
+          relativePath: filePath,
+          url: downloadUrl,
+          onProgress: (loaded, reportedTotal) => {
+            const callback = this.progressCallbacks.get(itemId);
+            if (!callback) return;
+            const total = reportedTotal > 0 ? reportedTotal : (estimatedSize || 0);
+            const percentage = total > 0 ? Math.min(99, Math.round((loaded / total) * 100)) : -1;
+            callback({ filename, itemId, loaded, percentage, total });
+          },
         });
       }
 
@@ -159,11 +137,11 @@ class DownloadService {
       // Actual file size after completion
       let fileSize = 0;
       try {
-        const stat = await this.statFile(filePath);
+        const stat = await this.statFile(storedFilePath);
         fileSize = stat.size ?? 0;
       } catch { /* ignore */ }
 
-      const downloadedMedia: DownloadedMedia = buildDownloadedMedia(metadata, filePath, fileSize);
+      const downloadedMedia: DownloadedMedia = buildDownloadedMedia(metadata, storedFilePath, fileSize);
 
       // Download sidecar subtitle file. Desktop uses WebVTT (the only format
       // Chromium's <track> renders); Android uses SRT for ExoPlayer. The
@@ -174,14 +152,26 @@ class DownloadService {
           const subPath = filePath.replace(/\.[^.]+$/, `.${subExtension}`);
           const subUrl = `${serverUrl}/Videos/${itemId}/${itemId}/Subtitles/${subtitleInfo.streamIndex}/Stream.${subExtension}`;
           logger.log('📝 Downloading subtitle:', subPath);
-          await this.downloadFile(`subtitle-${itemId}`, subUrl, subPath, authHeaders);
-          downloadedMedia.subtitleFilePath = subPath;
+          downloadedMedia.subtitleFilePath = isDesktop
+            ? await this.downloadDesktopSidecar(`subtitle-${itemId}`, subUrl, subPath, authHeaders)
+            : await this.downloadAndroidFile({
+                activeDownload,
+                headers: authHeaders,
+                itemName: `${metadata.Name || itemId} subtitles`,
+                operationId: `subtitle-${itemId}`,
+                relativePath: subPath,
+                url: subUrl,
+              });
           downloadedMedia.subtitleLabel = subtitleInfo.label;
           downloadedMedia.subtitleLanguage = subtitleInfo.language;
           logger.log('✅ Subtitle downloaded:', subPath);
         } catch (e) {
           logger.warn('⚠️ Subtitle download failed (non-critical):', e);
         }
+      }
+
+      if (activeDownload.aborted) {
+        throw Object.assign(new Error('AbortError'), { name: 'AbortError' });
       }
 
       // Fetch intro/outro segment timestamps so skip-intro works offline
@@ -216,7 +206,7 @@ class DownloadService {
     } catch (error: any) {
       if (error.name === 'AbortError' || activeDownload.aborted) {
         logger.log('🚫 Download cancelled:', metadata.Name);
-        try { await this.deleteFile(filePath); } catch { /* ignore */ }
+        try { await this.deleteFile(storedFilePath); } catch { /* ignore */ }
         const err = Object.assign(new Error('AbortError'), { name: 'AbortError' });
         throw err;
       }
@@ -270,7 +260,7 @@ class DownloadService {
       return { size: result.size };
     }
 
-    const result = await Filesystem.stat({ path: filePath, directory: Directory.Data });
+    const result = await Filesystem.stat(this.getAndroidFileOptions(filePath));
     return { size: result.size ?? 0 };
   }
 
@@ -279,7 +269,7 @@ class DownloadService {
       await deleteDesktopMedia(filePath);
       return;
     }
-    await Filesystem.deleteFile({ path: filePath, directory: Directory.Data });
+    await Filesystem.deleteFile(this.getAndroidFileOptions(filePath));
   }
 
   private async ensureDirectory(directoryPath: string): Promise<void> {
@@ -316,10 +306,82 @@ class DownloadService {
     });
   }
 
+  private async downloadDesktopSidecar(
+    operationId: string,
+    url: string,
+    filePath: string,
+    headers: Record<string, string>,
+  ): Promise<string> {
+    await this.downloadFile(operationId, url, filePath, headers);
+    return filePath;
+  }
+
+  private async downloadAndroidFile(options: NativeDownloadOptions): Promise<string> {
+    const handles: PluginListenerHandle[] = [];
+    if (options.activeDownload) {
+      options.activeDownload.nativeOperationId = options.operationId;
+    }
+
+    const cleanup = async () => {
+      for (const handle of handles) {
+        try { await handle.remove(); } catch { /* ignore */ }
+      }
+    };
+
+    return new Promise<string>((resolve, reject) => {
+      (async () => {
+        handles.push(await DownloadPlugin.addListener('downloadProgress', (event) => {
+          if (event.itemId !== options.operationId) return;
+          if (options.activeDownload?.aborted) {
+            DownloadPlugin.cancel({ itemId: options.operationId }).catch(() => {});
+            return;
+          }
+          options.onProgress?.(event.loaded, event.total);
+        }));
+        handles.push(await DownloadPlugin.addListener('downloadComplete', async (event) => {
+          if (event.itemId !== options.operationId) return;
+          await cleanup();
+          resolve(event.filePath || options.relativePath);
+        }));
+        handles.push(await DownloadPlugin.addListener('downloadFailed', async (event) => {
+          if (event.itemId !== options.operationId) return;
+          await cleanup();
+          if (options.activeDownload?.aborted || event.error === 'AbortError') {
+            reject(Object.assign(new Error('AbortError'), { name: 'AbortError' }));
+            return;
+          }
+          reject(new Error(event.error));
+        }));
+        await DownloadPlugin.enqueue({
+          destPath: options.relativePath,
+          estimatedSize: options.estimatedSize || 0,
+          headers: options.headers,
+          itemId: options.operationId,
+          itemName: options.itemName,
+          url: options.url,
+        });
+      })().catch(async (error) => {
+        await cleanup();
+        reject(error);
+      });
+    });
+  }
+
   private async getFileUrl(filePath: string): Promise<string> {
     if (isDesktop) return getDesktopMediaUrl(filePath);
+    if (this.isAndroidPublicPath(filePath)) return Capacitor.convertFileSrc(filePath);
     const fileInfo = await Filesystem.getUri({ path: filePath, directory: Directory.Data });
     return Capacitor.convertFileSrc(fileInfo.uri);
+  }
+
+  private isAndroidPublicPath(filePath: string): boolean {
+    return filePath.startsWith('content://') || filePath.startsWith('file://') || filePath.startsWith('/');
+  }
+
+  private getAndroidFileOptions(filePath: string): { path: string; directory?: Directory } {
+    return this.isAndroidPublicPath(filePath)
+      ? { path: filePath }
+      : { directory: Directory.Data, path: filePath };
   }
 
   private getFileExtension(metadata: any): string {
@@ -429,7 +491,7 @@ class DownloadService {
       if (isDesktop) {
         cancelDesktopMediaDownload(itemId).catch(() => {});
       } else {
-        DownloadPlugin.cancel({ itemId }).catch(() => {});
+        DownloadPlugin.cancel({ itemId: download.nativeOperationId || itemId }).catch(() => {});
       }
       logger.log('🚫 Cancelling:', itemId);
     }

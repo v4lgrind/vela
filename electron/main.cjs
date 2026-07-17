@@ -2,6 +2,7 @@ const path = require("node:path");
 
 const { app, BrowserWindow, shell } = require("electron");
 const {
+  migrateLegacyMedia,
   registerMediaIpc,
   registerMediaProtocol,
   registerMediaScheme,
@@ -72,7 +73,8 @@ function createMainWindow() {
 
 app.setAppUserModelId("com.v4lgrind.jellyfinclient");
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  await migrateLegacyMedia();
   registerMediaIpc();
   registerMediaProtocol();
   createMainWindow();

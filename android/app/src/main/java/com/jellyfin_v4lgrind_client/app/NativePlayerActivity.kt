@@ -1678,18 +1678,25 @@ class NativePlayerActivity : AppCompatActivity() {
 
         // Parse the SRT file
         try {
-            val file = java.io.File(android.net.Uri.parse(srtPath).path ?: return)
-            if (!file.exists()) {
-                android.util.Log.w("NativePlayer", "[SRT] File not found: $srtPath")
-                return
-            }
-            srtCues = parseSrt(file.readText())
+            srtCues = parseSrt(readSubtitleText(srtPath))
             android.util.Log.d("NativePlayer", "[SRT] Parsed ${srtCues.size} cues from $srtPath")
             // Show subtitle button so user can toggle
             if (srtCues.isNotEmpty()) btnSubtitle.visibility = View.VISIBLE
         } catch (e: Exception) {
             android.util.Log.w("NativePlayer", "[SRT] Failed to parse: $e")
         }
+    }
+
+    private fun readSubtitleText(srtPath: String): String {
+        val uri = android.net.Uri.parse(srtPath)
+        if (uri.scheme == "content") {
+            return contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+                ?: throw java.io.IOException("Unable to open subtitle URI")
+        }
+        val filePath = if (uri.scheme == "file") uri.path else srtPath
+        val file = java.io.File(filePath ?: throw java.io.IOException("Invalid subtitle path"))
+        if (!file.exists()) throw java.io.IOException("Subtitle file not found")
+        return file.readText()
     }
 
     private fun parseSrt(content: String): List<SrtCue> {

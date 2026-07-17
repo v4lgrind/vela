@@ -105,9 +105,9 @@ Desktop builds are platform-specific:
 
 The GitHub Actions desktop workflow builds both platforms independently.
 
-Desktop downloads are stored under Electron's application data directory. Unsupported
-offline video formats are requested from Jellyfin as H.264/AAC MP4 files so they remain
-playable on both Windows and Linux.
+Offline media is stored in the user-visible `Downloads/Jellyfin V4lgrind` folder on
+desktop and Android. Unsupported offline video formats are requested from Jellyfin as
+H.264/AAC MP4 files so they remain playable on both Windows and Linux.
 
 Windows development installers are currently unsigned. Smart App Control or an
 organization policy may block them until they are code signed or explicitly allowed.

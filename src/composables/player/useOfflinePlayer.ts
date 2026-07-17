@@ -63,11 +63,15 @@ export function useOfflinePlayer(
             // and create a blob URL for the <video> element.
             let playUrl: string | null = null;
             if (isNative) {
-                const fileInfo = await Filesystem.getUri({
-                    path: cachedDownload.filePath,
-                    directory: Directory.Data,
-                });
-                playUrl = fileInfo.uri; // file:///data/user/0/...
+                if (isPublicAndroidPath(cachedDownload.filePath)) {
+                    playUrl = cachedDownload.filePath;
+                } else {
+                    const fileInfo = await Filesystem.getUri({
+                        path: cachedDownload.filePath,
+                        directory: Directory.Data,
+                    });
+                    playUrl = fileInfo.uri;
+                }
             } else if (isDesktop && window.desktopRuntime) {
                 playUrl = window.desktopRuntime.getMediaUrl(cachedDownload.filePath);
             } else {
@@ -256,12 +260,16 @@ export function useOfflinePlayer(
                 let offlineSrtPath: string | undefined;
                 if (cachedDownload.subtitleFilePath) {
                     try {
-                        const subUri = await Filesystem.getUri({
-                            path: cachedDownload.subtitleFilePath,
-                            directory: Directory.Data,
-                        });
-                        offlineSrtPath = subUri.uri;
-                        debugLog(`[Offline] SRT subtitle: ${subUri.uri}`);
+                        if (isPublicAndroidPath(cachedDownload.subtitleFilePath)) {
+                            offlineSrtPath = cachedDownload.subtitleFilePath;
+                        } else {
+                            const subUri = await Filesystem.getUri({
+                                path: cachedDownload.subtitleFilePath,
+                                directory: Directory.Data,
+                            });
+                            offlineSrtPath = subUri.uri;
+                        }
+                        debugLog(`[Offline] SRT subtitle: ${offlineSrtPath}`);
                     } catch (e) {
                         debugLog(`[Offline] Subtitle file not found: ${cachedDownload.subtitleFilePath}`);
                     }
@@ -355,6 +363,10 @@ export function useOfflinePlayer(
         initOfflinePlayer,
         dispose,
     };
+}
+
+function isPublicAndroidPath(filePath: string): boolean {
+    return filePath.startsWith('content://') || filePath.startsWith('file://') || filePath.startsWith('/');
 }
 
 export type OfflinePlayer = ReturnType<typeof useOfflinePlayer>;

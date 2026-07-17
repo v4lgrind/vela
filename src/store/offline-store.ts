@@ -231,7 +231,7 @@ export const useOfflineStore = defineStore('offline', {
             continue;
           }
           const { metadata, filePath } = JSON.parse(savedStr) as { metadata: any; filePath: string };
-          const media = buildDownloadedMedia(metadata, filePath, item.fileSize);
+          const media = buildDownloadedMedia(metadata, item.filePath || filePath, item.fileSize);
           await offlineDatabase.addDownload(media);
           localStorage.removeItem(`dl_meta_${item.itemId}`);
           logger.log('[OfflineStore] Reconciled:', metadata.Name);

@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="i-blue" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#6FDCFF"/>
+      <stop offset="55%" stop-color="#35A6FF"/>
+      <stop offset="100%" stop-color="#2F86FF"/>
+    </linearGradient>
+    <radialGradient id="i-halo" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#2F9BFF" stop-opacity="0.34"/>
+      <stop offset="55%" stop-color="#2F9BFF" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#2F9BFF" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="i-tile" cx="50%" cy="37%" r="80%">
+      <stop offset="0%" stop-color="#0E1826"/>
+      <stop offset="55%" stop-color="#060A11"/>
+      <stop offset="100%" stop-color="#000000"/>
+    </radialGradient>
+    <filter id="i-soft" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="9"/>
+    </filter>
+  </defs><rect width="1024" height="1024" rx="224" fill="url(#i-tile)"/>
+    <circle cx="512" cy="512" r="300" fill="url(#i-halo)"/>
+    <path d="M614.6 230.1 A300 300 0 1 1 409.4 230.1" fill="none" stroke="url(#i-blue)" stroke-width="42" stroke-linecap="round"/>
+    <g filter="url(#i-soft)" opacity="0.55">
+      <path d="M432 372 L432 652 L668 512 Z" fill="#2F9BFF" stroke="#2F9BFF" stroke-width="46" stroke-linejoin="round" stroke-linecap="round"/>
+    </g>
+    <path d="M432 372 L432 652 L668 512 Z" fill="url(#i-blue)" stroke="url(#i-blue)" stroke-width="46" stroke-linejoin="round" stroke-linecap="round"/></svg>

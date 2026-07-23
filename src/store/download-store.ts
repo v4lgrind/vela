@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { Capacitor } from '@capacitor/core';
 
 import { getClientPlatform } from '@/composables/usePlatform';
+import { QUALITY_PRESETS } from '@/constants';
 import { downloadService } from '@/services/downloadService';
 import { CODEC_MIME_MAP, isDolbyVision } from '@/utils/codecDetection';
 import { needsDesktopTranscode } from '@/utils/desktopCodec';
@@ -16,6 +17,36 @@ import { usePreferencesStore } from './preferences-store';
 const MAX_CONCURRENT = 3;
 const clientPlatform = getClientPlatform();
 const isDesktopPlatform = ['linux', 'macos', 'windows'].includes(clientPlatform);
+
+/**
+ * Force resolution + video bitrate on a Jellyfin transcode URL.
+ *
+ * Jellyfin does not reliably apply `MaxStreamingBitrate` from the device profile to
+ * downloaded (progressive) transcodes — it can transcode at the source resolution and
+ * ignore the cap, producing a file even larger than the original. Setting
+ * `maxWidth`/`maxHeight`/`videoBitRate` directly on the stream URL is honoured
+ * unconditionally. Existing values are replaced case-insensitively so ASP.NET never
+ * sees duplicate keys.
+ */
+export function withForcedVideoParams(rawUrl: string, videoBitrate: number, height: number): string {
+  try {
+    const u = new URL(rawUrl);
+    const setParam = (key: string, value: string) => {
+      for (const existing of [...u.searchParams.keys()]) {
+        if (existing.toLowerCase() === key.toLowerCase()) u.searchParams.delete(existing);
+      }
+      u.searchParams.set(key, value);
+    };
+    setParam('videoBitRate', String(videoBitrate));
+    if (height > 0) {
+      setParam('maxHeight', String(height));
+      setParam('maxWidth', String(Math.round((height * 16) / 9)));
+    }
+    return u.toString();
+  } catch {
+    return rawUrl;
+  }
+}
 
 /**
  * Pick a text subtitle stream for a sidecar download: the user's preferred
@@ -432,9 +463,20 @@ export const useDownloadStore = defineStore('downloads', {
         logger.log(`[DownloadStore] PlaybackInfo response: TranscodingUrl=${ms?.TranscodingUrl} SupportsTranscoding=${ms?.SupportsTranscoding} Protocol=${ms?.TranscodingSubProtocol}`);
 
         if (ms?.TranscodingUrl) {
-          const url = `${serverUrl}${ms.TranscodingUrl}`;
-          const estimatedSize = (ms.Bitrate && ms.RunTimeTicks)
-            ? Math.ceil((ms.Bitrate / 8) * (ms.RunTimeTicks / 10_000_000))
+          let url = `${serverUrl}${ms.TranscodingUrl}`;
+          // Bitrate we expect the video track to actually be encoded at. Defaults to
+          // whatever Jellyfin reports, but a cap forces the real value on the URL below.
+          let effectiveVideoBitrate = ms.Bitrate || 0;
+
+          if (hasBitrateCap) {
+            const targetHeight = QUALITY_PRESETS.find((p) => p.bitrate === bitrateCap)?.minHeight ?? 0;
+            url = withForcedVideoParams(url, bitrateCap, targetHeight);
+            effectiveVideoBitrate = bitrateCap;
+          }
+
+          const runtimeSec = (ms.RunTimeTicks || metadata.RunTimeTicks || 0) / 10_000_000;
+          const estimatedSize = (effectiveVideoBitrate && runtimeSec)
+            ? Math.ceil((effectiveVideoBitrate / 8) * runtimeSec)
             : 0;
           logger.log(`[DownloadStore] Transcoded URL (est. ${Math.round(estimatedSize / 1024 / 1024)}MB): ${url}`);
           return { container: transcodeContainer, url, estimatedSize };

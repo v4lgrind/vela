@@ -2,12 +2,12 @@ import { ref, computed, type Ref } from 'vue';
 import { useRoute } from 'vue-router';
 import { useJellyfinStore } from '@/store/jellyfin-store';
 import { usePreferencesStore } from '@/store/preferences-store';
-import { deviceProfile, nativeAndroidDeviceProfile } from '@/constants';
+import { deviceProfile, nativeAndroidDeviceProfile, QUALITY_PRESETS } from '@/constants';
 import { debugLog } from '@/utils/debugLog';
 import { logger } from '@/utils/logger';
 import { buildPlaybackUrl } from '@/utils/playbackUrl';
 import { createSubtitleTracks, parseSavedBurnInSubtitleIndex } from '@/utils/subtitleTracks';
-import type { MediaSource, MediaStream, SubtitleTrack, AudioTrack, QualityPreset } from '@/types/jellyfin';
+import type { MediaSource, MediaStream, SubtitleTrack, AudioTrack } from '@/types/jellyfin';
 
 // Stable per-browser device ID so Jellyfin can match DELETE /Videos/ActiveEncodings
 // to the session we created. Without it, Jellyfin can't kill the FFmpeg job on demand.
@@ -20,14 +20,7 @@ function getDeviceId(): string {
     return id;
 }
 
-const ALL_QUALITY_PRESETS: QualityPreset[] = [
-    { label: 'Auto',   bitrate: 0,          minHeight: 0    },
-    { label: '4K',     bitrate: 80_000_000, minHeight: 2160 },
-    { label: '1080p',  bitrate: 20_000_000, minHeight: 1080 },
-    { label: '720p',   bitrate:  8_000_000, minHeight: 720  },
-    { label: '480p',   bitrate:  3_000_000, minHeight: 480  },
-    { label: '360p',   bitrate:  1_500_000, minHeight: 360  },
-];
+const ALL_QUALITY_PRESETS = QUALITY_PRESETS;
 
 /**
  * Shared playback state and Jellyfin session API for the player page.

@@ -58,6 +58,12 @@ export interface DownloadTask {
 export interface TranscodeOptions {
   audioStreamIndex?: number;
   subtitleStreamIndex?: number;
+  /**
+   * Max streaming bitrate in bps for the transcoded download (e.g. 8_000_000 for
+   * 720p). 0 or undefined = keep the source resolution (Auto). A cap forces a
+   * real re-encode even when the media is already device-compatible.
+   */
+  maxBitrate?: number;
   /** User explicitly chose to download the original file — never transcode. */
   forceOriginal?: boolean;
 }
@@ -340,21 +346,24 @@ export const useDownloadStore = defineStore('downloads', {
       transcodeOptions?: TranscodeOptions,
     ): Promise<{ container: string; url: string; estimatedSize: number } | undefined> {
       try {
-        // If user explicitly chose to keep the original, never transcode.
-        // If they chose transcode options, always transcode.
-        // Otherwise, auto-detect based on device codec capabilities.
+        // Decide whether this download needs transcoding:
+        //  - forceOriginal: user explicitly kept the original file — never transcode.
+        //  - a resolution/bitrate cap always forces a re-encode, even for a
+        //    device-compatible file (that's the whole point of downscaling).
+        //  - otherwise, auto-detect based on device codec capabilities.
         if (transcodeOptions?.forceOriginal) return undefined;
 
-        const forceTranscode = transcodeOptions != null;
+        const bitrateCap = transcodeOptions?.maxBitrate ?? 0;
+        const hasBitrateCap = bitrateCap > 0;
 
-        if (!forceTranscode) {
+        if (!hasBitrateCap) {
           const needsTranscode = await this.checkNeedsTranscode(metadata);
           if (!needsTranscode) return undefined;
         }
 
         // Request a transcoding URL from Jellyfin
         logger.log(`[DownloadStore] Requesting transcoded download for ${itemId}` +
-          (transcodeOptions ? ` (audio=${transcodeOptions.audioStreamIndex} sub=${transcodeOptions.subtitleStreamIndex})` : ' (auto-detected)'));
+          (transcodeOptions ? ` (audio=${transcodeOptions.audioStreamIndex} sub=${transcodeOptions.subtitleStreamIndex} maxBitrate=${bitrateCap || 'auto'})` : ' (auto-detected)'));
         const serverUrl = jellyfinStore.serverUrl!;
         const token = jellyfinStore.accessToken!;
         const transcodeContainer = isDesktopPlatform ? 'mp4' : 'ts';
@@ -388,6 +397,14 @@ export const useDownloadStore = defineStore('downloads', {
           AllowVideoStreamCopy: false,
           AllowAudioStreamCopy: !isDesktopPlatform,
         };
+
+        // Resolution cap: MaxStreamingBitrate + AllowVideoStreamCopy:false (set
+        // above) forces Jellyfin to re-encode down to the requested bitrate,
+        // scaling the resolution to match — mirrors the streaming quality picker.
+        if (hasBitrateCap) {
+          requestBody.MaxStreamingBitrate = bitrateCap;
+          requestBody.DeviceProfile.MaxStreamingBitrate = bitrateCap;
+        }
 
         if (transcodeOptions?.audioStreamIndex != null) {
           requestBody.AudioStreamIndex = transcodeOptions.audioStreamIndex;

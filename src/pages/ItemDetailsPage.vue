@@ -458,6 +458,8 @@
         v-if="pendingTranscodeTarget"
         v-model:open="showTranscodeDialog"
         :item="pendingTranscodeTarget.metadata"
+        :items="transcodeItems"
+        :needs-conversion="transcodeNeedsConversion"
         @confirm="onTranscodeConfirm"
         @original="onTranscodeOriginal"
     />
@@ -538,6 +540,10 @@ const bulkDownloadTarget = ref<'season' | 'series'>('season');
 const showTranscodeDialog = ref(false);
 const pendingTranscodeTarget = ref<{ itemId: string; metadata: any } | null>(null);
 const pendingBulkTranscode = ref<any[] | null>(null);
+// Items covered by the open dialog (single item or a bulk set) — drives the size estimate.
+const transcodeItems = ref<any[]>([]);
+// Whether the pending download's source needs conversion to play on this device.
+const transcodeNeedsConversion = ref(false);
 const playingSeasonId = ref<string | null>(null);
 const watchingSeasonId = ref<string | null>(null);
 const watchingEpId = ref<string | null>(null);
@@ -983,18 +989,28 @@ const downloadProgress = computed(() => {
     return task?.progress ?? 0;
 });
 
-/** Start a download, or open the transcode dialog first when the codec needs it. */
+/** True when the item carries a video stream (i.e. resolution/transcode options apply). */
+function hasVideoStream(metadata: any): boolean {
+    const streams = metadata?.MediaStreams ?? metadata?.MediaSources?.[0]?.MediaStreams ?? [];
+    return streams.some((s: any) => s.Type === 'Video');
+}
+
+/**
+ * Open the download options dialog (quality, tracks, size) for a video item.
+ * Audio-only items skip the dialog and download directly.
+ */
 async function requestDownload(id: string, metadata: any, failMessage: string) {
-    const needsTranscode = await downloadStore.checkNeedsTranscode(metadata);
-    if (needsTranscode) {
-        pendingTranscodeTarget.value = { itemId: id, metadata };
-        pendingBulkTranscode.value = null;
-        showTranscodeDialog.value = true;
-    } else {
+    if (!hasVideoStream(metadata)) {
         downloadStore.startDownload(id, metadata).catch((error: any) => {
             if (error.name !== 'AbortError') showError(failMessage);
         });
+        return;
     }
+    pendingTranscodeTarget.value = { itemId: id, metadata };
+    pendingBulkTranscode.value = null;
+    transcodeItems.value = [metadata];
+    transcodeNeedsConversion.value = await downloadStore.checkNeedsTranscode(metadata);
+    showTranscodeDialog.value = true;
 }
 
 async function handleDownload() {
@@ -1082,22 +1098,14 @@ async function startBulkDownload(mode: 'all' | 'unwatched') {
 
     logger.log(`[BulkDownload] Queueing ${candidates.length} episodes (mode: ${mode})`);
 
-    // Check first episode to see if transcode is needed — apply same choice to all
+    // Open the options dialog once — quality and track choice apply to every episode,
+    // and the size estimate covers the whole batch. Compatibility is checked on the
+    // first episode with stream info as a representative sample.
     const firstWithStreams = candidates.find(ep => ep.MediaStreams?.length > 0) || candidates[0];
-    const needsTranscode = await downloadStore.checkNeedsTranscode(firstWithStreams);
-    if (needsTranscode) {
-        pendingTranscodeTarget.value = { itemId: firstWithStreams.Id, metadata: firstWithStreams };
-        pendingBulkTranscode.value = candidates;
-        showTranscodeDialog.value = true;
-        return;
-    }
-
-    for (const ep of candidates) {
-        downloadStore.startDownload(ep.Id, ep).catch((err: any) => {
-            if (err?.name !== 'AbortError') {
-                logger.error('[BulkDownload] Failed:', ep.Name, err);
-            }
-        });
-    }
+    pendingTranscodeTarget.value = { itemId: firstWithStreams.Id, metadata: firstWithStreams };
+    pendingBulkTranscode.value = candidates;
+    transcodeItems.value = candidates;
+    transcodeNeedsConversion.value = await downloadStore.checkNeedsTranscode(firstWithStreams);
+    showTranscodeDialog.value = true;
 }
 </script>

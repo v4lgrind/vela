@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       keep_count:
-        description: 'Number of recent artifacts to keep for each platform'
+        description: 'Number of most recent artifacts to keep (repository-wide)'
         required: false
         default: '2'
 
@@ -26,9 +26,8 @@ jobs:
           script: |
             const keepCount = parseInt('${{ github.event.inputs.keep_count || 2 }}');
 
-            console.log(`Keeping ${keepCount} recent artifacts for each platform...`);
+            console.log(`Keeping the ${keepCount} most recent artifacts repository-wide...`);
 
-            // Get all artifacts
             const artifacts = await github.paginate(github.rest.actions.listArtifactsForRepo, {
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -37,34 +36,27 @@ jobs:
 
             console.log(`Found ${artifacts.length} total artifacts`);
 
-            const artifactGroup = (name) => {
-              const withoutCommit = name.replace(/-[0-9a-f]{40}$/i, '');
-              if (withoutCommit.startsWith('jellyfin-v4lgrind-android')) return 'android';
-              if (withoutCommit.startsWith('mediaserver-client-debug')) return 'android';
-              if (withoutCommit.startsWith('jellyfin-v4lgrind-windows')) return 'windows';
-              if (withoutCommit.startsWith('jellyfin-v4lgrind-linux')) return 'linux';
-              return withoutCommit;
-            };
+            // Les artefacts déjà expirés n'occupent plus de stockage mais
+            // polluent la liste : on les supprime dans tous les cas.
+            const expired = artifacts.filter((a) => a.expired);
 
-            const groups = new Map();
-            for (const artifact of artifacts) {
-              const group = artifactGroup(artifact.name);
-              const groupArtifacts = groups.get(group) || [];
-              groupArtifacts.push(artifact);
-              groups.set(group, groupArtifacts);
-            }
+            const live = artifacts
+              .filter((a) => !a.expired)
+              .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
-            const artifactsToDelete = [];
-            for (const [group, groupArtifacts] of groups) {
-              groupArtifacts.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-              const expired = groupArtifacts.slice(keepCount);
-              artifactsToDelete.push(...expired);
-              console.log(`${group}: keeping ${Math.min(groupArtifacts.length, keepCount)}, deleting ${expired.length}`);
-            }
+            const artifactsToDelete = [...expired, ...live.slice(keepCount)];
 
+            const keptBytes = live
+              .slice(0, keepCount)
+              .reduce((sum, a) => sum + a.size_in_bytes, 0);
+            const freedBytes = live
+              .slice(keepCount)
+              .reduce((sum, a) => sum + a.size_in_bytes, 0);
+
+            console.log(`Live artifacts: ${live.length}, expired: ${expired.length}`);
             console.log(`Will delete ${artifactsToDelete.length} artifacts`);
+            console.log(`Freeing ~${(freedBytes / 1048576).toFixed(1)} MB, keeping ~${(keptBytes / 1048576).toFixed(1)} MB`);
 
-            // Delete old artifacts
             let deletedCount = 0;
             for (const artifact of artifactsToDelete) {
               try {
@@ -81,4 +73,3 @@ jobs:
             }
 
             console.log(`\nCleanup complete! Deleted ${deletedCount} of ${artifactsToDelete.length} artifacts.`);
-            console.log(`Kept up to ${keepCount} recent artifacts for each platform.`);

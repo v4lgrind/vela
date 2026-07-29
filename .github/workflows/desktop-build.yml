@@ -51,11 +51,14 @@ jobs:
             echo "::error::Aucun distribuable trouvé dans release/"
             exit 1
           fi
+
+          source .github/scripts/nightly-tag.sh
+
           # Création idempotente : android-build.yml publie sur la même release
-          # en parallèle, donc on ne supprime jamais la release existante.
-          gh release create nightly \
-            --title "Nightly Build" \
-            --notes "Automated build from commit ${{ github.sha }}" \
+          # en parallèle, l'un des deux la crée et l'autre échoue sans dommage.
+          gh release create "$NIGHTLY_TAG" \
+            --title "Nightly $NIGHTLY_DATE ($NIGHTLY_SHA7)" \
+            --notes "Build automatique de \`main\` — commit ${{ github.sha }}" \
             --prerelease \
             --target "${{ github.sha }}" || true
-          gh release upload nightly "${files[@]}" --clobber
+          gh release upload "$NIGHTLY_TAG" "${files[@]}" --clobber

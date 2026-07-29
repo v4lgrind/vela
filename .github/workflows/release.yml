@@ -121,7 +121,7 @@ jobs:
           name: release-android
           path: release-assets/*.apk
           if-no-files-found: error
-          retention-days: 3
+          retention-days: 1
 
   desktop:
     needs: prepare
@@ -162,7 +162,7 @@ jobs:
           name: ${{ matrix.artifact-name }}
           path: ${{ matrix.artifact-path }}
           if-no-files-found: error
-          retention-days: 3
+          retention-days: 1
 
   publish:
     needs:

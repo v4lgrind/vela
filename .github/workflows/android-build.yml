@@ -53,24 +53,30 @@ jobs:
         working-directory: android
         run: ./gradlew assembleDebug
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-        with:
-          name: jellyfin-v4lgrind-android-${{ github.sha }}
-          path: android/app/build/outputs/apk/debug/mediaserver-client.apk
-          if-no-files-found: error
-          retention-days: 7
-
+      # Une prerelease par commit de main, pour garder un historique des builds
+      # téléchargeables. desktop-build.yml publie ses distribuables sur la même
+      # release : le tag est donc dérivé du commit (et non de la date du run)
+      # pour que les deux workflows calculent la même valeur.
       - name: Publish nightly release
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release delete nightly --yes || true
-          git push origin :refs/tags/nightly || true
-          gh release create nightly \
-            --title "Nightly Build" \
-            --notes "Automated build from commit ${{ github.sha }} on $(date -u +'%Y-%m-%d %H:%M UTC')" \
+          source .github/scripts/nightly-tag.sh
+
+          gh release create "$NIGHTLY_TAG" \
+            --title "Nightly $NIGHTLY_DATE ($NIGHTLY_SHA7)" \
+            --notes "Build automatique de \`main\` — commit ${{ github.sha }}" \
             --prerelease \
-            android/app/build/outputs/apk/debug/mediaserver-client.apk
+            --target "${{ github.sha }}" || true
+          gh release upload "$NIGHTLY_TAG" \
+            android/app/build/outputs/apk/debug/mediaserver-client.apk --clobber
+
+      # Purge dans ce seul workflow pour éviter les suppressions concurrentes.
+      # Ne touche jamais aux 3 plus récentes, dont celle du build en cours.
+      - name: Prune old nightly releases
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          KEEP: '3'
+        run: .github/scripts/prune-nightlies.sh

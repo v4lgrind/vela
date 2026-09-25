@@ -4,12 +4,11 @@ import { withForcedVideoParams } from './download-store';
 
 describe('withForcedVideoParams', () => {
   it('adds video bitrate and resolution box params', () => {
-    const out = withForcedVideoParams('https://jf.example/Videos/abc/stream.ts?api_key=k', 8_000_000, 720);
+    const out = withForcedVideoParams('https://jf.example/Videos/abc/stream.ts', 8_000_000, 720);
     const params = new URL(out).searchParams;
     expect(params.get('videoBitRate')).toBe('8000000');
     expect(params.get('maxHeight')).toBe('720');
     expect(params.get('maxWidth')).toBe('1280');
-    expect(params.get('api_key')).toBe('k'); // untouched
   });
 
   it('replaces an existing bitrate baked in by Jellyfin (case-insensitive)', () => {

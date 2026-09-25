@@ -20,11 +20,30 @@ native playback while Windows and Linux use the shared web player.
 - 🎬 Browse and stream Movies, TV Shows, and Music
 - 📱 Native Android app support
 - Windows and Linux desktop packages
-- 💾 Offline downloads for media playback
+- 💾 Offline playback with cached item metadata, posters, backdrops, parent artwork, and cast portraits
 - 🎵 Background audio playback
 - 🔍 Search across your media library
 - 📺 Android TV (Leanback) support
 - 🌐 Support for local Jellyfin servers (HTTP cleartext)
+
+Library filters, genre, sort order and page position are remembered per library
+for the current session when opening a title and returning. New pages open at the
+top; browser Back restores the previous scroll position. Recently added episodes
+use their series poster in portrait cards when available. Tapping a video
+timeline seeks to that point; dragging from anywhere adjusts the current time
+relatively, without requiring the thumb to be grabbed precisely.
+
+## Jellyfin server compatibility
+
+The client uses the Jellyfin 12 SDK (`@jellyfin/sdk` 1.x). Authenticated HTTP,
+HLS, download and watch-progress requests use `Authorization: MediaBrowser`;
+URLs assigned directly to a browser media element use the case-sensitive
+`ApiKey` parameter because an element cannot attach headers. Do not restore
+the legacy `api_key` query parameter or `X-Emby-*` token headers: Jellyfin 12
+rejects them by default. Browser login, browsing, audio playback, HLS video
+and subtitles were exercised against Jellyfin 12.1. Native Android direct
+playback, subtitles, relative scrubbing and direct timeline taps were verified
+on a physical Android 14 tablet.
 
 ## Prerequisites
 
@@ -83,7 +102,42 @@ cd android
 ./gradlew assembleDebug  # or assembleRelease
 ```
 
-**Output:** `android/app/build/outputs/apk/debug/mediaserver-client-debug.apk`
+**Output:** `android/app/build/outputs/apk/debug/mediaserver-client.apk`
+
+#### Docker Android Build
+
+With Docker installed, the container installs Node 22, JDK 21 and Android SDK 36.
+It runs `npm ci`, the web build with type checking, Capacitor sync and Gradle
+`assembleDebug`. No Android SDK is needed on the host.
+
+```bash
+docker build -f Dockerfile.android --target apk \
+  --output type=local,dest=./out .
+# APK: out/mediaserver-client.apk
+```
+
+The default local APK has Android `versionCode` 1. If the phone already has a
+newer build installed, pass a higher code to preserve its app data during the
+update (for example, `--build-arg ANDROID_VERSION_CODE=252` before `--target apk`
+when the installed code is 251). Then install without clearing app data:
+
+```bash
+adb install -r out/mediaserver-client.apk
+```
+
+Do not uninstall the existing app just to bypass a version downgrade.
+
+To keep the build environment as an image instead of exporting only the APK:
+
+```bash
+docker build -f Dockerfile.android -t mediaserver-android .
+container=$(docker create mediaserver-android)
+docker cp "$container":/workspace/android/app/build/outputs/apk/debug/mediaserver-client.apk ./mediaserver-client.apk
+docker rm "$container"
+```
+
+Rebuild the image after source changes. The APK uses the repository's fixed
+debug-grade signing key; do not use that key for a public production release.
 
 ### Desktop Development
 
@@ -109,6 +163,10 @@ Offline media is stored in the user-visible `Videos/Jellyfin V4lgrind` folder on
 `Downloads/Jellyfin V4lgrind` on Linux, and `Documents/Jellyfin V4lgrind` on Android.
 Unsupported offline video formats are requested from Jellyfin as H.264/AAC MP4 files so
 they remain playable on both Windows and Linux.
+
+A download is only marked complete after its full item metadata and local artwork
+have been cached. Opening Downloads while online also backfills these assets for
+media downloaded by older app versions.
 
 Windows development installers are currently unsigned. Smart App Control or an
 organization policy may block them until they are code signed or explicitly allowed.

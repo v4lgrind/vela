@@ -6,6 +6,7 @@ import type { PluginListenerHandle } from '@capacitor/core';
 import { usePlatform } from '@/composables/usePlatform';
 import { DownloadPlugin } from '@/plugins/DownloadPlugin';
 import { getPrimaryContainer } from '@/utils/desktopCodec';
+import { jellyfinAuthorization } from '@/utils/jellyfinAuthorization';
 import { logger } from '@/utils/logger';
 
 import {
@@ -42,9 +43,57 @@ interface NativeDownloadOptions {
   url: string;
 }
 
+export type OfflineArtworkType = 'Primary' | 'Backdrop';
+
+export interface OfflineArtworkTarget {
+  itemId: string;
+  imageType: OfflineArtworkType;
+  maxWidth: number;
+}
+
+interface OfflineArtworkMetadata {
+  Id?: string;
+  Type?: string;
+  SeriesId?: string;
+  SeasonId?: string;
+  People?: Array<{
+    Id?: string;
+    PrimaryImageTag?: string;
+  }>;
+}
+
+/**
+ * Build the complete image set required by the offline library and detail page.
+ * Duplicate IDs are collapsed because an episode can share artwork with a parent.
+ */
+export function buildOfflineArtworkTargets(metadata: OfflineArtworkMetadata): OfflineArtworkTarget[] {
+  const targets = new Map<string, OfflineArtworkTarget>();
+  const add = (itemId: string | undefined, imageType: OfflineArtworkType, maxWidth: number) => {
+    if (!itemId) return;
+    targets.set(`${itemId}:${imageType}`, { itemId, imageType, maxWidth });
+  };
+
+  add(metadata.Id, 'Primary', metadata.Type === 'Episode' ? 960 : 600);
+  add(metadata.Id, 'Backdrop', 1920);
+
+  if (metadata.Type === 'Episode') {
+    add(metadata.SeriesId, 'Primary', 600);
+    add(metadata.SeriesId, 'Backdrop', 1920);
+    add(metadata.SeasonId, 'Primary', 600);
+  }
+
+  for (const person of (metadata.People || []).slice(0, 20)) {
+    if (person.PrimaryImageTag) add(person.Id, 'Primary', 400);
+  }
+
+  return [...targets.values()];
+}
+
+
 class DownloadService {
   private downloads: Map<string, ActiveDownload> = new Map();
   private progressCallbacks: Map<string, (progress: DownloadProgress) => void> = new Map();
+  private artworkDownloads: Map<string, Promise<void>> = new Map();
 
   /**
    * Download file for offline use via native Android ForegroundService.
@@ -72,7 +121,7 @@ class DownloadService {
     const filename = this.sanitizeFilename(`${metadata.Name || itemId}.${extension}`);
     const filePath = this.buildFilePath(metadata, filename);
     const downloadUrl = transcodedUrl || `${serverUrl}/Items/${itemId}/Download`;
-    const authHeaders = { 'X-Emby-Token': accessToken };
+    const authHeaders = { Authorization: jellyfinAuthorization(accessToken) };
 
     if (transcodedUrl) {
       logger.log('📥 Transcoded download:', filename);
@@ -196,8 +245,9 @@ class DownloadService {
       localStorage.removeItem(`dl_meta_${itemId}`);
       logger.log('✅ Download complete:', filename);
 
-      // Cache artwork images for offline display (fire-and-forget, don't block)
-      this.cacheArtwork(serverUrl, accessToken, metadata).catch(() => {});
+      // Artwork is part of the offline contract. Wait for every requested image
+      // before reporting completion so airplane mode cannot race this work.
+      await this.cacheArtworkForMetadata(serverUrl, accessToken, metadata);
 
       // Final 100% callback
       const callback = this.progressCallbacks.get(itemId);
@@ -424,29 +474,30 @@ class DownloadService {
   }
 
   /**
-   * Download artwork images for offline display.
-   * Caches the primary image for the item, plus series/season images for episodes.
+   * Cache every image used by offline list/detail views: item poster/backdrop,
+   * episode parents, and cast portraits.
    */
-  private async cacheArtwork(serverUrl: string, accessToken: string, metadata: any): Promise<void> {
-    const imageIds: string[] = [metadata.Id];
-
-    // For episodes, also cache series and season artwork
-    if (metadata.Type === 'Episode') {
-      if (metadata.SeriesId) imageIds.push(metadata.SeriesId);
-      if (metadata.SeasonId) imageIds.push(metadata.SeasonId);
-    }
-
-    for (const id of imageIds) {
-      await this.cacheArtworkById(serverUrl, accessToken, id);
-    }
+  async cacheArtworkForMetadata(
+    serverUrl: string,
+    accessToken: string,
+    metadata: OfflineArtworkMetadata,
+  ): Promise<void> {
+    await Promise.allSettled(
+      buildOfflineArtworkTargets(metadata).map(({ itemId, imageType, maxWidth }) =>
+        this.cacheArtworkById(serverUrl, accessToken, itemId, imageType, maxWidth)
+      ),
+    );
   }
 
   /**
    * Get a WebView-accessible URL for a cached artwork image.
    * Returns null if the image is not cached locally.
    */
-  async getCachedImageUrl(itemId: string): Promise<string | null> {
-    const imgPath = `Jellyfin V4lgrind/Images/${itemId}_Primary.jpg`;
+  async getCachedImageUrl(
+    itemId: string,
+    imageType: OfflineArtworkType = 'Primary',
+  ): Promise<string | null> {
+    const imgPath = `Jellyfin V4lgrind/Images/${itemId}_${imageType}.jpg`;
     try {
       await this.statFile(imgPath);
       return await this.getFileUrl(imgPath);
@@ -456,32 +507,49 @@ class DownloadService {
   }
 
   /**
-   * Cache a single artwork image by item ID (skips if already cached).
-   * Also exposed publicly to backfill artwork for downloads created before
-   * artwork caching was added.
+   * Cache one image, de-duplicating concurrent episode downloads that share
+   * series, season, or cast artwork.
    */
-  async cacheArtworkById(serverUrl: string, accessToken: string, itemId: string): Promise<void> {
-    const imgPath = `Jellyfin V4lgrind/Images/${itemId}_Primary.jpg`;
+  async cacheArtworkById(
+    serverUrl: string,
+    accessToken: string,
+    itemId: string,
+    imageType: OfflineArtworkType = 'Primary',
+    maxWidth = 400,
+  ): Promise<void> {
+    const imgPath = `Jellyfin V4lgrind/Images/${itemId}_${imageType}.jpg`;
     try {
-      // Skip if already cached
       await this.statFile(imgPath);
       return;
     } catch { /* not cached yet */ }
 
-    const imgUrl = `${serverUrl}/Items/${itemId}/Images/Primary?maxWidth=400&quality=80`;
-    try {
+    const pending = this.artworkDownloads.get(imgPath);
+    if (pending) return pending;
+
+    const task = (async () => {
+      const imgUrl = `${serverUrl}/Items/${itemId}/Images/${imageType}?maxWidth=${maxWidth}&quality=80`;
       const dirPath = imgPath.substring(0, imgPath.lastIndexOf('/'));
       try {
         await this.ensureDirectory(dirPath);
       } catch { /* may exist */ }
 
       await this.downloadFile(
-        `artwork-${itemId}`,
+        `artwork-${imageType}-${itemId}`,
         imgUrl,
         imgPath,
-        { 'X-Emby-Token': accessToken },
+        { Authorization: jellyfinAuthorization(accessToken) },
       );
-    } catch { /* non-critical */ }
+    })();
+
+    this.artworkDownloads.set(imgPath, task);
+    try {
+      await task;
+    } catch (error) {
+      logger.warn(`Artwork download failed: ${itemId}/${imageType}`, error);
+      throw error;
+    } finally {
+      this.artworkDownloads.delete(imgPath);
+    }
   }
 
   cancelDownload(itemId: string): void {

@@ -1,0 +1,48 @@
+# Node 22 and JDK 21 match the Android CI workflow. Noble's glibc can run
+# the Node binary copied from the Debian Bookworm image.
+FROM node:22-bookworm-slim AS node
+
+FROM eclipse-temurin:21-jdk-noble AS toolchain
+
+ENV ANDROID_HOME=/opt/android-sdk \
+    ANDROID_SDK_ROOT=/opt/android-sdk \
+    GRADLE_USER_HOME=/opt/gradle-cache \
+    PATH=/opt/android-sdk/cmdline-tools/latest/bin:/opt/android-sdk/platform-tools:${PATH}
+
+COPY --from=node /usr/local/bin/node /usr/local/bin/node
+COPY --from=node /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm
+RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
+    && ln -s /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl unzip \
+    && rm -rf /var/lib/apt/lists/*
+
+ARG CMDLINE_TOOLS_VERSION=13114758
+RUN mkdir -p "${ANDROID_HOME}/cmdline-tools" \
+    && curl -fsSL "https://dl.google.com/android/repository/commandlinetools-linux-${CMDLINE_TOOLS_VERSION}_latest.zip" -o /tmp/cmdline-tools.zip \
+    && unzip -q /tmp/cmdline-tools.zip -d "${ANDROID_HOME}/cmdline-tools" \
+    && mv "${ANDROID_HOME}/cmdline-tools/cmdline-tools" "${ANDROID_HOME}/cmdline-tools/latest" \
+    && rm /tmp/cmdline-tools.zip \
+    && yes | sdkmanager --licenses >/dev/null \
+    && sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+
+FROM toolchain AS build
+WORKDIR /workspace
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY . .
+ARG ANDROID_VERSION_CODE=1
+RUN --mount=type=cache,target=/opt/gradle-cache \
+    npm run build \
+    && npx cap sync android \
+    && cd android \
+    && GITHUB_RUN_NUMBER="${ANDROID_VERSION_CODE}" ./gradlew --no-daemon assembleDebug
+
+# To export only the APK:
+# docker build -f Dockerfile.android --target apk --output type=local,dest=./out .
+FROM scratch AS apk
+COPY --from=build /workspace/android/app/build/outputs/apk/debug/mediaserver-client.apk /mediaserver-client.apk
+
+# The default image retains the toolchain and compiled project. Its APK is at
+# /workspace/android/app/build/outputs/apk/debug/mediaserver-client.apk.
+FROM build AS android-builder

@@ -13,8 +13,10 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.util.TypedValue
 import android.view.GestureDetector
 import android.view.MotionEvent
+import android.view.ViewConfiguration
 import android.view.View
 import android.view.ViewGroup
 import android.view.Window
@@ -266,8 +268,10 @@ class NativePlayerActivity : AppCompatActivity() {
             val pos = p.currentPosition
             val dur = effectiveDuration().coerceAtLeast(1L)
             val progress = ((pos.toDouble() / dur) * seekBar.max).toInt()
-            if (!isUserSeeking) seekBar.progress = progress
-            tvCurrentTime.text = formatTime(pos)
+            if (!isUserSeeking) {
+                seekBar.progress = progress
+                tvCurrentTime.text = formatTime(pos)
+            }
             tvTotalTime.text = formatTime(dur)
 
             // Show/hide Skip Intro button
@@ -303,6 +307,9 @@ class NativePlayerActivity : AppCompatActivity() {
     }
 
     private var isUserSeeking = false
+    private var seekTouchStartX = 0f
+    private var seekTouchStartProgress = 0
+    private var seekTouchDragged = false
     private var introStartMs = -1L
     private var introEndMs = -1L
     private var introSkipped = false
@@ -523,11 +530,17 @@ class NativePlayerActivity : AppCompatActivity() {
             scheduleHideControls()
         }
 
+        // Default SeekBar max is 100: for a movie that rounds every seek to minutes.
+        seekBar.max = 1_000_000
+
         seekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(sb: SeekBar, progress: Int, fromUser: Boolean) {
                 if (fromUser) {
                     val dur = effectiveDuration().coerceAtLeast(1L)
-                    tvCurrentTime.text = formatTime((progress.toLong() * dur) / sb.max)
+                    val positionMs = (progress.toLong() * dur) / sb.max
+                    tvCurrentTime.text = formatTime(positionMs)
+                    // Keyboard and accessibility adjustments have no touch-up event.
+                    if (!isUserSeeking) safeSeekTo(positionMs)
                 }
             }
 
@@ -544,6 +557,48 @@ class NativePlayerActivity : AppCompatActivity() {
                 scheduleHideControls()
             }
         })
+
+        // A tap seeks to its location; a drag moves the playhead relative to where
+        // playback was when the finger landed, even if it starts far from the thumb.
+        val seekTouchSlop = ViewConfiguration.get(this).scaledTouchSlop
+        seekBar.setOnTouchListener { bar, event ->
+            if (effectiveDuration() <= 0L) return@setOnTouchListener true
+            val slider = bar as SeekBar
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    isUserSeeking = true
+                    seekTouchStartX = event.x
+                    seekTouchStartProgress = slider.progress
+                    seekTouchDragged = false
+                    handler.removeCallbacks(hideControlsRunnable)
+                    true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val deltaX = event.x - seekTouchStartX
+                    if (kotlin.math.abs(deltaX) >= seekTouchSlop) seekTouchDragged = true
+                    if (seekTouchDragged) updateRelativeSeekPreview(slider, deltaX)
+                    true
+                }
+                MotionEvent.ACTION_UP -> {
+                    val deltaX = event.x - seekTouchStartX
+                    val dragged = seekTouchDragged || kotlin.math.abs(deltaX) >= seekTouchSlop
+                    val seekMs = if (dragged) updateRelativeSeekPreview(slider, deltaX)
+                                 else updateSeekPreviewAt(slider, event.x)
+                    isUserSeeking = false
+                    safeSeekTo(seekMs)
+                    bar.performClick()
+                    scheduleHideControls()
+                    true
+                }
+                MotionEvent.ACTION_CANCEL -> {
+                    isUserSeeking = false
+                    updateTimeUI(player?.currentPosition ?: 0L, effectiveDuration())
+                    scheduleHideControls()
+                    true
+                }
+                else -> false
+            }
+        }
 
         // Single-tap and double-tap handled via gestureDetector in dispatchTouchEvent
 
@@ -879,15 +934,11 @@ class NativePlayerActivity : AppCompatActivity() {
                 null
             )
         )
-        // Apply user subtitle size preference — defer until view is laid out so width/height are known
+        // Scale glyphs, not the entire SubtitleView: scaling the view around its
+        // bottom edge moves captions toward the top of the video at large sizes.
         currentSubtitleScale = intent.getFloatExtra(EXTRA_SUBTITLE_TEXT_SIZE, 1.0f)
-        val initialScale = currentSubtitleScale
-        playerView.subtitleView?.addOnLayoutChangeListener(object : View.OnLayoutChangeListener {
-            override fun onLayoutChange(v: View, l: Int, t: Int, r: Int, b: Int, ol: Int, ot: Int, or2: Int, ob: Int) {
-                v.removeOnLayoutChangeListener(this)
-                applySubtitleTextSize(initialScale)
-            }
-        })
+        playerView.subtitleView?.setApplyEmbeddedFontSizes(false)
+        applySubtitleTextSize(currentSubtitleScale)
 
         scheduleHideControls()
         setupMediaNotification()
@@ -927,16 +978,8 @@ class NativePlayerActivity : AppCompatActivity() {
     }
 
     private fun applySubtitleTextSize(scale: Float) {
-        // Scale the SubtitleView directly — bypasses cue-level text size overrides
-        // (setFractionalTextSize/setFixedTextSize are ignored when cues embed their own size)
-        playerView.subtitleView?.let { view ->
-            view.scaleX = scale
-            view.scaleY = scale
-            // Anchor scaling to the bottom-center so subtitles grow upward, not off-screen
-            view.pivotX = view.width / 2f
-            view.pivotY = view.height.toFloat()
-        }
-        // Also scale the SRT overlay to match
+        playerView.subtitleView?.setFixedTextSize(TypedValue.COMPLEX_UNIT_SP, 22f * scale)
+        // Offline SRT sidecars use a separate bottom-anchored TextView.
         tvSrtSubtitle?.textSize = 22f * scale
     }
 
@@ -1611,22 +1654,43 @@ class NativePlayerActivity : AppCompatActivity() {
         tvScrubOverlay.visibility = View.GONE
     }
 
+    private fun showSeekPreview(bar: SeekBar, progress: Int): Long {
+        bar.progress = progress.coerceIn(0, bar.max)
+        val positionMs = (bar.progress.toLong() * effectiveDuration()) / bar.max
+        tvCurrentTime.text = formatTime(positionMs)
+        return positionMs
+    }
+
+    private fun updateSeekPreviewAt(bar: SeekBar, touchX: Float): Long {
+        val trackWidth = (bar.width - bar.paddingLeft - bar.paddingRight).coerceAtLeast(1)
+        val fraction = ((touchX - bar.paddingLeft) / trackWidth).coerceIn(0f, 1f)
+        return showSeekPreview(bar, (fraction * bar.max).toInt())
+    }
+
+    private fun updateRelativeSeekPreview(bar: SeekBar, deltaX: Float): Long {
+        val trackWidth = (bar.width - bar.paddingLeft - bar.paddingRight).coerceAtLeast(1)
+        val deltaProgress = (deltaX / trackWidth * bar.max).toInt()
+        return showSeekPreview(bar, seekTouchStartProgress + deltaProgress)
+    }
+
     private fun scheduleHideControls() {
         handler.removeCallbacks(hideControlsRunnable)
         handler.postDelayed(hideControlsRunnable, 3000)
     }
 
     private fun updateTimeUI(posMs: Long, durMs: Long) {
-        tvCurrentTime.text = formatTime(posMs)
         tvTotalTime.text = formatTime(durMs)
-        if (!isUserSeeking && durMs > 0) {
-            seekBar.progress = ((posMs.toDouble() / durMs) * seekBar.max).toInt()
+        if (!isUserSeeking) {
+            tvCurrentTime.text = formatTime(posMs)
+            if (durMs > 0) {
+                seekBar.progress = ((posMs.toDouble() / durMs) * seekBar.max).toInt()
+            }
         }
     }
 
     private fun addChapterMarkers(durationMs: Long) {
         chapterMarkersContainer.removeAllViews()
-        val thumbPaddingPx = (16 * resources.displayMetrics.density).toInt() // match SeekBar thumb padding
+        val thumbPaddingPx = seekBar.paddingLeft
         for (ch in chapters) {
             if (ch.startMs <= 0 || ch.startMs >= durationMs) continue
             val fraction = ch.startMs.toFloat() / durationMs
@@ -1642,7 +1706,7 @@ class NativePlayerActivity : AppCompatActivity() {
             chapterMarkersContainer.addView(marker)
             // Position marker after layout
             marker.post {
-                val trackWidth = chapterMarkersContainer.width - 2 * thumbPaddingPx
+                val trackWidth = seekBar.width - seekBar.paddingLeft - seekBar.paddingRight
                 val x = thumbPaddingPx + (fraction * trackWidth).toInt() - marker.width / 2
                 marker.translationX = x.toFloat()
             }

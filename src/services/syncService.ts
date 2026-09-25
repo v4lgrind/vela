@@ -1,6 +1,7 @@
 import { offlineDatabase } from './offlineDatabase';
 import { offlineDetection } from './offlineDetection';
 import { logger } from '@/utils/logger';
+import { jellyfinAuthorization } from '@/utils/jellyfinAuthorization';
 
 /**
  * Sync Service
@@ -58,7 +59,7 @@ class SyncService {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'X-Emby-Authorization': `MediaBrowser Token="${accessToken}"`,
+              Authorization: jellyfinAuthorization(accessToken),
             },
             body: JSON.stringify({
               ItemId: progress.itemId,

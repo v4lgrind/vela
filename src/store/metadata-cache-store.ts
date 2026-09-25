@@ -59,10 +59,10 @@ export const useMetadataCacheStore = defineStore('metadataCache', {
       this.cache[item.Id] = slim;
     },
 
-    get(id: string): CachedItem | null {
+    get(id: string, allowExpired = false): CachedItem | null {
       const entry = this.cache[id];
       if (!entry) return null;
-      if (entry._cachedAt && Date.now() - entry._cachedAt > CACHE_TTL_MS) {
+      if (!allowExpired && entry._cachedAt && Date.now() - entry._cachedAt > CACHE_TTL_MS) {
         delete this.cache[id];
         return null;
       }

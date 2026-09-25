@@ -141,9 +141,8 @@
           <div v-for="item in latestByLibrary[lib.Id]" :key="item.Id"
             class="shrink-0 w-32 sm:w-36 group cursor-pointer active:scale-[0.97] active:opacity-75 transition-all duration-200"
             @click="goToItem(item)">
-            <div class="relative rounded-xl overflow-hidden mb-1.5
-                        group-hover:-translate-y-1 group-hover:shadow-xl transition-all duration-200"
-              :class="item.Type === 'Episode' ? 'aspect-video' : 'aspect-[2/3]'">
+            <div class="relative rounded-xl overflow-hidden mb-1.5 aspect-[2/3]
+                        group-hover:-translate-y-1 group-hover:shadow-xl transition-all duration-200">
               <LazyImg :src="getLatestImageUrl(item)" :alt="item.Name" :item-type="item.Type"
                 class="block w-full h-full object-cover" />
               <!-- Download badge -->
@@ -274,8 +273,9 @@ async function loadMedia() {
 
 function getLatestImageUrl(item: any): string {
   if (item.Type === 'Episode') {
-    if (item.BackdropImageTags?.length) return store.getImageUrl(item.Id, 'Backdrop', 640, 360);
-    if (item.ParentBackdropItemId) return store.getImageUrl(item.ParentBackdropItemId, 'Backdrop', 640, 360);
+    // Latest episodes represent an episode, but the portrait artwork belongs to its series.
+    const posterId = item.SeriesId || item.ParentPrimaryImageItemId;
+    return posterId ? store.getImageUrl(posterId, 'Primary', 300, 450) : '';
   }
   return store.getImageUrl(item.Id, 'Primary', 300, 450) || '';
 }

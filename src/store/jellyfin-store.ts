@@ -1,12 +1,13 @@
+import { markRaw, type Raw } from "vue";
 import { defineStore } from "pinia";
 import { Api, Jellyfin } from "@jellyfin/sdk";
+import type { LibraryApiGetItemsRequest } from "@jellyfin/sdk/lib/generated-client";
 import {
+  getAuthenticationApi,
   getLibraryApi,
-  getItemsApi,
-  getPlaystateApi,
-  getTvShowsApi,
-  getUserLibraryApi,
-  getUserViewsApi,
+  getUserDataApi,
+  getShowApi,
+  getUserViewApi,
   getSystemApi,
 } from "@jellyfin/sdk/lib/utils/api";
 import { Preferences } from "@capacitor/preferences";
@@ -118,7 +119,7 @@ interface State {
   userId: string | undefined;
   libraries: any[];
   items: any[];
-  api: Api;
+  api: Raw<Api>;
   accessToken: string | null | undefined;
   savedServers: SavedServer[];
   currentItem: any | null;
@@ -132,7 +133,7 @@ export const useJellyfinStore = defineStore("jellyfin", {
     accessToken: "",
     libraries: [],
     items: [],
-    api: {} as Api,
+    api: markRaw({} as Api),
     savedServers: [],
     currentItem: null,
     _qcDeviceId: '',
@@ -154,7 +155,7 @@ export const useJellyfinStore = defineStore("jellyfin", {
     },
     initializeApi() {
       if (!this.serverUrl || !this.accessToken) return;
-      this.api = this._createJellyfin().createApi(this.serverUrl, this.accessToken);
+      this.api = markRaw(this._createJellyfin().createApi(this.serverUrl, this.accessToken));
     },
     _createJellyfin(): Jellyfin {
       if (!this._qcDeviceId) this._qcDeviceId = createDeviceId(Date.now());
@@ -163,9 +164,11 @@ export const useJellyfinStore = defineStore("jellyfin", {
 
     async login(serverUrl: string, username: string, password: string) {
       this.serverUrl = serverUrl;
-      this.api = this._createJellyfin().createApi(serverUrl);
+      this.api = markRaw(this._createJellyfin().createApi(serverUrl));
 
-      const resp = await this.api.authenticateUserByName(username, password);
+      const resp = await getAuthenticationApi(this.api).authenticateUserByName({
+        authenticateUserByName: { Username: username, Pw: password },
+      });
       this.accessToken = resp.data.AccessToken;
       this.userId = resp.data.User?.Id;
       await setStoredToken(this.accessToken ?? null);
@@ -287,7 +290,7 @@ export const useJellyfinStore = defineStore("jellyfin", {
     },
     async fetchLibraries() {
       this.initializeApi();
-      const views = await getUserViewsApi(this.api).getUserViews({
+      const views = await getUserViewApi(this.api).getUserViews({
         userId: this.userId!,
       });
 
@@ -311,32 +314,32 @@ export const useJellyfinStore = defineStore("jellyfin", {
     ) {
       this.initializeApi();
 
-      const apiParams: any = {
+      const apiParams: LibraryApiGetItemsRequest = {
         userId: this.userId,
         parentId: libraryId,
         recursive: true,
-        includeItemTypes: ["Movie", "Series", "MusicAlbum", "BoxSet"] as any,
-        sortBy: (options?.sortBy ?? ["SortName"]) as any,
-        sortOrder: (options?.sortOrder ?? ["Ascending"]) as any,
+        includeItemTypes: ["Movie", "Series", "MusicAlbum", "BoxSet"],
+        sortBy: (options?.sortBy ?? ["SortName"]) as LibraryApiGetItemsRequest["sortBy"],
+        sortOrder: (options?.sortOrder ?? ["Ascending"]) as LibraryApiGetItemsRequest["sortOrder"],
         startIndex: options?.startIndex ?? 0,
         limit: options?.limit ?? 48,
-        filters: options?.filters as any,
-        genres: options?.genres as any,
+        filters: options?.filters as LibraryApiGetItemsRequest["filters"],
+        genres: options?.genres,
         nameStartsWith: options?.nameStartsWith || undefined,
       };
 
-      const resp = await getItemsApi(this.api).getItems(apiParams);
+      const resp = await getLibraryApi(this.api).getItems(apiParams);
       this.items = resp.data.Items || [];
       return this.items;
     },
 
     async fetchGenres(libraryId: string) {
       this.initializeApi();
-      const resp = await getItemsApi(this.api).getItems({
+      const resp = await getLibraryApi(this.api).getItems({
         userId: this.userId,
         parentId: libraryId,
         recursive: true,
-        includeItemTypes: ["Movie", "Series", "MusicAlbum", "BoxSet"] as any,
+        includeItemTypes: ["Movie", "Series", "MusicAlbum", "BoxSet"],
         fields: ["Genres"] as any,
         limit: 1000,
       });
@@ -376,10 +379,10 @@ export const useJellyfinStore = defineStore("jellyfin", {
     async fetchItemDetails(itemId: string) {
       this.initializeApi();
 
-      // Use getItems with explicit fields — getUserLibraryApi.getItem does not expose
+      // Use getItems with explicit fields — fetching an item alone does not expose
       // enableUserData or fields params, so UserData and MediaStreams can be missing
       // on some Jellyfin versions, causing resume position and audio track to be lost.
-      const resp = await getItemsApi(this.api).getItems({
+      const resp = await getLibraryApi(this.api).getItems({
         ids: [itemId],
         userId: this.userId,
         fields: ['MediaStreams', 'UserData', 'People', 'Overview', 'Genres', 'Studios', 'MediaSources'] as any,
@@ -399,7 +402,7 @@ export const useJellyfinStore = defineStore("jellyfin", {
       this.initializeApi();
 
       if (!this.api || !this.userId) return [];
-      const resp = await getItemsApi(this.api).getItems({
+      const resp = await getLibraryApi(this.api).getItems({
         userId: this.userId,
         searchTerm: opts.searchTerm,
         includeItemTypes: (opts.includeItemTypes ?? [
@@ -417,7 +420,7 @@ export const useJellyfinStore = defineStore("jellyfin", {
 
     async fetchResumeItems(limit = 12) {
       this.initializeApi();
-      const resp = await getItemsApi(this.api).getResumeItems({
+      const resp = await getLibraryApi(this.api).getResumeItems({
         userId: this.userId!,
         limit,
         fields: ["Overview", "UserData", "SeriesInfo", "ParentId"] as any,
@@ -430,7 +433,7 @@ export const useJellyfinStore = defineStore("jellyfin", {
 
     async fetchSeasons(seriesId: string) {
       this.initializeApi();
-      const resp = await getItemsApi(this.api).getItems({
+      const resp = await getLibraryApi(this.api).getItems({
         userId: this.userId,
         parentId: seriesId,
         includeItemTypes: ["Season"] as any,
@@ -442,7 +445,7 @@ export const useJellyfinStore = defineStore("jellyfin", {
 
     async fetchEpisodes(seasonId: string) {
       this.initializeApi();
-      const resp = await getItemsApi(this.api).getItems({
+      const resp = await getLibraryApi(this.api).getItems({
         userId: this.userId,
         parentId: seasonId,
         includeItemTypes: ["Episode"] as any,
@@ -455,7 +458,7 @@ export const useJellyfinStore = defineStore("jellyfin", {
 
     async fetchAllSeriesEpisodes(seriesId: string) {
       this.initializeApi();
-      const resp = await getItemsApi(this.api).getItems({
+      const resp = await getLibraryApi(this.api).getItems({
         userId: this.userId,
         seriesId,
         includeItemTypes: ["Episode"] as any,
@@ -469,7 +472,7 @@ export const useJellyfinStore = defineStore("jellyfin", {
 
     async markPlayed(itemId: string) {
       this.initializeApi();
-      await getPlaystateApi(this.api).markPlayedItem({
+      await getUserDataApi(this.api).markPlayedItem({
         itemId,
         userId: this.userId!,
       });
@@ -477,7 +480,7 @@ export const useJellyfinStore = defineStore("jellyfin", {
 
     async markUnplayed(itemId: string) {
       this.initializeApi();
-      await getPlaystateApi(this.api).markUnplayedItem({
+      await getUserDataApi(this.api).markUnplayedItem({
         itemId,
         userId: this.userId!,
       });
@@ -485,7 +488,7 @@ export const useJellyfinStore = defineStore("jellyfin", {
 
     async fetchNextUp(seriesId: string) {
       this.initializeApi();
-      const resp = await getTvShowsApi(this.api).getNextUp({
+      const resp = await getShowApi(this.api).getNextUp({
         userId: this.userId,
         seriesId,
         limit: 1,
@@ -495,7 +498,7 @@ export const useJellyfinStore = defineStore("jellyfin", {
 
     async fetchAllNextUp(limit = 20) {
       this.initializeApi();
-      const resp = await getTvShowsApi(this.api).getNextUp({
+      const resp = await getShowApi(this.api).getNextUp({
         userId: this.userId,
         limit,
         fields: ["PrimaryImageAspectRatio", "SeriesInfo", "ParentId", "UserData"] as any,
@@ -507,7 +510,7 @@ export const useJellyfinStore = defineStore("jellyfin", {
 
     async fetchFirstUnwatchedEpisode(seasonId: string) {
       this.initializeApi();
-      const resp = await getItemsApi(this.api).getItems({
+      const resp = await getLibraryApi(this.api).getItems({
         userId: this.userId,
         parentId: seasonId,
         includeItemTypes: ["Episode"] as any,
@@ -521,7 +524,7 @@ export const useJellyfinStore = defineStore("jellyfin", {
 
     async fetchFirstEpisode(seasonId: string) {
       this.initializeApi();
-      const resp = await getItemsApi(this.api).getItems({
+      const resp = await getLibraryApi(this.api).getItems({
         userId: this.userId,
         parentId: seasonId,
         includeItemTypes: ["Episode"] as any,
@@ -534,7 +537,7 @@ export const useJellyfinStore = defineStore("jellyfin", {
 
     async fetchLatestItems(libraryId: string, limit = 10) {
       this.initializeApi();
-      const resp = await getUserLibraryApi(this.api).getLatestMedia({
+      const resp = await getLibraryApi(this.api).getLatestMedia({
         userId: this.userId!,
         parentId: libraryId,
         limit,
@@ -547,7 +550,7 @@ export const useJellyfinStore = defineStore("jellyfin", {
 
     async fetchPersonDetails(personId: string) {
       this.initializeApi();
-      const resp = await getItemsApi(this.api).getItems({
+      const resp = await getLibraryApi(this.api).getItems({
         ids: [personId],
         userId: this.userId,
         fields: ['Overview', 'PrimaryImageAspectRatio'] as any,
@@ -557,7 +560,7 @@ export const useJellyfinStore = defineStore("jellyfin", {
 
     async fetchPersonFilmography(personId: string) {
       this.initializeApi();
-      const resp = await getItemsApi(this.api).getItems({
+      const resp = await getLibraryApi(this.api).getItems({
         userId: this.userId,
         personIds: [personId],
         includeItemTypes: ['Movie', 'Series'] as any,
@@ -583,7 +586,7 @@ export const useJellyfinStore = defineStore("jellyfin", {
 
     async fetchAudioTracks(albumId: string) {
       this.initializeApi();
-      const resp = await getItemsApi(this.api).getItems({
+      const resp = await getLibraryApi(this.api).getItems({
         userId: this.userId,
         parentId: albumId,
         includeItemTypes: ["Audio"] as any,

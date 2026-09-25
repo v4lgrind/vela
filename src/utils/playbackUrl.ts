@@ -11,10 +11,32 @@ export interface PlaybackUrlContext {
   serverUrl: string;
   itemId: string;
   accessToken: string;
-  /** Native (ExoPlayer) passes the token via an auth header; web plays via
-   *  <video>.src and must carry the token in the URL. */
+  /** Native ExoPlayer passes the token via an auth header; web DirectPlay
+   *  uses <video>.src and must carry the token in the URL. */
   isNative: boolean;
   playSessionId: string;
+}
+
+// HLS.js and ExoPlayer authenticate via headers. A server-supplied stream URL
+// can contain a legacy query token, which must not accompany that header.
+export function withoutPlaybackApiKey(url: string): string {
+  const hashIndex = url.indexOf('#');
+  const base = hashIndex === -1 ? url : url.slice(0, hashIndex);
+  const queryIndex = base.indexOf('?');
+  if (queryIndex === -1 || !/[?&](?:api_key|ApiKey)(?:=|&|$)/.test(base)) return url;
+  const params = base.slice(queryIndex + 1).split('&')
+    .filter(param => !/^(?:api_key|ApiKey)(?:=|$)/.test(param));
+  const query = params.some(param => param.length > 0) ? `?${params.join('&')}` : '';
+  return base.slice(0, queryIndex) + query + (hashIndex === -1 ? '' : url.slice(hashIndex));
+}
+
+// A <video> element (including native Safari HLS) cannot attach auth headers.
+export function withPlaybackApiKey(url: string, accessToken: string): string {
+  const cleanUrl = withoutPlaybackApiKey(url);
+  const hashIndex = cleanUrl.indexOf('#');
+  const base = hashIndex === -1 ? cleanUrl : cleanUrl.slice(0, hashIndex);
+  const fragment = hashIndex === -1 ? '' : cleanUrl.slice(hashIndex);
+  return `${base}${base.includes('?') ? '&' : '?'}ApiKey=${encodeURIComponent(accessToken)}${fragment}`;
 }
 
 /**
@@ -29,19 +51,19 @@ export function buildPlaybackUrl(
 
   if (ms.SupportsDirectPlay) {
     const msId = ms.Id || itemId;
-    const auth = isNative ? '' : `&api_key=${accessToken}`;
+    const url = `${serverUrl}/Videos/${encodeURIComponent(itemId)}/stream?static=true&mediaSourceId=${encodeURIComponent(msId)}`;
     return {
       method: 'DirectPlay',
-      url: `${serverUrl}/Videos/${itemId}/stream?static=true&mediaSourceId=${msId}${auth}`,
+      url: isNative ? url : withPlaybackApiKey(url, accessToken),
     };
   }
 
   const method: PlaybackMethod = ms.SupportsDirectStream ? 'DirectStream' : 'Transcode';
   if (ms.TranscodingUrl) {
-    return { method, url: `${serverUrl}${ms.TranscodingUrl}`.replace('?&', '?') };
+    return { method, url: withoutPlaybackApiKey(`${serverUrl}${ms.TranscodingUrl}`.replace('?&', '?')) };
   }
   return {
     method,
-    url: `${serverUrl}/Videos/${itemId}/master.m3u8?mediaSourceId=${ms.Id || itemId}&PlaySessionId=${playSessionId}`,
+    url: `${serverUrl}/Videos/${encodeURIComponent(itemId)}/master.m3u8?mediaSourceId=${encodeURIComponent(ms.Id || itemId)}&PlaySessionId=${encodeURIComponent(playSessionId)}`,
   };
 }

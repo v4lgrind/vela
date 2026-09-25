@@ -119,21 +119,18 @@
             <SeekBar
                 android:id="@+id/seek_bar"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:minHeight="20dp"
-                android:maxHeight="20dp"
+                android:layout_height="32dp"
+                android:contentDescription="Playback position"
                 android:progressDrawable="@drawable/seekbar_progress"
                 android:thumb="@drawable/seekbar_thumb"
                 android:splitTrack="false" />
 
-            <!-- Chapter tick marks rendered programmatically -->
+            <!-- Chapter ticks are visual only; the full bar below owns touch input. -->
             <FrameLayout
                 android:id="@+id/chapter_markers"
                 android:layout_width="match_parent"
-                android:layout_height="20dp"
-                android:layout_gravity="center_vertical"
-                android:paddingStart="16dp"
-                android:paddingEnd="16dp" />
+                android:layout_height="32dp"
+                android:layout_gravity="center_vertical" />
         </FrameLayout>
 
         <!-- Bottom row: time (left) + actions (right) -->

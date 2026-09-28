@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.ActivityInfo
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.ColorDrawable
@@ -361,6 +362,13 @@ class NativePlayerActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Set in code, not the manifest: the theme is translucent (see
+        // AppTheme.NativePlayer) and Android 8.0 throws when a translucent
+        // activity requests a fixed orientation.
+        if (Build.VERSION.SDK_INT != Build.VERSION_CODES.O) {
+            requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        }
 
         // Keep screen on, extend layout edge-to-edge, then hide system bars.
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)

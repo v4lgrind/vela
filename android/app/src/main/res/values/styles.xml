@@ -16,6 +16,15 @@
     </style>
 
 
+    <!-- Translucent so MainActivity stays visible (paused, not stopped) behind the
+         player. A hidden WebView page is frozen by Chromium after about a minute,
+         which stalls every JS-driven player action (audio/subtitle restarts,
+         progress reporting). The player layout itself is opaque black. -->
+    <style name="AppTheme.NativePlayer" parent="AppTheme.NoActionBar">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+    </style>
+
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
         <item name="android:background">@drawable/splash</item>
     </style>

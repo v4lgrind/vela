@@ -1,40 +1,81 @@
-import { describe, it, expect } from 'vitest';
-import { CODEC_MIME_MAP, isCodecSupported, isDolbyVision } from './codecDetection';
+import { describe, expect, it } from 'vitest';
+
+import type { NativeDeviceCapabilities } from '@/plugins/NativeVideoPlugin';
+
+import {
+  CODEC_MIME_MAP,
+  canSoftwareDecodeVideo,
+  getRecommendedNativeTranscodeBitrate,
+  getVideoMime,
+  isAudioStreamSupported,
+  isDolbyVision,
+} from './codecDetection';
+
+const capabilities: NativeDeviceCapabilities = {
+  hardwareVideoCodecs: ['video/avc', 'video/hevc'],
+  softwareVideoCodecs: ['video/av01'],
+  platformAudioCodecs: ['audio/mp4a-latm', 'audio/eac3'],
+  ffmpegAudioCodecs: ['audio/eac3', 'audio/vnd.dts', 'audio/true-hd'],
+  ffmpegVideoCodecs: ['video/avc', 'video/hevc'],
+  displayWidth: 2408,
+  displayHeight: 1720,
+  manufacturer: 'OnePlus',
+  model: 'OPD2304',
+  androidApi: 34,
+};
 
 describe('isDolbyVision', () => {
-  it('detects DV via codec name (dvhe / dvh1)', () => {
+  it('detects Dolby Vision by codec or profile', () => {
     expect(isDolbyVision('dvhe', '')).toBe(true);
     expect(isDolbyVision('dvh1', '')).toBe(true);
-  });
-
-  it('detects DV via profile string', () => {
     expect(isDolbyVision('hevc', 'dolby vision')).toBe(true);
   });
 
-  it('returns false for plain codecs', () => {
+  it('rejects plain HEVC and H.264 profiles', () => {
     expect(isDolbyVision('hevc', 'main 10')).toBe(false);
     expect(isDolbyVision('h264', 'high')).toBe(false);
   });
 });
 
-describe('isCodecSupported', () => {
-  const device = ['video/hevc', 'audio/eac3'];
-
-  it('returns true when the mapped mime is present on the device', () => {
-    expect(isCodecSupported('hevc', device)).toBe(true);
-    expect(isCodecSupported('eac3', device)).toBe(true);
+describe('device codec decisions', () => {
+  it('requires Android MediaCodec for AAC instead of FFmpeg', () => {
+    expect(isAudioStreamSupported({ Codec: 'aac' }, capabilities)).toBe(true);
+    expect(isAudioStreamSupported(
+      { Codec: 'aac' },
+      { ...capabilities, platformAudioCodecs: [] },
+    )).toBe(false);
   });
 
-  it('returns false when the mapped mime is absent', () => {
-    expect(isCodecSupported('av1', device)).toBe(false);
+  it('requires explicit platform support for E-AC3 Atmos/JOC', () => {
+    expect(isAudioStreamSupported(
+      { Codec: 'eac3', Profile: 'Dolby Digital Plus + Dolby Atmos' },
+      capabilities,
+    )).toBe(false);
+    expect(isAudioStreamSupported(
+      { Codec: 'eac3', Profile: 'Dolby Digital Plus + Dolby Atmos' },
+      { ...capabilities, platformAudioCodecs: [...capabilities.platformAudioCodecs, 'audio/eac3-joc'] },
+    )).toBe(true);
   });
 
-  it('assumes supported for unknown codecs (no mime mapping)', () => {
-    expect(isCodecSupported('made-up-codec', device)).toBe(true);
+  it('uses FFmpeg only for non-AAC audio absent from MediaCodec', () => {
+    expect(isAudioStreamSupported({ Codec: 'dts' }, capabilities)).toBe(true);
+    expect(isAudioStreamSupported({ Codec: 'made-up-codec' }, capabilities)).toBe(false);
   });
 
-  it('is case-insensitive on the codec name', () => {
-    expect(isCodecSupported('HEVC', device)).toBe(true);
+  it('maps Dolby Vision range metadata and FFmpeg video support', () => {
+    expect(getVideoMime({ Codec: 'hevc', VideoRangeType: 'DOVIWithHDR10' }))
+      .toBe('video/dolby-vision');
+    expect(canSoftwareDecodeVideo({ Codec: 'hevc' }, capabilities)).toBe(true);
+    expect(canSoftwareDecodeVideo({ Codec: 'av1' }, capabilities)).toBe(false);
+  });
+
+  it('caps automatic transcodes to the physical display class', () => {
+    expect(getRecommendedNativeTranscodeBitrate(capabilities)).toBe(20_000_000);
+    expect(getRecommendedNativeTranscodeBitrate({
+      ...capabilities,
+      displayWidth: 1280,
+      displayHeight: 720,
+    })).toBe(8_000_000);
   });
 });
 

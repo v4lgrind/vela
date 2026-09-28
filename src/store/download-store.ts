@@ -4,11 +4,17 @@ import { Capacitor } from '@capacitor/core';
 import { getClientPlatform } from '@/composables/usePlatform';
 import { QUALITY_PRESETS } from '@/constants';
 import { downloadService } from '@/services/downloadService';
-import { CODEC_MIME_MAP, isDolbyVision } from '@/utils/codecDetection';
+import {
+  canHardwareDecodeVideo,
+  canSoftwareDecodeVideo,
+  getDeviceCapabilities,
+  isAudioStreamSupported,
+} from '@/utils/codecDetection';
 import { needsDesktopTranscode } from '@/utils/desktopCodec';
 import { languageMatches } from '@/utils/language';
 import { jellyfinAuthorization } from '@/utils/jellyfinAuthorization';
 import { logger } from '@/utils/logger';
+import type { MediaStream } from '@/types/jellyfin';
 
 import { useJellyfinStore } from './jellyfin-store';
 import { useMetadataCacheStore } from './metadata-cache-store';
@@ -103,6 +109,11 @@ export interface TranscodeOptions {
 interface EpisodeParentMetadata {
   SeriesId?: string;
   SeasonId?: string;
+}
+
+interface CodecMetadata {
+  MediaStreams?: MediaStream[];
+  MediaSources?: Array<{ MediaStreams?: MediaStream[] }>;
 }
 
 interface DownloadStoreState {
@@ -362,37 +373,29 @@ export const useDownloadStore = defineStore('downloads', {
      * Check if any video or audio codec in the media is unsupported by the device.
      * Returns true if transcoding would be beneficial.
      */
-    async checkNeedsTranscode(metadata: any): Promise<boolean> {
+    async checkNeedsTranscode(metadata: CodecMetadata): Promise<boolean> {
       if (isDesktopPlatform) return needsDesktopTranscode(metadata);
       if (!Capacitor.isNativePlatform()) return false;
       try {
-        const { getDeviceCodecs } = await import('@/utils/codecDetection');
-        const { NativeVideo } = await import('@/plugins/NativeVideoPlugin');
-        const deviceCodecs = await getDeviceCodecs();
-        if (deviceCodecs.length === 0) return false;
+        const capabilities = await getDeviceCapabilities();
+        if (capabilities.androidApi <= 0) return false;
 
-        const streams: any[] = metadata.MediaStreams || metadata.MediaSources?.[0]?.MediaStreams || [];
-        const MAX_SW_HEIGHT = 1080;
+        const streams: MediaStream[] =
+          metadata.MediaStreams || metadata.MediaSources?.[0]?.MediaStreams || [];
+        const maxSoftwareHeight = 1080;
 
         for (const stream of streams) {
-          const codec = (stream.Codec || '').toLowerCase();
-          const profile = (stream.Profile || '').toLowerCase();
-          const mime = CODEC_MIME_MAP[codec];
-          if (!mime) continue;
-
-          const effectiveMime = isDolbyVision(codec, profile) ? 'video/dolby-vision' : mime;
-
-          if (!deviceCodecs.includes(effectiveMime)) {
-            if (stream.Type === 'Video' && (stream.Height || 0) <= MAX_SW_HEIGHT) continue;
+          if (stream.Type === 'Audio' && !isAudioStreamSupported(stream, capabilities)) {
             return true;
           }
+          if (stream.Type !== 'Video') continue;
 
-          if ((codec === 'hevc' || codec === 'h265') && stream.Type === 'Video') {
-            const checkProfile = (stream.Profile as string) || 'Main 10';
-            const checkLevel = (stream.Level as number) || 153;
-            const { supported } = await NativeVideo.canDecodeHevc({ profile: checkProfile, level: checkLevel, hardwareOnly: true });
-            if (!supported && (stream.Height || 0) > MAX_SW_HEIGHT) return true;
-          }
+          const hardwareResult = await canHardwareDecodeVideo(stream);
+          if (hardwareResult.supported) continue;
+
+          const canUseSoftware = (stream.Height || 0) <= maxSoftwareHeight
+            && canSoftwareDecodeVideo(stream, capabilities);
+          if (!canUseSoftware) return true;
         }
         return false;
       } catch {

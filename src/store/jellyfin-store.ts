@@ -2,6 +2,7 @@ import { markRaw, type Raw } from "vue";
 import { defineStore } from "pinia";
 import { Api, Jellyfin } from "@jellyfin/sdk";
 import type { LibraryApiGetItemsRequest } from "@jellyfin/sdk/lib/generated-client";
+import type { BaseItemDto } from "@jellyfin/sdk/lib/generated-client/models/base-item-dto";
 import {
   getAuthenticationApi,
   getLibraryApi,
@@ -114,6 +115,23 @@ export interface SavedServer {
   accessToken?: string;
 }
 
+export type HomeItem = BaseItemDto & { Id: string };
+
+export interface HomeLibraryCard {
+  Id: string;
+  Name: string;
+  imageUrl: string;
+  Type?: string;
+}
+
+export interface HomeCache {
+  key: string;
+  mediaItems: HomeLibraryCard[];
+  resumeItems: HomeItem[];
+  nextUpItems: HomeItem[];
+  latestByLibrary: Record<string, HomeItem[]>;
+}
+
 interface State {
   serverUrl: string;
   userId: string | undefined;
@@ -124,6 +142,7 @@ interface State {
   savedServers: SavedServer[];
   currentItem: any | null;
   _qcDeviceId: string;
+  homeCache: HomeCache | null;
 }
 
 export const useJellyfinStore = defineStore("jellyfin", {
@@ -137,6 +156,7 @@ export const useJellyfinStore = defineStore("jellyfin", {
     savedServers: [],
     currentItem: null,
     _qcDeviceId: '',
+    homeCache: null,
   }),
   persist: {
     pick: ['serverUrl', 'savedServers', '_qcDeviceId'],
@@ -373,6 +393,7 @@ export const useJellyfinStore = defineStore("jellyfin", {
       this.accessToken = "";
       this.libraries = [];
       this.items = [];
+      this.homeCache = null;
       await setStoredToken(null);
       await setStoredUserId(null);
     },

@@ -32,6 +32,9 @@ top; browser Back restores the previous scroll position. Recently added episodes
 use their series poster in portrait cards when available. Tapping a video
 timeline seeks to that point; dragging from anywhere adjusts the current time
 relatively, without requiring the thumb to be grabbed precisely.
+Home content is kept in memory while navigating between pages; use the refresh
+button in the header to fetch fresh libraries, resume items, next-up items, and
+recent additions.
 
 ## Jellyfin server compatibility
 
@@ -41,9 +44,11 @@ URLs assigned directly to a browser media element use the case-sensitive
 `ApiKey` parameter because an element cannot attach headers. Do not restore
 the legacy `api_key` query parameter or `X-Emby-*` token headers: Jellyfin 12
 rejects them by default. Browser login, browsing, audio playback, HLS video
-and subtitles were exercised against Jellyfin 12.1. Native Android direct
-playback, subtitles, relative scrubbing and direct timeline taps were verified
-on a physical Android 14 tablet.
+and subtitles were exercised against Jellyfin 12.1. Native Android playback
+probes the device's MediaCodec profiles, levels, dimensions, display size, and
+audio decoders before choosing direct play or a bounded server transcode.
+Native direct playback, subtitles, relative scrubbing and direct timeline taps
+were verified on a physical Android 14 tablet.
 
 ## Prerequisites
 

@@ -2,6 +2,20 @@
   <div class="bg-background text-text-primary p-4"
     style="padding-top: calc(16px + var(--sat, env(safe-area-inset-top, 0px)))">
 
+    <header class="flex items-center justify-between mb-4">
+      <h1 class="text-2xl sm:text-3xl font-bold text-foreground">Accueil</h1>
+      <button
+        type="button"
+        title="Actualiser l’accueil"
+        aria-label="Actualiser l’accueil"
+        :disabled="refreshing"
+        class="size-10 rounded-full border border-border-default bg-surface-raised text-text-muted
+               flex items-center justify-center active:scale-95 transition disabled:opacity-50"
+        @click="loadMedia(true)">
+        <RefreshCw class="size-4" :class="{ 'animate-spin': refreshing }" />
+      </button>
+    </header>
+
     <!-- Continue Watching -->
     <section v-if="resumeItems.length" class="mb-5">
       <h2 class="text-xl sm:text-2xl font-bold text-foreground mb-4">Continue Watching</h2>
@@ -11,7 +25,7 @@
           <div class="relative rounded-xl overflow-hidden aspect-video mb-1.5
                       group-hover:-translate-y-1 group-hover:shadow-xl transition-all duration-200 cursor-pointer active:scale-[0.97] active:opacity-75"
                @click="playResume(item)">
-            <LazyImg :src="getResumeImageUrl(item)" :alt="item.Name" :item-type="item.Type"
+            <LazyImg :src="getResumeImageUrl(item)" :alt="item.Name ?? undefined" :item-type="item.Type"
               class="block w-full h-full object-cover" />
 
             <!-- Play overlay -->
@@ -75,7 +89,7 @@
           <div class="relative rounded-xl overflow-hidden aspect-video mb-1.5
                       group-hover:-translate-y-1 group-hover:shadow-xl transition-all duration-200 cursor-pointer active:scale-[0.97] active:opacity-75"
                @click="playResume(item)">
-            <LazyImg :src="getResumeImageUrl(item)" :alt="item.Name" :item-type="item.Type"
+            <LazyImg :src="getResumeImageUrl(item)" :alt="item.Name ?? undefined" :item-type="item.Type"
               class="block w-full h-full object-cover" />
 
             <!-- Play overlay -->
@@ -110,7 +124,7 @@
           <!-- Title -->
           <div class="px-0.5 cursor-pointer" @click="goToItem(item)">
             <div class="text-xs font-semibold text-text-heading truncate hover:text-accent-purple-light transition-colors"
-                 :title="item.SeriesName ?? item.Name">
+                 :title="item.SeriesName ?? item.Name ?? undefined">
               {{ item.SeriesName ?? item.Name }}
             </div>
             <div class="text-xs text-text-muted truncate mt-0.5">
@@ -143,7 +157,7 @@
             @click="goToItem(item)">
             <div class="relative rounded-xl overflow-hidden mb-1.5 aspect-[2/3]
                         group-hover:-translate-y-1 group-hover:shadow-xl transition-all duration-200">
-              <LazyImg :src="getLatestImageUrl(item)" :alt="item.Name" :item-type="item.Type"
+              <LazyImg :src="getLatestImageUrl(item)" :alt="item.Name ?? undefined" :item-type="item.Type"
                 class="block w-full h-full object-cover" />
               <!-- Download badge -->
               <div v-if="offlineStore.isItemDownloaded(item.Id)"
@@ -157,7 +171,7 @@
             </div>
             <div class="px-0.5 text-xs font-semibold text-text-heading truncate
                         group-hover:text-accent-purple-light transition-colors"
-              :title="item.Name">
+              :title="item.Name ?? undefined">
               {{ item.Name }}
             </div>
             <div v-if="item.ProductionYear" class="px-0.5 text-xs text-text-muted mt-0.5">
@@ -217,10 +231,12 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
+import type { BaseItemDto } from '@jellyfin/sdk/lib/generated-client/models/base-item-dto';
 import { useJellyfinStore } from '@/store/jellyfin-store';
+import type { HomeCache, HomeItem, HomeLibraryCard } from '@/store/jellyfin-store';
 import LazyImg from '@/components/LazyImg.vue';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowRight, Check, Download as DownloadIcon, Loader2, Play } from 'lucide-vue-next';
+import { ArrowRight, Check, Download as DownloadIcon, Loader2, Play, RefreshCw } from 'lucide-vue-next';
 import { useOfflineStore } from '@/store/offline-store';
 import { useDownloadStore } from '@/store/download-store';
 
@@ -229,16 +245,49 @@ const offlineStore = useOfflineStore();
 const downloadStore = useDownloadStore();
 const router = useRouter();
 
-const mediaItems = ref<Array<{ Id: string; Name: string; imageUrl: string; Type?: string }>>([]);
-const resumeItems = ref<any[]>([]);
-const nextUpItems = ref<any[]>([]);
-const latestByLibrary = ref<Record<string, any[]>>({});
+const mediaItems = ref<HomeLibraryCard[]>([]);
+const resumeItems = ref<HomeItem[]>([]);
+const nextUpItems = ref<HomeItem[]>([]);
+const latestByLibrary = ref<Record<string, HomeItem[]>>({});
 const loading = ref(true);
 const latestLoading = ref(false);
+const refreshing = ref(false);
 const error = ref<string | null>(null);
 
-async function loadMedia() {
-  loading.value = true;
+function hasHomeItemId(item: BaseItemDto): item is HomeItem {
+  return typeof item.Id === 'string' && item.Id.length > 0;
+}
+
+function restoreCachedHome(): boolean {
+  const cache = store.homeCache;
+  const key = JSON.stringify([store.serverUrl, store.userId]);
+  if (!cache || cache.key !== key) return false;
+  mediaItems.value = cache.mediaItems;
+  resumeItems.value = cache.resumeItems;
+  nextUpItems.value = cache.nextUpItems;
+  latestByLibrary.value = cache.latestByLibrary;
+  loading.value = false;
+  latestLoading.value = false;
+  return true;
+}
+
+function cacheCurrentHome() {
+  const snapshot: HomeCache = {
+    key: JSON.stringify([store.serverUrl, store.userId]),
+    mediaItems: mediaItems.value,
+    resumeItems: resumeItems.value,
+    nextUpItems: nextUpItems.value,
+    latestByLibrary: latestByLibrary.value,
+  };
+  store.homeCache = snapshot;
+}
+
+async function loadMedia(force = false) {
+  if (!force && restoreCachedHome()) return;
+
+  const hasCachedContent = mediaItems.value.length > 0;
+  loading.value = !hasCachedContent;
+  refreshing.value = force;
   error.value = null;
   try {
     const [libs, resume, nextUp] = await Promise.all([
@@ -246,42 +295,48 @@ async function loadMedia() {
       store.fetchResumeItems(12),
       store.fetchAllNextUp(20),
     ]);
-    mediaItems.value = libs.map(lib => ({
-      Id: lib.Id!,
-      Name: lib.Name!,
+    const validLibraries = libs.filter(hasHomeItemId);
+    mediaItems.value = validLibraries.map(lib => ({
+      Id: lib.Id,
+      Name: lib.Name || '',
       Type: lib.Type,
-      imageUrl: store.getImageUrl(lib.Id!, 'Primary', 800, 400) || ''
+      imageUrl: store.getImageUrl(lib.Id, 'Primary', 800, 400) || '',
     }));
-    resumeItems.value = resume;
-    const resumeIds = new Set(resume.map((i: any) => i.Id));
-    nextUpItems.value = nextUp.filter((i: any) => !resumeIds.has(i.Id));
+    resumeItems.value = resume.filter(hasHomeItemId);
+    const resumeIds = new Set(resumeItems.value.map(item => item.Id));
+    nextUpItems.value = nextUp
+      .filter(hasHomeItemId)
+      .filter(item => !resumeIds.has(item.Id));
     loading.value = false;
 
-    // Fetch latest items per library in parallel after main content is shown
-    latestLoading.value = true;
-    const latestResults = await Promise.all(libs.map(lib => store.fetchLatestItems(lib.Id!, 10)));
-    const map: Record<string, any[]> = {};
-    libs.forEach((lib, i) => { map[lib.Id!] = latestResults[i]; });
-    latestByLibrary.value = map;
-  } catch (e) {
-    error.value = 'Failed to load media libraries';
+    latestLoading.value = Object.keys(latestByLibrary.value).length === 0;
+    const latestResults = await Promise.all(
+      validLibraries.map(lib => store.fetchLatestItems(lib.Id, 10)),
+    );
+    const latestMap: Record<string, HomeItem[]> = {};
+    validLibraries.forEach((lib, index) => {
+      latestMap[lib.Id] = latestResults[index].filter(hasHomeItemId);
+    });
+    latestByLibrary.value = latestMap;
+    cacheCurrentHome();
+  } catch {
+    if (!hasCachedContent) error.value = 'Failed to load media libraries';
   } finally {
     loading.value = false;
     latestLoading.value = false;
+    refreshing.value = false;
   }
 }
 
-function getLatestImageUrl(item: any): string {
+function getLatestImageUrl(item: HomeItem): string {
   if (item.Type === 'Episode') {
-    // Latest episodes represent an episode, but the portrait artwork belongs to its series.
     const posterId = item.SeriesId || item.ParentPrimaryImageItemId;
     return posterId ? store.getImageUrl(posterId, 'Primary', 300, 450) : '';
   }
   return store.getImageUrl(item.Id, 'Primary', 300, 450) || '';
 }
 
-function getResumeImageUrl(item: any): string {
-  // Prefer Backdrop for episodes/movies (landscape fits the aspect-video card)
+function getResumeImageUrl(item: HomeItem): string {
   if (item.BackdropImageTags?.length) {
     return store.getImageUrl(item.Id, 'Backdrop', 640, 360);
   }
@@ -291,11 +346,11 @@ function getResumeImageUrl(item: any): string {
   return store.getImageUrl(item.Id, 'Primary', 640, 360) || '';
 }
 
-function resumeTitle(item: any): string {
-  return item.Type === 'Episode' ? (item.SeriesName ?? item.Name) : item.Name;
+function resumeTitle(item: HomeItem): string {
+  return (item.Type === 'Episode' ? item.SeriesName || item.Name : item.Name) || '';
 }
 
-function remainingTime(item: any): string {
+function remainingTime(item: HomeItem): string {
   const total = item.RunTimeTicks;
   const position = item.UserData?.PlaybackPositionTicks ?? 0;
   if (!total || !position) return '';
@@ -308,19 +363,20 @@ function remainingTime(item: any): string {
 
 const markingPlayed = ref<Set<string>>(new Set());
 
-async function markPlayed(item: any) {
+async function markPlayed(item: HomeItem) {
   if (markingPlayed.value.has(item.Id)) return;
   markingPlayed.value.add(item.Id);
   try {
     await store.markPlayed(item.Id);
-    resumeItems.value = resumeItems.value.filter(i => i.Id !== item.Id);
-    nextUpItems.value = nextUpItems.value.filter(i => i.Id !== item.Id);
+    resumeItems.value = resumeItems.value.filter(candidate => candidate.Id !== item.Id);
+    nextUpItems.value = nextUpItems.value.filter(candidate => candidate.Id !== item.Id);
+    cacheCurrentHome();
   } finally {
     markingPlayed.value.delete(item.Id);
   }
 }
 
-function playResume(item: any) {
+function playResume(item: HomeItem) {
   const ticks = item.UserData?.PlaybackPositionTicks;
   router.push({
     name: 'Player',
@@ -329,7 +385,7 @@ function playResume(item: any) {
   });
 }
 
-function goToItem(item: any) {
+function goToItem(item: HomeItem) {
   router.push({ name: 'ItemDetails', params: { id: item.Id } });
 }
 

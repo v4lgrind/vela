@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.media.MediaCodecInfo.CodecProfileLevel
 import androidx.core.content.ContextCompat
 import com.getcapacitor.JSObject
 import com.getcapacitor.Plugin
@@ -186,103 +187,213 @@ class NativeVideoPlugin : Plugin() {
     }
 
     @PluginMethod
-    fun getDeviceCodecs(call: PluginCall) {
-        val codecList = android.media.MediaCodecList(android.media.MediaCodecList.ALL_CODECS)
-        val decoderTypes = codecList.codecInfos
+    fun getDeviceCapabilities(call: PluginCall) {
+        val decoderInfos = android.media.MediaCodecList(android.media.MediaCodecList.ALL_CODECS)
+            .codecInfos
             .filter { !it.isEncoder }
-            .flatMap { it.supportedTypes.toList() }
-            .filter { it.startsWith("audio/") || it.startsWith("video/") }
-            .distinct()
-            .sorted()
-        val result = JSObject()
-        result.put("codecs", com.getcapacitor.JSArray(decoderTypes))
-        call.resolve(result)
+        val hardwareVideoCodecs = linkedSetOf<String>()
+        val softwareVideoCodecs = linkedSetOf<String>()
+        val platformAudioCodecs = linkedSetOf<String>()
+
+        decoderInfos.forEach { info ->
+            info.supportedTypes.forEach { mime ->
+                when {
+                    mime.startsWith("video/") && isHardwareDecoder(info) ->
+                        hardwareVideoCodecs.add(mime.lowercase())
+                    mime.startsWith("video/") ->
+                        softwareVideoCodecs.add(mime.lowercase())
+                    mime.startsWith("audio/") ->
+                        platformAudioCodecs.add(mime.lowercase())
+                }
+            }
+        }
+
+        val ffmpegAudioCandidates = listOf(
+            "audio/mp4a-latm", "audio/mpeg", "audio/mpeg-L1", "audio/mpeg-L2",
+            "audio/ac3", "audio/eac3", "audio/eac3-joc", "audio/true-hd",
+            "audio/vnd.dts", "audio/vnd.dts.hd", "audio/vorbis", "audio/opus",
+            "audio/flac", "audio/alac"
+        )
+        val ffmpegVideoCandidates = listOf("video/avc", "video/hevc")
+        val ffmpegAvailable = androidx.media3.decoder.ffmpeg.FfmpegLibrary.isAvailable()
+        val ffmpegAudioCodecs = if (ffmpegAvailable) {
+            ffmpegAudioCandidates.filter {
+                androidx.media3.decoder.ffmpeg.FfmpegLibrary.supportsFormat(it)
+            }
+        } else emptyList()
+        val ffmpegVideoCodecs = if (ffmpegAvailable) {
+            ffmpegVideoCandidates.filter {
+                androidx.media3.decoder.ffmpeg.FfmpegLibrary.supportsFormat(it)
+            }
+        } else emptyList()
+
+        val metrics = context.resources.displayMetrics
+        call.resolve(JSObject().apply {
+            put("hardwareVideoCodecs", com.getcapacitor.JSArray(hardwareVideoCodecs.sorted()))
+            put("softwareVideoCodecs", com.getcapacitor.JSArray(softwareVideoCodecs.sorted()))
+            put("platformAudioCodecs", com.getcapacitor.JSArray(platformAudioCodecs.sorted()))
+            put("ffmpegAudioCodecs", com.getcapacitor.JSArray(ffmpegAudioCodecs.sorted()))
+            put("ffmpegVideoCodecs", com.getcapacitor.JSArray(ffmpegVideoCodecs.sorted()))
+            put("displayWidth", metrics.widthPixels)
+            put("displayHeight", metrics.heightPixels)
+            put("manufacturer", android.os.Build.MANUFACTURER)
+            put("model", android.os.Build.MODEL)
+            put("androidApi", android.os.Build.VERSION.SDK_INT)
+        })
     }
 
     @PluginMethod
-    fun canDecodeHevc(call: PluginCall) {
-        val profileStr = (call.getString("profile") ?: "main").lowercase().trim()
-        val jellyfinLevel = call.getInt("level") ?: 0
-
-        // Map Jellyfin profile string → Android HEVCProfile integer
-        val targetProfile = when (profileStr) {
-            "main"               -> android.media.MediaCodecInfo.CodecProfileLevel.HEVCProfileMain
-            "main 10", "main10"  -> android.media.MediaCodecInfo.CodecProfileLevel.HEVCProfileMain10
-            "main still picture" -> android.media.MediaCodecInfo.CodecProfileLevel.HEVCProfileMainStill
-            "main 10 hdr10"      -> android.media.MediaCodecInfo.CodecProfileLevel.HEVCProfileMain10HDR10
-            "main 10 hdr10 plus" -> android.media.MediaCodecInfo.CodecProfileLevel.HEVCProfileMain10HDR10Plus
-            else -> -1 // unknown → assume supported
-        }
-
-        if (targetProfile == -1 || jellyfinLevel == 0) {
-            call.resolve(JSObject().apply { put("supported", true) })
+    fun canDecodeVideo(call: PluginCall) {
+        val mime = (call.getString("mime") ?: "").lowercase()
+        if (!mime.startsWith("video/")) {
+            call.reject("A video MIME type is required")
             return
         }
 
-        // Map Android HEVC level constants → Jellyfin level (H.265 level_idc = level × 30).
-        // Both Main tier and High tier entries are included; either suffices.
-        val levelMap = mapOf(
-            0x1 to 30,   0x2 to 30,             // L1.0
-            0x4 to 60,   0x8 to 60,             // L2.0
-            0x10 to 63,  0x20 to 63,            // L2.1
-            0x40 to 90,  0x80 to 90,            // L3.0
-            0x100 to 93, 0x200 to 93,           // L3.1
-            0x400 to 120, 0x800 to 120,         // L4.0
-            0x1000 to 123, 0x2000 to 123,       // L4.1
-            0x4000 to 150, 0x8000 to 150,       // L5.0
-            0x10000 to 153, 0x20000 to 153,     // L5.1
-            0x40000 to 156, 0x80000 to 156,     // L5.2
-            0x100000 to 180, 0x200000 to 180,   // L6.0
-            0x400000 to 183, 0x800000 to 183,   // L6.1
-            0x1000000 to 186, 0x2000000 to 186  // L6.2
-        )
+        val profile = (call.getString("profile") ?: "").lowercase().trim()
+        val jellyfinLevel = call.getInt("level") ?: 0
+        val bitDepth = call.getInt("bitDepth") ?: 8
+        val width = call.getInt("width") ?: 0
+        val height = call.getInt("height") ?: 0
+        val frameRate = call.data.optDouble("frameRate", 0.0)
+        val targetProfile = androidVideoProfile(mime, profile, bitDepth)
 
-        // Only check hardware decoders — software decoders (OMX.google.*, c2.android.*)
-        // may declare Main 10 support but ExoPlayer uses hardware decoders by default,
-        // so a software-only match would produce a false positive that causes runtime failure.
-        android.util.Log.d("NativePlayer", "canDecodeHevc: profile='$profileStr' (targetProfile=$targetProfile) level=$jellyfinLevel")
-
-        val allHevcDecoders = android.media.MediaCodecList(android.media.MediaCodecList.ALL_CODECS)
+        val decoders = android.media.MediaCodecList(android.media.MediaCodecList.ALL_CODECS)
             .codecInfos
-            .filter { !it.isEncoder && it.supportedTypes.contains("video/hevc") }
+            .filter {
+                !it.isEncoder &&
+                    isHardwareDecoder(it) &&
+                    it.supportedTypes.any { type -> type.equals(mime, ignoreCase = true) }
+            }
 
-        android.util.Log.d("NativePlayer", "canDecodeHevc: all HEVC decoders: ${allHevcDecoders.map { it.name }}")
+        var decoderName = ""
+        var profileMatched = false
+        var sizeMatched = false
+        val supported = decoders.any { info ->
+            val capabilities = runCatching { info.getCapabilitiesForType(mime) }.getOrNull()
+                ?: return@any false
+            val profileSupported = targetProfile == null || capabilities.profileLevels.any { level ->
+                level.profile == targetProfile &&
+                    (jellyfinLevel <= 0 || androidVideoLevel(mime, level.level) >= jellyfinLevel)
+            }
+            if (profileSupported) profileMatched = true
 
-        val hwHevcDecoders = allHevcDecoders.filter { info ->
-            val isHardware = if (android.os.Build.VERSION.SDK_INT >= 29) {
-                info.isHardwareAccelerated
+            val sizeSupported = if (width > 0 && height > 0) {
+                runCatching {
+                    val videoCapabilities = capabilities.videoCapabilities
+                        ?: return@runCatching false
+                    if (frameRate > 0.0) {
+                        videoCapabilities.areSizeAndRateSupported(width, height, frameRate)
+                    } else {
+                        videoCapabilities.isSizeSupported(width, height)
+                    }
+                }.getOrDefault(false)
             } else {
-                !info.name.startsWith("OMX.google.", ignoreCase = true) &&
+                true
+            }
+            if (sizeSupported) sizeMatched = true
+            if (profileSupported && sizeSupported) {
+                decoderName = info.name
+                true
+            } else {
+                false
+            }
+        }
+
+        val reason = when {
+            supported -> "supported"
+            decoders.isEmpty() -> "no_hardware_decoder"
+            !profileMatched -> "unsupported_profile_or_level"
+            !sizeMatched -> "unsupported_size_or_rate"
+            else -> "unsupported"
+        }
+        android.util.Log.d(
+            "NativePlayer",
+            "canDecodeVideo: mime=$mime profile=$profile level=$jellyfinLevel bitDepth=$bitDepth " +
+                "size=${width}x$height fps=$frameRate supported=$supported decoder=$decoderName reason=$reason"
+        )
+        call.resolve(JSObject().apply {
+            put("supported", supported)
+            put("decoderName", decoderName)
+            put("reason", reason)
+        })
+    }
+
+    private fun isHardwareDecoder(info: android.media.MediaCodecInfo): Boolean {
+        return if (android.os.Build.VERSION.SDK_INT >= 29) {
+            info.isHardwareAccelerated
+        } else {
+            !info.name.startsWith("OMX.google.", ignoreCase = true) &&
                 !info.name.startsWith("c2.android.", ignoreCase = true)
-            }
-            isHardware
         }
-
-        android.util.Log.d("NativePlayer", "canDecodeHevc: hardware HEVC decoders: ${hwHevcDecoders.map { it.name }}")
-
-        val supported = hwHevcDecoders.any { info ->
-            val match = info.getCapabilitiesForType("video/hevc").profileLevels.any { pl ->
-                pl.profile == targetProfile &&
-                (levelMap[pl.level] ?: 0) >= jellyfinLevel
+    }
+    private fun androidVideoProfile(mime: String, profile: String, bitDepth: Int): Int? {
+        return when (mime) {
+            "video/hevc" -> when (profile) {
+                "main" -> CodecProfileLevel.HEVCProfileMain
+                "main 10", "main10", "main 10 hdr10", "main 10 hdr10 plus" ->
+                    CodecProfileLevel.HEVCProfileMain10
+                "main still picture" -> CodecProfileLevel.HEVCProfileMainStill
+                else -> if (bitDepth > 8) CodecProfileLevel.HEVCProfileMain10 else null
             }
-            val levels = info.getCapabilitiesForType("video/hevc").profileLevels
-                .map { "profile=${it.profile} level=${it.level}(${levelMap[it.level] ?: 0})" }
-            android.util.Log.d("NativePlayer", "canDecodeHevc: ${info.name} match=$match levels=$levels")
-            match
+            "video/avc" -> when (profile) {
+                "baseline", "constrained baseline" -> CodecProfileLevel.AVCProfileBaseline
+                "main" -> CodecProfileLevel.AVCProfileMain
+                "high" -> CodecProfileLevel.AVCProfileHigh
+                "high 10", "high10" -> CodecProfileLevel.AVCProfileHigh10
+                else -> null
+            }
+            "video/av01" ->
+                if (bitDepth > 8) CodecProfileLevel.AV1ProfileMain10 else CodecProfileLevel.AV1ProfileMain8
+            "video/x-vnd.on2.vp9" ->
+                if (bitDepth > 8) CodecProfileLevel.VP9Profile2 else CodecProfileLevel.VP9Profile0
+            else -> null
         }
+    }
 
-        // If hardware can't handle it, check if FFmpeg software decoder can.
-        // FFmpeg supports all valid HEVC bitstreams (including Main 10), so any HEVC
-        // content that hardware rejects can still be played via the software fallback.
-        // When hardwareOnly=true (used by download codec check), skip FFmpeg fallback
-        // so the caller knows transcoding is recommended.
-        val hardwareOnly = call.getBoolean("hardwareOnly") ?: false
-        val ffmpegSupported = !hardwareOnly && !supported &&
-            androidx.media3.decoder.ffmpeg.FfmpegLibrary.isAvailable() &&
-            androidx.media3.decoder.ffmpeg.FfmpegLibrary.supportsFormat("video/hevc")
-        val finalSupported = supported || ffmpegSupported
-        android.util.Log.d("NativePlayer", "canDecodeHevc: result supported=$finalSupported (hw=$supported ffmpeg=$ffmpegSupported hardwareOnly=$hardwareOnly) for profile=$profileStr level=$jellyfinLevel")
-        call.resolve(JSObject().apply { put("supported", finalSupported) })
+    private fun androidVideoLevel(mime: String, androidLevel: Int): Int {
+        return when (mime) {
+            "video/hevc" -> when (androidLevel) {
+                0x1, 0x2 -> 30
+                0x4, 0x8 -> 60
+                0x10, 0x20 -> 63
+                0x40, 0x80 -> 90
+                0x100, 0x200 -> 93
+                0x400, 0x800 -> 120
+                0x1000, 0x2000 -> 123
+                0x4000, 0x8000 -> 150
+                0x10000, 0x20000 -> 153
+                0x40000, 0x80000 -> 156
+                0x100000, 0x200000 -> 180
+                0x400000, 0x800000 -> 183
+                0x1000000, 0x2000000 -> 186
+                else -> 0
+            }
+            "video/avc" -> when (androidLevel) {
+                0x1 -> 10
+                0x2 -> 9
+                0x4 -> 11
+                0x8 -> 12
+                0x10 -> 13
+                0x20 -> 20
+                0x40 -> 21
+                0x80 -> 22
+                0x100 -> 30
+                0x200 -> 31
+                0x400 -> 32
+                0x800 -> 40
+                0x1000 -> 41
+                0x2000 -> 42
+                0x4000 -> 50
+                0x8000 -> 51
+                0x10000 -> 52
+                0x20000 -> 60
+                0x40000 -> 61
+                0x80000 -> 62
+                else -> 0
+            }
+            else -> Int.MAX_VALUE
+        }
     }
 
     @PluginMethod

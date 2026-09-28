@@ -5,6 +5,10 @@ import { usePreferencesStore } from '@/store/preferences-store';
 import { deviceProfile, nativeAndroidDeviceProfile, QUALITY_PRESETS } from '@/constants';
 import { debugLog } from '@/utils/debugLog';
 import { logger } from '@/utils/logger';
+import {
+    getDeviceCapabilities,
+    getRecommendedNativeTranscodeBitrate,
+} from '@/utils/codecDetection';
 import { buildPlaybackUrl } from '@/utils/playbackUrl';
 import { createSubtitleTracks, parseSavedBurnInSubtitleIndex } from '@/utils/subtitleTracks';
 import type { MediaSource, MediaStream, SubtitleTrack, AudioTrack } from '@/types/jellyfin';
@@ -209,8 +213,15 @@ export function usePlayerSession(videoEl: Ref<HTMLVideoElement | null>, isNative
         stripHevc = false,
         subtitleStreamIndex?: number,
     ) {
-        const bitrateCap = selectedBitrate.value || 1_000_000_000;
         const shouldBurnSubtitle = subtitleStreamIndex !== undefined;
+        const needsNativeVideoTranscode = useNativeProfile
+            && selectedBitrate.value === 0
+            && (forceTranscode || shouldBurnSubtitle);
+        const bitrateCap = selectedBitrate.value || (
+            needsNativeVideoTranscode
+                ? getRecommendedNativeTranscodeBitrate(await getDeviceCapabilities())
+                : 1_000_000_000
+        );
         // When a quality cap is active we must force a real video re-encode.
         // Stripping DirectPlayProfiles prevents DirectPlay, but Jellyfin can still
         // fall back to DirectStream (remux without re-encoding), which ignores the

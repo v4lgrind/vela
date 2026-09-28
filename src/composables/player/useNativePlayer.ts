@@ -4,10 +4,16 @@ import { NativeVideo } from '@/plugins/NativeVideoPlugin';
 import { debugLog } from '@/utils/debugLog';
 import { logger } from '@/utils/logger';
 import { languageMatches } from '@/utils/language';
-import { CODEC_MIME_MAP, getDeviceCodecs, isCodecSupported, isDolbyVision } from '@/utils/codecDetection';
+import {
+    canHardwareDecodeVideo,
+    getDeviceCapabilities,
+    getVideoMime,
+    isAudioStreamSupported,
+} from '@/utils/codecDetection';
 import type { PlayerSession } from './usePlayerSession';
 import type { StreamInfo } from './useStreamInfo';
 import type { SkipIntro } from './useSkipIntro';
+import type { MediaStream } from '@/types/jellyfin';
 
 /**
  * Native (Android ExoPlayer) playback path: negotiates the stream with the
@@ -494,51 +500,55 @@ export function useNativePlayer(
     }
 
     /**
-     * Proactive codec detection: if the preferred audio or the video codec is
-     * not natively supported by the device, request server-side transcoding
-     * upfront instead of letting ExoPlayer crash and then falling back
-     * (saves time & battery).
+     * Probe this device's real MediaCodec/FFmpeg capabilities before asking
+     * Jellyfin for a stream. Video DirectPlay requires a matching hardware
+     * decoder profile, level, size, and frame rate. Audio can use MediaCodec or
+     * FFmpeg, except AAC (MediaCodec only) and E-AC3 JOC (explicit platform
+     * support required).
      */
-    async function detectCodecFallbacks(allStreams: any[], preferredAudio: any):
-        Promise<{ forceTranscodeAudio: boolean; forceTranscodeVideo: boolean; stripHevc: boolean }> {
+    async function detectCodecFallbacks(
+        allStreams: MediaStream[],
+        preferredAudio?: MediaStream,
+    ): Promise<{ forceTranscodeAudio: boolean; forceTranscodeVideo: boolean; stripHevc: boolean }> {
         let forceTranscodeAudio = false;
         let forceTranscodeVideo = false;
         let stripHevc = false;
 
-        const deviceCodecs = await getDeviceCodecs();
-        if (deviceCodecs.length > 0) {
-            // Audio codec check
-            if (preferredAudio && !isCodecSupported(preferredAudio.Codec, deviceCodecs)) {
-                debugLog(`[Codec] Preferred audio codec "${preferredAudio.Codec}" not natively supported — requesting server transcode`);
-                forceTranscodeAudio = true;
-            }
-            // Video codec check — detect any unsupported video codec
-            const videoStreamMeta = allStreams.find(s => s.Type === 'Video');
-            if (videoStreamMeta && !forceTranscodeVideo) {
-                const videoCodec = (videoStreamMeta.Codec || '').toLowerCase();
-                const videoProfile = (videoStreamMeta.Profile || '').toLowerCase();
-                // DV detection: Jellyfin may report codec as "hevc" with DV profile
-                const isDV = isDolbyVision(videoCodec, videoProfile);
-                const effectiveMime = isDV ? 'video/dolby-vision' : CODEC_MIME_MAP[videoCodec];
-                if (effectiveMime && !deviceCodecs.includes(effectiveMime)) {
-                    debugLog(`[Codec] Video codec "${videoStreamMeta.Codec}" (${effectiveMime}) not supported — requesting server transcode`);
-                    forceTranscodeVideo = true;
-                    if (effectiveMime === 'video/hevc') stripHevc = true;
-                }
-                // MIME type supported — also verify HEVC profile/level (e.g. Main 10 / Level 5.1
-                // may be unsupported even when video/hevc is listed as a supported MIME type).
-                if (!forceTranscodeVideo && (videoCodec === 'hevc' || videoCodec === 'h265') && !isDV) {
-                    const profile = (videoStreamMeta.Profile || '') as string;
-                    const level = (videoStreamMeta.Level as number) || 0;
-                    if (profile && level) {
-                        const { supported } = await NativeVideo.canDecodeHevc({ profile, level });
-                        if (!supported) {
-                            debugLog(`[Codec] HEVC profile "${profile}" level ${level} not supported — requesting server transcode`);
-                            forceTranscodeVideo = true;
-                            stripHevc = true;
-                        }
-                    }
-                }
+        const capabilities = await getDeviceCapabilities();
+        if (capabilities.androidApi <= 0) {
+            debugLog('[Codec] Device capability probe unavailable; preserving runtime fallback');
+            return { forceTranscodeAudio, forceTranscodeVideo, stripHevc };
+        }
+
+        debugLog(
+            `[Codec] ${capabilities.manufacturer} ${capabilities.model} API ${capabilities.androidApi} ` +
+            `display=${capabilities.displayWidth}x${capabilities.displayHeight} ` +
+            `video=[${capabilities.hardwareVideoCodecs.join(',')}] ` +
+            `audio=[${capabilities.platformAudioCodecs.join(',')}]`,
+        );
+
+        if (preferredAudio && !isAudioStreamSupported(preferredAudio, capabilities)) {
+            debugLog(
+                `[Codec] Audio codec "${preferredAudio.Codec}" profile="${preferredAudio.Profile || ''}" ` +
+                'is unsupported by this device; requesting AAC transcode',
+            );
+            forceTranscodeAudio = true;
+        }
+
+        const videoStream = allStreams.find(stream => stream.Type === 'Video');
+        if (videoStream) {
+            const result = await canHardwareDecodeVideo(videoStream);
+            if (!result.supported) {
+                const mime = getVideoMime(videoStream);
+                debugLog(
+                    `[Codec] Video codec "${videoStream.Codec}" profile="${videoStream.Profile || ''}" ` +
+                    `level=${videoStream.Level || 0} ${videoStream.Width || 0}x${videoStream.Height || 0} ` +
+                    `unsupported: ${result.reason}; requesting H.264 transcode`,
+                );
+                forceTranscodeVideo = true;
+                stripHevc = mime === 'video/hevc' || mime === 'video/dolby-vision';
+            } else {
+                debugLog(`[Codec] Hardware decoder selected: ${result.decoderName}`);
             }
         }
 

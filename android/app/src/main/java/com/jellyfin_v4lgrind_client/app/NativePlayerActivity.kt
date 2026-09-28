@@ -1071,6 +1071,17 @@ class NativePlayerActivity : AppCompatActivity() {
         val group = audioTrackGroups.firstOrNull { it.first == groupIndex } ?: return
         val language = group.second.getFormat(0).language ?: "und"
 
+        // No MediaCodec or FFmpeg renderer can decode this track on this device:
+        // ask Vue for a server-side audio transcode instead of letting it crash.
+        val supported = p.currentTracks.groups
+            .firstOrNull { it.mediaTrackGroup == group.second }
+            ?.isTrackSupported(0) ?: true
+        if (!supported) {
+            debugLog("[AudioCrash] selectAudioTrack: groupIndex=$groupIndex codec=${group.second.getFormat(0).sampleMimeType} unsupported on this device, requesting transcode")
+            sendAudioErrorBroadcast(groupIndex, language)
+            return
+        }
+
         // Mark pending — onPlayerError will check this if the decoder fails on the new track.
         // Auto-cleared after 4 s (success path); cancelled and handled immediately on error.
         debugLog("[AudioCrash] selectAudioTrack: groupIndex=$groupIndex lang=$language codec=${group.second.getFormat(0).codecs}")

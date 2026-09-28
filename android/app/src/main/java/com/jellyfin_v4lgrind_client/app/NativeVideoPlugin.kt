@@ -227,15 +227,15 @@ class NativeVideoPlugin : Plugin() {
             }
         } else emptyList()
 
-        val metrics = context.resources.displayMetrics
+        val (displayWidth, displayHeight) = physicalDisplaySize()
         call.resolve(JSObject().apply {
             put("hardwareVideoCodecs", com.getcapacitor.JSArray(hardwareVideoCodecs.sorted()))
             put("softwareVideoCodecs", com.getcapacitor.JSArray(softwareVideoCodecs.sorted()))
             put("platformAudioCodecs", com.getcapacitor.JSArray(platformAudioCodecs.sorted()))
             put("ffmpegAudioCodecs", com.getcapacitor.JSArray(ffmpegAudioCodecs.sorted()))
             put("ffmpegVideoCodecs", com.getcapacitor.JSArray(ffmpegVideoCodecs.sorted()))
-            put("displayWidth", metrics.widthPixels)
-            put("displayHeight", metrics.heightPixels)
+            put("displayWidth", displayWidth)
+            put("displayHeight", displayHeight)
             put("manufacturer", android.os.Build.MANUFACTURER)
             put("model", android.os.Build.MODEL)
             put("androidApi", android.os.Build.VERSION.SDK_INT)
@@ -317,6 +317,22 @@ class NativeVideoPlugin : Plugin() {
             put("decoderName", decoderName)
             put("reason", reason)
         })
+    }
+
+    /**
+     * Panel resolution of the active display mode. displayMetrics reports the
+     * app window instead: 1080p UI on 4K Android TV, or minus system bars on
+     * devices without edge-to-edge, which would trigger needless transcodes.
+     */
+    private fun physicalDisplaySize(): Pair<Int, Int> {
+        val displayManager = context.getSystemService(android.content.Context.DISPLAY_SERVICE)
+            as android.hardware.display.DisplayManager
+        val mode = displayManager.getDisplay(android.view.Display.DEFAULT_DISPLAY)?.mode
+        if (mode != null && mode.physicalWidth > 0 && mode.physicalHeight > 0) {
+            return mode.physicalWidth to mode.physicalHeight
+        }
+        val metrics = context.resources.displayMetrics
+        return metrics.widthPixels to metrics.heightPixels
     }
 
     private fun isHardwareDecoder(info: android.media.MediaCodecInfo): Boolean {

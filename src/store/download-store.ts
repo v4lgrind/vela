@@ -7,8 +7,12 @@ import { downloadService } from '@/services/downloadService';
 import {
   canHardwareDecodeVideo,
   canSoftwareDecodeVideo,
+  exceedsDeviceDisplay,
   getDeviceCapabilities,
+  getDisplayBoundsForSource,
+  getRecommendedNativeTranscodeBitrate,
   isAudioStreamSupported,
+  withDeviceAudioCodecs,
 } from '@/utils/codecDetection';
 import { needsDesktopTranscode } from '@/utils/desktopCodec';
 import { languageMatches } from '@/utils/language';
@@ -33,9 +37,14 @@ const isDesktopPlatform = ['linux', 'macos', 'windows'].includes(clientPlatform)
  * ignore the cap, producing a file even larger than the original. Setting
  * `maxWidth`/`maxHeight`/`videoBitRate` directly on the stream URL is honoured
  * unconditionally. Existing values are replaced case-insensitively so ASP.NET never
- * sees duplicate keys.
+ * sees duplicate keys. `width` defaults to a 16:9 box around `height`.
  */
-export function withForcedVideoParams(rawUrl: string, videoBitrate: number, height: number): string {
+export function withForcedVideoParams(
+  rawUrl: string,
+  videoBitrate: number,
+  height: number,
+  width = Math.round((height * 16) / 9),
+): string {
   try {
     const u = new URL(rawUrl);
     const setParam = (key: string, value: string) => {
@@ -47,12 +56,38 @@ export function withForcedVideoParams(rawUrl: string, videoBitrate: number, heig
     setParam('videoBitRate', String(videoBitrate));
     if (height > 0) {
       setParam('maxHeight', String(height));
-      setParam('maxWidth', String(Math.round((height * 16) / 9)));
+      setParam('maxWidth', String(width));
     }
     return u.toString();
   } catch {
     return rawUrl;
   }
+}
+
+/**
+ * Bound an auto-detected transcode of a source larger than the display to the
+ * display size and the device's recommended bitrate (never above the source).
+ */
+async function withDisplaySizedDownload(
+  url: string,
+  streams: MediaStream[],
+  sourceBitrate: number,
+): Promise<{ url: string; videoBitrate: number } | undefined> {
+  const video = streams.find((stream) => stream.Type === 'Video');
+  if (!video) return undefined;
+  const capabilities = await getDeviceCapabilities();
+  const bounds = getDisplayBoundsForSource(video, capabilities);
+  if (!bounds) return undefined;
+
+  const recommendedBitrate = getRecommendedNativeTranscodeBitrate(capabilities);
+  const videoBitrate = sourceBitrate > 0
+    ? Math.min(recommendedBitrate, sourceBitrate)
+    : recommendedBitrate;
+  logger.log(`[DownloadStore] Bounding transcoded download to ${bounds.maxWidth}x${bounds.maxHeight} at ${videoBitrate} bps`);
+  return {
+    url: withForcedVideoParams(url, videoBitrate, bounds.maxHeight, bounds.maxWidth),
+    videoBitrate,
+  };
 }
 
 /**
@@ -390,6 +425,8 @@ export const useDownloadStore = defineStore('downloads', {
           }
           if (stream.Type !== 'Video') continue;
 
+          if (exceedsDeviceDisplay(stream, capabilities)) return true;
+
           const hardwareResult = await canHardwareDecodeVideo(stream);
           if (hardwareResult.supported) continue;
 
@@ -440,7 +477,7 @@ export const useDownloadStore = defineStore('downloads', {
                 Container: transcodeContainer,
                 Type: 'Video',
                 VideoCodec: 'h264',
-                AudioCodec: isDesktopPlatform ? 'aac' : 'aac,mp3,ac3',
+                AudioCodec: isDesktopPlatform ? 'aac' : 'aac,mp3,ac3,eac3',
                 Context: 'Streaming',
                 Protocol: 'http',
                 CopyTimestamps: true,
@@ -461,6 +498,11 @@ export const useDownloadStore = defineStore('downloads', {
           AllowVideoStreamCopy: false,
           AllowAudioStreamCopy: !isDesktopPlatform,
         };
+        // Only stream-copy audio this device can decode offline (no-op off Android).
+        requestBody.DeviceProfile = withDeviceAudioCodecs(
+          requestBody.DeviceProfile,
+          await getDeviceCapabilities(),
+        );
 
         // Resolution cap: MaxStreamingBitrate + AllowVideoStreamCopy:false (set
         // above) forces Jellyfin to re-encode down to the requested bitrate,
@@ -513,6 +555,16 @@ export const useDownloadStore = defineStore('downloads', {
             const targetHeight = QUALITY_PRESETS.find((p) => p.bitrate === bitrateCap)?.minHeight ?? 0;
             url = withForcedVideoParams(url, bitrateCap, targetHeight);
             effectiveVideoBitrate = bitrateCap;
+          } else {
+            const streams: MediaStream[] = ms.MediaStreams
+              || metadata.MediaStreams
+              || metadata.MediaSources?.[0]?.MediaStreams
+              || [];
+            const bounded = await withDisplaySizedDownload(url, streams, ms.Bitrate || 0);
+            if (bounded) {
+              url = bounded.url;
+              effectiveVideoBitrate = bounded.videoBitrate;
+            }
           }
 
           const runtimeSec = (ms.RunTimeTicks || metadata.RunTimeTicks || 0) / 10_000_000;

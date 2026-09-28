@@ -88,6 +88,10 @@ export function isAudioStreamSupported(
   if (!mime) return false;
 
   const profile = stream.Profile?.toLowerCase() || '';
+  // E-AC3 JOC (Atmos) needs a platform decoder that declares audio/eac3-joc.
+  // A plain audio/eac3 decoder is not enough: the Pixel 10's Dolby decoder
+  // (exposed only as audio/ac3 and audio/eac3) rejects JOC input with
+  // CodecException 0x80000000 although Media3 reports the format supported.
   if (codec === 'eac3' && (profile.includes('atmos') || profile.includes('joc'))) {
     return capabilities.platformAudioCodecs.includes('audio/eac3-joc');
   }
@@ -99,6 +103,46 @@ export function isAudioStreamSupported(
   }
   return capabilities.platformAudioCodecs.includes(mime)
     || capabilities.ffmpegAudioCodecs.includes(mime);
+}
+
+interface CodecListProfile {
+  Type?: string;
+  AudioCodec?: string;
+}
+
+function supportedAudioCodecs(codecList: string, capabilities: NativeDeviceCapabilities): string {
+  return codecList
+    .split(',')
+    .filter(codec => isAudioStreamSupported({ Codec: codec }, capabilities))
+    .join(',');
+}
+
+/**
+ * Restrict the video profiles' audio codec lists to what this device decodes,
+ * so Jellyfin never direct plays or stream-copies an undecodable audio track.
+ * An empty AudioCodec means "any codec" to Jellyfin, so a DirectPlay profile
+ * left without codecs is dropped and a transcode target falls back to AAC.
+ */
+export function withDeviceAudioCodecs<T extends {
+  DirectPlayProfiles?: CodecListProfile[];
+  TranscodingProfiles?: CodecListProfile[];
+}>(deviceProfile: T, capabilities: NativeDeviceCapabilities): T {
+  if (capabilities.androidApi <= 0) return deviceProfile;
+
+  const directPlayProfiles = deviceProfile.DirectPlayProfiles
+    ?.map(profile => (profile.Type === 'Video' && profile.AudioCodec
+      ? { ...profile, AudioCodec: supportedAudioCodecs(profile.AudioCodec, capabilities) }
+      : profile))
+    .filter(profile => profile.AudioCodec !== '');
+  const transcodingProfiles = deviceProfile.TranscodingProfiles
+    ?.map(profile => (profile.Type === 'Video' && profile.AudioCodec
+      ? { ...profile, AudioCodec: supportedAudioCodecs(profile.AudioCodec, capabilities) || 'aac' }
+      : profile));
+  return {
+    ...deviceProfile,
+    ...(directPlayProfiles ? { DirectPlayProfiles: directPlayProfiles } : {}),
+    ...(transcodingProfiles ? { TranscodingProfiles: transcodingProfiles } : {}),
+  };
 }
 
 export async function canHardwareDecodeVideo(stream: MediaStream): Promise<VideoDecodeResult> {
@@ -123,6 +167,46 @@ export function canSoftwareDecodeVideo(
 ): boolean {
   const mime = getVideoMime(stream);
   return Boolean(mime && capabilities.ffmpegVideoCodecs.includes(mime));
+}
+
+export function exceedsDeviceDisplay(
+  stream: Pick<MediaStream, 'Width' | 'Height'>,
+  capabilities: NativeDeviceCapabilities,
+): boolean {
+  const sourceWidth = stream.Width || 0;
+  const sourceHeight = stream.Height || 0;
+  if (
+    sourceWidth <= 0
+    || sourceHeight <= 0
+    || capabilities.displayWidth <= 0
+    || capabilities.displayHeight <= 0
+  ) {
+    return false;
+  }
+
+  const sourceLongEdge = Math.max(sourceWidth, sourceHeight);
+  const sourceShortEdge = Math.min(sourceWidth, sourceHeight);
+  const displayLongEdge = Math.max(capabilities.displayWidth, capabilities.displayHeight);
+  const displayShortEdge = Math.min(capabilities.displayWidth, capabilities.displayHeight);
+  return sourceLongEdge > displayLongEdge || sourceShortEdge > displayShortEdge;
+}
+
+/**
+ * Maximum transcode dimensions that fit the display, oriented like the source.
+ * Returns null when the source already fits and no size limit is needed.
+ */
+export function getDisplayBoundsForSource(
+  stream: Pick<MediaStream, 'Width' | 'Height'>,
+  capabilities: NativeDeviceCapabilities,
+): { maxWidth: number; maxHeight: number } | null {
+  if (!exceedsDeviceDisplay(stream, capabilities)) return null;
+
+  const displayLongEdge = Math.max(capabilities.displayWidth, capabilities.displayHeight);
+  const displayShortEdge = Math.min(capabilities.displayWidth, capabilities.displayHeight);
+  const isPortraitSource = (stream.Height || 0) > (stream.Width || 0);
+  return isPortraitSource
+    ? { maxWidth: displayShortEdge, maxHeight: displayLongEdge }
+    : { maxWidth: displayLongEdge, maxHeight: displayShortEdge };
 }
 
 export function getRecommendedNativeTranscodeBitrate(

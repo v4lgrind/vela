@@ -283,7 +283,8 @@ function cacheCurrentHome() {
 }
 
 async function loadMedia(force = false) {
-  if (!force && restoreCachedHome()) return;
+  // A stale snapshot stays rendered while fresh data loads without a spinner.
+  if (!force && restoreCachedHome() && !store.homeCache?.stale) return;
 
   const hasCachedContent = mediaItems.value.length > 0;
   loading.value = !hasCachedContent;

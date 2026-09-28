@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { buildPlaybackUrl, withPlaybackApiKey, withoutPlaybackApiKey, type PlaybackUrlContext } from './playbackUrl';
+import {
+  buildPlaybackUrl,
+  withMaxVideoSize,
+  withPlaybackApiKey,
+  withoutPlaybackApiKey,
+  type PlaybackUrlContext,
+} from './playbackUrl';
 
 const baseCtx: PlaybackUrlContext = {
   serverUrl: 'http://192.168.1.10:8096',
@@ -95,6 +101,26 @@ describe('buildPlaybackUrl — transcode/direct-stream', () => {
     expect(url).toBe(
       'http://192.168.1.10:8096/Videos/item%20%2B%26%2F1/master.m3u8?mediaSourceId=source%20%2B%26%2F7&PlaySessionId=session%20%2B%26%2F9',
     );
+  });
+});
+
+describe('withMaxVideoSize', () => {
+  it('adds size limits to a relative server TranscodingUrl', () => {
+    expect(withMaxVideoSize('/videos/x/master.m3u8?StartTimeTicks=123', 2424, 1080))
+      .toBe('/videos/x/master.m3u8?StartTimeTicks=123&maxWidth=2424&maxHeight=1080');
+  });
+
+  it('replaces server size limits case-insensitively on absolute URLs', () => {
+    const url = withMaxVideoSize(
+      'https://jf.example/videos/x/master.m3u8?MaxWidth=3840&MaxHeight=2160',
+      1920,
+      1080,
+    );
+    const params = new URL(url).searchParams;
+    expect(params.get('MaxWidth')).toBeNull();
+    expect(params.get('MaxHeight')).toBeNull();
+    expect(params.get('maxWidth')).toBe('1920');
+    expect(params.get('maxHeight')).toBe('1080');
   });
 });
 

@@ -130,6 +130,8 @@ export interface HomeCache {
   resumeItems: HomeItem[];
   nextUpItems: HomeItem[];
   latestByLibrary: Record<string, HomeItem[]>;
+  /** Playback may have changed resume/next-up data; refetch behind the snapshot. */
+  stale?: boolean;
 }
 
 interface State {
@@ -396,6 +398,9 @@ export const useJellyfinStore = defineStore("jellyfin", {
       this.homeCache = null;
       await setStoredToken(null);
       await setStoredUserId(null);
+    },
+    markHomeCacheStale() {
+      if (this.homeCache) this.homeCache = { ...this.homeCache, stale: true };
     },
     async fetchItemDetails(itemId: string) {
       this.initializeApi();

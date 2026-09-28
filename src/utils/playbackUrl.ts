@@ -30,6 +30,21 @@ export function withoutPlaybackApiKey(url: string): string {
   return base.slice(0, queryIndex) + query + (hashIndex === -1 ? '' : url.slice(hashIndex));
 }
 
+// Jellyfin honours maxWidth/maxHeight on the stream URL and re-encodes when the
+// source exceeds them. Existing values are replaced case-insensitively so
+// ASP.NET never sees duplicate keys. Relative server URLs stay relative.
+export function withMaxVideoSize(url: string, maxWidth: number, maxHeight: number): string {
+  const isAbsolute = /^[a-z][a-z\d+.-]*:/i.test(url);
+  const parsed = new URL(url, 'http://relative.invalid');
+  for (const key of [...parsed.searchParams.keys()]) {
+    const lower = key.toLowerCase();
+    if (lower === 'maxwidth' || lower === 'maxheight') parsed.searchParams.delete(key);
+  }
+  parsed.searchParams.set('maxWidth', String(maxWidth));
+  parsed.searchParams.set('maxHeight', String(maxHeight));
+  return isAbsolute ? parsed.toString() : `${parsed.pathname}${parsed.search}${parsed.hash}`;
+}
+
 // A <video> element (including native Safari HLS) cannot attach auth headers.
 export function withPlaybackApiKey(url: string, accessToken: string): string {
   const cleanUrl = withoutPlaybackApiKey(url);

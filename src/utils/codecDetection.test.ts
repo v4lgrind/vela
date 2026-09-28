@@ -5,10 +5,13 @@ import type { NativeDeviceCapabilities } from '@/plugins/NativeVideoPlugin';
 import {
   CODEC_MIME_MAP,
   canSoftwareDecodeVideo,
+  exceedsDeviceDisplay,
+  getDisplayBoundsForSource,
   getRecommendedNativeTranscodeBitrate,
   getVideoMime,
   isAudioStreamSupported,
   isDolbyVision,
+  withDeviceAudioCodecs,
 } from './codecDetection';
 
 const capabilities: NativeDeviceCapabilities = {
@@ -46,15 +49,16 @@ describe('device codec decisions', () => {
     )).toBe(false);
   });
 
-  it('requires explicit platform support for E-AC3 Atmos/JOC', () => {
+  it('requires a platform decoder declaring E-AC3 JOC for Atmos', () => {
+    const atmos = { Codec: 'eac3', Profile: 'Dolby Digital Plus + Dolby Atmos' };
+    // Plain platform E-AC3 decoder (Pixel 10 Dolby decoder) fails on JOC input.
+    expect(isAudioStreamSupported(atmos, capabilities)).toBe(false);
     expect(isAudioStreamSupported(
-      { Codec: 'eac3', Profile: 'Dolby Digital Plus + Dolby Atmos' },
-      capabilities,
-    )).toBe(false);
-    expect(isAudioStreamSupported(
-      { Codec: 'eac3', Profile: 'Dolby Digital Plus + Dolby Atmos' },
-      { ...capabilities, platformAudioCodecs: [...capabilities.platformAudioCodecs, 'audio/eac3-joc'] },
+      atmos,
+      { ...capabilities, platformAudioCodecs: ['audio/mp4a-latm', 'audio/eac3-joc'] },
     )).toBe(true);
+    // Plain E-AC3 still plays on the same decoder.
+    expect(isAudioStreamSupported({ Codec: 'eac3' }, capabilities)).toBe(true);
   });
 
   it('uses FFmpeg only for non-AAC audio absent from MediaCodec', () => {
@@ -76,6 +80,66 @@ describe('device codec decisions', () => {
       displayWidth: 1280,
       displayHeight: 720,
     })).toBe(8_000_000);
+  });
+
+  it('transcodes sources larger than the rotation-normalized display', () => {
+    expect(exceedsDeviceDisplay({ Width: 3840, Height: 1636 }, capabilities)).toBe(true);
+    expect(exceedsDeviceDisplay({ Width: 1920, Height: 1080 }, capabilities)).toBe(false);
+    expect(exceedsDeviceDisplay(
+      { Width: 3840, Height: 1636 },
+      { ...capabilities, displayWidth: 1080, displayHeight: 2424 },
+    )).toBe(true);
+    expect(exceedsDeviceDisplay({ Width: 0, Height: 0 }, capabilities)).toBe(false);
+  });
+
+  it('bounds oversized sources to the display in the source orientation', () => {
+    expect(getDisplayBoundsForSource({ Width: 3840, Height: 1636 }, capabilities))
+      .toEqual({ maxWidth: 2408, maxHeight: 1720 });
+    expect(getDisplayBoundsForSource(
+      { Width: 3840, Height: 1636 },
+      { ...capabilities, displayWidth: 1080, displayHeight: 2424 },
+    )).toEqual({ maxWidth: 2424, maxHeight: 1080 });
+    expect(getDisplayBoundsForSource({ Width: 2160, Height: 3840 }, capabilities))
+      .toEqual({ maxWidth: 1720, maxHeight: 2408 });
+    expect(getDisplayBoundsForSource({ Width: 1920, Height: 1080 }, capabilities)).toBeNull();
+  });
+});
+
+describe('withDeviceAudioCodecs', () => {
+  const profile = {
+    DirectPlayProfiles: [
+      { Container: 'webm', Type: 'Video', AudioCodec: 'vorbis,opus' },
+      { Container: 'mkv', Type: 'Video', AudioCodec: 'aac,mp3,ac3,eac3,dts,truehd' },
+      { Container: 'flac', Type: 'Audio' },
+    ],
+    TranscodingProfiles: [
+      { Container: 'ts', Type: 'Video', AudioCodec: 'aac,ac3' },
+      { Container: 'mp3', Type: 'Audio', AudioCodec: 'mp3' },
+    ],
+  };
+
+  it('advertises only the audio codecs this device can decode', () => {
+    const result = withDeviceAudioCodecs(profile, capabilities);
+    expect(result.DirectPlayProfiles).toEqual([
+      { Container: 'mkv', Type: 'Video', AudioCodec: 'aac,eac3,dts,truehd' },
+      { Container: 'flac', Type: 'Audio' },
+    ]);
+    expect(result.TranscodingProfiles).toEqual([
+      { Container: 'ts', Type: 'Video', AudioCodec: 'aac' },
+      { Container: 'mp3', Type: 'Audio', AudioCodec: 'mp3' },
+    ]);
+  });
+
+  it('keeps AAC as the transcode target when no listed codec is supported', () => {
+    const result = withDeviceAudioCodecs(
+      { TranscodingProfiles: [{ Container: 'ts', Type: 'Video', AudioCodec: 'ac3' }] },
+      capabilities,
+    );
+    expect(result.TranscodingProfiles).toEqual([{ Container: 'ts', Type: 'Video', AudioCodec: 'aac' }]);
+  });
+
+  it('leaves the profile unchanged when device capabilities are unavailable', () => {
+    expect(withDeviceAudioCodecs(profile, { ...capabilities, androidApi: 0 })).toBe(profile);
   });
 });
 

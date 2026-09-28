@@ -33,6 +33,13 @@ describe('withForcedVideoParams', () => {
     expect(params.has('maxWidth')).toBe(false);
   });
 
+  it('uses an explicit width for non-16:9 display bounds', () => {
+    const out = withForcedVideoParams('https://jf.example/Videos/abc/stream.ts', 20_000_000, 1080, 2424);
+    const params = new URL(out).searchParams;
+    expect(params.get('maxHeight')).toBe('1080');
+    expect(params.get('maxWidth')).toBe('2424');
+  });
+
   it('returns the original string when the URL cannot be parsed', () => {
     expect(withForcedVideoParams('not a url', 8_000_000, 720)).toBe('not a url');
   });

@@ -288,6 +288,8 @@ import { useStreamInfo } from '@/composables/player/useStreamInfo';
 import { useWebPlayer } from '@/composables/player/useWebPlayer';
 import { useNativePlayer } from '@/composables/player/useNativePlayer';
 import { useOfflinePlayer } from '@/composables/player/useOfflinePlayer';
+import { pickPreferredAudioStream } from '@/utils/audioTrackSelection';
+import { getDeviceCapabilities } from '@/utils/codecDetection';
 import { formatTime } from '@/utils/helpers';
 import { buildMediaTitle } from '@/utils/mediaTitle';
 import { lockLandscape, unlockOrientation } from '@/utils/orientation';
@@ -513,14 +515,13 @@ onMounted(async () => {
     // Jellyfin returns a video stream with the subtitle burned in from the start.
     activeBurnInSubtitleIndex.value = resolveInitialBurnInSubtitleIndex(allStreams);
 
+    // Within the preferred language, prefer the track this device decodes best.
     const audioStreams = allStreams.filter(s => s.Type === 'Audio');
-    const savedLang = localStorage.getItem(`msplayer-audio-${itemId}`);
-    const globalLang = preferencesStore.preferredAudioLanguage;
-    const preferred =
-        (savedLang ? audioStreams.find((s: any) => s.Language === savedLang) : null) ||
-        (globalLang ? audioStreams.find((s: any) => s.Language === globalLang) : null) ||
-        audioStreams.find((s: any) => s.IsDefault) ||
-        audioStreams[0];
+    const preferred = pickPreferredAudioStream(
+        audioStreams,
+        [localStorage.getItem(`msplayer-audio-${itemId}`), preferencesStore.preferredAudioLanguage],
+        await getDeviceCapabilities(),
+    );
     const preferredAudioIndex: number | undefined = preferred?.Index;
 
     if (isNative) {
@@ -547,6 +548,8 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
     unlockOrientation();
+    // Resume position / next-up changed: home refetches behind its snapshot.
+    store.markHomeCacheStale();
 
     if (isNative) {
         // Save progress BEFORE removing listeners or stopping

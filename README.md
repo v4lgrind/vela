@@ -47,8 +47,10 @@ rejects them by default. Browser login, browsing, audio playback, HLS video
 and subtitles were exercised against Jellyfin 12.1. Native Android playback
 probes the device's MediaCodec profiles, levels, dimensions, display size, and
 audio decoders before choosing direct play or a bounded server transcode.
-Native direct playback, subtitles, relative scrubbing and direct timeline taps
-were verified on a physical Android 14 tablet.
+Sources larger than the rotation-normalized display are transcoded even when
+the decoder advertises support, avoiding wasteful and unstable 4K playback on
+smaller screens. Native playback, subtitles, relative scrubbing and direct
+timeline taps were verified on physical Android 14 and Android 17 devices.
 
 ## Prerequisites
 

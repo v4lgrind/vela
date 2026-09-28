@@ -36,7 +36,7 @@
     "@capacitor/splash-screen": "^8.0.0",
     "@capacitor/status-bar": "^8.0.0",
     "@fontsource-variable/outfit": "^5.2.8",
-    "@jellyfin/sdk": "^0.11.0",
+    "@jellyfin/sdk": "^1.0.0",
     "@vueuse/core": "^14.2.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

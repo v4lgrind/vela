@@ -156,10 +156,13 @@ export const nativeAndroidDeviceProfile = {
                 Protocol: "http",
                 MaxAudioChannels: "8",
             },
+            // AAC first: it is the encode target. E-AC3/AC3 let Jellyfin stream-copy
+            // the source audio (keeping E-AC3 Atmos) while only the video is
+            // transcoded; withDeviceAudioCodecs drops them on devices without them.
             {
                 Container: "ts",
                 Type: "Video",
-                AudioCodec: "aac",
+                AudioCodec: "aac,eac3,ac3",
                 VideoCodec: "h264,hevc,vp9,av1",
                 Context: "Streaming",
                 Protocol: "hls",
@@ -170,7 +173,7 @@ export const nativeAndroidDeviceProfile = {
             {
                 Container: "mp4",
                 Type: "Video",
-                AudioCodec: "aac",
+                AudioCodec: "aac,eac3,ac3",
                 VideoCodec: "h264,hevc,vp9,av1",
                 Context: "Streaming",
                 Protocol: "hls",
@@ -179,30 +182,9 @@ export const nativeAndroidDeviceProfile = {
             },
         ],
         ContainerProfiles: [],
+        // No IsSecondaryAudio restriction: unlike a browser <video>, ExoPlayer
+        // selects a non-default audio track inside a DirectPlay file itself.
         CodecProfiles: [
-            {
-                Type: "VideoAudio",
-                Codec: "aac",
-                Conditions: [
-                    {
-                        Condition: "Equals",
-                        Property: "IsSecondaryAudio",
-                        Value: "false",
-                        IsRequired: false,
-                    },
-                ],
-            },
-            {
-                Type: "VideoAudio",
-                Conditions: [
-                    {
-                        Condition: "Equals",
-                        Property: "IsSecondaryAudio",
-                        Value: "false",
-                        IsRequired: false,
-                    },
-                ],
-            },
             {
                 Type: "Video",
                 Codec: "h264",

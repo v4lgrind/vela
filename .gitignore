@@ -36,6 +36,7 @@ android/app/build/
 android/.gradle/
 android/local.properties
 electron/dist/
+out/
 electron/node_modules/
 release/
 

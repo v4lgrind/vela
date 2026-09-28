@@ -83,6 +83,35 @@ export interface NativeVideoAudioSwitchJellyfinEvent {
     jellyfinIndex: number;
 }
 
+export interface NativeDeviceCapabilities {
+    hardwareVideoCodecs: string[];
+    softwareVideoCodecs: string[];
+    platformAudioCodecs: string[];
+    ffmpegAudioCodecs: string[];
+    ffmpegVideoCodecs: string[];
+    displayWidth: number;
+    displayHeight: number;
+    manufacturer: string;
+    model: string;
+    androidApi: number;
+}
+
+export interface VideoDecodeOptions {
+    mime: string;
+    profile?: string;
+    level?: number;
+    bitDepth?: number;
+    width?: number;
+    height?: number;
+    frameRate?: number;
+}
+
+export interface VideoDecodeResult {
+    supported: boolean;
+    decoderName: string;
+    reason: string;
+}
+
 export interface NativeVideoPlugin {
     start(options: NativeVideoStartOptions): Promise<void>;
     stop(): Promise<void>;
@@ -95,8 +124,8 @@ export interface NativeVideoPlugin {
     nativeLog(options: { message: string }): Promise<void>;
     updateStreamInfo(options: { streamInfo: string }): Promise<void>;
     updateQualityPresets(options: { presets: string; selectedBitrate: number }): Promise<void>;
-    getDeviceCodecs(): Promise<{ codecs: string[] }>;
-    canDecodeHevc(options: { profile: string; level: number; hardwareOnly?: boolean }): Promise<{ supported: boolean }>;
+    getDeviceCapabilities(): Promise<NativeDeviceCapabilities>;
+    canDecodeVideo(options: VideoDecodeOptions): Promise<VideoDecodeResult>;
     setSubtitleSize(options: { scale: number }): Promise<void>;
     getSafeAreaInsets(): Promise<{ top: number; bottom: number; left: number; right: number }>;
 

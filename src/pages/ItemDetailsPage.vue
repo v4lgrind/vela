@@ -498,7 +498,11 @@ import { useOfflineStore } from '@/store/offline-store';
 import { useAudioPlayerStore, type AudioTrack } from '@/store/audio-player-store';
 import { useDownloadStore } from '@/store/download-store';
 import { useMetadataCacheStore } from '@/store/metadata-cache-store';
-import { downloadService } from '@/services/downloadService';
+import {
+    buildOfflineArtworkTargets,
+    downloadService,
+    type OfflineArtworkType,
+} from '@/services/downloadService';
 import { offlineDatabase } from '@/services/offlineDatabase';
 import LazyImg from '@/components/LazyImg.vue';
 import { formatTicksDuration, formatTicksHuman, formatBytes } from '@/utils/helpers';
@@ -549,6 +553,41 @@ const watchingSeasonId = ref<string | null>(null);
 const watchingEpId = ref<string | null>(null);
 const togglingWatched = ref(false);
 const offlineProgressSeconds = ref<number | null>(null);
+const cachedArtworkUrls = ref<Record<string, string>>({});
+
+async function loadCachedArtwork(metadata: {
+    Id?: string;
+    Type?: string;
+    SeriesId?: string;
+    SeasonId?: string;
+    People?: Array<{ Id?: string; PrimaryImageTag?: string }>;
+}) {
+    const targets = new Map<string, { itemId: string; imageType: OfflineArtworkType }>();
+    for (const target of buildOfflineArtworkTargets(metadata)) {
+        targets.set(`${target.itemId}:${target.imageType}`, target);
+    }
+    for (const child of [...seasons.value, ...episodes.value]) {
+        if (child.Id) {
+            targets.set(`${child.Id}:Primary`, { itemId: child.Id, imageType: 'Primary' });
+        }
+    }
+
+    const entries = await Promise.all(
+        [...targets.values()].map(async ({ itemId: id, imageType }) => {
+            const url = await downloadService.getCachedImageUrl(id, imageType);
+            return url ? [`${id}:${imageType}`, url] as const : null;
+        }),
+    );
+    const urls: Record<string, string> = {};
+    for (const entry of entries) {
+        if (entry) urls[entry[0]] = entry[1];
+    }
+    cachedArtworkUrls.value = urls;
+}
+
+function cachedArtworkUrl(id: string | undefined, imageType: OfflineArtworkType): string {
+    return id ? cachedArtworkUrls.value[`${id}:${imageType}`] || '' : '';
+}
 
 async function load() {
     loading.value = true;
@@ -558,6 +597,7 @@ async function load() {
     audioTracks.value = [];
     similarItems.value = [];
     offlineProgressSeconds.value = null;
+    cachedArtworkUrls.value = {};
 
     try {
         const isOffline = !offlineStore.isFullyOnline;
@@ -579,7 +619,7 @@ async function load() {
                 (s: any) => s.seriesId === itemId.value
             );
             if (seriesGroup) {
-                item.value = metadataCache.get(itemId.value) ?? {
+                item.value = metadataCache.get(itemId.value, true) ?? {
                     Id: seriesGroup.seriesId,
                     Name: seriesGroup.seriesName,
                     Type: 'Series',
@@ -598,7 +638,7 @@ async function load() {
             for (const sg of offlineStore.tvShowsGrouped) {
                 const seasonGroup = sg.seasons.find((s: any) => s.seasonId === itemId.value);
                 if (seasonGroup) {
-                    item.value = metadataCache.get(itemId.value) ?? {
+                    item.value = metadataCache.get(itemId.value, true) ?? {
                         Id: seasonGroup.seasonId,
                         Name: `Season ${seasonGroup.seasonNumber}`,
                         Type: 'Season',
@@ -639,6 +679,7 @@ async function load() {
             error.value = 'Failed to load details';
         }
     } finally {
+        if (item.value) await loadCachedArtwork(item.value);
         loading.value = false;
     }
 }
@@ -701,6 +742,9 @@ const isLandscapePoster = computed(() => {
 
 const posterUrl = computed(() => {
     if (!item.value?.Id) return '';
+    const cached = cachedArtworkUrl(item.value.Id, 'Primary');
+    if (cached) return cached;
+    if (!offlineStore.isFullyOnline) return '';
     if (isLandscapePoster.value) {
         return store.getImageUrl(item.value.Id, 'Primary', 960, 540) || '';
     }
@@ -709,10 +753,14 @@ const posterUrl = computed(() => {
 
 const backdropUrl = computed(() => {
     if (!item.value?.Id) return '';
-    if (item.value.Type === 'Episode' && item.value.SeriesId) {
-        return store.getImageUrl(item.value.SeriesId, 'Backdrop', 1920, 1080) || '';
-    }
-    return store.getImageUrl(item.value.Id, 'Backdrop', 1920, 1080) || '';
+    const backdropId = item.value.Type === 'Episode' && item.value.SeriesId
+        ? item.value.SeriesId
+        : item.value.Id;
+    const cached = cachedArtworkUrl(backdropId, 'Backdrop');
+    if (cached) return cached;
+    return offlineStore.isFullyOnline
+        ? store.getImageUrl(backdropId, 'Backdrop', 1920, 1080) || ''
+        : '';
 });
 
 // Cinematic hero image: prefer a wide backdrop, fall back to the poster so
@@ -753,7 +801,11 @@ const studioNames = computed(() => (item.value?.Studios || []).map((s: any) => s
 
 function personImageUrl(p: Person) {
     if (!p?.Id || !p.PrimaryImageTag) return '';
-    return store.getImageUrl(p.Id, 'Primary', 220) || '';
+    const cached = cachedArtworkUrl(p.Id, 'Primary');
+    if (cached) return cached;
+    return offlineStore.isFullyOnline
+        ? store.getImageUrl(p.Id, 'Primary', 220) || ''
+        : '';
 }
 
 function navigateToPerson(id?: string) {
@@ -853,7 +905,12 @@ async function toggleWatchedEpisode(ep: any) {
 }
 
 function getImageUrl(id: string, type: string, w: number, h: number) {
-    return store.getImageUrl(id, type, w, h) || '';
+    const offlineType = type === 'Backdrop' ? 'Backdrop' : 'Primary';
+    const cached = cachedArtworkUrl(id, offlineType);
+    if (cached) return cached;
+    return offlineStore.isFullyOnline
+        ? store.getImageUrl(id, type, w, h) || ''
+        : '';
 }
 
 function itemToAudioTrack(raw: any): AudioTrack {

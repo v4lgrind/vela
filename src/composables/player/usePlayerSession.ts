@@ -5,8 +5,15 @@ import { usePreferencesStore } from '@/store/preferences-store';
 import { deviceProfile, nativeAndroidDeviceProfile, QUALITY_PRESETS } from '@/constants';
 import { debugLog } from '@/utils/debugLog';
 import { logger } from '@/utils/logger';
-import { buildPlaybackUrl } from '@/utils/playbackUrl';
+import {
+    getDeviceCapabilities,
+    getDisplayBoundsForSource,
+    getRecommendedNativeTranscodeBitrate,
+    withDeviceAudioCodecs,
+} from '@/utils/codecDetection';
+import { buildPlaybackUrl, withMaxVideoSize } from '@/utils/playbackUrl';
 import { createSubtitleTracks, parseSavedBurnInSubtitleIndex } from '@/utils/subtitleTracks';
+import type { NativeDeviceCapabilities } from '@/plugins/NativeVideoPlugin';
 import type { MediaSource, MediaStream, SubtitleTrack, AudioTrack } from '@/types/jellyfin';
 
 // Stable per-browser device ID so Jellyfin can match DELETE /Videos/ActiveEncodings
@@ -21,6 +28,17 @@ function getDeviceId(): string {
 }
 
 const ALL_QUALITY_PRESETS = QUALITY_PRESETS;
+
+// An automatic native transcode is only bitrate-capped by the device profile,
+// which does not stop Jellyfin from keeping the source resolution. Add explicit
+// size limits so an oversized source is scaled down to the display.
+function limitTranscodeToDisplay(ms: MediaSource, capabilities: NativeDeviceCapabilities) {
+    const video = ms.MediaStreams?.find((stream) => stream.Type === 'Video');
+    const bounds = video ? getDisplayBoundsForSource(video, capabilities) : null;
+    if (!bounds || !ms.TranscodingUrl) return;
+    ms.TranscodingUrl = withMaxVideoSize(ms.TranscodingUrl, bounds.maxWidth, bounds.maxHeight);
+    debugLog(`[Codec] Transcode limited to display ${bounds.maxWidth}x${bounds.maxHeight}`);
+}
 
 /**
  * Shared playback state and Jellyfin session API for the player page.
@@ -209,8 +227,16 @@ export function usePlayerSession(videoEl: Ref<HTMLVideoElement | null>, isNative
         stripHevc = false,
         subtitleStreamIndex?: number,
     ) {
-        const bitrateCap = selectedBitrate.value || 1_000_000_000;
         const shouldBurnSubtitle = subtitleStreamIndex !== undefined;
+        const needsNativeVideoTranscode = useNativeProfile
+            && selectedBitrate.value === 0
+            && (forceTranscode || shouldBurnSubtitle);
+        const nativeCapabilities = useNativeProfile ? await getDeviceCapabilities() : null;
+        const bitrateCap = selectedBitrate.value || (
+            needsNativeVideoTranscode && nativeCapabilities
+                ? getRecommendedNativeTranscodeBitrate(nativeCapabilities)
+                : 1_000_000_000
+        );
         // When a quality cap is active we must force a real video re-encode.
         // Stripping DirectPlayProfiles prevents DirectPlay, but Jellyfin can still
         // fall back to DirectStream (remux without re-encoding), which ignores the
@@ -218,7 +244,12 @@ export function usePlayerSession(videoEl: Ref<HTMLVideoElement | null>, isNative
         // re-encode the video, so the bitrate/resolution cap is actually honoured.
         const shouldForce = forceTranscode || selectedBitrate.value > 0 || shouldBurnSubtitle;
 
-        const baseDeviceProfile = useNativeProfile ? nativeAndroidDeviceProfile : deviceProfile;
+        const baseDeviceProfile = nativeCapabilities
+            ? {
+                ...nativeAndroidDeviceProfile,
+                DeviceProfile: withDeviceAudioCodecs(nativeAndroidDeviceProfile.DeviceProfile, nativeCapabilities),
+            }
+            : deviceProfile;
         const stripDirectPlay = shouldForce || transcodeAudio;
 
         // When stripHevc is set (video fallback after HEVC decode failure), remove
@@ -287,6 +318,9 @@ export function usePlayerSession(videoEl: Ref<HTMLVideoElement | null>, isNative
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const result = await response.json();
         const ms0 = result.MediaSources?.[0];
+        if (ms0 && needsNativeVideoTranscode && nativeCapabilities) {
+            limitTranscodeToDisplay(ms0, nativeCapabilities);
+        }
         if (ms0) {
             debugLog(`[NativePlayer] PlaybackInfo response: SupportsDirectPlay=${ms0.SupportsDirectPlay} SupportsDirectStream=${ms0.SupportsDirectStream} TranscodingUrl=${ms0.TranscodingUrl ? 'YES' : 'NO'}`);
             if (ms0.TranscodingUrl) {

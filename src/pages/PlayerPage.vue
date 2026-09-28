@@ -77,23 +77,24 @@
 
             <!-- Bottom controls overlay (auto-hide, web only) -->
             <div v-if="!isNative" class="absolute inset-x-0 bottom-0 flex flex-col justify-end player-gradient transition-opacity duration-300"
-                :class="controlsVisible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'"
+                :class="controlsVisible || seekPreview !== null ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'"
                 style="padding-top: 40px; padding-right: calc(16px + env(safe-area-inset-right, 0px)); padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); padding-left: calc(16px + env(safe-area-inset-left, 0px));"
                 @click.self="handleVideoTap">
 
-                <!-- Progress bar -->
-                <div class="w-full h-6 flex items-center cursor-pointer mb-2 group active:brightness-90" @click="seek">
-                    <div
-                        class="w-full h-1 bg-white/30 rounded-sm relative transition-[height] duration-200 group-hover:h-1.5">
-                        <div class="h-full bg-accent-purple rounded-sm transition-[width] duration-100 ease-linear"
-                            :style="{ width: progressPct + '%' }"></div>
-                    </div>
-                </div>
+                <!-- The range input owns the entire track, including its unplayed portion. -->
+                <input type="range" min="0" :max="duration > 0 ? duration : 1" step="any"
+                    :value="seekPreview ?? currentTime" :disabled="!Number.isFinite(duration) || duration <= 0"
+                    :style="{ '--seek-progress': `${seekProgress}%` }"
+                    class="player-seek w-full h-6 mb-2 cursor-pointer disabled:cursor-default"
+                    aria-label="Playback position"
+                    :aria-valuetext="`${formatTime(seekPreview ?? currentTime)} of ${formatTime(duration)}`"
+                    @pointerdown.prevent="beginSeek" @pointermove="moveSeek" @pointerup="finishSeek"
+                    @pointercancel="cancelSeek" @input="previewSeek" @change="commitSeek" />
 
                 <!-- Bottom controls: time (left) + actions (right) -->
                 <div class="flex justify-between items-center">
                     <div class="text-[0.9rem] text-white tabular-nums">
-                        {{ formatTime(currentTime) }} / {{ formatTime(duration) }}
+                        {{ formatTime(seekPreview ?? currentTime) }} / {{ formatTime(duration) }}
                     </div>
 
                     <div class="flex items-center gap-1">
@@ -287,6 +288,8 @@ import { useStreamInfo } from '@/composables/player/useStreamInfo';
 import { useWebPlayer } from '@/composables/player/useWebPlayer';
 import { useNativePlayer } from '@/composables/player/useNativePlayer';
 import { useOfflinePlayer } from '@/composables/player/useOfflinePlayer';
+import { pickPreferredAudioStream } from '@/utils/audioTrackSelection';
+import { getDeviceCapabilities } from '@/utils/codecDetection';
 import { formatTime } from '@/utils/helpers';
 import { buildMediaTitle } from '@/utils/mediaTitle';
 import { lockLandscape, unlockOrientation } from '@/utils/orientation';
@@ -310,7 +313,7 @@ const videoEl = ref<HTMLVideoElement | null>(null);
 const session = usePlayerSession(videoEl, isNative);
 const {
     itemId,
-    isLoading, isPlaying, currentTime, duration, progressPct, error, mediaTitle,
+    isLoading, isPlaying, currentTime, duration, error, mediaTitle,
     playMethod, audioList, selectedAudioIndex, subtitleList, selectedSubtitleIndex,
     activeBurnInSubtitleIndex,
     selectedBitrate, availablePresets, currentQualityLabel,
@@ -361,6 +364,71 @@ const selectedSubtitleIsBurnIn = computed(() =>
 const qualitySheetItems = computed(() =>
     availablePresets.value.map(p => ({ key: p.bitrate, label: p.label, selected: p.bitrate === selectedBitrate.value }))
 );
+// Keep the user's drag position visible until the range commits on release.
+const seekPreview = ref<number | null>(null);
+const seekProgress = computed(() => duration.value > 0 && Number.isFinite(duration.value)
+    ? Math.max(0, Math.min(100, ((seekPreview.value ?? currentTime.value) / duration.value) * 100))
+    : 0
+);
+
+// Pointer gestures scrub relative to the current position; a simple tap still
+// jumps to the tapped time. Native range input keyboard events remain intact.
+let seekPointer: { id: number; x: number; time: number; moved: boolean } | null = null;
+
+function beginSeek(event: PointerEvent) {
+    if (event.button !== 0 || seekPointer) return;
+    seekPointer = { id: event.pointerId, x: event.clientX, time: currentTime.value, moved: false };
+    seekPreview.value = currentTime.value;
+    (event.currentTarget as HTMLInputElement).setPointerCapture(event.pointerId);
+    showControls();
+}
+
+function relativeSeek(event: PointerEvent): number {
+    const slider = event.currentTarget as HTMLInputElement;
+    // Account for the 16px thumb, whose centre stops short of the track edges.
+    const width = Math.max(1, slider.getBoundingClientRect().width - 16);
+    return Math.max(0, Math.min(duration.value, seekPointer!.time + (event.clientX - seekPointer!.x) / width * duration.value));
+}
+
+function moveSeek(event: PointerEvent) {
+    if (seekPointer?.id !== event.pointerId) return;
+    if (Math.abs(event.clientX - seekPointer.x) >= 5) seekPointer.moved = true;
+    if (seekPointer.moved) seekPreview.value = relativeSeek(event);
+}
+
+function finishSeek(event: PointerEvent) {
+    if (seekPointer?.id !== event.pointerId) return;
+    const slider = event.currentTarget as HTMLInputElement;
+    const rect = slider.getBoundingClientRect();
+    const width = Math.max(1, rect.width - 16);
+    const position = seekPointer.moved
+        ? relativeSeek(event)
+        : Math.max(0, Math.min(duration.value, (event.clientX - rect.left - 8) / width * duration.value));
+    seekPointer = null;
+    seek(position);
+    seekPreview.value = null;
+    showControls();
+}
+
+function previewSeek(event: Event) {
+    seekPreview.value = Number((event.target as HTMLInputElement).value);
+    showControls();
+}
+
+function commitSeek(event: Event) {
+    if (seekPointer) return;
+    seek(Number((event.target as HTMLInputElement).value));
+    seekPreview.value = null;
+    showControls();
+}
+
+function cancelSeek(event: PointerEvent) {
+    if (seekPointer?.id !== event.pointerId) return;
+    seekPointer = null;
+    seekPreview.value = null;
+    showControls();
+}
+
 
 function openInfoModal() {
     streamInfo.openInfoModal();
@@ -447,14 +515,13 @@ onMounted(async () => {
     // Jellyfin returns a video stream with the subtitle burned in from the start.
     activeBurnInSubtitleIndex.value = resolveInitialBurnInSubtitleIndex(allStreams);
 
+    // Within the preferred language, prefer the track this device decodes best.
     const audioStreams = allStreams.filter(s => s.Type === 'Audio');
-    const savedLang = localStorage.getItem(`msplayer-audio-${itemId}`);
-    const globalLang = preferencesStore.preferredAudioLanguage;
-    const preferred =
-        (savedLang ? audioStreams.find((s: any) => s.Language === savedLang) : null) ||
-        (globalLang ? audioStreams.find((s: any) => s.Language === globalLang) : null) ||
-        audioStreams.find((s: any) => s.IsDefault) ||
-        audioStreams[0];
+    const preferred = pickPreferredAudioStream(
+        audioStreams,
+        [localStorage.getItem(`msplayer-audio-${itemId}`), preferencesStore.preferredAudioLanguage],
+        await getDeviceCapabilities(),
+    );
     const preferredAudioIndex: number | undefined = preferred?.Index;
 
     if (isNative) {
@@ -481,6 +548,8 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
     unlockOrientation();
+    // Resume position / next-up changed: home refetches behind its snapshot.
+    store.markHomeCacheStale();
 
     if (isNative) {
         // Save progress BEFORE removing listeners or stopping
@@ -514,6 +583,50 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+.player-seek {
+    appearance: none;
+    -webkit-appearance: none;
+    display: block;
+    margin-left: 0;
+    margin-right: 0;
+    padding: 0;
+    background: transparent;
+    touch-action: none;
+}
+.player-seek::-webkit-slider-runnable-track {
+    height: 5px;
+    border-radius: 999px;
+    background: linear-gradient(to right, var(--color-accent-purple) var(--seek-progress), rgb(255 255 255 / 30%) var(--seek-progress));
+}
+.player-seek::-moz-range-track {
+    height: 5px;
+    border-radius: 999px;
+    background: linear-gradient(to right, var(--color-accent-purple) var(--seek-progress), rgb(255 255 255 / 30%) var(--seek-progress));
+}
+.player-seek::-webkit-slider-thumb {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    margin-top: -5.5px;
+    border: 0;
+    border-radius: 50%;
+    background: var(--color-accent-purple);
+    box-shadow: 0 0 0 2px rgb(0 0 0 / 35%);
+}
+.player-seek::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border: 0;
+    border-radius: 50%;
+    background: var(--color-accent-purple);
+    box-shadow: 0 0 0 2px rgb(0 0 0 / 35%);
+}
+.player-seek:focus-visible {
+    outline: 2px solid var(--color-accent-purple-light);
+    outline-offset: 2px;
+    border-radius: 4px;
+}
 .player-gradient {
     background: linear-gradient(to top, rgba(0, 0, 0, 0.7) 0%, transparent 40%);
 }

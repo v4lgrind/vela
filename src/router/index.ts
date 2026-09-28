@@ -77,6 +77,11 @@ const routes = [
 export const router = createRouter({
   history: createWebHashHistory(),
   routes,
+  // New destinations start at the top; browser history still restores the
+  // previous position when returning to a list or detail page.
+  scrollBehavior(_to, _from, savedPosition) {
+    return savedPosition ?? { top: 0 };
+  },
 });
 
 router.beforeEach(async (to, _from, next) => {

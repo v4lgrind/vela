@@ -4,10 +4,21 @@ import { Capacitor } from '@capacitor/core';
 import { getClientPlatform } from '@/composables/usePlatform';
 import { QUALITY_PRESETS } from '@/constants';
 import { downloadService } from '@/services/downloadService';
-import { CODEC_MIME_MAP, isDolbyVision } from '@/utils/codecDetection';
+import {
+  canHardwareDecodeVideo,
+  canSoftwareDecodeVideo,
+  exceedsDeviceDisplay,
+  getDeviceCapabilities,
+  getDisplayBoundsForSource,
+  getRecommendedNativeTranscodeBitrate,
+  isAudioStreamSupported,
+  withDeviceAudioCodecs,
+} from '@/utils/codecDetection';
 import { needsDesktopTranscode } from '@/utils/desktopCodec';
 import { languageMatches } from '@/utils/language';
+import { jellyfinAuthorization } from '@/utils/jellyfinAuthorization';
 import { logger } from '@/utils/logger';
+import type { MediaStream } from '@/types/jellyfin';
 
 import { useJellyfinStore } from './jellyfin-store';
 import { useMetadataCacheStore } from './metadata-cache-store';
@@ -26,9 +37,14 @@ const isDesktopPlatform = ['linux', 'macos', 'windows'].includes(clientPlatform)
  * ignore the cap, producing a file even larger than the original. Setting
  * `maxWidth`/`maxHeight`/`videoBitRate` directly on the stream URL is honoured
  * unconditionally. Existing values are replaced case-insensitively so ASP.NET never
- * sees duplicate keys.
+ * sees duplicate keys. `width` defaults to a 16:9 box around `height`.
  */
-export function withForcedVideoParams(rawUrl: string, videoBitrate: number, height: number): string {
+export function withForcedVideoParams(
+  rawUrl: string,
+  videoBitrate: number,
+  height: number,
+  width = Math.round((height * 16) / 9),
+): string {
   try {
     const u = new URL(rawUrl);
     const setParam = (key: string, value: string) => {
@@ -40,12 +56,38 @@ export function withForcedVideoParams(rawUrl: string, videoBitrate: number, heig
     setParam('videoBitRate', String(videoBitrate));
     if (height > 0) {
       setParam('maxHeight', String(height));
-      setParam('maxWidth', String(Math.round((height * 16) / 9)));
+      setParam('maxWidth', String(width));
     }
     return u.toString();
   } catch {
     return rawUrl;
   }
+}
+
+/**
+ * Bound an auto-detected transcode of a source larger than the display to the
+ * display size and the device's recommended bitrate (never above the source).
+ */
+async function withDisplaySizedDownload(
+  url: string,
+  streams: MediaStream[],
+  sourceBitrate: number,
+): Promise<{ url: string; videoBitrate: number } | undefined> {
+  const video = streams.find((stream) => stream.Type === 'Video');
+  if (!video) return undefined;
+  const capabilities = await getDeviceCapabilities();
+  const bounds = getDisplayBoundsForSource(video, capabilities);
+  if (!bounds) return undefined;
+
+  const recommendedBitrate = getRecommendedNativeTranscodeBitrate(capabilities);
+  const videoBitrate = sourceBitrate > 0
+    ? Math.min(recommendedBitrate, sourceBitrate)
+    : recommendedBitrate;
+  logger.log(`[DownloadStore] Bounding transcoded download to ${bounds.maxWidth}x${bounds.maxHeight} at ${videoBitrate} bps`);
+  return {
+    url: withForcedVideoParams(url, videoBitrate, bounds.maxHeight, bounds.maxWidth),
+    videoBitrate,
+  };
 }
 
 /**
@@ -97,6 +139,16 @@ export interface TranscodeOptions {
   maxBitrate?: number;
   /** User explicitly chose to download the original file — never transcode. */
   forceOriginal?: boolean;
+}
+
+interface EpisodeParentMetadata {
+  SeriesId?: string;
+  SeasonId?: string;
+}
+
+interface CodecMetadata {
+  MediaStreams?: MediaStream[];
+  MediaSources?: Array<{ MediaStreams?: MediaStream[] }>;
 }
 
 interface DownloadStoreState {
@@ -221,11 +273,21 @@ export const useDownloadStore = defineStore('downloads', {
     /** Actually run a single download. Called internally when a slot is free. */
     async _executeDownload(itemId: string) {
       const task = this.tasks.get(itemId);
-      const metadata = this._metadataQueue.get(itemId);
+      let metadata = this._metadataQueue.get(itemId);
       if (!task || !metadata) return;
 
       const jellyfinStore = useJellyfinStore();
       const transcodeOptions = this._transcodeOptionsQueue.get(itemId);
+
+      // List/bulk responses can omit People and other detail fields. Persist the
+      // complete item so summary, cast, streams, and artwork remain available offline.
+      try {
+        const detailedMetadata = await jellyfinStore.fetchItemDetails(itemId);
+        metadata = { ...metadata, ...detailedMetadata };
+        this._metadataQueue.set(itemId, metadata);
+      } catch (error) {
+        logger.warn('[DownloadStore] Could not enrich offline metadata:', itemId, error);
+      }
 
       task.status = 'downloading';
 
@@ -290,9 +352,9 @@ export const useDownloadStore = defineStore('downloads', {
         const offlineStore = useOfflineStore();
         await offlineStore.loadDownloads();
 
-        // Cache series and season metadata so their detail pages work offline
+        // Parent metadata and artwork are part of a completed episode download.
         if (metadata.Type === 'Episode') {
-          this._cacheParentMetadata(metadata, jellyfinStore);
+          await this._cacheParentMetadata(metadata, jellyfinStore);
         }
 
         logger.log('[DownloadStore] Completed:', metadata.Name);
@@ -310,59 +372,67 @@ export const useDownloadStore = defineStore('downloads', {
       }
     },
 
-    /** Fetch and cache Series + Season metadata in the background (fire-and-forget). */
-    async _cacheParentMetadata(episodeMetadata: any, jellyfinStore: ReturnType<typeof useJellyfinStore>) {
+    /** Fetch and cache Series + Season metadata and artwork for an episode. */
+    async _cacheParentMetadata(
+      episodeMetadata: EpisodeParentMetadata,
+      jellyfinStore: ReturnType<typeof useJellyfinStore>,
+    ) {
       const metaCache = useMetadataCacheStore();
-      const toFetch: string[] = [];
-      if (episodeMetadata.SeriesId && !metaCache.has(episodeMetadata.SeriesId)) {
-        toFetch.push(episodeMetadata.SeriesId);
+      const parentIds = [episodeMetadata.SeriesId, episodeMetadata.SeasonId]
+        .filter((id): id is string => typeof id === 'string' && id.length > 0);
+
+      for (const id of parentIds) {
+        let parent = metaCache.get(id, true);
+        if (!parent) {
+          try {
+            const fetched = await jellyfinStore.fetchItemDetails(id);
+            if (!fetched) continue;
+            metaCache.set(fetched);
+            parent = metaCache.get(id, true);
+          } catch (error) {
+            logger.warn('[DownloadStore] Could not cache parent metadata:', id, error);
+            continue;
+          }
+        }
+        if (parent && jellyfinStore.serverUrl && jellyfinStore.accessToken) {
+          await downloadService.cacheArtworkForMetadata(
+            jellyfinStore.serverUrl,
+            jellyfinStore.accessToken,
+            parent,
+          );
+        }
       }
-      if (episodeMetadata.SeasonId && !metaCache.has(episodeMetadata.SeasonId)) {
-        toFetch.push(episodeMetadata.SeasonId);
-      }
-      if (toFetch.length === 0) return;
-      await Promise.allSettled(
-        toFetch.map(id =>
-          jellyfinStore.fetchItemDetails(id).then(item => { if (item) metaCache.set(item); }).catch(() => {})
-        )
-      );
     },
 
     /**
      * Check if any video or audio codec in the media is unsupported by the device.
      * Returns true if transcoding would be beneficial.
      */
-    async checkNeedsTranscode(metadata: any): Promise<boolean> {
+    async checkNeedsTranscode(metadata: CodecMetadata): Promise<boolean> {
       if (isDesktopPlatform) return needsDesktopTranscode(metadata);
       if (!Capacitor.isNativePlatform()) return false;
       try {
-        const { getDeviceCodecs } = await import('@/utils/codecDetection');
-        const { NativeVideo } = await import('@/plugins/NativeVideoPlugin');
-        const deviceCodecs = await getDeviceCodecs();
-        if (deviceCodecs.length === 0) return false;
+        const capabilities = await getDeviceCapabilities();
+        if (capabilities.androidApi <= 0) return false;
 
-        const streams: any[] = metadata.MediaStreams || metadata.MediaSources?.[0]?.MediaStreams || [];
-        const MAX_SW_HEIGHT = 1080;
+        const streams: MediaStream[] =
+          metadata.MediaStreams || metadata.MediaSources?.[0]?.MediaStreams || [];
+        const maxSoftwareHeight = 1080;
 
         for (const stream of streams) {
-          const codec = (stream.Codec || '').toLowerCase();
-          const profile = (stream.Profile || '').toLowerCase();
-          const mime = CODEC_MIME_MAP[codec];
-          if (!mime) continue;
-
-          const effectiveMime = isDolbyVision(codec, profile) ? 'video/dolby-vision' : mime;
-
-          if (!deviceCodecs.includes(effectiveMime)) {
-            if (stream.Type === 'Video' && (stream.Height || 0) <= MAX_SW_HEIGHT) continue;
+          if (stream.Type === 'Audio' && !isAudioStreamSupported(stream, capabilities)) {
             return true;
           }
+          if (stream.Type !== 'Video') continue;
 
-          if ((codec === 'hevc' || codec === 'h265') && stream.Type === 'Video') {
-            const checkProfile = (stream.Profile as string) || 'Main 10';
-            const checkLevel = (stream.Level as number) || 153;
-            const { supported } = await NativeVideo.canDecodeHevc({ profile: checkProfile, level: checkLevel, hardwareOnly: true });
-            if (!supported && (stream.Height || 0) > MAX_SW_HEIGHT) return true;
-          }
+          if (exceedsDeviceDisplay(stream, capabilities)) return true;
+
+          const hardwareResult = await canHardwareDecodeVideo(stream);
+          if (hardwareResult.supported) continue;
+
+          const canUseSoftware = (stream.Height || 0) <= maxSoftwareHeight
+            && canSoftwareDecodeVideo(stream, capabilities);
+          if (!canUseSoftware) return true;
         }
         return false;
       } catch {
@@ -407,7 +477,7 @@ export const useDownloadStore = defineStore('downloads', {
                 Container: transcodeContainer,
                 Type: 'Video',
                 VideoCodec: 'h264',
-                AudioCodec: isDesktopPlatform ? 'aac' : 'aac,mp3,ac3',
+                AudioCodec: isDesktopPlatform ? 'aac' : 'aac,mp3,ac3,eac3',
                 Context: 'Streaming',
                 Protocol: 'http',
                 CopyTimestamps: true,
@@ -428,6 +498,11 @@ export const useDownloadStore = defineStore('downloads', {
           AllowVideoStreamCopy: false,
           AllowAudioStreamCopy: !isDesktopPlatform,
         };
+        // Only stream-copy audio this device can decode offline (no-op off Android).
+        requestBody.DeviceProfile = withDeviceAudioCodecs(
+          requestBody.DeviceProfile,
+          await getDeviceCapabilities(),
+        );
 
         // Resolution cap: MaxStreamingBitrate + AllowVideoStreamCopy:false (set
         // above) forces Jellyfin to re-encode down to the requested bitrate,
@@ -448,7 +523,7 @@ export const useDownloadStore = defineStore('downloads', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'X-Emby-Token': token,
+              Authorization: jellyfinAuthorization(token),
             },
             body: JSON.stringify(requestBody),
           }
@@ -460,10 +535,18 @@ export const useDownloadStore = defineStore('downloads', {
         }
         const result = await response.json();
         const ms = result.MediaSources?.[0];
-        logger.log(`[DownloadStore] PlaybackInfo response: TranscodingUrl=${ms?.TranscodingUrl} SupportsTranscoding=${ms?.SupportsTranscoding} Protocol=${ms?.TranscodingSubProtocol}`);
+        logger.log(`[DownloadStore] PlaybackInfo response: HasTranscodingUrl=${Boolean(ms?.TranscodingUrl)} SupportsTranscoding=${ms?.SupportsTranscoding} Protocol=${ms?.TranscodingSubProtocol}`);
 
         if (ms?.TranscodingUrl) {
-          let url = `${serverUrl}${ms.TranscodingUrl}`;
+          const streamUrl = new URL(`${serverUrl}${ms.TranscodingUrl}`);
+          // The transport authenticates with a header; server-provided stream URLs
+          // may still include a query token, which Jellyfin 12 no longer accepts.
+          for (const key of [...streamUrl.searchParams.keys()]) {
+            if (key.toLowerCase() === 'api_key' || key.toLowerCase() === 'apikey') {
+              streamUrl.searchParams.delete(key);
+            }
+          }
+          let url = streamUrl.toString();
           // Bitrate we expect the video track to actually be encoded at. Defaults to
           // whatever Jellyfin reports, but a cap forces the real value on the URL below.
           let effectiveVideoBitrate = ms.Bitrate || 0;
@@ -472,13 +555,23 @@ export const useDownloadStore = defineStore('downloads', {
             const targetHeight = QUALITY_PRESETS.find((p) => p.bitrate === bitrateCap)?.minHeight ?? 0;
             url = withForcedVideoParams(url, bitrateCap, targetHeight);
             effectiveVideoBitrate = bitrateCap;
+          } else {
+            const streams: MediaStream[] = ms.MediaStreams
+              || metadata.MediaStreams
+              || metadata.MediaSources?.[0]?.MediaStreams
+              || [];
+            const bounded = await withDisplaySizedDownload(url, streams, ms.Bitrate || 0);
+            if (bounded) {
+              url = bounded.url;
+              effectiveVideoBitrate = bounded.videoBitrate;
+            }
           }
 
           const runtimeSec = (ms.RunTimeTicks || metadata.RunTimeTicks || 0) / 10_000_000;
           const estimatedSize = (effectiveVideoBitrate && runtimeSec)
             ? Math.ceil((effectiveVideoBitrate / 8) * runtimeSec)
             : 0;
-          logger.log(`[DownloadStore] Transcoded URL (est. ${Math.round(estimatedSize / 1024 / 1024)}MB): ${url}`);
+          logger.log(`[DownloadStore] Transcoded download estimated at ${Math.round(estimatedSize / 1024 / 1024)}MB`);
           return { container: transcodeContainer, url, estimatedSize };
         }
 

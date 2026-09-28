@@ -2,8 +2,10 @@ import { defineStore } from 'pinia';
 import { offlineDetection } from '../services/offlineDetection';
 import { usePreferencesStore } from './preferences-store';
 import { buildDownloadedMedia, offlineDatabase, type DownloadedMedia } from '../services/offlineDatabase';
+import { downloadService } from '../services/downloadService';
 import { syncService } from '../services/syncService';
 import { useJellyfinStore } from './jellyfin-store';
+import { useMetadataCacheStore } from './metadata-cache-store';
 import { Capacitor } from '@capacitor/core';
 import { DownloadPlugin } from '@/plugins/DownloadPlugin';
 import { logger } from '@/utils/logger';
@@ -13,6 +15,8 @@ interface State {
   syncInProgress: boolean;
   lastSyncTime: number;
   initialized: boolean;
+  offlineAssetsRefreshInProgress: boolean;
+  offlineAssetsRefreshed: boolean;
 }
 
 export const useOfflineStore = defineStore('offline', {
@@ -21,6 +25,8 @@ export const useOfflineStore = defineStore('offline', {
     syncInProgress: false,
     lastSyncTime: 0,
     initialized: false,
+    offlineAssetsRefreshInProgress: false,
+    offlineAssetsRefreshed: false,
   }),
 
   persist: {
@@ -207,6 +213,75 @@ export const useOfflineStore = defineStore('offline', {
         logger.log(`[OfflineStore] Loaded ${this.downloads.length} downloads`);
       } catch (error) {
         logger.error('[OfflineStore] Failed to load downloads:', error);
+      }
+    },
+
+    /**
+     * Backfill full metadata and every local image required by existing
+     * downloads. New downloads already perform the same work before completion.
+     */
+    async refreshOfflineAssets() {
+      if (
+        this.offlineAssetsRefreshInProgress
+        || this.offlineAssetsRefreshed
+        || !this.isFullyOnline
+      ) return;
+
+      const jellyfinStore = useJellyfinStore();
+      if (!jellyfinStore.serverUrl || !jellyfinStore.accessToken) return;
+
+      this.offlineAssetsRefreshInProgress = true;
+      let complete = true;
+      const metadataCache = useMetadataCacheStore();
+
+      try {
+        for (const download of [...this.downloads]) {
+          let metadata = download.jellyfinItem;
+          try {
+            const detailed = await jellyfinStore.fetchItemDetails(download.itemId);
+            metadata = { ...metadata, ...detailed };
+            await offlineDatabase.addDownload({ ...download, jellyfinItem: metadata });
+          } catch (error) {
+            complete = false;
+            logger.warn('[OfflineStore] Could not refresh downloaded metadata:', download.itemId, error);
+          }
+
+          await downloadService.cacheArtworkForMetadata(
+            jellyfinStore.serverUrl,
+            jellyfinStore.accessToken,
+            metadata,
+          );
+
+          if (download.type !== 'Episode') continue;
+          const parentIds = [download.seriesId, download.seasonId]
+            .filter((id): id is string => typeof id === 'string' && id.length > 0);
+          for (const parentId of parentIds) {
+            let parent = metadataCache.get(parentId, true);
+            if (!parent) {
+              try {
+                const fetched = await jellyfinStore.fetchItemDetails(parentId);
+                if (!fetched) continue;
+                metadataCache.set(fetched);
+                parent = metadataCache.get(parentId, true);
+              } catch (error) {
+                complete = false;
+                logger.warn('[OfflineStore] Could not refresh parent metadata:', parentId, error);
+                continue;
+              }
+            }
+            if (parent) {
+              await downloadService.cacheArtworkForMetadata(
+                jellyfinStore.serverUrl,
+                jellyfinStore.accessToken,
+                parent,
+              );
+            }
+          }
+        }
+        await this.loadDownloads();
+        this.offlineAssetsRefreshed = complete;
+      } finally {
+        this.offlineAssetsRefreshInProgress = false;
       }
     },
 

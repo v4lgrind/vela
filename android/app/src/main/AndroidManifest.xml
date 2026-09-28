@@ -42,8 +42,7 @@
         <activity
             android:name=".NativePlayerActivity"
             android:configChanges="orientation|screenSize|screenLayout|keyboard|keyboardHidden|navigation"
-            android:screenOrientation="sensorLandscape"
-            android:theme="@style/AppTheme.NoActionBar"
+            android:theme="@style/AppTheme.NativePlayer"
             android:launchMode="singleTop"
             android:exported="false" />
 

@@ -3,6 +3,7 @@ import Hls from 'hls.js';
 import { usePreferencesStore } from '@/store/preferences-store';
 import { NativeVideo } from '@/plugins/NativeVideoPlugin';
 import { logger } from '@/utils/logger';
+import { withPlaybackApiKey, withoutPlaybackApiKey } from '@/utils/playbackUrl';
 import type { PlayerSession } from './usePlayerSession';
 import type { PlayerControls } from './usePlayerControls';
 
@@ -44,7 +45,7 @@ export function useWebPlayer(
     isNative: boolean,
 ) {
     const {
-        itemId, serverUrl, accessToken,
+        itemId, serverUrl, accessToken, embyAuthHeader,
         isLoading, isPlaying, currentTime, duration, progressPct, error,
         playSessionId, mediaSource, hlsUrl, playMethod,
         audioList, selectedAudioIndex, subtitleList, selectedSubtitleIndex,
@@ -106,13 +107,12 @@ export function useWebPlayer(
         }
     }
 
-    function seek(e: MouseEvent) {
-        const bar = e.currentTarget as HTMLElement;
-        const rect = bar.getBoundingClientRect();
-        const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    function seek(time: number) {
         const video = videoEl.value;
-        if (!video || !duration.value) return;
-        video.currentTime = Math.max(0, ratio * duration.value);
+        if (!video || !Number.isFinite(duration.value) || duration.value <= 0) return;
+        video.currentTime = Math.max(0, Math.min(duration.value, time));
+        currentTime.value = video.currentTime;
+        progressPct.value = (currentTime.value / duration.value) * 100;
         if (!isOfflinePlayback.value) reportPlaybackProgress();
     }
 
@@ -210,7 +210,7 @@ export function useWebPlayer(
                 // Local media:// sidecars need no token — and the custom header
                 // would trigger a CORS preflight the protocol handler rejects.
                 const init = sub.deliveryUrl.startsWith('http')
-                    ? { headers: { 'X-Emby-Token': accessToken } }
+                    ? { headers: { Authorization: embyAuthHeader } }
                     : undefined;
                 const resp = await fetch(sub.deliveryUrl, init);
                 blobUrl = URL.createObjectURL(await resp.blob());
@@ -254,7 +254,7 @@ export function useWebPlayer(
                 maxMaxBufferLength: 60,
                 fLoader: makeJellyfinFragmentLoader() as any,
                 xhrSetup: (xhr) => {
-                    xhr.setRequestHeader('X-Emby-Token', accessToken);
+                    xhr.setRequestHeader('Authorization', embyAuthHeader);
                 },
             });
             hls.loadSource(url);
@@ -283,8 +283,8 @@ export function useWebPlayer(
                 }
             });
         } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-            // Native HLS — iOS Safari
-            video.src = url;
+            // Native HLS cannot attach headers to <video> manifest/segment requests.
+            video.src = withPlaybackApiKey(url, accessToken);
             video.play().catch(() => { });
             startProgressReporting();
         } else {
@@ -580,7 +580,7 @@ export function useWebPlayer(
                 url = /AudioStreamIndex=\d+/.test(url)
                     ? url.replace(/AudioStreamIndex=\d+/, `AudioStreamIndex=${index}`)
                     : url + `&AudioStreamIndex=${index}`;
-                hlsUrl.value = `${serverUrl}${url}`;
+                hlsUrl.value = withoutPlaybackApiKey(`${serverUrl}${url}`);
                 playMethod.value = activeBurnInSubtitleIndex.value !== null
                     ? 'Transcode'
                     : ms.SupportsDirectStream ? 'DirectStream' : 'Transcode';
@@ -589,7 +589,7 @@ export function useWebPlayer(
                 const subtitleQuery = activeBurnInSubtitleIndex.value !== null
                     ? `&SubtitleStreamIndex=${activeBurnInSubtitleIndex.value}&SubtitleMethod=Encode`
                     : '';
-                hlsUrl.value = `${serverUrl}/Videos/${itemId}/master.m3u8?mediaSourceId=${ms.Id || itemId}&AudioStreamIndex=${index}${subtitleQuery}&PlaySessionId=${playSessionId.value}`;
+                hlsUrl.value = `${serverUrl}/Videos/${encodeURIComponent(itemId)}/master.m3u8?mediaSourceId=${encodeURIComponent(ms.Id || itemId)}&AudioStreamIndex=${index}${subtitleQuery}&PlaySessionId=${encodeURIComponent(playSessionId.value)}`;
                 playMethod.value = 'Transcode';
             }
 
@@ -652,7 +652,7 @@ export function useWebPlayer(
 
             const ms = mediaSource.value;
             if (ms.TranscodingUrl) {
-                hlsUrl.value = `${serverUrl}${ms.TranscodingUrl.replace('?&', '?')}`;
+                hlsUrl.value = withoutPlaybackApiKey(`${serverUrl}${ms.TranscodingUrl.replace('?&', '?')}`);
                 // If we requested AllowVideoStreamCopy:false (bitrate > 0), it's a real transcode.
                 // Otherwise fall back to what Jellyfin reports.
                 playMethod.value = bitrate > 0 || activeBurnInSubtitleIndex.value !== null

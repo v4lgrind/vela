@@ -5,6 +5,7 @@ import { useOfflineStore } from '../store/offline-store';
 import { downloadService } from './downloadService';
 import { offlineDatabase } from './offlineDatabase';
 import { logger } from '@/utils/logger';
+import { jellyfinAuthorization } from '@/utils/jellyfinAuthorization';
 
 class AudioPlayerService {
   private audio: HTMLAudioElement;
@@ -139,7 +140,7 @@ class AudioPlayerService {
 
     const params = new URLSearchParams({
       userId: this.jellyfinStore.userId || '',
-      api_key: accessToken,
+      ApiKey: accessToken,
       MaxStreamingBitrate: '140000000',
       Container: 'opus,webm|opus,mp3,aac,m4a|aac,m4b|aac,flac,webma,webm|webma,wav,ogg',
       TranscodingContainer: 'ts',
@@ -240,7 +241,7 @@ class AudioPlayerService {
   private get reportingHeaders() {
     return {
       'Content-Type': 'application/json',
-      'X-Emby-Token': this.jellyfinStore.accessToken || '',
+      Authorization: jellyfinAuthorization(this.jellyfinStore.accessToken || ''),
     };
   }
 

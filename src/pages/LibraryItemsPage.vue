@@ -238,7 +238,7 @@ const downloadStore = useDownloadStore();
 const prefs = usePreferencesStore();
 const route = useRoute();
 const router = useRouter();
-const libraryId = route.params.id as string;
+const libraryId = computed(() => route.params.id as string);
 const libraryName = computed(() => (route.params.name as string) || 'Library');
 
 const playingId = ref<string | null>(null);
@@ -251,6 +251,7 @@ const hasNextPage = ref(false);
 const loading = ref(true);
 const error = ref<string | null>(null);
 
+let pageRequest = 0;
 // Filtering and sorting
 const showFilters = ref(false);
 const sortBy = ref('SortName');
@@ -259,9 +260,67 @@ const filter = ref('');
 const selectedGenre = ref('');
 const nameStartsWith = ref('');
 const hasActiveFilters = computed(() =>
-  sortBy.value !== 'SortName' || sortOrder.value !== 'Ascending' || filter.value !== '' || selectedGenre.value !== ''
+  sortBy.value !== 'SortName' || sortOrder.value !== 'Ascending' || filter.value !== '' ||
+  selectedGenre.value !== '' || nameStartsWith.value !== ''
 );
 const availableGenres = ref<string[]>([]);
+
+type LibraryState = {
+  sortBy: string;
+  sortOrder: string;
+  filter: string;
+  selectedGenre: string;
+  nameStartsWith: string;
+  startIndex: number;
+};
+
+function stateKey(id: string) {
+  return `library-state:${JSON.stringify([store.serverUrl, store.userId, id])}`;
+}
+
+function restoreLibraryState() {
+  sortBy.value = 'SortName';
+  sortOrder.value = 'Ascending';
+  filter.value = '';
+  selectedGenre.value = '';
+  nameStartsWith.value = '';
+  startIndex.value = 0;
+
+  try {
+    const saved = sessionStorage.getItem(stateKey(libraryId.value));
+    if (saved) {
+      const state = JSON.parse(saved) as Partial<LibraryState>;
+      if (['SortName', 'PremiereDate', 'DateCreated', 'CommunityRating', 'PlayCount', 'Random'].includes(state.sortBy ?? '')) {
+        sortBy.value = state.sortBy!;
+      }
+      if (state.sortOrder === 'Ascending' || state.sortOrder === 'Descending') sortOrder.value = state.sortOrder;
+      if (['', 'IsUnplayed', 'IsPlayed', 'IsFavorite'].includes(state.filter ?? '')) filter.value = state.filter!;
+      if (typeof state.selectedGenre === 'string') selectedGenre.value = state.selectedGenre;
+      if (typeof state.nameStartsWith === 'string') nameStartsWith.value = state.nameStartsWith;
+      if (typeof state.startIndex === 'number' && Number.isInteger(state.startIndex) && state.startIndex >= 0) {
+        startIndex.value = state.startIndex;
+      }
+    }
+  } catch (e) {
+    logger.warn('Failed to restore library state', e);
+  }
+  showFilters.value = hasActiveFilters.value;
+}
+
+function saveLibraryState() {
+  try {
+    sessionStorage.setItem(stateKey(libraryId.value), JSON.stringify({
+      sortBy: sortBy.value,
+      sortOrder: sortOrder.value,
+      filter: filter.value,
+      selectedGenre: selectedGenre.value,
+      nameStartsWith: nameStartsWith.value,
+      startIndex: startIndex.value,
+    } satisfies LibraryState));
+  } catch (e) {
+    logger.warn('Failed to save library state', e);
+  }
+}
 
 // View mode
 const viewMode = computed(() => prefs.libraryViewMode);
@@ -296,10 +355,13 @@ function formatRuntime(ticks: number): string {
 }
 
 async function loadPage() {
+  saveLibraryState();
+  const id = libraryId.value;
+  const request = ++pageRequest;
   loading.value = true;
   error.value = null;
   try {
-    const pageItems = await store.fetchItems(libraryId, {
+    const pageItems = await store.fetchItems(id, {
       startIndex: startIndex.value,
       limit: limit.value,
       sortBy: [sortBy.value],
@@ -308,18 +370,21 @@ async function loadPage() {
       genres: selectedGenre.value ? [selectedGenre.value] : undefined,
       nameStartsWith: nameStartsWith.value === '#' ? '#' : nameStartsWith.value || undefined,
     });
+    if (request !== pageRequest) return;
     items.value = pageItems;
     hasNextPage.value = pageItems.length === limit.value;
   } catch (e) {
-    error.value = 'Failed to load items';
+    if (request === pageRequest) error.value = 'Failed to load items';
   } finally {
-    loading.value = false;
+    if (request === pageRequest) loading.value = false;
   }
 }
 
 async function loadGenres() {
+  const id = libraryId.value;
   try {
-    availableGenres.value = await store.fetchGenres(libraryId);
+    const genres = await store.fetchGenres(id);
+    if (id === libraryId.value) availableGenres.value = genres;
   } catch (e) {
     logger.error('Failed to load genres', e);
   }
@@ -406,15 +471,17 @@ async function toggleWatched(item: any) {
 }
 
 onMounted(() => {
+  restoreLibraryState();
   loadGenres();
   loadPage();
 });
 
-watch(() => route.params.id, async (newId) => {
+watch(() => route.params.id, (newId) => {
   if (!newId) return;
-  startIndex.value = 0;
-  nameStartsWith.value = '';
-  await loadGenres();
-  await loadPage();
+  items.value = [];
+  availableGenres.value = [];
+  restoreLibraryState();
+  loadGenres();
+  loadPage();
 });
 </script>

@@ -36,7 +36,7 @@ RUN --mount=type=cache,target=/opt/gradle-cache \
     npm run build \
     && npx cap sync android \
     && cd android \
-    && GITHUB_RUN_NUMBER="${ANDROID_VERSION_CODE}" ./gradlew --no-daemon assembleDebug
+    && ANDROID_VERSION_CODE="${ANDROID_VERSION_CODE}" ./gradlew --no-daemon assembleDebug
 
 # To export only the APK:
 # docker build -f Dockerfile.android --target apk --output type=local,dest=./out .

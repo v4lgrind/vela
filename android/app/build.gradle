@@ -8,10 +8,14 @@ android {
         applicationId "com.jellyfin_v4lgrind_client.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        // Auto-increment from the CI run number so each published build is seen
-        // as newer; falls back to 1 for local builds.
+        // Local/Docker builds pass an explicit ANDROID_VERSION_CODE. CI builds
+        // auto-increment from the run number, offset by 1000 so a published
+        // build always supersedes locally installed test builds (which reached
+        // 266 before the offset existed). Falls back to 1.
+        def explicitVersionCode = System.getenv("ANDROID_VERSION_CODE")
         def ciRunNumber = System.getenv("GITHUB_RUN_NUMBER")
-        versionCode ciRunNumber ? ciRunNumber.toInteger() : 1
+        versionCode explicitVersionCode ? explicitVersionCode.toInteger()
+                : ciRunNumber ? ciRunNumber.toInteger() + 1000 : 1
         versionName "0.1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {

@@ -98,6 +98,13 @@
                                 class="flex-1 min-w-[180px] flex items-center justify-center gap-2 h-[50px] rounded-2xl bg-accent-purple text-accent-ink font-bold text-[15px] active:scale-[0.98] transition cursor-pointer">
                                 <Play class="size-4 fill-current stroke-none" /> Play album
                             </button>
+                            <button v-if="item.Type === 'MusicAlbum' && audioTracks.length" @click="shuffleAlbum" title="Shuffle"
+                                class="flex items-center justify-center size-[50px] rounded-2xl bg-surface border border-border-default text-text-heading active:scale-95 transition cursor-pointer">
+                                <Shuffle class="size-5" />
+                            </button>
+                            <TrackActionsMenu v-if="item.Type === 'MusicAlbum' && audioTracks.length"
+                                trigger-class="size-[50px] rounded-2xl bg-surface border border-border-default text-text-heading"
+                                @play-next="queueAlbum('next')" @add-to-queue="queueAlbum('end')" />
 
                             <!-- Download (single item) -->
                             <button v-if="isItemDownloaded && !isDownloading" @click="deleteDownload"
@@ -366,7 +373,7 @@
                     <h3 class="text-xs font-semibold text-text-muted uppercase tracking-widest mb-4">Tracks</h3>
                     <div class="flex flex-col gap-0.5">
                         <div v-for="(track, i) in audioTracks" :key="track.Id"
-                            class="grid grid-cols-[36px_1fr_56px] gap-3 items-center rounded-lg px-3 py-2.5 cursor-pointer transition-all duration-150 hover:bg-surface-raised"
+                            class="grid grid-cols-[36px_1fr_56px_36px] gap-3 items-center rounded-lg pl-3 pr-1 py-2.5 cursor-pointer transition-all duration-150 hover:bg-surface-raised"
                             :class="audioPlayerStore.currentTrack?.id === track.Id ? 'bg-accent-purple/10 text-accent-purple-light' : ''"
                             @click="playTrack(track.Id, i)">
                             <div class="text-center text-text-subtle font-medium text-sm tabular-nums">{{ track.IndexNumber || '·' }}</div>
@@ -382,6 +389,7 @@
                                 <Loader2 v-else-if="downloadStore.isDownloading(track.Id)" class="size-3.5 text-accent-purple animate-spin" />
                                 <span class="text-text-subtle text-xs tabular-nums">{{ formatTicksDuration(track.RunTimeTicks) }}</span>
                             </div>
+                            <TrackActionsMenu @play-next="queueTrack(track, 'next')" @add-to-queue="queueTrack(track, 'end')" />
                         </div>
                     </div>
                 </section>
@@ -517,12 +525,13 @@ import { formatTicksDuration, formatTicksHuman, formatBytes } from '@/utils/help
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose, DialogTrigger } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
-import { Play, Check, Download as DownloadIcon, ArrowLeft, ArrowRight, ChevronLeft, Loader2, Info, Tv2 } from 'lucide-vue-next';
+import { Play, Check, Download as DownloadIcon, ArrowLeft, ArrowRight, ChevronLeft, Loader2, Info, Shuffle, Tv2 } from 'lucide-vue-next';
 import CastPlugin, { type CastState } from '@/plugins/CastPlugin';
 import { usePlatform } from '@/composables/usePlatform';
 import { useToast } from '@/composables/useToast';
 import { logger } from '@/utils/logger';
 import TranscodeDownloadDialog from '@/components/TranscodeDownloadDialog.vue';
+import TrackActionsMenu from '@/components/TrackActionsMenu.vue';
 import type { TranscodeOptions } from '@/store/download-store';
 
 const store = useJellyfinStore();
@@ -532,7 +541,8 @@ const downloadStore = useDownloadStore();
 const metadataCache = useMetadataCacheStore();
 const route = useRoute();
 const router = useRouter();
-const { showError } = useToast();
+const toast = useToast();
+const { showError } = toast;
 
 const loading = ref(true);
 const overviewExpanded = ref(false);
@@ -954,6 +964,24 @@ function playTrack(_trackId: string, index: number) {
 function playAlbum() {
     const tracks = audioTracks.value.map(itemToAudioTrack);
     audioPlayerStore.playAlbum(tracks, 0);
+}
+
+function shuffleAlbum() {
+    audioPlayerStore.playShuffled(audioTracks.value.map(itemToAudioTrack));
+}
+
+function enqueue(tracks: AudioTrack[], where: 'next' | 'end') {
+    if (where === 'next') audioPlayerStore.playNext(tracks);
+    else audioPlayerStore.addToQueue(tracks);
+    toast.show(where === 'next' ? 'Playing next' : 'Added to queue', 'success', 2000);
+}
+
+function queueTrack(track: any, where: 'next' | 'end') {
+    enqueue([itemToAudioTrack(track)], where);
+}
+
+function queueAlbum(where: 'next' | 'end') {
+    enqueue(audioTracks.value.map(itemToAudioTrack), where);
 }
 
 const castRail = ref<HTMLDivElement | null>(null);

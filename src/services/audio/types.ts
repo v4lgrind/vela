@@ -1,4 +1,4 @@
-import type { AudioTrack } from '@/store/audio-player-store';
+import type { AudioTrack, RepeatMode } from '@/store/audio-player-store';
 
 export interface QueueItem {
   track: AudioTrack;
@@ -18,7 +18,13 @@ export interface EngineState {
 
 /** A playback engine owning the queue: native ExoPlayer service or web <audio>. */
 export interface AudioEngine {
-  setQueue(items: QueueItem[], startIndex: number): Promise<void>;
+  setQueue(items: QueueItem[], startIndex: number, opts?: { position?: number; autoplay?: boolean }): Promise<void>;
+  insert(index: number, items: QueueItem[]): Promise<void>;
+  remove(index: number): void;
+  move(from: number, to: number): void;
+  /** Swap every track except the current one, which keeps playing. */
+  replaceAroundCurrent(before: QueueItem[], after: QueueItem[]): Promise<void>;
+  setRepeatMode(mode: RepeatMode): void;
   play(): void;
   pause(): void;
   seek(seconds: number): void;

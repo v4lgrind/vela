@@ -1,4 +1,8 @@
 import { defineStore } from 'pinia';
+import { indexAfterMove, moveItem, shuffleAround } from '@/utils/audioQueue';
+
+export type RepeatMode = 'off' | 'all' | 'one';
+const NEXT_REPEAT_MODE: Record<RepeatMode, RepeatMode> = { off: 'all', all: 'one', one: 'off' };
 
 export interface AudioTrack {
   id: string;
@@ -24,6 +28,11 @@ export interface PlayerSnapshot {
  */
 export interface AudioController {
   setQueue(tracks: AudioTrack[], startIndex: number): void;
+  insert(index: number, tracks: AudioTrack[]): void;
+  remove(index: number): void;
+  move(from: number, to: number): void;
+  replaceAroundCurrent(before: AudioTrack[], after: AudioTrack[]): void;
+  setRepeatMode(mode: RepeatMode): void;
   play(): void;
   pause(): void;
   seek(seconds: number): void;
@@ -49,6 +58,12 @@ interface AudioPlayerState {
   volume: number;
   isMiniPlayerVisible: boolean;
   isExpanded: boolean;
+  repeatMode: RepeatMode;
+  shuffle: boolean;
+  /** Queue order to return to when shuffle is turned off */
+  unshuffledQueue: AudioTrack[];
+  /** Last known position, persisted so the queue resumes after a restart */
+  resumePosition: number;
 }
 
 export const useAudioPlayerStore = defineStore('audio-player', {
@@ -61,8 +76,14 @@ export const useAudioPlayerStore = defineStore('audio-player', {
     volume: 100,
     isMiniPlayerVisible: false,
     isExpanded: false,
+    repeatMode: 'off',
+    shuffle: false,
+    unshuffledQueue: [],
+    resumePosition: 0,
   }),
-  persist: false,
+  persist: {
+    pick: ['queue', 'currentIndex', 'volume', 'repeatMode', 'shuffle', 'unshuffledQueue', 'resumePosition'],
+  },
   getters: {
     currentTrack: (state): AudioTrack | null => {
       if (state.currentIndex < 0 || state.currentIndex >= state.queue.length) return null;
@@ -80,17 +101,81 @@ export const useAudioPlayerStore = defineStore('audio-player', {
       this.playAlbum([track], 0);
     },
     playAlbum(tracks: AudioTrack[], startIndex = 0) {
-      this.queue = tracks;
-      this.currentIndex = startIndex;
+      this.unshuffledQueue = tracks;
+      this.queue = this.shuffle ? shuffleAround(tracks, startIndex) : tracks;
+      this.currentIndex = this.shuffle ? 0 : startIndex;
       this.currentTime = 0;
       this.duration = tracks[startIndex]?.duration ?? 0;
       this.isMiniPlayerVisible = true;
       this.isPlaying = true;
-      controller?.setQueue(tracks, startIndex);
+      controller?.setQueue(this.queue, this.currentIndex);
+    },
+    playShuffled(tracks: AudioTrack[]) {
+      this.shuffle = true;
+      this.playAlbum(tracks, Math.floor(Math.random() * tracks.length));
+    },
+    toggleShuffle() {
+      const current = this.currentTrack;
+      this.shuffle = !this.shuffle;
+      if (!current) return;
+      let reordered: AudioTrack[];
+      if (this.shuffle) {
+        this.unshuffledQueue = this.queue.slice();
+        reordered = shuffleAround(this.queue, this.currentIndex);
+      } else {
+        reordered = this.unshuffledQueue.length ? this.unshuffledQueue : this.queue;
+      }
+      const at = reordered.findIndex((t) => t.id === current.id);
+      const before = at >= 0 ? reordered.slice(0, at) : [];
+      const after = at >= 0 ? reordered.slice(at + 1) : reordered.filter((t) => t.id !== current.id);
+      this.queue = [...before, current, ...after];
+      this.currentIndex = before.length;
+      controller?.replaceAroundCurrent(before, after);
+    },
+    cycleRepeat() {
+      this.repeatMode = NEXT_REPEAT_MODE[this.repeatMode];
+      controller?.setRepeatMode(this.repeatMode);
+    },
+    playNext(tracks: AudioTrack[]) {
+      if (!this.currentTrack) {
+        this.playAlbum(tracks);
+        return;
+      }
+      const at = this.currentIndex + 1;
+      this.queue = [...this.queue.slice(0, at), ...tracks, ...this.queue.slice(at)];
+      this.unshuffledQueue = [...this.unshuffledQueue, ...tracks];
+      controller?.insert(at, tracks);
+    },
+    addToQueue(tracks: AudioTrack[]) {
+      if (!this.currentTrack) {
+        this.playAlbum(tracks);
+        return;
+      }
+      const at = this.queue.length;
+      this.queue = [...this.queue, ...tracks];
+      this.unshuffledQueue = [...this.unshuffledQueue, ...tracks];
+      controller?.insert(at, tracks);
+    },
+    /** Removes an upcoming or past track; the playing one can't be removed. */
+    removeFromQueue(index: number) {
+      if (index === this.currentIndex || !this.queue[index]) return;
+      const removedId = this.queue[index].id;
+      this.queue = this.queue.filter((_, i) => i !== index);
+      if (index < this.currentIndex) this.currentIndex--;
+      const u = this.unshuffledQueue.findIndex((t) => t.id === removedId);
+      if (u >= 0) this.unshuffledQueue = this.unshuffledQueue.filter((_, i) => i !== u);
+      controller?.remove(index);
+    },
+    moveInQueue(from: number, to: number) {
+      if (from === to) return;
+      this.queue = moveItem(this.queue, from, to);
+      this.currentIndex = indexAfterMove(this.currentIndex, from, to);
+      controller?.move(from, to);
     },
     next() {
       if (!this.hasNext) {
-        this.stop();
+        if (this.repeatMode === 'all' && this.queue.length) this.jumpTo(0);
+        else this.stop();
         return;
       }
       this.currentIndex++;
@@ -130,7 +215,9 @@ export const useAudioPlayerStore = defineStore('audio-player', {
       this.isMiniPlayerVisible = false;
       this.isExpanded = false;
       this.queue = [];
+      this.unshuffledQueue = [];
       this.currentIndex = -1;
+      this.resumePosition = 0;
       controller?.stop();
     },
     /** Mirror the engine's state; never calls back into the controller. */

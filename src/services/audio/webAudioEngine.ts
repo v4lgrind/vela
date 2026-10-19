@@ -1,3 +1,4 @@
+import type { RepeatMode } from '@/store/audio-player-store';
 import type { AudioEngine, EngineState, QueueItem } from './types';
 
 const RESTART_THRESHOLD_S = 3;
@@ -8,6 +9,7 @@ export class WebAudioEngine implements AudioEngine {
   private items: QueueItem[] = [];
   private index = -1;
   private ended = false;
+  private repeatMode: RepeatMode = 'off';
   private stateHandler: (s: EngineState) => void = () => {};
   private errorHandler: (message: string) => void = () => {};
 
@@ -21,10 +23,37 @@ export class WebAudioEngine implements AudioEngine {
     this.setupMediaSession();
   }
 
-  async setQueue(items: QueueItem[], startIndex: number) {
+  async setQueue(items: QueueItem[], startIndex: number, opts: { position?: number; autoplay?: boolean } = {}) {
     this.items = items;
-    this.load(startIndex);
+    this.load(startIndex, opts.autoplay ?? true);
+    if (opts.position) this.audio.currentTime = opts.position;
   }
+
+  async insert(index: number, items: QueueItem[]) {
+    this.items.splice(index, 0, ...items);
+    if (index <= this.index) this.index += items.length;
+  }
+
+  remove(index: number) {
+    this.items.splice(index, 1);
+    if (index < this.index) this.index--;
+    else if (index === this.index) this.load(Math.min(index, this.items.length - 1));
+  }
+
+  move(from: number, to: number) {
+    const [item] = this.items.splice(from, 1);
+    this.items.splice(to, 0, item);
+    if (from === this.index) this.index = to;
+    else if (from < this.index && to >= this.index) this.index--;
+    else if (from > this.index && to <= this.index) this.index++;
+  }
+
+  async replaceAroundCurrent(before: QueueItem[], after: QueueItem[]) {
+    this.items = [...before, this.items[this.index], ...after];
+    this.index = before.length;
+  }
+
+  setRepeatMode(mode: RepeatMode) { this.repeatMode = mode; }
 
   play() { this.audio.play().catch(() => {}); }
   pause() { this.audio.pause(); }
@@ -60,21 +89,26 @@ export class WebAudioEngine implements AudioEngine {
   onError(handler: (message: string) => void) { this.errorHandler = handler; }
   async restore() { return null; }
 
-  private load(index: number) {
+  private load(index: number, autoplay = true) {
     const item = this.items[index];
     if (!item) return;
     this.index = index;
     this.ended = false;
     this.audio.src = item.url;
     this.audio.load();
-    this.play();
+    if (autoplay) this.play();
     this.updateMediaSessionMetadata(item);
     this.emit();
   }
 
   private onEnded() {
-    if (this.index < this.items.length - 1) {
-      this.load(this.index + 1);
+    if (this.repeatMode === 'one') {
+      this.audio.currentTime = 0;
+      this.play();
+      return;
+    }
+    if (this.index < this.items.length - 1 || this.repeatMode === 'all') {
+      this.load((this.index + 1) % this.items.length);
       return;
     }
     this.ended = true;

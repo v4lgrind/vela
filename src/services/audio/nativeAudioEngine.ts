@@ -1,5 +1,5 @@
-import { NativeAudio, type NativeAudioState } from '@/plugins/NativeAudioPlugin';
-import type { AudioTrack } from '@/store/audio-player-store';
+import { NativeAudio, type NativeAudioState, type NativeAudioTrack } from '@/plugins/NativeAudioPlugin';
+import type { AudioTrack, RepeatMode } from '@/store/audio-player-store';
 import { logger } from '@/utils/logger';
 import type { AudioEngine, EngineState, QueueItem } from './types';
 
@@ -14,27 +14,48 @@ function toEngineState(s: NativeAudioState): EngineState {
   };
 }
 
+function toNativeTrack({ track, url, artworkUrl }: QueueItem): NativeAudioTrack {
+  return {
+    id: track.id,
+    url,
+    title: track.name,
+    artist: track.artist,
+    album: track.albumName,
+    artworkUrl,
+    track: { ...track },
+  };
+}
+
 function run(label: string, p: Promise<unknown>) {
   p.catch((e) => logger.error(`[NativeAudio] ${label} failed`, e));
 }
 
 /** ExoPlayer in MusicService: background playback, notification, headset keys. */
 export class NativeAudioEngine implements AudioEngine {
-  async setQueue(items: QueueItem[], startIndex: number) {
+  async setQueue(items: QueueItem[], startIndex: number, opts: { position?: number; autoplay?: boolean } = {}) {
     await NativeAudio.setQueue({
-      tracks: items.map(({ track, url, artworkUrl }) => ({
-        id: track.id,
-        url,
-        title: track.name,
-        artist: track.artist,
-        album: track.albumName,
-        artworkUrl,
-        track: { ...track },
-      })),
+      tracks: items.map(toNativeTrack),
       startIndex,
-      playWhenReady: true,
+      startPositionMs: Math.round((opts.position ?? 0) * 1000),
+      playWhenReady: opts.autoplay ?? true,
     });
   }
+
+  async insert(index: number, items: QueueItem[]) {
+    await NativeAudio.addTracks({ index, tracks: items.map(toNativeTrack) });
+  }
+
+  remove(index: number) { run('removeTrack', NativeAudio.removeTrack({ index })); }
+  move(from: number, to: number) { run('moveTrack', NativeAudio.moveTrack({ from, to })); }
+
+  async replaceAroundCurrent(before: QueueItem[], after: QueueItem[]) {
+    await NativeAudio.replaceAroundCurrent({
+      before: before.map(toNativeTrack),
+      after: after.map(toNativeTrack),
+    });
+  }
+
+  setRepeatMode(mode: RepeatMode) { run('setRepeatMode', NativeAudio.setRepeatMode({ mode })); }
 
   play() { run('play', NativeAudio.play()); }
   pause() { run('pause', NativeAudio.pause()); }

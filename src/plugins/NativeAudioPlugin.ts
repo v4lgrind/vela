@@ -1,5 +1,6 @@
 import { registerPlugin } from '@capacitor/core';
 import type { PluginListenerHandle } from '@capacitor/core';
+import type { RepeatMode } from '@/store/audio-player-store';
 
 export interface NativeAudioTrack {
   id: string;
@@ -36,6 +37,11 @@ export interface NativeAudioPluginInterface {
   previous(): Promise<void>;
   setVolume(opts: { volume: number }): Promise<void>;
   stop(): Promise<void>;
+  addTracks(opts: { index: number; tracks: NativeAudioTrack[] }): Promise<void>;
+  removeTrack(opts: { index: number }): Promise<void>;
+  moveTrack(opts: { from: number; to: number }): Promise<void>;
+  replaceAroundCurrent(opts: { before: NativeAudioTrack[]; after: NativeAudioTrack[] }): Promise<void>;
+  setRepeatMode(opts: { mode: RepeatMode }): Promise<void>;
   getState(): Promise<NativeAudioState & { tracks: Record<string, unknown>[] }>;
   addListener(event: 'stateChange', handler: (e: NativeAudioState) => void): Promise<PluginListenerHandle>;
   addListener(event: 'error', handler: (e: { message: string }) => void): Promise<PluginListenerHandle>;

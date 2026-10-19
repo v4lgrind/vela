@@ -4,6 +4,7 @@ import {
   useAudioPlayerStore,
   type AudioController,
   type AudioTrack,
+  type RepeatMode,
 } from '../store/audio-player-store';
 import { useJellyfinStore } from '../store/jellyfin-store';
 import { useOfflineStore } from '../store/offline-store';
@@ -34,6 +35,7 @@ class AudioPlayerService implements AudioController {
   private lastPosition = 0;
   private lastDuration = 0;
   private reportInterval: ReturnType<typeof setInterval> | null = null;
+  private ops: Promise<unknown> = Promise.resolve();
 
   init() {
     if (this.initialized) return;
@@ -51,22 +53,44 @@ class AudioPlayerService implements AudioController {
   }
 
   // --- AudioController (store intents) ---
+  // Engine calls run one after another: inserts resolve URLs asynchronously
+  // and must land before a following move/remove addresses their indexes.
 
   setQueue(tracks: AudioTrack[], startIndex: number) {
-    this.loadQueue(tracks, startIndex);
+    this.enqueue(() => this.loadQueue(tracks, startIndex, { autoplay: true }));
   }
 
-  play() { this.engine.play(); }
-  pause() { this.engine.pause(); }
-  seek(seconds: number) { this.engine.seek(seconds); }
-  skipTo(index: number) { this.engine.skipTo(index); }
-  next() { this.engine.next(); }
-  previous() { this.engine.previous(); }
-  setVolume(volume: number) { this.engine.setVolume(volume); }
+  insert(index: number, tracks: AudioTrack[]) {
+    this.enqueue(async () => this.engine.insert(index, await this.toQueueItems(tracks)));
+  }
+
+  replaceAroundCurrent(before: AudioTrack[], after: AudioTrack[]) {
+    this.enqueue(async () => {
+      const [b, a] = await Promise.all([this.toQueueItems(before), this.toQueueItems(after)]);
+      await this.engine.replaceAroundCurrent(b, a);
+    });
+  }
+
+  remove(index: number) { this.enqueue(() => this.engine.remove(index)); }
+  move(from: number, to: number) { this.enqueue(() => this.engine.move(from, to)); }
+  setRepeatMode(mode: RepeatMode) { this.enqueue(() => this.engine.setRepeatMode(mode)); }
+  play() { this.enqueue(() => this.engine.play()); }
+  pause() { this.enqueue(() => this.engine.pause()); }
+  seek(seconds: number) { this.enqueue(() => this.engine.seek(seconds)); }
+  skipTo(index: number) { this.enqueue(() => this.engine.skipTo(index)); }
+  next() { this.enqueue(() => this.engine.next()); }
+  previous() { this.enqueue(() => this.engine.previous()); }
+  setVolume(volume: number) { this.enqueue(() => this.engine.setVolume(volume)); }
 
   stop() {
-    this.engine.stop();
+    this.enqueue(() => this.engine.stop());
     this.endReporting();
+  }
+
+  private enqueue(op: () => unknown) {
+    this.ops = this.ops
+      .then(op)
+      .catch((e) => logger.error('[AudioPlayer] Engine command failed', e));
   }
 
   // --- Engine → store ---
@@ -86,6 +110,7 @@ class AudioPlayerService implements AudioController {
     });
     if (s.trackId !== this.reportedTrackId) this.onTrackChanged(s.trackId);
     this.lastPosition = s.position;
+    this.audioStore.resumePosition = s.position;
     this.lastDuration = s.duration;
   }
 
@@ -94,10 +119,17 @@ class AudioPlayerService implements AudioController {
     if (this.audioStore.hasNext) this.audioStore.next();
   }
 
+  /**
+   * Resync with a queue the native service kept playing while the WebView was
+   * gone; otherwise reload the persisted queue, paused where it was left.
+   */
   private async restoreFromEngine() {
     try {
       const restored = await this.engine.restore();
-      if (!restored) return;
+      if (!restored) {
+        this.resumePersistedQueue();
+        return;
+      }
       const { tracks, state } = restored;
       this.audioStore.restoreQueue(tracks, {
         index: state.index,
@@ -110,15 +142,28 @@ class AudioPlayerService implements AudioController {
     }
   }
 
+  private resumePersistedQueue() {
+    const store = this.audioStore;
+    if (!store.currentTrack) return;
+    store.isMiniPlayerVisible = true;
+    store.isPlaying = false;
+    store.currentTime = store.resumePosition;
+    store.duration = store.currentTrack.duration;
+    this.enqueue(async () => {
+      await this.loadQueue(store.queue, store.currentIndex, { position: store.resumePosition, autoplay: false });
+      this.engine.setVolume(store.volume / 100);
+      this.engine.setRepeatMode(store.repeatMode);
+    });
+  }
+
   // --- URLs ---
 
-  private async loadQueue(tracks: AudioTrack[], startIndex: number) {
-    try {
-      const items = await Promise.all(tracks.map((t) => this.toQueueItem(t)));
-      await this.engine.setQueue(items, startIndex);
-    } catch (e) {
-      logger.error('[AudioPlayer] Failed to load queue', e);
-    }
+  private async loadQueue(tracks: AudioTrack[], startIndex: number, opts: { position?: number; autoplay: boolean }) {
+    await this.engine.setQueue(await this.toQueueItems(tracks), startIndex, opts);
+  }
+
+  private toQueueItems(tracks: AudioTrack[]): Promise<QueueItem[]> {
+    return Promise.all(tracks.map((t) => this.toQueueItem(t)));
   }
 
   private async toQueueItem(track: AudioTrack): Promise<QueueItem> {

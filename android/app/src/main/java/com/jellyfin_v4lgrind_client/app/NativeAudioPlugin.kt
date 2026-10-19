@@ -192,6 +192,63 @@ class NativeAudioPlugin : Plugin() {
         call.resolve()
     }
 
+    @PluginMethod
+    fun addTracks(call: PluginCall) {
+        val items = toMediaItems(call.getArray("tracks") ?: JSArray())
+        val index = call.getInt("index") ?: Int.MAX_VALUE
+        withController(call) { c ->
+            c.addMediaItems(index.coerceAtMost(c.mediaItemCount), items)
+            call.resolve()
+        }
+    }
+
+    @PluginMethod
+    fun removeTrack(call: PluginCall) {
+        val index = call.getInt("index") ?: -1
+        withController(call) { c ->
+            if (index in 0 until c.mediaItemCount) c.removeMediaItem(index)
+            call.resolve()
+        }
+    }
+
+    @PluginMethod
+    fun moveTrack(call: PluginCall) {
+        val from = call.getInt("from") ?: 0
+        val to = call.getInt("to") ?: 0
+        withController(call) { c ->
+            c.moveMediaItem(from, to)
+            call.resolve()
+        }
+    }
+
+    /** Replaces everything around the current track without interrupting it. */
+    @PluginMethod
+    fun replaceAroundCurrent(call: PluginCall) {
+        val before = toMediaItems(call.getArray("before") ?: JSArray())
+        val after = toMediaItems(call.getArray("after") ?: JSArray())
+        withController(call) { c ->
+            val current = c.currentMediaItemIndex
+            if (current + 1 < c.mediaItemCount) c.removeMediaItems(current + 1, c.mediaItemCount)
+            if (current > 0) c.removeMediaItems(0, current)
+            c.addMediaItems(0, before)
+            c.addMediaItems(after)
+            call.resolve()
+        }
+    }
+
+    @PluginMethod
+    fun setRepeatMode(call: PluginCall) {
+        val mode = when (call.getString("mode")) {
+            "all" -> Player.REPEAT_MODE_ALL
+            "one" -> Player.REPEAT_MODE_ONE
+            else -> Player.REPEAT_MODE_OFF
+        }
+        withController(call) { c ->
+            c.repeatMode = mode
+            call.resolve()
+        }
+    }
+
     /** Current state plus the queue, so a recreated WebView can resync. */
     @PluginMethod
     fun getState(call: PluginCall) = withController(call) { c ->

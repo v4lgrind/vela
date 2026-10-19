@@ -38,7 +38,13 @@
       </div>
 
       <!-- Controls -->
-      <div class="flex items-center gap-6">
+      <div class="flex items-center gap-4">
+        <Button variant="ghost" size="icon" title="Shuffle"
+          class="size-12 rounded-full hover:bg-white/10"
+          :class="audioStore.shuffle ? 'text-accent-purple' : 'text-text-muted'"
+          @click="audioStore.toggleShuffle()">
+          <Shuffle class="size-6" />
+        </Button>
         <Button variant="ghost" size="icon" class="size-14 rounded-full text-text-primary hover:bg-white/10 disabled:opacity-30" :disabled="!audioStore.hasPrevious && audioStore.currentTime <= 3" @click="audioStore.previous()">
           <SkipBack class="size-8 fill-current" />
         </Button>
@@ -46,8 +52,15 @@
           <Play v-if="!audioStore.isPlaying" class="size-9 fill-current stroke-none" />
           <Pause v-else class="size-9 fill-current stroke-none" />
         </Button>
-        <Button variant="ghost" size="icon" class="size-14 rounded-full text-text-primary hover:bg-white/10 disabled:opacity-30" :disabled="!audioStore.hasNext" @click="audioStore.next()">
+        <Button variant="ghost" size="icon" class="size-14 rounded-full text-text-primary hover:bg-white/10 disabled:opacity-30" :disabled="!audioStore.hasNext && audioStore.repeatMode !== 'all'" @click="audioStore.next()">
           <SkipForward class="size-8 fill-current" />
+        </Button>
+        <Button variant="ghost" size="icon" :title="`Repeat: ${audioStore.repeatMode}`"
+          class="size-12 rounded-full hover:bg-white/10"
+          :class="audioStore.repeatMode !== 'off' ? 'text-accent-purple' : 'text-text-muted'"
+          @click="audioStore.cycleRepeat()">
+          <Repeat1 v-if="audioStore.repeatMode === 'one'" class="size-6" />
+          <Repeat v-else class="size-6" />
         </Button>
       </div>
 
@@ -66,16 +79,29 @@
       <div class="flex-1 overflow-y-auto flex flex-col gap-0.5 scrollbar-hide">
         <div
           v-for="(track, i) in audioStore.queue"
-          :key="track.id"
-          class="flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-colors hover:bg-white/5"
-          :class="i === audioStore.currentIndex && 'bg-accent-purple/15'"
+          :key="`${track.id}-${i}`"
+          data-queue-row
+          class="flex items-center gap-2 pl-1 pr-1 py-1.5 rounded-lg cursor-pointer hover:bg-white/5"
+          :class="[
+            i === audioStore.currentIndex && 'bg-accent-purple/15',
+            dragFrom === i ? 'relative z-10 bg-surface-raised shadow-lg' : 'transition-transform duration-150',
+          ]"
+          :style="{ transform: `translateY(${rowShift(i)}px)` }"
           @click="jumpToTrack(i)"
         >
-          <div class="w-7 text-center text-text-muted text-sm shrink-0">{{ track.indexNumber || i + 1 }}</div>
+          <button title="Drag to reorder" class="size-10 flex items-center justify-center text-text-subtle touch-none cursor-grab shrink-0"
+            @click.stop @pointerdown="onDragStart($event, i)" @pointermove="onDragMove" @pointerup="onDragEnd" @pointercancel="onDragEnd">
+            <GripVertical class="size-5" />
+          </button>
           <div class="flex-1 min-w-0">
             <div class="font-semibold text-text-heading truncate" :class="i === audioStore.currentIndex && 'text-accent-purple-light'">{{ track.name }}</div>
             <div class="text-xs text-text-muted truncate">{{ track.artist }}</div>
           </div>
+          <Button v-if="i !== audioStore.currentIndex" variant="ghost" size="icon" title="Remove from queue"
+            class="size-10 rounded-full text-text-subtle hover:bg-white/10 shrink-0"
+            @click.stop="audioStore.removeFromQueue(i)">
+            <X class="size-5" />
+          </Button>
         </div>
       </div>
     </div>
@@ -89,7 +115,7 @@ import { useJellyfinStore } from '@/store/jellyfin-store';
 import { formatTime } from '@/utils/helpers';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
-import { ChevronDown, ListMusic, SkipBack, SkipForward, Play, Pause, Volume2, Volume1, VolumeX } from 'lucide-vue-next';
+import { ChevronDown, GripVertical, ListMusic, SkipBack, SkipForward, Play, Pause, Repeat, Repeat1, Shuffle, Volume2, Volume1, VolumeX, X } from 'lucide-vue-next';
 
 const audioStore = useAudioPlayerStore();
 const jellyfinStore = useJellyfinStore();
@@ -112,5 +138,49 @@ function seekFromProgress(e: MouseEvent) {
 
 function jumpToTrack(index: number) {
   audioStore.jumpTo(index);
+}
+
+// --- Drag to reorder: the dragged row follows the finger, rows it passes
+// slide out of the way, and the move is committed on release.
+const dragFrom = ref<number | null>(null);
+const dragTo = ref<number | null>(null);
+const dragOffset = ref(0);
+let dragStartY = 0;
+let rowHeight = 0;
+
+function onDragStart(e: PointerEvent, index: number) {
+  const handle = e.currentTarget as HTMLElement;
+  rowHeight = (handle.closest('[data-queue-row]') as HTMLElement).offsetHeight + 2;
+  handle.setPointerCapture(e.pointerId);
+  dragStartY = e.clientY;
+  dragOffset.value = 0;
+  dragFrom.value = index;
+  dragTo.value = index;
+}
+
+function onDragMove(e: PointerEvent) {
+  if (dragFrom.value === null) return;
+  dragOffset.value = e.clientY - dragStartY;
+  const target = dragFrom.value + Math.round(dragOffset.value / rowHeight);
+  dragTo.value = Math.max(0, Math.min(audioStore.queue.length - 1, target));
+}
+
+function onDragEnd() {
+  if (dragFrom.value !== null && dragTo.value !== null) {
+    audioStore.moveInQueue(dragFrom.value, dragTo.value);
+  }
+  dragFrom.value = null;
+  dragTo.value = null;
+  dragOffset.value = 0;
+}
+
+function rowShift(index: number): number {
+  const from = dragFrom.value;
+  const to = dragTo.value;
+  if (from === null || to === null) return 0;
+  if (index === from) return dragOffset.value;
+  if (from < to && index > from && index <= to) return -rowHeight;
+  if (from > to && index >= to && index < from) return rowHeight;
+  return 0;
 }
 </script>

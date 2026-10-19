@@ -64,6 +64,10 @@ interface AudioPlayerState {
   unshuffledQueue: AudioTrack[];
   /** Last known position, persisted so the queue resumes after a restart */
   resumePosition: number;
+  /** A Google Cast device is reachable */
+  castAvailable: boolean;
+  /** Name of the device the queue is cast to, null when playing locally */
+  castDevice: string | null;
 }
 
 export const useAudioPlayerStore = defineStore('audio-player', {
@@ -80,6 +84,8 @@ export const useAudioPlayerStore = defineStore('audio-player', {
     shuffle: false,
     unshuffledQueue: [],
     resumePosition: 0,
+    castAvailable: false,
+    castDevice: null,
   }),
   persist: {
     pick: ['queue', 'currentIndex', 'volume', 'repeatMode', 'shuffle', 'unshuffledQueue', 'resumePosition'],

@@ -14,7 +14,10 @@
       <div v-else class="size-12 rounded-md bg-border-input shrink-0"></div>
       <div class="flex-1 min-w-0">
         <div class="text-sm font-semibold text-text-heading truncate">{{ currentTrack?.name || '' }}</div>
-        <div class="text-xs text-text-muted truncate">{{ currentTrack?.artist || '' }}</div>
+        <div v-if="audioStore.castDevice" class="flex items-center gap-1 text-xs text-accent-purple truncate">
+          <Cast class="size-3 shrink-0" /> {{ audioStore.castDevice }}
+        </div>
+        <div v-else class="text-xs text-text-muted truncate">{{ currentTrack?.artist || '' }}</div>
       </div>
       <div class="flex items-center gap-1 shrink-0" @click.stop>
         <Button variant="ghost" size="icon" class="size-10 rounded-full text-text-primary hover:bg-white/10" @click="audioStore.previous()">
@@ -37,7 +40,7 @@ import { computed } from 'vue';
 import { useAudioPlayerStore } from '@/store/audio-player-store';
 import { useJellyfinStore } from '@/store/jellyfin-store';
 import { Button } from '@/components/ui/button';
-import { SkipBack, SkipForward, Play, Pause } from 'lucide-vue-next';
+import { Cast, SkipBack, SkipForward, Play, Pause } from 'lucide-vue-next';
 import { useBottomNavVisible } from '@/composables/useBottomNav';
 
 const audioStore = useAudioPlayerStore();

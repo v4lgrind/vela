@@ -12,6 +12,8 @@ import { usePreferencesStore } from '../store/preferences-store';
 import { downloadService } from './downloadService';
 import { offlineDatabase } from './offlineDatabase';
 import { NativeAudioEngine } from './audio/nativeAudioEngine';
+import { CastAudioEngine } from './audio/castAudioEngine';
+import { CastAudio } from '@/plugins/CastAudioPlugin';
 import { WebAudioEngine } from './audio/webAudioEngine';
 import type { AudioEngine, EngineState, QueueItem } from './audio/types';
 import { logger } from '@/utils/logger';
@@ -26,6 +28,9 @@ const REPORT_INTERVAL_MS = 10_000;
  */
 class AudioPlayerService implements AudioController {
   private engine!: AudioEngine;
+  /** Engine for the device itself (native, or <audio> on the web preview) */
+  private localEngine!: AudioEngine;
+  private castEngine: CastAudioEngine | null = null;
   private audioStore!: ReturnType<typeof useAudioPlayerStore>;
   private jellyfinStore!: ReturnType<typeof useJellyfinStore>;
   private offlineStore!: ReturnType<typeof useOfflineStore>;
@@ -48,11 +53,60 @@ class AudioPlayerService implements AudioController {
     this.offlineStore = useOfflineStore();
     this.preferencesStore = usePreferencesStore();
 
-    this.engine = isNative ? new NativeAudioEngine() : new WebAudioEngine();
-    this.engine.onState((s) => this.onEngineState(s));
-    this.engine.onError((message) => this.onEngineError(message));
+    this.localEngine = isNative ? new NativeAudioEngine() : new WebAudioEngine();
+    this.engine = this.localEngine;
+    this.bindEngine(this.localEngine);
+    if (isNative) this.setupCasting();
     registerAudioController(this);
     this.restoreFromEngine();
+  }
+
+  /** Only the active engine's events reach the store. */
+  private bindEngine(engine: AudioEngine) {
+    engine.onState((s) => { if (this.engine === engine) this.onEngineState(s); });
+    engine.onError((message) => { if (this.engine === engine) this.onEngineError(message); });
+  }
+
+  // --- Casting: while a Cast session is up, the queue plays on the device ---
+
+  openCastDialog() {
+    CastAudio.showDialog().catch((e) => logger.error('[AudioPlayer] Cast dialog failed', e));
+  }
+
+  private setupCasting() {
+    const castEngine = new CastAudioEngine();
+    this.castEngine = castEngine;
+    this.bindEngine(castEngine);
+    CastAudio.getAvailability()
+      .then(({ available }) => { this.audioStore.castAvailable = available; })
+      .catch(() => {});
+    CastAudio.addListener('availabilityChange', ({ available }) => { this.audioStore.castAvailable = available; });
+    CastAudio.addListener('sessionStarted', ({ deviceName }) => this.startCasting(castEngine, deviceName));
+    CastAudio.addListener('sessionEnded', () => this.stopCasting());
+  }
+
+  private startCasting(castEngine: CastAudioEngine, deviceName: string) {
+    const store = this.audioStore;
+    store.castDevice = deviceName || 'Cast device';
+    this.enqueue(async () => {
+      this.localEngine.pause();
+      this.engine = castEngine;
+      castEngine.setRepeatMode(store.repeatMode);
+      if (!store.currentTrack) return;
+      await this.loadQueue(store.queue, store.currentIndex, { position: store.currentTime, autoplay: store.isPlaying });
+    });
+  }
+
+  /** Back on the device, paused where the cast left off. */
+  private stopCasting() {
+    const store = this.audioStore;
+    store.castDevice = null;
+    this.enqueue(async () => {
+      this.engine = this.localEngine;
+      store.isPlaying = false;
+      if (!store.currentTrack) return;
+      await this.loadQueue(store.queue, store.currentIndex, { position: store.currentTime, autoplay: false });
+    });
   }
 
   // --- AudioController (store intents) ---
@@ -178,7 +232,8 @@ class AudioPlayerService implements AudioController {
   }
 
   private async resolveUrl(itemId: string): Promise<string> {
-    if (this.offlineStore.isItemDownloaded(itemId)) {
+    // A Cast device fetches from the server itself; local files are out of reach.
+    if (this.offlineStore.isItemDownloaded(itemId) && this.engine !== this.castEngine) {
       const local = isNative
         ? await downloadService.getNativeFileUri(itemId)
         : await downloadService.getLocalFile(itemId);
@@ -193,7 +248,10 @@ class AudioPlayerService implements AudioController {
       userId: this.jellyfinStore.userId || '',
       ApiKey: this.jellyfinStore.accessToken || '',
       MaxStreamingBitrate: String(this.preferencesStore.musicMaxBitrate || 140_000_000),
-      Container: 'opus,webm|opus,mp3,aac,m4a|aac,m4a|alac,m4b|aac,flac,webma,webm|webma,wav,ogg',
+      // Cast devices can't decode ALAC, so it gets transcoded for them.
+      Container: this.engine === this.castEngine
+        ? 'opus,webm|opus,mp3,aac,m4a|aac,m4b|aac,flac,webma,webm|webma,wav,ogg'
+        : 'opus,webm|opus,mp3,aac,m4a|aac,m4a|alac,m4b|aac,flac,webma,webm|webma,wav,ogg',
       // ExoPlayer picks the extractor from the URL, so it can't follow a
       // redirect to an HLS playlist; ask for a progressive transcode instead.
       TranscodingContainer: isNative ? 'mp3' : 'ts',

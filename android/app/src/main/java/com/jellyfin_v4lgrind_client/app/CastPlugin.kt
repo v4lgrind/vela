@@ -16,6 +16,8 @@ import com.google.android.gms.cast.framework.SessionManagerListener
 import com.google.android.gms.cast.framework.media.RemoteMediaClient
 import org.json.JSONObject
 
+const val JELLYFIN_RECEIVER_ID = "F007D354"
+
 @CapacitorPlugin(name = "Cast")
 class CastPlugin : Plugin() {
 
@@ -46,6 +48,9 @@ class CastPlugin : Plugin() {
                 @Suppress("UNCHECKED_CAST")
                 sessionManagerListener = object : SessionManagerListener<com.google.android.gms.cast.framework.Session> {
                     override fun onSessionStarted(session: com.google.android.gms.cast.framework.Session, sessionId: String) {
+                        // Music casts run on the Default Media Receiver (CastAudioPlugin).
+                        val appId = (session as? com.google.android.gms.cast.framework.CastSession)?.applicationMetadata?.applicationId
+                        if (appId != JELLYFIN_RECEIVER_ID) return
                         val data = JSObject()
                         data.put("sessionId", sessionId)
                         notifyListeners("sessionStarted", data)
@@ -85,8 +90,10 @@ class CastPlugin : Plugin() {
                     call.reject("Cast not initialized")
                     return@runOnUiThread
                 }
+                // The music cast button may have switched the receiver.
+                castContext?.setReceiverApplicationId(JELLYFIN_RECEIVER_ID)
                 val selector = androidx.mediarouter.media.MediaRouteSelector.Builder()
-                    .addControlCategory(CastMediaControlIntent.categoryForCast("F007D354"))
+                    .addControlCategory(CastMediaControlIntent.categoryForCast(JELLYFIN_RECEIVER_ID))
                     .build()
                 val dialog = androidx.mediarouter.app.MediaRouteChooserDialog(activity)
                 dialog.routeSelector = selector

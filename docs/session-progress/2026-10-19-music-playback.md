@@ -53,3 +53,20 @@ committed and pushed straight to `main` one step at a time (user's request).
   implemented but only the cold-start path was tested.
 - Mini player progress bar is still tap-only (3 px tall).
 - Album duration shows only the tracks Jellyfin has (e.g. "6m" for 3 tracks).
+
+## Follow-up: music casting
+- `CastAudioPlugin.kt` + `CastAudioEngine`: the queue plays on a Google Cast
+  device through the **Default Media Receiver** (`CC1AD845`), which works on
+  speakers too; the device fetches the Jellyfin stream URLs itself (ALAC is
+  transcoded, downloaded tracks are streamed). While a session is up,
+  `audioPlayerService` swaps engines; on disconnect the queue returns to the
+  tablet paused at the cast position.
+- Cast discovery filters by receiver: with the Jellyfin receiver (static
+  default, used by the video cast button) the Nest Mini never showed up.
+  `CastAudioPlugin` sets the DMR at load and runs passive MediaRouter
+  discovery while in the foreground; `CastPlugin.showPicker` switches back
+  to the Jellyfin receiver and ignores sessions of other receivers.
+- Verified with "Salon Nest Mini": discovery, connect, play, next, seek,
+  pause, header/mini player show the device, disconnect → local resume.
+- Not verified: Chromecast / Google TV (none online), and the video cast
+  button with the receiver switching (still never tested on hardware).

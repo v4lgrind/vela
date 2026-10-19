@@ -3,7 +3,7 @@ import type { AudioTrack, RepeatMode } from '@/store/audio-player-store';
 import { logger } from '@/utils/logger';
 import type { AudioEngine, EngineState, QueueItem } from './types';
 
-function toEngineState(s: NativeAudioState): EngineState {
+export function toEngineState(s: NativeAudioState): EngineState {
   return {
     index: s.index,
     trackId: s.trackId,
@@ -14,7 +14,7 @@ function toEngineState(s: NativeAudioState): EngineState {
   };
 }
 
-function toNativeTrack({ track, url, artworkUrl }: QueueItem): NativeAudioTrack {
+export function toNativeTrack({ track, url, artworkUrl }: QueueItem): NativeAudioTrack {
   return {
     id: track.id,
     url,

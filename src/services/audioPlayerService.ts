@@ -8,6 +8,7 @@ import {
 } from '../store/audio-player-store';
 import { useJellyfinStore } from '../store/jellyfin-store';
 import { useOfflineStore } from '../store/offline-store';
+import { usePreferencesStore } from '../store/preferences-store';
 import { downloadService } from './downloadService';
 import { offlineDatabase } from './offlineDatabase';
 import { NativeAudioEngine } from './audio/nativeAudioEngine';
@@ -28,6 +29,7 @@ class AudioPlayerService implements AudioController {
   private audioStore!: ReturnType<typeof useAudioPlayerStore>;
   private jellyfinStore!: ReturnType<typeof useJellyfinStore>;
   private offlineStore!: ReturnType<typeof useOfflineStore>;
+  private preferencesStore!: ReturnType<typeof usePreferencesStore>;
   private initialized = false;
   private playSessionId = '';
   private reportedTrackId = '';
@@ -44,6 +46,7 @@ class AudioPlayerService implements AudioController {
     this.audioStore = useAudioPlayerStore();
     this.jellyfinStore = useJellyfinStore();
     this.offlineStore = useOfflineStore();
+    this.preferencesStore = usePreferencesStore();
 
     this.engine = isNative ? new NativeAudioEngine() : new WebAudioEngine();
     this.engine.onState((s) => this.onEngineState(s));
@@ -189,7 +192,7 @@ class AudioPlayerService implements AudioController {
     const params = new URLSearchParams({
       userId: this.jellyfinStore.userId || '',
       ApiKey: this.jellyfinStore.accessToken || '',
-      MaxStreamingBitrate: '140000000',
+      MaxStreamingBitrate: String(this.preferencesStore.musicMaxBitrate || 140_000_000),
       Container: 'opus,webm|opus,mp3,aac,m4a|aac,m4a|alac,m4b|aac,flac,webma,webm|webma,wav,ogg',
       // ExoPlayer picks the extractor from the URL, so it can't follow a
       // redirect to an HLS playlist; ask for a progressive transcode instead.

@@ -1,6 +1,8 @@
 <template>
-  <div class="fixed inset-0 z-200 bg-[radial-gradient(circle_at_top,#1a1a2e_0%,#0a0a0a_70%)] text-text-primary flex flex-col overflow-y-auto"
-    style="padding: var(--sat, env(safe-area-inset-top, 12px)) 16px calc(16px + var(--sab, env(safe-area-inset-bottom, 0px)))">
+  <div ref="sheet" class="fixed inset-0 z-200 bg-[radial-gradient(circle_at_top,#1a1a2e_0%,#0a0a0a_70%)] text-text-primary flex flex-col overflow-y-auto"
+    :class="swipeStartY === null && 'transition-transform duration-200'"
+    :style="{ padding: 'var(--sat, env(safe-area-inset-top, 12px)) 16px calc(16px + var(--sab, env(safe-area-inset-bottom, 0px)))', transform: `translateY(${sheetOffset}px)` }"
+    @touchstart.passive="onSwipeStart" @touchmove.passive="onSwipeMove" @touchend="onSwipeEnd" @touchcancel="onSwipeEnd">
 
     <!-- Header -->
     <div class="flex items-center justify-between py-2 shrink-0">
@@ -26,13 +28,11 @@
 
       <!-- Progress -->
       <div class="w-full max-w-[400px]">
-        <div class="w-full h-6 flex items-center cursor-pointer group" @click="seekFromProgress">
-          <div class="w-full h-1 bg-white/20 rounded-sm relative group-hover:h-1.5 transition-[height]">
-            <div class="h-full bg-accent-purple rounded-sm transition-[width] duration-300 ease-linear" :style="{ width: audioStore.progress + '%' }"></div>
-          </div>
-        </div>
+        <Slider data-no-swipe class="h-8" :model-value="[seekPreview ?? audioStore.currentTime]" :max="audioStore.duration || 1" :step="1"
+          @update:model-value="(v?: number[]) => v && (seekPreview = v[0])"
+          @value-commit="(v: number[]) => commitSeek(v[0])" />
         <div class="flex justify-between text-xs text-text-muted tabular-nums mt-1">
-          <span>{{ formatTime(audioStore.currentTime) }}</span>
+          <span>{{ formatTime(seekPreview ?? audioStore.currentTime) }}</span>
           <span>{{ formatTime(audioStore.duration) }}</span>
         </div>
       </div>
@@ -69,14 +69,14 @@
         <Volume2 v-if="audioStore.volume > 50" class="size-5 text-text-muted shrink-0" />
         <Volume1 v-else-if="audioStore.volume > 0" class="size-5 text-text-muted shrink-0" />
         <VolumeX v-else class="size-5 text-text-muted shrink-0" />
-        <Slider :model-value="[audioStore.volume]" :max="100" :step="1" class="flex-1" @update:model-value="(v?: number[]) => v && audioStore.setVolume(v[0])" />
+        <Slider data-no-swipe :model-value="[audioStore.volume]" :max="100" :step="1" class="flex-1" @update:model-value="(v?: number[]) => v && audioStore.setVolume(v[0])" />
       </div>
     </div>
 
     <!-- Queue -->
     <div v-else class="flex-1 flex flex-col overflow-hidden">
       <h3 class="text-lg font-semibold mb-3">Queue</h3>
-      <div class="flex-1 overflow-y-auto flex flex-col gap-0.5 scrollbar-hide">
+      <div data-queue-scroll class="flex-1 overflow-y-auto flex flex-col gap-0.5 scrollbar-hide">
         <div
           v-for="(track, i) in audioStore.queue"
           :key="`${track.id}-${i}`"
@@ -89,7 +89,7 @@
           :style="{ transform: `translateY(${rowShift(i)}px)` }"
           @click="jumpToTrack(i)"
         >
-          <button title="Drag to reorder" class="size-10 flex items-center justify-center text-text-subtle touch-none cursor-grab shrink-0"
+          <button data-no-swipe title="Drag to reorder" class="size-10 flex items-center justify-center text-text-subtle touch-none cursor-grab shrink-0"
             @click.stop @pointerdown="onDragStart($event, i)" @pointermove="onDragMove" @pointerup="onDragEnd" @pointercancel="onDragEnd">
             <GripVertical class="size-5" />
           </button>
@@ -130,10 +130,38 @@ const albumArtUrl = computed(() => {
   return jellyfinStore.getImageUrl(track.albumId || track.id, 'Primary', 560, 560);
 });
 
-function seekFromProgress(e: MouseEvent) {
-  const bar = e.currentTarget as HTMLElement;
-  const ratio = e.offsetX / bar.offsetWidth;
-  audioStore.seek(ratio * audioStore.duration);
+// While the thumb is dragged, show its position; seek once on release.
+const seekPreview = ref<number | null>(null);
+
+function commitSeek(seconds: number) {
+  audioStore.seek(seconds);
+  seekPreview.value = null;
+}
+
+// --- Swipe down anywhere (when nothing above is scrolled) to collapse.
+const COLLAPSE_DISTANCE = 120;
+const sheet = ref<HTMLElement | null>(null);
+const sheetOffset = ref(0);
+const swipeStartY = ref<number | null>(null);
+
+function onSwipeStart(e: TouchEvent) {
+  const target = e.target as HTMLElement;
+  if (target.closest('[data-no-swipe]')) return;
+  const queueScroll = target.closest('[data-queue-scroll]');
+  if ((queueScroll && queueScroll.scrollTop > 0) || (sheet.value?.scrollTop ?? 0) > 0) return;
+  swipeStartY.value = e.touches[0].clientY;
+}
+
+function onSwipeMove(e: TouchEvent) {
+  if (swipeStartY.value === null) return;
+  sheetOffset.value = Math.max(0, e.touches[0].clientY - swipeStartY.value);
+}
+
+function onSwipeEnd() {
+  if (swipeStartY.value === null) return;
+  if (sheetOffset.value > COLLAPSE_DISTANCE) audioStore.isExpanded = false;
+  swipeStartY.value = null;
+  sheetOffset.value = 0;
 }
 
 function jumpToTrack(index: number) {

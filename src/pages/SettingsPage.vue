@@ -105,6 +105,14 @@
             </select>
             <ChevronRight class="size-[17px] text-text-muted shrink-0" />
           </label>
+          <label class="settings-row">
+            <Music class="size-[19px] text-text-muted shrink-0" :stroke-width="1.8" />
+            <span class="flex-1 text-[14.5px] text-text-heading">Music Quality</span>
+            <select v-model.number="preferencesStore.musicMaxBitrate" class="settings-select">
+              <option v-for="q in MUSIC_QUALITY_PRESETS" :key="q.bitrate" :value="q.bitrate">{{ q.label }}</option>
+            </select>
+            <ChevronRight class="size-[17px] text-text-muted shrink-0" />
+          </label>
         </div>
       </section>
 
@@ -153,7 +161,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useRouter } from 'vue-router';
-import { ChevronRight, LogOut, Server, Palette, MonitorPlay } from 'lucide-vue-next';
+import { ChevronRight, LogOut, Server, Palette, MonitorPlay, Music } from 'lucide-vue-next';
 import { usePreferencesStore } from '@/store/preferences-store';
 import { useJellyfinStore } from '@/store/jellyfin-store';
 
@@ -214,6 +222,14 @@ const QUALITY_PRESETS = [
   { bitrate:  8_000_000, label: '720p' },
   { bitrate:  3_000_000, label: '480p' },
   { bitrate:  1_500_000, label: '360p' },
+];
+
+// Above the limit (e.g. FLAC on a 320 kbps cap) the server transcodes to MP3.
+const MUSIC_QUALITY_PRESETS = [
+  { bitrate: 0,       label: 'Original' },
+  { bitrate: 320_000, label: '320 kbps' },
+  { bitrate: 192_000, label: '192 kbps' },
+  { bitrate: 128_000, label: '128 kbps' },
 ];
 </script>
 

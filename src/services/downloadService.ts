@@ -280,6 +280,15 @@ class DownloadService {
     }
   }
 
+  /** Raw file:// or content:// URI for native players, which can't read WebView URLs. */
+  async getNativeFileUri(itemId: string): Promise<string | null> {
+    const download = await offlineDatabase.getDownload(itemId);
+    if (!download) return null;
+    if (this.isAndroidPublicPath(download.filePath)) return download.filePath;
+    const fileInfo = await Filesystem.getUri({ path: download.filePath, directory: Directory.Data });
+    return fileInfo.uri;
+  }
+
   async deleteOfflineFile(itemId: string): Promise<void> {
     try {
       const download = await offlineDatabase.getDownload(itemId);

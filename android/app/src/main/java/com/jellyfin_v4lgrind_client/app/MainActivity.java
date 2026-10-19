@@ -19,6 +19,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(NativeVideoPlugin.class);
         registerPlugin(DownloadPlugin.class);
         registerPlugin(CastPlugin.class);
+        registerPlugin(NativeAudioPlugin.class);
         super.onCreate(savedInstanceState);
     }
 

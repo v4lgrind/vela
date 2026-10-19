@@ -10,6 +10,36 @@ export interface AudioTrack {
   indexNumber: number;
 }
 
+/** What the playback engine reports back; mirrored into the store. */
+export interface PlayerSnapshot {
+  index: number;
+  isPlaying: boolean;
+  currentTime: number;
+  duration: number;
+}
+
+/**
+ * Executes store intents on the actual playback engine (native ExoPlayer
+ * service or the web <audio> fallback). Registered by audioPlayerService.
+ */
+export interface AudioController {
+  setQueue(tracks: AudioTrack[], startIndex: number): void;
+  play(): void;
+  pause(): void;
+  seek(seconds: number): void;
+  skipTo(index: number): void;
+  next(): void;
+  previous(): void;
+  setVolume(volume: number): void;
+  stop(): void;
+}
+
+let controller: AudioController | null = null;
+
+export function registerAudioController(c: AudioController) {
+  controller = c;
+}
+
 interface AudioPlayerState {
   queue: AudioTrack[];
   currentIndex: number;
@@ -47,45 +77,51 @@ export const useAudioPlayerStore = defineStore('audio-player', {
   },
   actions: {
     playTrack(track: AudioTrack) {
-      this.queue = [track];
-      this.currentIndex = 0;
-      this.isMiniPlayerVisible = true;
-      this.isPlaying = true;
-      // audioPlayerService listens to state changes and loads the track
+      this.playAlbum([track], 0);
     },
     playAlbum(tracks: AudioTrack[], startIndex = 0) {
       this.queue = tracks;
       this.currentIndex = startIndex;
+      this.currentTime = 0;
+      this.duration = tracks[startIndex]?.duration ?? 0;
       this.isMiniPlayerVisible = true;
       this.isPlaying = true;
+      controller?.setQueue(tracks, startIndex);
     },
     next() {
-      if (this.hasNext) {
-        this.currentIndex++;
-        this.isPlaying = true;
-      } else {
+      if (!this.hasNext) {
         this.stop();
-      }
-    },
-    previous() {
-      // If more than 3s in, restart current track
-      if (this.currentTime > 3 && this.currentIndex >= 0) {
-        this.currentTime = 0;
         return;
       }
-      if (this.hasPrevious) {
-        this.currentIndex--;
-        this.isPlaying = true;
-      }
+      this.currentIndex++;
+      this.currentTime = 0;
+      this.duration = this.queue[this.currentIndex].duration;
+      this.isPlaying = true;
+      controller?.next();
+    },
+    /** Restarts the track past 3 s, otherwise goes to the previous one. */
+    previous() {
+      controller?.previous();
+    },
+    jumpTo(index: number) {
+      this.currentIndex = index;
+      this.currentTime = 0;
+      this.duration = this.queue[index]?.duration ?? 0;
+      this.isPlaying = true;
+      controller?.skipTo(index);
     },
     togglePlayPause() {
       this.isPlaying = !this.isPlaying;
+      if (this.isPlaying) controller?.play();
+      else controller?.pause();
     },
     seek(seconds: number) {
       this.currentTime = seconds;
+      controller?.seek(seconds);
     },
     setVolume(v: number) {
       this.volume = Math.max(0, Math.min(100, v));
+      controller?.setVolume(this.volume / 100);
     },
     stop() {
       this.isPlaying = false;
@@ -95,6 +131,23 @@ export const useAudioPlayerStore = defineStore('audio-player', {
       this.isExpanded = false;
       this.queue = [];
       this.currentIndex = -1;
+      controller?.stop();
+    },
+    /** Mirror the engine's state; never calls back into the controller. */
+    applySnapshot(s: PlayerSnapshot) {
+      if (s.index >= 0 && s.index < this.queue.length && s.index !== this.currentIndex) {
+        this.currentIndex = s.index;
+        this.duration = this.queue[s.index].duration;
+      }
+      this.isPlaying = s.isPlaying;
+      this.currentTime = s.currentTime;
+      if (s.duration > 0) this.duration = s.duration;
+    },
+    /** Adopt a queue the engine is already playing (e.g. after a WebView reload). */
+    restoreQueue(tracks: AudioTrack[], s: PlayerSnapshot) {
+      this.queue = tracks;
+      this.isMiniPlayerVisible = true;
+      this.applySnapshot(s);
     },
   },
 });

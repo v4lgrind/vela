@@ -39,6 +39,15 @@
             android:foregroundServiceType="dataSync"
             android:exported="false" />
 
+        <service
+            android:name=".MusicService"
+            android:foregroundServiceType="mediaPlayback"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="androidx.media3.session.MediaSessionService" />
+            </intent-filter>
+        </service>
+
         <activity
             android:name=".NativePlayerActivity"
             android:configChanges="orientation|screenSize|screenLayout|keyboard|keyboardHidden|navigation"

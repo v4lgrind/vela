@@ -111,7 +111,6 @@ function seekFromProgress(e: MouseEvent) {
 }
 
 function jumpToTrack(index: number) {
-  audioStore.currentIndex = index;
-  audioStore.isPlaying = true;
+  audioStore.jumpTo(index);
 }
 </script>

@@ -1,29 +1,39 @@
-import { watch } from 'vue';
-import { useAudioPlayerStore } from '../store/audio-player-store';
+import { Capacitor } from '@capacitor/core';
+import {
+  registerAudioController,
+  useAudioPlayerStore,
+  type AudioController,
+  type AudioTrack,
+} from '../store/audio-player-store';
 import { useJellyfinStore } from '../store/jellyfin-store';
 import { useOfflineStore } from '../store/offline-store';
 import { downloadService } from './downloadService';
 import { offlineDatabase } from './offlineDatabase';
+import { NativeAudioEngine } from './audio/nativeAudioEngine';
+import { WebAudioEngine } from './audio/webAudioEngine';
+import type { AudioEngine, EngineState, QueueItem } from './audio/types';
 import { logger } from '@/utils/logger';
 import { jellyfinAuthorization } from '@/utils/jellyfinAuthorization';
 
-class AudioPlayerService {
-  private audio: HTMLAudioElement;
+const isNative = Capacitor.isNativePlatform();
+const REPORT_INTERVAL_MS = 10_000;
+
+/**
+ * Bridges the audio store and the playback engine: resolves stream / local
+ * URLs, mirrors engine state into the store and reports playback to Jellyfin.
+ */
+class AudioPlayerService implements AudioController {
+  private engine!: AudioEngine;
   private audioStore!: ReturnType<typeof useAudioPlayerStore>;
   private jellyfinStore!: ReturnType<typeof useJellyfinStore>;
   private offlineStore!: ReturnType<typeof useOfflineStore>;
-  private progressInterval: ReturnType<typeof setInterval> | null = null;
-  private playSessionId = '';
   private initialized = false;
-  // Track the index we've loaded so we don't re-load the same track
-  private loadedIndex = -1;
-  private loadedTrackId = '';
-  private offlineProgressInterval: ReturnType<typeof setInterval> | null = null;
-
-  constructor() {
-    this.audio = document.createElement('audio');
-    this.audio.preload = 'metadata';
-  }
+  private playSessionId = '';
+  private reportedTrackId = '';
+  private reportedToServer = false;
+  private lastPosition = 0;
+  private lastDuration = 0;
+  private reportInterval: ReturnType<typeof setInterval> | null = null;
 
   init() {
     if (this.initialized) return;
@@ -33,210 +43,157 @@ class AudioPlayerService {
     this.jellyfinStore = useJellyfinStore();
     this.offlineStore = useOfflineStore();
 
-    this.setupAudioEvents();
-    this.setupStoreWatchers();
+    this.engine = isNative ? new NativeAudioEngine() : new WebAudioEngine();
+    this.engine.onState((s) => this.onEngineState(s));
+    this.engine.onError((message) => this.onEngineError(message));
+    registerAudioController(this);
+    this.restoreFromEngine();
   }
 
-  private setupAudioEvents() {
-    this.audio.addEventListener('timeupdate', () => {
-      if (this.audioStore) {
-        this.audioStore.currentTime = this.audio.currentTime;
-        this.updatePositionState();
-      }
-    });
+  // --- AudioController (store intents) ---
 
-    this.audio.addEventListener('loadedmetadata', () => {
-      if (this.audioStore) {
-        this.audioStore.duration = this.audio.duration;
-      }
-    });
-
-    this.audio.addEventListener('ended', () => {
-      if (this.audioStore) {
-        this.stopProgressReporting();
-        this.audioStore.next();
-      }
-    });
-
-    this.audio.addEventListener('play', () => {
-      if (this.audioStore) {
-        this.audioStore.isPlaying = true;
-      }
-    });
-
-    this.audio.addEventListener('pause', () => {
-      if (this.audioStore) {
-        this.audioStore.isPlaying = false;
-      }
-    });
+  setQueue(tracks: AudioTrack[], startIndex: number) {
+    this.loadQueue(tracks, startIndex);
   }
 
-  private setupStoreWatchers() {
-    // Watch for track changes (currentIndex or queue changes)
-    watch(
-      () => ({
-        index: this.audioStore.currentIndex,
-        trackId: this.audioStore.currentTrack?.id,
-      }),
-      (newVal) => {
-        if (newVal.trackId && (newVal.index !== this.loadedIndex || newVal.trackId !== this.loadedTrackId)) {
-          this.loadedIndex = newVal.index;
-          this.loadedTrackId = newVal.trackId;
-          this.loadTrack(newVal.trackId);
-        }
-      },
-      { immediate: true }
-    );
+  play() { this.engine.play(); }
+  pause() { this.engine.pause(); }
+  seek(seconds: number) { this.engine.seek(seconds); }
+  skipTo(index: number) { this.engine.skipTo(index); }
+  next() { this.engine.next(); }
+  previous() { this.engine.previous(); }
+  setVolume(volume: number) { this.engine.setVolume(volume); }
 
-    // Watch play/pause
-    watch(
-      () => this.audioStore.isPlaying,
-      (playing) => {
-        if (!this.audioStore.currentTrack) return;
-        if (playing && this.audio.paused) {
-          this.audio.play().catch(() => {});
-        } else if (!playing && !this.audio.paused) {
-          this.audio.pause();
-        }
-        this.updateNativeNotification();
-      }
-    );
-
-    // Watch volume
-    watch(
-      () => this.audioStore.volume,
-      (vol) => {
-        this.audio.volume = vol / 100;
-      },
-      { immediate: true }
-    );
-
-    // Watch seek (when user seeks via store action)
-    watch(
-      () => this.audioStore.currentTime,
-      (time) => {
-        // Only seek if difference is more than 1.5s (avoid feedback loop from timeupdate)
-        if (Math.abs(this.audio.currentTime - time) > 1.5) {
-          this.audio.currentTime = time;
-          this.reportPlaybackProgress();
-        }
-      }
-    );
-
-    // Watch for stop (queue cleared)
-    watch(
-      () => this.audioStore.queue.length,
-      (len) => {
-        if (len === 0) {
-          this.stopPlayback();
-        }
-      }
-    );
+  stop() {
+    this.engine.stop();
+    this.endReporting();
   }
 
-  private buildAudioUrl(itemId: string): string {
-    const serverUrl = this.jellyfinStore.serverUrl;
-    const accessToken = this.jellyfinStore.accessToken || '';
+  // --- Engine → store ---
 
+  private onEngineState(s: EngineState) {
+    // Ignore events from a queue the store has already replaced.
+    if (this.audioStore.queue[s.index]?.id !== s.trackId) return;
+    if (s.ended) {
+      this.audioStore.stop();
+      return;
+    }
+    this.audioStore.applySnapshot({
+      index: s.index,
+      isPlaying: s.isPlaying,
+      currentTime: s.position,
+      duration: s.duration,
+    });
+    if (s.trackId !== this.reportedTrackId) this.onTrackChanged(s.trackId);
+    this.lastPosition = s.position;
+    this.lastDuration = s.duration;
+  }
+
+  private onEngineError(message: string) {
+    logger.error('[AudioPlayer] Playback error:', message);
+    if (this.audioStore.hasNext) this.audioStore.next();
+  }
+
+  private async restoreFromEngine() {
+    try {
+      const restored = await this.engine.restore();
+      if (!restored) return;
+      const { tracks, state } = restored;
+      this.audioStore.restoreQueue(tracks, {
+        index: state.index,
+        isPlaying: state.isPlaying,
+        currentTime: state.position,
+        duration: state.duration,
+      });
+    } catch (e) {
+      logger.error('[AudioPlayer] Restore failed', e);
+    }
+  }
+
+  // --- URLs ---
+
+  private async loadQueue(tracks: AudioTrack[], startIndex: number) {
+    try {
+      const items = await Promise.all(tracks.map((t) => this.toQueueItem(t)));
+      await this.engine.setQueue(items, startIndex);
+    } catch (e) {
+      logger.error('[AudioPlayer] Failed to load queue', e);
+    }
+  }
+
+  private async toQueueItem(track: AudioTrack): Promise<QueueItem> {
+    return {
+      track,
+      url: await this.resolveUrl(track.id),
+      artworkUrl: this.jellyfinStore.getImageUrl(track.albumId || track.id, 'Primary', 512, 512),
+    };
+  }
+
+  private async resolveUrl(itemId: string): Promise<string> {
+    if (this.offlineStore.isItemDownloaded(itemId)) {
+      const local = isNative
+        ? await downloadService.getNativeFileUri(itemId)
+        : await downloadService.getLocalFile(itemId);
+      if (local) return local;
+      logger.error('[AudioPlayer] Fichier local introuvable', itemId);
+    }
+    return this.buildStreamUrl(itemId);
+  }
+
+  private buildStreamUrl(itemId: string): string {
     const params = new URLSearchParams({
       userId: this.jellyfinStore.userId || '',
-      ApiKey: accessToken,
+      ApiKey: this.jellyfinStore.accessToken || '',
       MaxStreamingBitrate: '140000000',
-      Container: 'opus,webm|opus,mp3,aac,m4a|aac,m4b|aac,flac,webma,webm|webma,wav,ogg',
-      TranscodingContainer: 'ts',
-      TranscodingProtocol: 'hls',
-      AudioCodec: 'aac',
+      Container: 'opus,webm|opus,mp3,aac,m4a|aac,m4a|alac,m4b|aac,flac,webma,webm|webma,wav,ogg',
+      // ExoPlayer picks the extractor from the URL, so it can't follow a
+      // redirect to an HLS playlist; ask for a progressive transcode instead.
+      TranscodingContainer: isNative ? 'mp3' : 'ts',
+      TranscodingProtocol: isNative ? 'http' : 'hls',
+      AudioCodec: isNative ? 'mp3' : 'aac',
     });
-
-    return `${serverUrl}/Audio/${itemId}/universal?${params.toString()}`;
+    return `${this.jellyfinStore.serverUrl}/Audio/${itemId}/universal?${params.toString()}`;
   }
 
-  private async loadTrack(trackId: string) {
-    // Stop previous reporting
-    this.stopProgressReporting();
-    this.stopOfflineProgressTracking();
+  // --- Playback reporting ---
 
-    // Stop current playback
-    this.audio.pause();
+  private onTrackChanged(trackId: string) {
+    this.endReporting();
+    this.reportedTrackId = trackId;
+    this.reportedToServer = !this.offlineStore.isItemDownloaded(trackId);
+    if (this.reportedToServer) this.reportPlaybackStart(trackId);
+    this.reportInterval = setInterval(() => this.reportProgress(), REPORT_INTERVAL_MS);
+  }
 
-    // Check if track is downloaded
-    const isDownloaded = this.offlineStore.isItemDownloaded(trackId);
-
-    if (isDownloaded) {
-      // Offline playback
-      logger.log('[AudioPlayer] Lecture hors ligne:', trackId);
-      const localUrl = await downloadService.getLocalFile(trackId);
-
-      if (localUrl) {
-        this.audio.src = localUrl;
-        this.audio.load();
-
-        try {
-          await this.audio.play();
-          this.startOfflineProgressTracking(trackId);
-          this.startNativeService();
-        } catch {
-          // autoplay may be blocked
-        }
-
-        return;
-      } else {
-        logger.error('[AudioPlayer] Fichier local introuvable');
-      }
+  private endReporting() {
+    if (this.reportInterval) {
+      clearInterval(this.reportInterval);
+      this.reportInterval = null;
     }
-
-    // Online playback
-    const url = this.buildAudioUrl(trackId);
-    this.audio.src = url;
-    this.audio.load();
-
-    try {
-      await this.audio.play();
-      this.startProgressReporting(trackId);
-      this.startNativeService();
-    } catch {
-      // autoplay may be blocked
+    if (this.reportedTrackId && this.reportedToServer) {
+      this.reportPlaybackStopped(this.reportedTrackId, this.lastPosition);
     }
+    this.reportedTrackId = '';
   }
 
-  private startOfflineProgressTracking(trackId: string) {
-    if (this.offlineProgressInterval) return;
-
-    this.offlineProgressInterval = setInterval(async () => {
-      if (!this.audio.duration || isNaN(this.audio.duration)) return;
-
-      const progress = {
-        itemId: trackId,
-        position: this.audio.currentTime,
-        duration: this.audio.duration,
-        percentage: (this.audio.currentTime / this.audio.duration) * 100,
-        completed: (this.audio.currentTime / this.audio.duration) > 0.9,
-        lastWatched: Date.now(),
-        synced: false,
-      };
-
-      await offlineDatabase.saveWatchProgress(progress);
-    }, 10000); // Save every 10 seconds
+  private reportProgress() {
+    if (this.reportedToServer) this.reportPlaybackProgress();
+    else this.saveOfflineProgress();
   }
 
-  private stopOfflineProgressTracking() {
-    if (this.offlineProgressInterval) {
-      clearInterval(this.offlineProgressInterval);
-      this.offlineProgressInterval = null;
-    }
+  private async saveOfflineProgress() {
+    if (!this.lastDuration) return;
+    const ratio = this.lastPosition / this.lastDuration;
+    await offlineDatabase.saveWatchProgress({
+      itemId: this.reportedTrackId,
+      position: this.lastPosition,
+      duration: this.lastDuration,
+      percentage: ratio * 100,
+      completed: ratio > 0.9,
+      lastWatched: Date.now(),
+      synced: false,
+    });
   }
-
-  private stopPlayback() {
-    this.stopProgressReporting();
-    this.stopOfflineProgressTracking();
-    this.audio.pause();
-    this.audio.src = '';
-    this.loadedIndex = -1;
-    this.loadedTrackId = '';
-    this.stopNativeService();
-  }
-
-  // --- Jellyfin Session Reporting ---
 
   private get reportingHeaders() {
     return {
@@ -245,157 +202,43 @@ class AudioPlayerService {
     };
   }
 
-  private generateSessionId(): string {
-    return `session-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
-  }
-
-  private buildReportingPayload(itemId: string, overrides: Record<string, any> = {}) {
+  private buildReportingPayload(itemId: string, positionSeconds: number) {
     return {
       ItemId: itemId,
       SessionId: this.playSessionId,
       MediaSourceId: itemId,
-      PositionTicks: Math.floor((this.audio.currentTime || 0) * 10_000_000),
+      PositionTicks: Math.floor(positionSeconds * 10_000_000),
       PlayMethod: 'DirectStream',
       PlaySessionId: this.playSessionId,
-      IsMuted: this.audio.muted || false,
-      VolumeLevel: Math.floor((this.audio.volume || 1) * 100),
-      ...overrides,
+      IsMuted: this.audioStore.volume === 0,
+      VolumeLevel: this.audioStore.volume,
+      IsPaused: !this.audioStore.isPlaying,
     };
   }
 
-  private async reportPlaybackStart(itemId: string) {
-    this.playSessionId = this.generateSessionId();
+  private async postSession(path: string, body: object) {
     try {
-      await fetch(`${this.jellyfinStore.serverUrl}/Sessions/Playing`, {
+      await fetch(`${this.jellyfinStore.serverUrl}/Sessions/Playing${path}`, {
         method: 'POST',
         headers: this.reportingHeaders,
-        body: JSON.stringify(this.buildReportingPayload(itemId, { IsPaused: false })),
+        body: JSON.stringify(body),
       });
     } catch (e) {
-      logger.error('reportPlaybackStart error', e);
+      logger.error(`[AudioPlayer] report ${path || 'start'} error`, e);
     }
   }
 
-  private async reportPlaybackProgress() {
-    const track = this.audioStore.currentTrack;
-    if (!track) return;
-    try {
-      await fetch(`${this.jellyfinStore.serverUrl}/Sessions/Playing/Progress`, {
-        method: 'POST',
-        headers: this.reportingHeaders,
-        body: JSON.stringify(
-          this.buildReportingPayload(track.id, { IsPaused: !this.audioStore.isPlaying })
-        ),
-      });
-    } catch (e) {
-      logger.error('reportPlaybackProgress error', e);
-    }
+  private reportPlaybackStart(itemId: string) {
+    this.playSessionId = `session-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+    this.postSession('', this.buildReportingPayload(itemId, 0));
   }
 
-  private async reportPlaybackStopped(itemId: string) {
-    try {
-      await fetch(`${this.jellyfinStore.serverUrl}/Sessions/Playing/Stopped`, {
-        method: 'POST',
-        headers: this.reportingHeaders,
-        body: JSON.stringify({
-          ItemId: itemId,
-          SessionId: this.playSessionId,
-          MediaSourceId: itemId,
-          PositionTicks: Math.floor((this.audio.currentTime || 0) * 10_000_000),
-          PlaySessionId: this.playSessionId,
-        }),
-      });
-    } catch (e) {
-      logger.error('reportPlaybackStopped error', e);
-    }
+  private reportPlaybackProgress() {
+    this.postSession('/Progress', this.buildReportingPayload(this.reportedTrackId, this.lastPosition));
   }
 
-  private startProgressReporting(itemId: string) {
-    this.reportPlaybackStart(itemId);
-    this.progressInterval = setInterval(() => {
-      this.reportPlaybackProgress();
-    }, 10000);
-  }
-
-  private stopProgressReporting() {
-    if (this.progressInterval) {
-      clearInterval(this.progressInterval);
-      this.progressInterval = null;
-    }
-    const track = this.audioStore?.currentTrack;
-    if (track) {
-      this.reportPlaybackStopped(track.id);
-    }
-  }
-
-  // --- Media Session API (lock screen / notification controls) ---
-
-  private startNativeService() {
-    if (!('mediaSession' in navigator)) return;
-    const track = this.audioStore.currentTrack;
-    if (!track) return;
-
-    const artUrl = this.jellyfinStore.getImageUrl(track.albumId || track.id, 'Primary', 512, 512);
-
-    navigator.mediaSession.metadata = new MediaMetadata({
-      title: track.name,
-      artist: track.artist,
-      album: track.albumName || '',
-      artwork: artUrl ? [
-        { src: artUrl, sizes: '512x512', type: 'image/jpeg' },
-      ] : [],
-    });
-
-    navigator.mediaSession.setActionHandler('play', () => {
-      this.audioStore.isPlaying = true;
-    });
-    navigator.mediaSession.setActionHandler('pause', () => {
-      this.audioStore.isPlaying = false;
-    });
-    navigator.mediaSession.setActionHandler('nexttrack', () => {
-      this.audioStore.next();
-    });
-    navigator.mediaSession.setActionHandler('previoustrack', () => {
-      this.audioStore.previous();
-    });
-    navigator.mediaSession.setActionHandler('seekto', (details) => {
-      if (details.seekTime != null) {
-        this.audio.currentTime = details.seekTime;
-        this.audioStore.currentTime = details.seekTime;
-      }
-    });
-    navigator.mediaSession.setActionHandler('seekbackward', (details) => {
-      this.audio.currentTime = Math.max(0, this.audio.currentTime - (details.seekOffset || 10));
-    });
-    navigator.mediaSession.setActionHandler('seekforward', (details) => {
-      this.audio.currentTime = Math.min(this.audio.duration || 0, this.audio.currentTime + (details.seekOffset || 10));
-    });
-  }
-
-  private updateNativeNotification() {
-    if (!('mediaSession' in navigator)) return;
-    navigator.mediaSession.playbackState = this.audioStore.isPlaying ? 'playing' : 'paused';
-    this.updatePositionState();
-  }
-
-  private updatePositionState() {
-    if (!('mediaSession' in navigator)) return;
-    if (!this.audio.duration || isNaN(this.audio.duration)) return;
-    try {
-      navigator.mediaSession.setPositionState({
-        duration: this.audio.duration,
-        playbackRate: this.audio.playbackRate,
-        position: Math.min(this.audio.currentTime, this.audio.duration),
-      });
-    } catch {
-      // ignore - position state may fail if duration is not ready
-    }
-  }
-
-  private stopNativeService() {
-    if (!('mediaSession' in navigator)) return;
-    navigator.mediaSession.metadata = null;
-    navigator.mediaSession.playbackState = 'none';
+  private reportPlaybackStopped(itemId: string, positionSeconds: number) {
+    this.postSession('/Stopped', this.buildReportingPayload(itemId, positionSeconds));
   }
 }
 

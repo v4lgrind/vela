@@ -459,7 +459,6 @@
             </div>
 
         </template>
-    </div>
 
     <!-- Transcode Download Options Dialog -->
     <TranscodeDownloadDialog
@@ -496,6 +495,7 @@
             </div>
         </DialogContent>
     </Dialog>
+    </div>
 </template>
 
 <script setup lang="ts">

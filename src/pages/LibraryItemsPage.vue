@@ -13,6 +13,15 @@
       <span class="text-xs text-text-muted shrink-0 ml-2">{{ items.length }} shown</span>
     </header>
 
+    <!-- Music library sections -->
+    <nav v-if="isMusicLibrary" class="flex gap-2 mb-3 overflow-x-auto scrollbar-hide">
+      <button v-for="tab in MUSIC_TABS" :key="tab.value" @click="selectMusicTab(tab.value)"
+        class="shrink-0 px-4 py-2 rounded-full text-sm font-semibold transition-colors"
+        :class="musicTab === tab.value ? 'bg-accent-purple text-accent-ink' : 'bg-surface-hover text-text-primary'">
+        {{ tab.label }}
+      </button>
+    </nav>
+
     <!-- Filters and Sorting -->
     <section class="mb-4">
       <!-- Quick filter pills -->
@@ -25,7 +34,7 @@
           Filters
           <ChevronDown class="size-3 transition-transform duration-200" :class="showFilters ? 'rotate-180' : ''" />
         </button>
-        <button
+        <button v-if="!isMusicLibrary"
           @click="quickFilter('IsUnplayed')"
           class="shrink-0 px-3.5 py-2 rounded-full text-[12.5px] font-medium transition-colors"
           :class="filter === 'IsUnplayed' ? 'bg-accent-purple text-accent-ink' : 'bg-surface-hover text-text-primary'">
@@ -42,7 +51,7 @@
         <div class="flex-1" />
 
         <!-- View mode toggle -->
-        <button @click="toggleViewMode" class="shrink-0 size-9 rounded-full bg-surface-hover text-text-primary flex items-center justify-center transition-colors" title="Toggle view">
+        <button v-if="!showSongList" @click="toggleViewMode" class="shrink-0 size-9 rounded-full bg-surface-hover text-text-primary flex items-center justify-center transition-colors" title="Toggle view">
           <List v-if="viewMode === 'grid'" class="size-4" />
           <LayoutGrid v-else class="size-4" />
         </button>
@@ -79,12 +88,32 @@
     </section>
 
     <section class="flex-1 relative">
+      <!-- Songs: tap plays this page from that song -->
+      <ul v-if="showSongList" class="list-none p-0 m-0 flex flex-col pr-5">
+        <li v-for="(song, i) in items" :key="song.Id"
+          class="flex items-center gap-3 py-2 px-1 border-b border-border-default cursor-pointer active:opacity-80"
+          :class="audioStore.currentTrack?.id === song.Id && 'bg-accent-purple/10'"
+          @click="playSongs(i)">
+          <div class="size-12 shrink-0 rounded-md overflow-hidden bg-black/60">
+            <LazyImg :src="getImageUrl(song.AlbumId || song.Id, 'MusicAlbum')" :alt="song.Album" item-type="MusicAlbum"
+              class="w-full h-full object-cover block" />
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="text-sm font-semibold text-text-heading truncate"
+              :class="audioStore.currentTrack?.id === song.Id && 'text-accent-purple-light'">{{ song.Name }}</div>
+            <div class="text-xs text-text-muted truncate">{{ [song.AlbumArtist || song.Artists?.[0], song.Album].filter(Boolean).join(' · ') }}</div>
+          </div>
+          <span v-if="song.RunTimeTicks" class="text-xs text-text-subtle tabular-nums shrink-0">{{ formatTicksDuration(song.RunTimeTicks) }}</span>
+          <TrackActionsMenu @play-next="enqueueSong(song, 'next')" @add-to-queue="enqueueSong(song, 'end')" />
+        </li>
+      </ul>
+
       <!-- Grid view -->
-      <ul v-if="viewMode === 'grid'" class="list-none p-0 m-0 grid grid-cols-3 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(150px,1fr))] sm:gap-4">
+      <ul v-else-if="viewMode === 'grid'" class="list-none p-0 m-0 grid grid-cols-3 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(150px,1fr))] sm:gap-4">
         <li v-for="item in items" :key="item.Id" class="group">
           <!-- Poster with overlay -->
           <div class="relative w-full rounded-xl overflow-hidden bg-surface shadow-lg"
-            :class="isAudioType(item.Type) ? 'aspect-square' : 'aspect-[2/3]'">
+            :class="isSquare(item) ? 'aspect-square' : 'aspect-[2/3]'">
             <router-link
               :to="item.Type === 'BoxSet'
                 ? { name: 'libraryItem', params: { id: item.Id, name: item.Name } }
@@ -110,7 +139,7 @@
             </div>
 
             <!-- Action overlay: always visible on mobile, hover-only on desktop -->
-            <div v-if="!isAudioType(item.Type) && item.Type !== 'BoxSet'"
+            <div v-if="!isSquare(item) && item.Type !== 'BoxSet'"
               class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent flex items-end justify-center gap-2 pb-2 transition-opacity duration-200 sm:opacity-0 sm:group-hover:opacity-100 pointer-events-none">
               <button
                 @click.prevent.stop="playItem(item)"
@@ -148,7 +177,7 @@
             class="flex items-center gap-3 py-2.5 px-1 border-b border-border-default hover:bg-surface-hover transition-colors active:opacity-80">
             <!-- Thumbnail -->
             <div class="w-[60px] shrink-0 rounded-md overflow-hidden bg-black/60"
-              :class="isAudioType(item.Type) ? 'aspect-square' : 'aspect-[2/3]'">
+              :class="isSquare(item) ? 'aspect-square' : 'aspect-[2/3]'">
               <LazyImg :src="getImageUrl(item.Id, item.Type)" :alt="item.Name" :item-type="item.Type"
                 class="w-full h-full object-cover block" />
             </div>
@@ -178,7 +207,7 @@
               <div v-if="item.UserData?.Played" class="bg-accent-purple rounded-full p-0.5">
                 <Check class="size-3 text-white" />
               </div>
-              <button v-if="!isAudioType(item.Type) && item.Type !== 'BoxSet'"
+              <button v-if="!isSquare(item) && item.Type !== 'BoxSet'"
                 @click.prevent.stop="playItem(item)"
                 :disabled="playingId === item.Id"
                 class="bg-surface-raised border border-border-default rounded-full p-2 hover:border-accent-purple transition-colors"
@@ -190,6 +219,8 @@
           </router-link>
         </li>
       </ul>
+
+      <p v-if="!loading && !error && !items.length" class="text-center text-sm text-text-muted py-12">Nothing here yet</p>
 
       <!-- A-Z Quick Jump Sidebar -->
       <div v-if="sortBy === 'SortName'" class="fixed right-0.5 top-1/2 -translate-y-1/2 flex flex-col items-center z-10 py-1">
@@ -226,7 +257,11 @@ import { useRoute, useRouter } from 'vue-router';
 import { useJellyfinStore } from '@/store/jellyfin-store';
 import { usePreferencesStore } from '@/store/preferences-store';
 import LazyImg from '@/components/LazyImg.vue';
-import { isAudioType } from '@/utils/helpers';
+import { formatTicksDuration, isAudioType } from '@/utils/helpers';
+import { toAudioTrack } from '@/utils/audioTrack';
+import TrackActionsMenu from '@/components/TrackActionsMenu.vue';
+import { useAudioPlayerStore } from '@/store/audio-player-store';
+import { useToast } from '@/composables/useToast';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, ArrowRight, Play, Check, Download as DownloadIcon, Loader2, SlidersHorizontal, ChevronDown, ChevronLeft, LayoutGrid, List } from 'lucide-vue-next';
 import { useOfflineStore } from '@/store/offline-store';
@@ -235,6 +270,8 @@ import { useDownloadStore } from '@/store/download-store';
 const store = useJellyfinStore();
 const offlineStore = useOfflineStore();
 const downloadStore = useDownloadStore();
+const audioStore = useAudioPlayerStore();
+const toast = useToast();
 const prefs = usePreferencesStore();
 const route = useRoute();
 const router = useRouter();
@@ -258,6 +295,37 @@ const sortBy = ref('SortName');
 const sortOrder = ref('Ascending');
 const filter = ref('');
 const selectedGenre = ref('');
+
+type MusicTab = 'albums' | 'artists' | 'songs' | 'playlists';
+const MUSIC_TABS: { value: MusicTab; label: string }[] = [
+  { value: 'albums', label: 'Albums' },
+  { value: 'artists', label: 'Artists' },
+  { value: 'songs', label: 'Songs' },
+  { value: 'playlists', label: 'Playlists' },
+];
+const musicTab = ref<MusicTab>('albums');
+const isMusicLibrary = computed(() =>
+  store.libraries.find((l) => l.Id === libraryId.value)?.CollectionType === 'music');
+const showSongList = computed(() => isMusicLibrary.value && musicTab.value === 'songs');
+
+function selectMusicTab(tab: MusicTab) {
+  musicTab.value = tab;
+  onFilterChange();
+}
+
+function isSquare(item: any): boolean {
+  return isAudioType(item.Type) || item.Type === 'Playlist';
+}
+
+function playSongs(index: number) {
+  audioStore.playAlbum(items.value.map((song) => toAudioTrack(song)), index);
+}
+
+function enqueueSong(song: any, where: 'next' | 'end') {
+  if (where === 'next') audioStore.playNext([toAudioTrack(song)]);
+  else audioStore.addToQueue([toAudioTrack(song)]);
+  toast.show(where === 'next' ? 'Playing next' : 'Added to queue', 'success', 2000);
+}
 const nameStartsWith = ref('');
 const hasActiveFilters = computed(() =>
   sortBy.value !== 'SortName' || sortOrder.value !== 'Ascending' || filter.value !== '' ||
@@ -272,6 +340,7 @@ type LibraryState = {
   selectedGenre: string;
   nameStartsWith: string;
   startIndex: number;
+  musicTab: MusicTab;
 };
 
 function stateKey(id: string) {
@@ -285,6 +354,7 @@ function restoreLibraryState() {
   selectedGenre.value = '';
   nameStartsWith.value = '';
   startIndex.value = 0;
+  musicTab.value = 'albums';
 
   try {
     const saved = sessionStorage.getItem(stateKey(libraryId.value));
@@ -297,6 +367,7 @@ function restoreLibraryState() {
       if (['', 'IsUnplayed', 'IsPlayed', 'IsFavorite'].includes(state.filter ?? '')) filter.value = state.filter!;
       if (typeof state.selectedGenre === 'string') selectedGenre.value = state.selectedGenre;
       if (typeof state.nameStartsWith === 'string') nameStartsWith.value = state.nameStartsWith;
+      if (MUSIC_TABS.some((t) => t.value === state.musicTab)) musicTab.value = state.musicTab!;
       if (typeof state.startIndex === 'number' && Number.isInteger(state.startIndex) && state.startIndex >= 0) {
         startIndex.value = state.startIndex;
       }
@@ -316,6 +387,7 @@ function saveLibraryState() {
       selectedGenre: selectedGenre.value,
       nameStartsWith: nameStartsWith.value,
       startIndex: startIndex.value,
+      musicTab: musicTab.value,
     } satisfies LibraryState));
   } catch (e) {
     logger.warn('Failed to save library state', e);
@@ -361,7 +433,7 @@ async function loadPage() {
   loading.value = true;
   error.value = null;
   try {
-    const pageItems = await store.fetchItems(id, {
+    const pageItems = await fetchPage(id, {
       startIndex: startIndex.value,
       limit: limit.value,
       sortBy: [sortBy.value],
@@ -377,6 +449,18 @@ async function loadPage() {
     if (request === pageRequest) error.value = 'Failed to load items';
   } finally {
     if (request === pageRequest) loading.value = false;
+  }
+}
+
+type PageOptions = Parameters<typeof store.fetchItems>[1] & { startIndex: number; limit: number; sortOrder: string[] };
+
+function fetchPage(id: string, opts: PageOptions) {
+  if (!isMusicLibrary.value) return store.fetchItems(id, opts);
+  switch (musicTab.value) {
+    case 'artists': return store.fetchAlbumArtists(id, opts);
+    case 'playlists': return store.fetchAudioPlaylists(opts);
+    case 'songs': return store.fetchItems(id, { ...opts, includeItemTypes: ['Audio'] });
+    default: return store.fetchItems(id, { ...opts, includeItemTypes: ['MusicAlbum'] });
   }
 }
 
@@ -470,9 +554,17 @@ async function toggleWatched(item: any) {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   restoreLibraryState();
   loadGenres();
+  // Needed to tell a music library apart (deep link / reload).
+  if (!store.libraries.length) {
+    try {
+      await store.fetchLibraries();
+    } catch (e) {
+      logger.error('Failed to load libraries', e);
+    }
+  }
   loadPage();
 });
 

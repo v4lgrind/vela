@@ -67,6 +67,10 @@
                                     class="hover:text-white transition-colors cursor-pointer">{{ item.SeasonName }}</button>
                             </div>
                             <h1 class="text-[2rem] sm:text-4xl font-bold text-white leading-none tracking-tight mb-2">{{ item.Name }}</h1>
+                            <div v-if="item.Type === 'MusicAlbum' && item.AlbumArtists?.length" class="flex flex-wrap gap-x-2 mb-1.5 text-[15px] font-semibold text-white/85">
+                                <button v-for="artist in item.AlbumArtists" :key="artist.Id" @click="goToItem(artist.Id)"
+                                    class="hover:text-white underline-offset-4 hover:underline cursor-pointer">{{ artist.Name }}</button>
+                            </div>
                             <div class="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[12.5px] text-white/80">
                                 <span v-if="year">{{ year }}</span>
                                 <span v-if="year && duration" class="text-white/40">·</span>
@@ -94,15 +98,15 @@
                                 {{ resumePositionLabel ? `Resume · ${resumePositionLabel}` : 'Play' }}
                             </button>
 
-                            <button v-if="item.Type === 'MusicAlbum' && audioTracks.length" @click="playAlbum"
+                            <button v-if="isMusicCollection" @click="playAlbum"
                                 class="flex-1 min-w-[180px] flex items-center justify-center gap-2 h-[50px] rounded-2xl bg-accent-purple text-accent-ink font-bold text-[15px] active:scale-[0.98] transition cursor-pointer">
-                                <Play class="size-4 fill-current stroke-none" /> Play album
+                                <Play class="size-4 fill-current stroke-none" /> {{ item.Type === 'MusicAlbum' ? 'Play album' : 'Play all' }}
                             </button>
-                            <button v-if="item.Type === 'MusicAlbum' && audioTracks.length" @click="shuffleAlbum" title="Shuffle"
+                            <button v-if="isMusicCollection" @click="shuffleAlbum" title="Shuffle"
                                 class="flex items-center justify-center size-[50px] rounded-2xl bg-surface border border-border-default text-text-heading active:scale-95 transition cursor-pointer">
                                 <Shuffle class="size-5" />
                             </button>
-                            <TrackActionsMenu v-if="item.Type === 'MusicAlbum' && audioTracks.length"
+                            <TrackActionsMenu v-if="isMusicCollection"
                                 trigger-class="size-[50px] rounded-2xl bg-surface border border-border-default text-text-heading"
                                 @play-next="queueAlbum('next')" @add-to-queue="queueAlbum('end')" />
 
@@ -148,7 +152,7 @@
 
                             <!-- Watched toggle (single playable) -->
                             <button
-                                v-if="item.Type !== 'Series' && item.Type !== 'Season' && item.Type !== 'MusicAlbum' && item.Type !== 'BoxSet'"
+                                v-if="item.Type !== 'Series' && item.Type !== 'Season' && item.Type !== 'MusicAlbum' && item.Type !== 'MusicArtist' && item.Type !== 'Playlist' && item.Type !== 'BoxSet'"
                                 :disabled="togglingWatched" @click="toggleWatched"
                                 :title="item.UserData?.Played ? 'Mark as unwatched' : 'Mark as watched'"
                                 class="flex items-center justify-center size-[50px] rounded-2xl border active:scale-95 transition cursor-pointer"
@@ -368,7 +372,7 @@
                 </section>
 
                 <!-- Audio Tracks -->
-                <section v-if="item.Type === 'MusicAlbum' && audioTracks.length"
+                <section v-if="(item.Type === 'MusicAlbum' || item.Type === 'Playlist') && audioTracks.length"
                     class="bg-surface-raised border border-border-default rounded-2xl p-5 backdrop-blur-sm">
                     <h3 class="text-xs font-semibold text-text-muted uppercase tracking-widest mb-4">Tracks</h3>
                     <div class="flex flex-col gap-0.5">
@@ -376,7 +380,7 @@
                             class="grid grid-cols-[36px_1fr_56px_36px] gap-3 items-center rounded-lg pl-3 pr-1 py-2.5 cursor-pointer transition-all duration-150 hover:bg-surface-raised"
                             :class="audioPlayerStore.currentTrack?.id === track.Id ? 'bg-accent-purple/10 text-accent-purple-light' : ''"
                             @click="playTrack(track.Id, i)">
-                            <div class="text-center text-text-subtle font-medium text-sm tabular-nums">{{ track.IndexNumber || '·' }}</div>
+                            <div class="text-center text-text-subtle font-medium text-sm tabular-nums">{{ item.Type === 'Playlist' ? i + 1 : track.IndexNumber || '·' }}</div>
                             <div class="min-w-0">
                                 <div class="font-medium text-text-primary truncate text-sm"
                                     :class="audioPlayerStore.currentTrack?.id === track.Id ? 'text-accent-purple-light' : ''">
@@ -422,6 +426,22 @@
                             <div v-if="p.Role" class="text-text-subtle text-xs mt-0.5 truncate">{{ p.Role }}</div>
                         </div>
                     </div>
+                </section>
+
+                <!-- Artist albums -->
+                <section v-if="artistAlbums.length"
+                    class="bg-surface-raised border border-border-default rounded-2xl p-5 backdrop-blur-sm">
+                    <h3 class="text-xs font-semibold text-text-muted uppercase tracking-widest mb-4">Albums</h3>
+                    <ul class="list-none p-0 m-0 grid grid-cols-[repeat(auto-fill,minmax(130px,1fr))] gap-4">
+                        <li v-for="album in artistAlbums" :key="album.Id" class="cursor-pointer active:opacity-75" @click="goToItem(album.Id)">
+                            <div class="aspect-square rounded-xl overflow-hidden bg-black/60 shadow-lg">
+                                <LazyImg :src="getImageUrl(album.Id, 'Primary', 300, 300)" :alt="album.Name" item-type="MusicAlbum"
+                                    class="w-full h-full object-cover" />
+                            </div>
+                            <div class="mt-1.5 text-xs font-medium text-text-heading truncate">{{ album.Name }}</div>
+                            <div v-if="album.ProductionYear" class="text-[10.5px] text-text-muted">{{ album.ProductionYear }}</div>
+                        </li>
+                    </ul>
                 </section>
 
                 <!-- Similar Items -->
@@ -532,6 +552,7 @@ import { useToast } from '@/composables/useToast';
 import { logger } from '@/utils/logger';
 import TranscodeDownloadDialog from '@/components/TranscodeDownloadDialog.vue';
 import TrackActionsMenu from '@/components/TrackActionsMenu.vue';
+import { toAudioTrack } from '@/utils/audioTrack';
 import type { TranscodeOptions } from '@/store/download-store';
 
 const store = useJellyfinStore();
@@ -551,6 +572,12 @@ const item = ref<any | null>(null);
 const seasons = ref<any[]>([]);
 const episodes = ref<any[]>([]);
 const audioTracks = ref<any[]>([]);
+const artistAlbums = ref<any[]>([]);
+const isMusicCollection = computed(() => {
+    const type = item.value?.Type;
+    if (type === 'MusicArtist') return artistAlbums.value.length > 0;
+    return (type === 'MusicAlbum' || type === 'Playlist') && audioTracks.value.length > 0;
+});
 const similarItems = ref<any[]>([]);
 
 const itemId = computed(() => route.params.id as string);
@@ -613,6 +640,7 @@ async function load() {
     seasons.value = [];
     episodes.value = [];
     audioTracks.value = [];
+    artistAlbums.value = [];
     similarItems.value = [];
     offlineProgressSeconds.value = null;
     cachedArtworkUrls.value = {};
@@ -684,6 +712,12 @@ async function load() {
         }
         if (data?.Type === 'MusicAlbum') {
             audioTracks.value = await store.fetchAudioTracks(itemId.value);
+        }
+        if (data?.Type === 'Playlist') {
+            audioTracks.value = await store.fetchPlaylistTracks(itemId.value);
+        }
+        if (data?.Type === 'MusicArtist') {
+            artistAlbums.value = await store.fetchArtistAlbums(itemId.value);
         }
         if (data?.Type === 'Movie' || data?.Type === 'Series') {
             similarItems.value = await store.fetchSimilarItems(itemId.value);
@@ -945,15 +979,15 @@ function getImageUrl(id: string, type: string, w: number, h: number) {
 }
 
 function itemToAudioTrack(raw: any): AudioTrack {
-    return {
-        id: raw.Id,
-        name: raw.Name || '',
-        artist: raw.AlbumArtist || raw.Artists?.join(', ') || '',
-        albumId: raw.AlbumId || raw.ParentId || raw.Id,
-        albumName: raw.Album || item.value?.Name || '',
-        duration: raw.RunTimeTicks ? raw.RunTimeTicks / 10_000_000 : 0,
-        indexNumber: raw.IndexNumber || 0,
-    };
+    return toAudioTrack(raw, item.value?.Name || '');
+}
+
+/** Album / playlist tracks, or every track of an artist (fetched on demand). */
+async function collectionTracks(): Promise<AudioTrack[]> {
+    if (item.value?.Type === 'MusicArtist' && !audioTracks.value.length) {
+        audioTracks.value = await store.fetchArtistTracks(item.value.Id);
+    }
+    return audioTracks.value.map(itemToAudioTrack);
 }
 
 function playTrack(_trackId: string, index: number) {
@@ -961,13 +995,12 @@ function playTrack(_trackId: string, index: number) {
     audioPlayerStore.playAlbum(tracks, index);
 }
 
-function playAlbum() {
-    const tracks = audioTracks.value.map(itemToAudioTrack);
-    audioPlayerStore.playAlbum(tracks, 0);
+async function playAlbum() {
+    audioPlayerStore.playAlbum(await collectionTracks(), 0);
 }
 
-function shuffleAlbum() {
-    audioPlayerStore.playShuffled(audioTracks.value.map(itemToAudioTrack));
+async function shuffleAlbum() {
+    audioPlayerStore.playShuffled(await collectionTracks());
 }
 
 function enqueue(tracks: AudioTrack[], where: 'next' | 'end') {
@@ -980,8 +1013,8 @@ function queueTrack(track: any, where: 'next' | 'end') {
     enqueue([itemToAudioTrack(track)], where);
 }
 
-function queueAlbum(where: 'next' | 'end') {
-    enqueue(audioTracks.value.map(itemToAudioTrack), where);
+async function queueAlbum(where: 'next' | 'end') {
+    enqueue(await collectionTracks(), where);
 }
 
 const castRail = ref<HTMLDivElement | null>(null);

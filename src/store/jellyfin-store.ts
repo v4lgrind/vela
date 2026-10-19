@@ -10,6 +10,7 @@ import {
   getShowApi,
   getUserViewApi,
   getSystemApi,
+  getArtistApi,
 } from "@jellyfin/sdk/lib/utils/api";
 import { Preferences } from "@capacitor/preferences";
 
@@ -332,6 +333,7 @@ export const useJellyfinStore = defineStore("jellyfin", {
         filters?: string[];
         genres?: string[];
         nameStartsWith?: string;
+        includeItemTypes?: string[];
       }
     ) {
       this.initializeApi();
@@ -340,7 +342,7 @@ export const useJellyfinStore = defineStore("jellyfin", {
         userId: this.userId,
         parentId: libraryId,
         recursive: true,
-        includeItemTypes: ["Movie", "Series", "MusicAlbum", "BoxSet"],
+        includeItemTypes: (options?.includeItemTypes ?? ["Movie", "Series", "MusicAlbum", "BoxSet"]) as LibraryApiGetItemsRequest["includeItemTypes"],
         sortBy: (options?.sortBy ?? ["SortName"]) as LibraryApiGetItemsRequest["sortBy"],
         sortOrder: (options?.sortOrder ?? ["Ascending"]) as LibraryApiGetItemsRequest["sortOrder"],
         startIndex: options?.startIndex ?? 0,
@@ -610,6 +612,75 @@ export const useJellyfinStore = defineStore("jellyfin", {
       return resp.data.Items ?? [];
     },
 
+    /** Same paging/sorting options as fetchItems, for a music library's artists. */
+    async fetchAlbumArtists(
+      libraryId: string,
+      options: { startIndex: number; limit: number; sortOrder: string[]; filters?: string[]; genres?: string[]; nameStartsWith?: string }
+    ) {
+      this.initializeApi();
+      const resp = await getArtistApi(this.api).getAlbumArtists({
+        userId: this.userId,
+        parentId: libraryId,
+        startIndex: options.startIndex,
+        limit: options.limit,
+        sortBy: ["SortName"],
+        sortOrder: options.sortOrder as any,
+        filters: options.filters as any,
+        genres: options.genres,
+        nameStartsWith: options.nameStartsWith,
+        enableUserData: true,
+      });
+      return resp.data.Items ?? [];
+    },
+    /** The user's audio playlists (they live outside the music library). */
+    async fetchAudioPlaylists(options: { startIndex: number; limit: number; sortOrder: string[]; nameStartsWith?: string }) {
+      this.initializeApi();
+      const resp = await getLibraryApi(this.api).getItems({
+        userId: this.userId,
+        recursive: true,
+        includeItemTypes: ["Playlist"] as any,
+        mediaTypes: ["Audio"] as any,
+        startIndex: options.startIndex,
+        limit: options.limit,
+        sortBy: ["SortName"],
+        sortOrder: options.sortOrder as any,
+        nameStartsWith: options.nameStartsWith,
+      });
+      return resp.data.Items ?? [];
+    },
+    async fetchArtistAlbums(artistId: string) {
+      this.initializeApi();
+      const resp = await getLibraryApi(this.api).getItems({
+        userId: this.userId,
+        recursive: true,
+        albumArtistIds: [artistId],
+        includeItemTypes: ["MusicAlbum"] as any,
+        sortBy: ["ProductionYear", "SortName"] as any,
+        sortOrder: ["Descending", "Ascending"] as any,
+      });
+      return resp.data.Items ?? [];
+    },
+    async fetchArtistTracks(artistId: string) {
+      this.initializeApi();
+      const resp = await getLibraryApi(this.api).getItems({
+        userId: this.userId,
+        recursive: true,
+        artistIds: [artistId],
+        includeItemTypes: ["Audio"] as any,
+        sortBy: ["ProductionYear", "Album", "ParentIndexNumber", "IndexNumber"] as any,
+      });
+      return resp.data.Items ?? [];
+    },
+    /** Playlist entries in playlist order (no sortBy). */
+    async fetchPlaylistTracks(playlistId: string) {
+      this.initializeApi();
+      const resp = await getLibraryApi(this.api).getItems({
+        userId: this.userId,
+        parentId: playlistId,
+        includeItemTypes: ["Audio"] as any,
+      });
+      return resp.data.Items ?? [];
+    },
     async fetchAudioTracks(albumId: string) {
       this.initializeApi();
       const resp = await getLibraryApi(this.api).getItems({
@@ -622,7 +693,7 @@ export const useJellyfinStore = defineStore("jellyfin", {
       return resp.data.Items ?? [];
     },
     getPlaceholderImage(itemType?: string): string {
-      return generatePlaceholderImage(itemType || "default");
+      return generatePlaceholderImage(PLACEHOLDER_KEYS[itemType ?? ""] ?? itemType ?? "default");
     },
   },
   getters: {
@@ -631,6 +702,19 @@ export const useJellyfinStore = defineStore("jellyfin", {
     },
   },
 });
+
+// Callers pass Jellyfin item types; placeholders are keyed by kind.
+const PLACEHOLDER_KEYS: Record<string, string> = {
+  Movie: "movie",
+  Series: "series",
+  Season: "series",
+  Episode: "episode",
+  MusicAlbum: "album",
+  Playlist: "album",
+  Audio: "audio",
+  MusicArtist: "artist",
+  Person: "person",
+};
 
 function generatePlaceholderImage(type: string = "default"): string {
   const placeholders: Record<string, string> = {
@@ -643,6 +727,8 @@ function generatePlaceholderImage(type: string = "default"): string {
     album: `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 300'%3E%3Crect fill='%231e1e1e' width='300' height='300'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-size='48' fill='%2343e97b' font-family='Arial'%3E🎵%3C/text%3E%3Ctext x='50%25' y='70%25' dominant-baseline='middle' text-anchor='middle' font-size='18' fill='%239aa0a6' font-family='Arial'%3ENo Image%3C/text%3E%3C/svg%3E`,
 
     audio: `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 140 140'%3E%3Crect fill='%231e1e1e' width='140' height='140'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-size='40' fill='%2343e97b' font-family='Arial'%3E🎵%3C/text%3E%3Ctext x='50%25' y='75%25' dominant-baseline='middle' text-anchor='middle' font-size='12' fill='%239aa0a6' font-family='Arial'%3ENo Image%3C/text%3E%3C/svg%3E`,
+
+    artist: `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 300'%3E%3Crect fill='%231e1e1e' width='300' height='300'/%3E%3Ccircle cx='150' cy='120' r='44' fill='%239aa0a6'/%3E%3Cpath d='M78 240c0-42 32-70 72-70s72 28 72 70z' fill='%239aa0a6'/%3E%3C/svg%3E`,
 
     person: `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 140 210'%3E%3Crect fill='%231e1e1e' width='140' height='210'/%3E%3Ccircle cx='70' cy='65' r='28' fill='%239aa0a6'/%3E%3Cellipse cx='70' cy='145' rx='40' ry='35' fill='%239aa0a6'/%3E%3C/svg%3E`,
 

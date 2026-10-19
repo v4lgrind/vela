@@ -17,7 +17,15 @@
 
                     <!-- Backdrop -->
                     <div class="relative w-full aspect-[16/10] max-h-[58vh] overflow-hidden">
-                        <LazyImg v-if="heroImageUrl" :src="heroImageUrl" :alt="item.Name" :item-type="item.Type"
+                        <template v-if="showCoverHero && posterUrl">
+                            <LazyImg :src="posterUrl" alt="" :item-type="item.Type"
+                                class="absolute inset-0 w-full h-full object-cover blur-3xl scale-125 opacity-70" />
+                            <div class="absolute inset-0 flex items-center justify-center pt-12 pb-24">
+                                <LazyImg :src="posterUrl" :alt="item.Name" :item-type="item.Type"
+                                    class="h-full aspect-square rounded-xl object-cover shadow-[0_20px_60px_rgba(0,0,0,0.6)]" />
+                            </div>
+                        </template>
+                        <LazyImg v-else-if="heroImageUrl" :src="heroImageUrl" :alt="item.Name" :item-type="item.Type"
                             class="w-full h-full object-cover" />
                         <div v-else class="absolute inset-0 bg-gradient-to-br from-surface-raised to-background" />
                         <!-- Fades: bottom into page bg, subtle top darken for buttons -->
@@ -740,6 +748,9 @@ const isLandscapePoster = computed(() => {
     return type === 'Episode';
 });
 
+const isSquareArtwork = computed(() =>
+    ['MusicAlbum', 'Audio', 'MusicArtist', 'Playlist'].includes(item.value?.Type));
+
 const posterUrl = computed(() => {
     if (!item.value?.Id) return '';
     const cached = cachedArtworkUrl(item.value.Id, 'Primary');
@@ -747,6 +758,9 @@ const posterUrl = computed(() => {
     if (!offlineStore.isFullyOnline) return '';
     if (isLandscapePoster.value) {
         return store.getImageUrl(item.value.Id, 'Primary', 960, 540) || '';
+    }
+    if (isSquareArtwork.value) {
+        return store.getImageUrl(item.value.Id, 'Primary', 800, 800) || '';
     }
     return store.getImageUrl(item.value.Id, 'Primary', 300, 450) || '';
 });
@@ -758,6 +772,9 @@ const backdropUrl = computed(() => {
         : item.value.Id;
     const cached = cachedArtworkUrl(backdropId, 'Backdrop');
     if (cached) return cached;
+    // Requesting a backdrop the item doesn't have 404s and shows the error
+    // placeholder instead of falling back to the poster.
+    if (item.value.Type !== 'Episode' && !item.value.BackdropImageTags?.length) return '';
     return offlineStore.isFullyOnline
         ? store.getImageUrl(backdropId, 'Backdrop', 1920, 1080) || ''
         : '';
@@ -766,6 +783,10 @@ const backdropUrl = computed(() => {
 // Cinematic hero image: prefer a wide backdrop, fall back to the poster so
 // items without a backdrop (most albums) still render a header.
 const heroImageUrl = computed(() => backdropUrl.value || posterUrl.value);
+
+// Square cover art cropped to a 16:10 hero looks broken; show it whole over a
+// blurred copy of itself instead.
+const showCoverHero = computed(() => !backdropUrl.value && isSquareArtwork.value);
 
 const resumePercent = computed(() => {
     const runtime = item.value?.RunTimeTicks;

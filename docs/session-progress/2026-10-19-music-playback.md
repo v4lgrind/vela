@@ -94,3 +94,13 @@ committed and pushed straight to `main` one step at a time (user's request).
   Stop AirPlay.
 - Not verified: AirPlay speakers (HomePod/AirPort), volume slider on the
   TV, long sessions / Wi-Fi drops, arm32 devices (only arm64 is built).
+
+## Follow-up: 16 KB pages and one player at a time, 2026-10-20
+- The Pixel 10 (16 KB page size) warned the app was incompatible:
+  `libcliairplay.so` was linked with 4 KB segments. `build.sh` now links
+  with `-Wl,-z,max-page-size=16384` (check: `readelf -lW <so>` → LOAD align
+  `0x4000`). Any future native binary needs the same.
+- Opening a video (`PlayerPage`) now stops the music whenever the mini
+  player is visible, not only while playing; the mini player has a close
+  (✕) button that stops the queue and drops the notification.
+- Verified on the tablet and the Pixel 10 (nightly 1276).

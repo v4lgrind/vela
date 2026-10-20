@@ -141,7 +141,8 @@ committed and pushed straight to `main` one step at a time (user's request).
   removed): root/latest/albums/artists/album/artist/search lists, artwork
   bytes, track pick → whole album at the right index, voice query, app
   adopting the queue, normal in-app playback unchanged.
-- Not verified: a real car / Desktop Head Unit (no display on the build
-  host). Sideloaded apps only show in Android Auto with its developer
+- In the user's car (Pixel 10, nightly 1285): the app shows up in Android
+  Auto. Browsing/playing there not yet reported.
+- Not verified: Desktop Head Unit (no display on the build host). Sideloaded apps only show in Android Auto with its developer
   setting "Unknown sources" on. Playback reporting to Jellyfin only runs
   while the app's WebView is alive.

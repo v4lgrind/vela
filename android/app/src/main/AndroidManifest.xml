@@ -45,8 +45,21 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="androidx.media3.session.MediaSessionService" />
+                <action android:name="androidx.media3.session.MediaLibraryService" />
+                <!-- Android Auto finds media apps through the legacy browser service -->
+                <action android:name="android.media.browse.MediaBrowserService" />
             </intent-filter>
         </service>
+
+        <!-- Cover art for Android Auto, which only loads content:// artwork -->
+        <provider
+            android:name=".ArtworkProvider"
+            android:authorities="${applicationId}.artwork"
+            android:exported="true" />
+
+        <meta-data
+            android:name="com.google.android.gms.car.application"
+            android:resource="@xml/automotive_app_desc" />
 
         <activity
             android:name=".NativePlayerActivity"

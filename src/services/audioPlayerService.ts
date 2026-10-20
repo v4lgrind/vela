@@ -1,4 +1,5 @@
 import { Capacitor } from '@capacitor/core';
+import { watch } from 'vue';
 import {
   registerAudioController,
   useAudioPlayerStore,
@@ -14,6 +15,7 @@ import { offlineDatabase } from './offlineDatabase';
 import { NativeAudioEngine } from './audio/nativeAudioEngine';
 import { CastAudioEngine } from './audio/castAudioEngine';
 import { CastAudio } from '@/plugins/CastAudioPlugin';
+import { NativeAudio } from '@/plugins/NativeAudioPlugin';
 import { AirPlay } from '@/plugins/AirPlayPlugin';
 import { useToast } from '@/composables/useToast';
 import { WebAudioEngine } from './audio/webAudioEngine';
@@ -61,6 +63,7 @@ class AudioPlayerService implements AudioController {
     if (isNative) {
       this.setupCasting();
       this.setupAirPlay();
+      this.setupAndroidAuto();
     }
     registerAudioController(this);
     this.restoreFromEngine();
@@ -99,6 +102,36 @@ class AudioPlayerService implements AudioController {
       castEngine.setRepeatMode(store.repeatMode);
       if (!store.currentTrack) return;
       await this.loadQueue(store.queue, store.currentIndex, { position: store.currentTime, autoplay: store.isPlaying });
+    });
+  }
+
+  // --- Android Auto: the car browses the library natively and may start a queue ---
+
+  private setupAndroidAuto() {
+    // The car can start the music service without the app: it needs its own credentials.
+    watch(
+      () => [
+        this.jellyfinStore.serverUrl,
+        this.jellyfinStore.accessToken,
+        this.jellyfinStore.userId,
+        this.preferencesStore.musicMaxBitrate,
+      ] as const,
+      ([serverUrl, accessToken, userId, maxBitrate]) => {
+        NativeAudio.setLibraryConfig({
+          serverUrl: serverUrl || '',
+          accessToken: accessToken || '',
+          userId: userId || '',
+          maxBitrate: maxBitrate || 140_000_000,
+        }).catch((e) => logger.error('[AudioPlayer] setLibraryConfig failed', e));
+      },
+      { immediate: true },
+    );
+    NativeAudio.addListener('externalQueue', () => {
+      if (this.engine !== this.localEngine) return;
+      this.audioStore.shuffle = false;
+      this.restoreFromEngine().then(() => {
+        this.audioStore.unshuffledQueue = this.audioStore.queue;
+      });
     });
   }
 

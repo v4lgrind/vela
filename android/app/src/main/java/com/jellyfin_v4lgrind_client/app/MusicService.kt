@@ -3,6 +3,9 @@ package com.jellyfin_v4lgrind_client.app
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.os.Bundle
+import android.util.Log
+import androidx.core.content.ContextCompat
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -10,20 +13,38 @@ import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.audio.DefaultAudioSink
+import androidx.media3.session.LibraryResult
+import androidx.media3.session.MediaLibraryService
+import androidx.media3.session.MediaLibraryService.LibraryParams
+import androidx.media3.session.MediaLibraryService.MediaLibrarySession
 import androidx.media3.session.MediaSession
-import androidx.media3.session.MediaSessionService
+import androidx.media3.session.SessionCommand
+import androidx.media3.session.SessionError
+import com.google.common.collect.ImmutableList
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
+import com.google.common.util.concurrent.MoreExecutors
+import java.util.concurrent.Executors
 
 /**
  * Background music playback. Owns the ExoPlayer playlist and the MediaSession,
  * which gives us the media notification, lock-screen controls, headset /
  * Bluetooth buttons and audio focus. The WebView drives it through
- * [NativeAudioPlugin] via a MediaController.
+ * [NativeAudioPlugin] via a MediaController. As a library service it also
+ * serves the Jellyfin music library to Android Auto ([JellyfinLibrary]).
  */
-class MusicService : MediaSessionService() {
+class MusicService : MediaLibraryService() {
 
-    private var session: MediaSession? = null
+    companion object {
+        /** Sent to controllers when a queue was started from outside the app (e.g. the car). */
+        const val COMMAND_EXTERNAL_QUEUE = "externalQueue"
+        private const val TAG = "MusicService"
+    }
+
+    private var session: MediaLibrarySession? = null
+    private lateinit var library: JellyfinLibrary
+    // Library calls hit the network: keep them off the main thread.
+    private val io = MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(2))
 
     override fun onCreate() {
         super.onCreate()
@@ -52,6 +73,7 @@ class MusicService : MediaSessionService() {
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
         AirPlayManager.attach(player)
+        library = JellyfinLibrary(this)
 
         val openApp = PendingIntent.getActivity(
             this,
@@ -60,14 +82,13 @@ class MusicService : MediaSessionService() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         // NativePlayerActivity has its own (default-id) session; ids must be unique.
-        session = MediaSession.Builder(this, player)
+        session = MediaLibrarySession.Builder(this, player, LibraryCallback())
             .setId("music")
             .setSessionActivity(openApp)
-            .setCallback(SessionCallback())
             .build()
     }
 
-    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session
+    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? = session
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         val player = session?.player
@@ -83,10 +104,17 @@ class MusicService : MediaSessionService() {
             release()
         }
         session = null
+        io.shutdownNow()
         super.onDestroy()
     }
 
-    private class SessionCallback : MediaSession.Callback {
+    private inner class LibraryCallback : MediaLibrarySession.Callback {
+
+        // The app sends ready-to-play items (URI in requestMetadata); the car
+        // sends only ids or a voice query, which the library resolves.
+        private fun isResolved(items: List<MediaItem>) =
+            items.all { it.localConfiguration != null || it.requestMetadata.mediaUri != null }
+
         // MediaItems lose their URI when sent from a controller; it travels in
         // requestMetadata.mediaUri and is restored here.
         override fun onAddMediaItems(
@@ -94,11 +122,97 @@ class MusicService : MediaSessionService() {
             controller: MediaSession.ControllerInfo,
             mediaItems: MutableList<MediaItem>,
         ): ListenableFuture<MutableList<MediaItem>> {
-            val resolved = mediaItems.map { item ->
-                if (item.localConfiguration != null) item
-                else item.buildUpon().setUri(item.requestMetadata.mediaUri).build()
-            }.toMutableList()
-            return Futures.immediateFuture(resolved)
+            if (isResolved(mediaItems)) {
+                val resolved = mediaItems.map { item ->
+                    if (item.localConfiguration != null) item
+                    else item.buildUpon().setUri(item.requestMetadata.mediaUri).build()
+                }.toMutableList()
+                return Futures.immediateFuture(resolved)
+            }
+            // Picked in the car: only ids (or a voice query) come through.
+            return io.submit<MutableList<MediaItem>> {
+                library.resolve(mediaItems)?.first?.toMutableList() ?: mutableListOf()
+            }
+        }
+
+        // A pick in the car replaces the queue with the rest of its album/playlist.
+        override fun onSetMediaItems(
+            mediaSession: MediaSession,
+            controller: MediaSession.ControllerInfo,
+            mediaItems: MutableList<MediaItem>,
+            startIndex: Int,
+            startPositionMs: Long,
+        ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> {
+            if (isResolved(mediaItems)) {
+                return super.onSetMediaItems(mediaSession, controller, mediaItems, startIndex, startPositionMs)
+            }
+            return io.submit<MediaSession.MediaItemsWithStartPosition> {
+                val (queue, index) = library.resolve(mediaItems) ?: throw IllegalStateException("Nothing to play")
+                MediaSession.MediaItemsWithStartPosition(queue, index, 0L)
+            }.also { future ->
+                future.addListener({
+                    // Let the app adopt this queue (and report playback) if it's running.
+                    if (runCatching { future.get() }.isSuccess) {
+                        session?.broadcastCustomCommand(SessionCommand(COMMAND_EXTERNAL_QUEUE, Bundle.EMPTY), Bundle.EMPTY)
+                    }
+                }, ContextCompat.getMainExecutor(this@MusicService))
+            }
+        }
+
+        override fun onGetLibraryRoot(
+            session: MediaLibrarySession,
+            browser: MediaSession.ControllerInfo,
+            params: LibraryParams?,
+        ): ListenableFuture<LibraryResult<MediaItem>> =
+            Futures.immediateFuture(LibraryResult.ofItem(library.root(), params))
+
+        override fun onGetChildren(
+            session: MediaLibrarySession,
+            browser: MediaSession.ControllerInfo,
+            parentId: String,
+            page: Int,
+            pageSize: Int,
+            params: LibraryParams?,
+        ): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> = io.submit<LibraryResult<ImmutableList<MediaItem>>> {
+            if (!library.isConfigured) return@submit LibraryResult.ofError(SessionError.ERROR_SESSION_AUTHENTICATION_EXPIRED)
+            try {
+                val all = library.children(parentId)
+                val from = (page * pageSize).coerceAtMost(all.size)
+                LibraryResult.ofItemList(all.subList(from, (from + pageSize).coerceAtMost(all.size)), params)
+            } catch (e: Exception) {
+                Log.w(TAG, "Browse $parentId failed: ${e.message}")
+                LibraryResult.ofError(SessionError.ERROR_IO)
+            }
+        }
+
+        override fun onSearch(
+            session: MediaLibrarySession,
+            browser: MediaSession.ControllerInfo,
+            query: String,
+            params: LibraryParams?,
+        ): ListenableFuture<LibraryResult<Void>> {
+            io.execute {
+                val count = runCatching { library.search(query).size }.getOrDefault(0)
+                session.notifySearchResultChanged(browser, query, count, params)
+            }
+            return Futures.immediateFuture(LibraryResult.ofVoid())
+        }
+
+        override fun onGetSearchResult(
+            session: MediaLibrarySession,
+            browser: MediaSession.ControllerInfo,
+            query: String,
+            page: Int,
+            pageSize: Int,
+            params: LibraryParams?,
+        ): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> = io.submit<LibraryResult<ImmutableList<MediaItem>>> {
+            try {
+                val all = library.search(query)
+                val from = (page * pageSize).coerceAtMost(all.size)
+                LibraryResult.ofItemList(all.subList(from, (from + pageSize).coerceAtMost(all.size)), params)
+            } catch (e: Exception) {
+                LibraryResult.ofError(SessionError.ERROR_IO)
+            }
         }
     }
 }

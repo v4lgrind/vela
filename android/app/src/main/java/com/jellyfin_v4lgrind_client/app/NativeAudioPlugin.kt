@@ -13,6 +13,8 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
+import androidx.media3.session.SessionCommand
+import androidx.media3.session.SessionResult
 import androidx.media3.session.SessionToken
 import com.getcapacitor.JSArray
 import com.getcapacitor.JSObject
@@ -20,10 +22,13 @@ import com.getcapacitor.Plugin
 import com.getcapacitor.PluginCall
 import com.getcapacitor.PluginMethod
 import com.getcapacitor.annotation.CapacitorPlugin
+import com.google.common.util.concurrent.Futures
+import com.google.common.util.concurrent.ListenableFuture
 import org.json.JSONObject
 
 private const val TAG = "NativeAudio"
-private const val TRACK_EXTRA = "track"
+// MediaMetadata extra holding the app's AudioTrack JSON (also set by JellyfinLibrary).
+internal const val TRACK_EXTRA = "track"
 private const val TICK_MS = 1000L
 
 /**
@@ -75,6 +80,16 @@ class NativeAudioPlugin : Plugin() {
                 override fun onDisconnected(controller: MediaController) {
                     this@NativeAudioPlugin.controller = null
                     mainHandler.removeCallbacks(ticker)
+                }
+
+                // A queue started in the car: the WebView re-reads it with getState.
+                override fun onCustomCommand(
+                    controller: MediaController,
+                    command: SessionCommand,
+                    args: Bundle,
+                ): ListenableFuture<SessionResult> {
+                    if (command.customAction == MusicService.COMMAND_EXTERNAL_QUEUE) notifyListeners("externalQueue", JSObject())
+                    return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
                 }
             })
             .buildAsync()
@@ -252,6 +267,19 @@ class NativeAudioPlugin : Plugin() {
     }
 
     /** Current state plus the queue, so a recreated WebView can resync. */
+    /** Server and credentials for browsing the library from Android Auto. */
+    @PluginMethod
+    fun setLibraryConfig(call: PluginCall) {
+        JellyfinLibrary.saveConfig(
+            context,
+            call.getString("serverUrl") ?: "",
+            call.getString("accessToken") ?: "",
+            call.getString("userId") ?: "",
+            call.data.optLong("maxBitrate", 140_000_000L),
+        )
+        call.resolve()
+    }
+
     @PluginMethod
     fun getState(call: PluginCall) = withController(call) { c ->
         val tracks = JSArray()

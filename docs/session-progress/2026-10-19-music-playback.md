@@ -70,3 +70,27 @@ committed and pushed straight to `main` one step at a time (user's request).
   pause, header/mini player show the device, disconnect → local resume.
 - Not verified: Chromecast / Google TV (none online), and the video cast
   button with the receiver switching (still never tested on hardware).
+
+## Follow-up: AirPlay (Apple TV), 2026-10-20
+- Sender: [music-assistant/airplay-cli](https://github.com/music-assistant/airplay-cli)
+  (`cliairplay`, GPL-3.0) cross-compiled for arm64 with NDK r27c against a
+  static OpenSSL 3.5.9 — `native/airplay/` (Dockerfile + build.sh; rebuild
+  with `docker build -f native/airplay/Dockerfile --output
+  type=local,dest=android/app/src/main/jniLibs native/airplay`). Shipped as
+  `jniLibs/arm64-v8a/libcliairplay.so` and executed from
+  `nativeLibraryDir` (needs `useLegacyPackaging = true`).
+- `AirPlayManager.kt`: a `TeeAudioProcessor` at the end of the ExoPlayer
+  audio chain copies decoded PCM (resampled to 44.1 kHz, stereo s16) to
+  cliairplay's stdin while the local output is muted; commands (START,
+  FLUSH, VOLUME, metadata, artwork) go through `--cmdpipe`. Apple TV
+  remote buttons (`[EVENT] remote command=`) drive the player.
+- Apple TVs need a one-time PIN pairing (`--pair-setup`); credentials are
+  stored per device in SharedPreferences `airplay` with a fixed DACP id.
+- Android blocks PTP ports 319/320; cliairplay falls back to NTP timing.
+- `AirPlayPlugin.kt` (NSD discovery of `_airplay._tcp`, connect, pairing)
+  + `AirPlayDialog.vue` (button in the full-screen player).
+- Verified on the tablet with the Apple TV "Télévision": pairing via the
+  dialog, connect while paused, play, next, seek, pause, artwork on the TV,
+  Stop AirPlay.
+- Not verified: AirPlay speakers (HomePod/AirPort), volume slider on the
+  TV, long sessions / Wi-Fi drops, arm32 devices (only arm64 is built).

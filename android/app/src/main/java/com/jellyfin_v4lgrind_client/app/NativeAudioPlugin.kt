@@ -180,7 +180,9 @@ class NativeAudioPlugin : Plugin() {
     fun setVolume(call: PluginCall) {
         val volume = call.data.optDouble("volume", 1.0).toFloat().coerceIn(0f, 1f)
         withController(call) { c ->
-            c.volume = volume
+            // While on AirPlay the local output stays muted; the slider drives the receiver.
+            if (AirPlayManager.currentDevice() != null) AirPlayManager.setVolume((volume * 100).toInt())
+            else c.volume = volume
             call.resolve()
         }
     }

@@ -1,12 +1,15 @@
 package com.jellyfin_v4lgrind_client.app
 
 import android.app.PendingIntent
+import android.content.Context
 import android.content.Intent
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.audio.AudioSink
+import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.google.common.util.concurrent.Futures
@@ -30,13 +33,25 @@ class MusicService : MediaSessionService() {
             .build()
         // FFmpeg after MediaCodec, same as the video player, for formats the
         // platform can't decode (ALAC on some devices, etc.).
-        val renderersFactory = DefaultRenderersFactory(this)
-            .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
+        val renderersFactory = object : DefaultRenderersFactory(this) {
+            // AirPlay taps the decoded PCM at the end of the processor chain.
+            override fun buildAudioSink(
+                context: Context,
+                enableFloatOutput: Boolean,
+                enableAudioTrackPlaybackParams: Boolean,
+            ): AudioSink = DefaultAudioSink.Builder(context)
+                .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
+                .setAudioProcessorChain(
+                    DefaultAudioSink.DefaultAudioProcessorChain(AirPlayManager.resampler, AirPlayManager.tee)
+                )
+                .build()
+        }.setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
         val player = ExoPlayer.Builder(this, renderersFactory)
             .setAudioAttributes(audioAttributes, true)
             .setHandleAudioBecomingNoisy(true)
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
+        AirPlayManager.attach(player)
 
         val openApp = PendingIntent.getActivity(
             this,
@@ -63,6 +78,7 @@ class MusicService : MediaSessionService() {
 
     override fun onDestroy() {
         session?.run {
+            AirPlayManager.detach(player as ExoPlayer)
             player.release()
             release()
         }

@@ -52,6 +52,13 @@ android {
             signingConfig signingConfigs.fixed
         }
     }
+    // libcliairplay.so is an executable (the AirPlay sender), not a library:
+    // it must be extracted to nativeLibraryDir to be run.
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
     applicationVariants.all { variant ->
         variant.outputs.all {
             outputFileName = "mediaserver-client.apk"

@@ -12,9 +12,18 @@
       <span v-if="audioStore.castDevice" class="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-accent-purple truncate">
         <Cast class="size-4 shrink-0" /> {{ audioStore.castDevice }}
       </span>
+      <span v-else-if="audioStore.airplayDevice" class="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-accent-purple truncate">
+        <Airplay class="size-4 shrink-0" /> {{ audioStore.airplayDevice }}
+      </span>
       <span v-else class="text-xs font-semibold uppercase tracking-wide text-text-muted">Now Playing</span>
       <div class="flex items-center">
-        <Button v-if="audioStore.castAvailable || audioStore.castDevice" variant="ghost" size="icon" title="Cast"
+        <Button v-if="audioStore.airplaySupported && !audioStore.castDevice" variant="ghost" size="icon" title="AirPlay"
+          class="size-11 rounded-full hover:bg-white/10"
+          :class="audioStore.airplayDevice ? 'text-accent-purple' : 'text-text-primary'"
+          @click="showAirPlay = true">
+          <Airplay class="size-6" />
+        </Button>
+        <Button v-if="(audioStore.castAvailable || audioStore.castDevice) && !audioStore.airplayDevice" variant="ghost" size="icon" title="Cast"
           class="size-11 rounded-full hover:bg-white/10"
           :class="audioStore.castDevice ? 'text-accent-purple' : 'text-text-primary'"
           @click="audioPlayerService.openCastDialog()">
@@ -116,6 +125,7 @@
         </div>
       </div>
     </div>
+    <AirPlayDialog v-model:open="showAirPlay" />
   </div>
 </template>
 
@@ -127,12 +137,14 @@ import { formatTime } from '@/utils/helpers';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { audioPlayerService } from '@/services/audioPlayerService';
-import { Cast, ChevronDown, GripVertical, ListMusic, SkipBack, SkipForward, Play, Pause, Repeat, Repeat1, Shuffle, Volume2, Volume1, VolumeX, X } from 'lucide-vue-next';
+import AirPlayDialog from '@/components/AirPlayDialog.vue';
+import { Airplay, Cast, ChevronDown, GripVertical, ListMusic, SkipBack, SkipForward, Play, Pause, Repeat, Repeat1, Shuffle, Volume2, Volume1, VolumeX, X } from 'lucide-vue-next';
 
 const audioStore = useAudioPlayerStore();
 const jellyfinStore = useJellyfinStore();
 
 const showQueue = ref(false);
+const showAirPlay = ref(false);
 
 const currentTrack = computed(() => audioStore.currentTrack);
 

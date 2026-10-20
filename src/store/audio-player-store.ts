@@ -68,6 +68,10 @@ interface AudioPlayerState {
   castAvailable: boolean;
   /** Name of the device the queue is cast to, null when playing locally */
   castDevice: string | null;
+  /** The AirPlay sender ships with this build (Android arm64) */
+  airplaySupported: boolean;
+  /** AirPlay receiver the sound goes to, null when playing on the device */
+  airplayDevice: string | null;
 }
 
 export const useAudioPlayerStore = defineStore('audio-player', {
@@ -86,6 +90,8 @@ export const useAudioPlayerStore = defineStore('audio-player', {
     resumePosition: 0,
     castAvailable: false,
     castDevice: null,
+    airplaySupported: false,
+    airplayDevice: null,
   }),
   persist: {
     pick: ['queue', 'currentIndex', 'volume', 'repeatMode', 'shuffle', 'unshuffledQueue', 'resumePosition'],

@@ -17,6 +17,9 @@
         <div v-if="audioStore.castDevice" class="flex items-center gap-1 text-xs text-accent-purple truncate">
           <Cast class="size-3 shrink-0" /> {{ audioStore.castDevice }}
         </div>
+        <div v-else-if="audioStore.airplayDevice" class="flex items-center gap-1 text-xs text-accent-purple truncate">
+          <Airplay class="size-3 shrink-0" /> {{ audioStore.airplayDevice }}
+        </div>
         <div v-else class="text-xs text-text-muted truncate">{{ currentTrack?.artist || '' }}</div>
       </div>
       <div class="flex items-center gap-1 shrink-0" @click.stop>
@@ -40,7 +43,7 @@ import { computed } from 'vue';
 import { useAudioPlayerStore } from '@/store/audio-player-store';
 import { useJellyfinStore } from '@/store/jellyfin-store';
 import { Button } from '@/components/ui/button';
-import { Cast, SkipBack, SkipForward, Play, Pause } from 'lucide-vue-next';
+import { Airplay, Cast, SkipBack, SkipForward, Play, Pause } from 'lucide-vue-next';
 import { useBottomNavVisible } from '@/composables/useBottomNav';
 
 const audioStore = useAudioPlayerStore();

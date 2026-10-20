@@ -14,6 +14,8 @@ import { offlineDatabase } from './offlineDatabase';
 import { NativeAudioEngine } from './audio/nativeAudioEngine';
 import { CastAudioEngine } from './audio/castAudioEngine';
 import { CastAudio } from '@/plugins/CastAudioPlugin';
+import { AirPlay } from '@/plugins/AirPlayPlugin';
+import { useToast } from '@/composables/useToast';
 import { WebAudioEngine } from './audio/webAudioEngine';
 import type { AudioEngine, EngineState, QueueItem } from './audio/types';
 import { logger } from '@/utils/logger';
@@ -56,7 +58,10 @@ class AudioPlayerService implements AudioController {
     this.localEngine = isNative ? new NativeAudioEngine() : new WebAudioEngine();
     this.engine = this.localEngine;
     this.bindEngine(this.localEngine);
-    if (isNative) this.setupCasting();
+    if (isNative) {
+      this.setupCasting();
+      this.setupAirPlay();
+    }
     registerAudioController(this);
     this.restoreFromEngine();
   }
@@ -94,6 +99,25 @@ class AudioPlayerService implements AudioController {
       castEngine.setRepeatMode(store.repeatMode);
       if (!store.currentTrack) return;
       await this.loadQueue(store.queue, store.currentIndex, { position: store.currentTime, autoplay: store.isPlaying });
+    });
+  }
+
+  // --- AirPlay: the native player keeps playing, its output goes to the receiver ---
+
+  private setupAirPlay() {
+    const store = this.audioStore;
+    AirPlay.isSupported()
+      .then(({ supported }) => { store.airplaySupported = supported; })
+      .catch(() => {});
+    AirPlay.getState()
+      .then(({ connected, deviceName }) => { store.airplayDevice = connected ? deviceName ?? 'AirPlay' : null; })
+      .catch(() => {});
+    AirPlay.addListener('stateChange', ({ state, deviceName, error }) => {
+      store.airplayDevice = state === 'connecting' || state === 'connected' ? deviceName ?? 'AirPlay' : null;
+      if (state === 'error') {
+        logger.error('[AudioPlayer] AirPlay error:', error);
+        useToast().showError(`AirPlay: ${error ?? 'connection lost'}`);
+      }
     });
   }
 

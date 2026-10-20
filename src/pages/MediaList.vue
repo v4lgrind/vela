@@ -4,17 +4,43 @@
 
     <header class="flex items-center justify-between mb-4">
       <h1 class="text-2xl sm:text-3xl font-bold text-foreground">Accueil</h1>
-      <button
-        type="button"
-        title="Actualiser l’accueil"
-        aria-label="Actualiser l’accueil"
-        :disabled="refreshing"
-        class="size-10 rounded-full border border-border-default bg-surface-raised text-text-muted
-               flex items-center justify-center active:scale-95 transition disabled:opacity-50"
-        @click="loadMedia(true)">
-        <RefreshCw class="size-4" :class="{ 'animate-spin': refreshing }" />
-      </button>
+      <div class="flex items-center gap-2">
+        <!-- Pick the music output before playing anything -->
+        <button
+          v-if="audioStore.airplaySupported && !audioStore.castDevice"
+          type="button"
+          :title="audioStore.airplayDevice ?? 'AirPlay'"
+          aria-label="AirPlay"
+          class="size-10 rounded-full border border-border-default bg-surface-raised
+                 flex items-center justify-center active:scale-95 transition"
+          :class="audioStore.airplayDevice ? 'text-accent-purple' : 'text-text-muted'"
+          @click="showAirPlay = true">
+          <Airplay class="size-4" />
+        </button>
+        <button
+          v-if="(audioStore.castAvailable || audioStore.castDevice) && !audioStore.airplayDevice"
+          type="button"
+          :title="audioStore.castDevice ?? 'Cast'"
+          aria-label="Cast"
+          class="size-10 rounded-full border border-border-default bg-surface-raised
+                 flex items-center justify-center active:scale-95 transition"
+          :class="audioStore.castDevice ? 'text-accent-purple' : 'text-text-muted'"
+          @click="audioPlayerService.openCastDialog()">
+          <Cast class="size-4" />
+        </button>
+        <button
+          type="button"
+          title="Actualiser l’accueil"
+          aria-label="Actualiser l’accueil"
+          :disabled="refreshing"
+          class="size-10 rounded-full border border-border-default bg-surface-raised text-text-muted
+                 flex items-center justify-center active:scale-95 transition disabled:opacity-50"
+          @click="loadMedia(true)">
+          <RefreshCw class="size-4" :class="{ 'animate-spin': refreshing }" />
+        </button>
+      </div>
     </header>
+    <AirPlayDialog v-model:open="showAirPlay" />
 
     <!-- Continue Watching -->
     <section v-if="resumeItems.length" class="mb-5">
@@ -236,7 +262,10 @@ import { useJellyfinStore } from '@/store/jellyfin-store';
 import type { HomeCache, HomeItem, HomeLibraryCard } from '@/store/jellyfin-store';
 import LazyImg from '@/components/LazyImg.vue';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowRight, Check, Download as DownloadIcon, Loader2, Play, RefreshCw } from 'lucide-vue-next';
+import { Airplay, ArrowRight, Cast, Check, Download as DownloadIcon, Loader2, Play, RefreshCw } from 'lucide-vue-next';
+import AirPlayDialog from '@/components/AirPlayDialog.vue';
+import { useAudioPlayerStore } from '@/store/audio-player-store';
+import { audioPlayerService } from '@/services/audioPlayerService';
 import { useOfflineStore } from '@/store/offline-store';
 import { useDownloadStore } from '@/store/download-store';
 
@@ -252,6 +281,8 @@ const latestByLibrary = ref<Record<string, HomeItem[]>>({});
 const loading = ref(true);
 const latestLoading = ref(false);
 const refreshing = ref(false);
+const audioStore = useAudioPlayerStore();
+const showAirPlay = ref(false);
 const error = ref<string | null>(null);
 
 function hasHomeItemId(item: BaseItemDto): item is HomeItem {

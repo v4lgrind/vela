@@ -63,6 +63,10 @@ object AirPlayManager {
     private val mainHandler = Handler(Looper.getMainLooper())
     private var player: ExoPlayer? = null
     private var session: Session? = null
+    /** Device whose session cliairplay ended after its idle timeout; reconnected on play. */
+    private var standby: Device? = null
+    private var appContext: Context? = null
+    private var airplayVolume = 50
     private var pairing: Process? = null
     private var localVolume = 1f
 
@@ -79,12 +83,14 @@ object AirPlayManager {
         @Volatile var started = false
         /** cliairplay reported audio buffered for the current feed (once per start cycle). */
         @Volatile var buffered = false
+        @Volatile var idleTimedOut = false
         @Volatile var closed = false
     }
 
     private val playerListener = object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             playing = isPlaying
+            if (isPlaying && session == null) standby?.let { device -> appContext?.let { spawn(it, device) } }
             val s = session ?: return
             // Paused: drop what the receiver queued so it stops right away;
             // the next feed is started again once buffered.
@@ -174,10 +180,25 @@ object AirPlayManager {
     fun connect(context: Context, device: Device, volume: Int) {
         disconnect()
         val exo = player ?: run { emit("error", device, "Music player not running"); return }
+        appContext = context.applicationContext
+        airplayVolume = volume.coerceIn(0, 100)
+        if (!spawn(context, device)) return
+
+        // Route the player into the tee: resample to 44.1 kHz and mute the
+        // local output. Re-preparing makes the audio sink pick up the change.
+        localVolume = exo.volume
+        exo.volume = 0f
+        resampler.setOutputSampleRateHz(SAMPLE_RATE)
+        reconfigure(exo)
+    }
+
+    /** Starts a cliairplay process for [device]; the player routing is left as is. */
+    private fun spawn(context: Context, device: Device): Boolean {
+        standby = null
         val cmdPipe = File(context.cacheDir, "airplay.cmd").apply { delete() }
         val args = mutableListOf(
             binary(context).path, "--protocol", "auto", "--port", device.port.toString(),
-            "--dacp", dacpId(context), "--volume", volume.coerceIn(0, 100).toString(),
+            "--dacp", dacpId(context), "--volume", airplayVolume.toString(),
             "--cmdpipe", cmdPipe.path, "--name", "Jellyfin",
             "--txt", device.txt.entries.joinToString(" ") { "${it.key}=${it.value}" },
         )
@@ -188,42 +209,45 @@ object AirPlayManager {
             ProcessBuilder(args).directory(context.cacheDir).start()
         } catch (e: Exception) {
             emit("error", device, e.message)
-            return
+            return false
         }
         val s = Session(device, process, cmdPipe)
         session = s
         emit("connecting", device, null)
         startIo(s)
-
-        // Route the player into the tee: resample to 44.1 kHz and mute the
-        // local output. Re-preparing makes the audio sink pick up the change.
-        localVolume = exo.volume
-        exo.volume = 0f
-        resampler.setOutputSampleRateHz(SAMPLE_RATE)
-        reconfigure(exo)
         sendMetadata(s)
+        return true
     }
 
     /** Main thread. Ends the session and gives the sound back to the device. */
     fun disconnect() {
-        val s = session ?: return
+        val s = session
+        val device = s?.device ?: standby ?: return
         session = null
-        s.closed = true
-        s.commands.offer("ACTION=DISCONNECT")
-        mainHandler.postDelayed({ s.process.destroy() }, 2000)
+        standby = null
+        s?.let {
+            it.closed = true
+            it.commands.offer("ACTION=DISCONNECT")
+            mainHandler.postDelayed({ it.process.destroy() }, 2000)
+        }
+        restoreLocalOutput()
+        emit("disconnected", device, null)
+    }
+
+    fun setVolume(volume: Int) {
+        airplayVolume = volume.coerceIn(0, 100)
+        session?.commands?.offer("VOLUME=$airplayVolume")
+    }
+
+    fun currentDevice(): Device? = session?.device ?: standby
+
+    private fun restoreLocalOutput() {
         player?.let { exo ->
             resampler.setOutputSampleRateHz(SonicAudioProcessor.SAMPLE_RATE_NO_CHANGE)
             exo.volume = localVolume
             reconfigure(exo)
         }
-        emit("disconnected", s.device, null)
     }
-
-    fun setVolume(volume: Int) {
-        session?.commands?.offer("VOLUME=${volume.coerceIn(0, 100)}")
-    }
-
-    fun currentDevice(): Device? = session?.device
 
     private fun reconfigure(exo: ExoPlayer) {
         if (exo.mediaItemCount == 0) return
@@ -289,12 +313,14 @@ object AirPlayManager {
                 if (session === s) {
                     session = null
                     s.closed = true
-                    player?.let { exo ->
-                        resampler.setOutputSampleRateHz(SonicAudioProcessor.SAMPLE_RATE_NO_CHANGE)
-                        exo.volume = localVolume
-                        reconfigure(exo)
+                    if (s.idleTimedOut) {
+                        // Nothing played for a while: stay on this device and
+                        // start a new session as soon as playback resumes.
+                        if (playing) spawn(appContext ?: return@post, s.device) else standby = s.device
+                    } else {
+                        restoreLocalOutput()
+                        emit("error", s.device, "AirPlay stopped (exit $code)")
                     }
-                    emit("error", s.device, "AirPlay stopped (exit $code)")
                 }
             }
         }
@@ -312,6 +338,7 @@ object AirPlayManager {
             }
             line.startsWith("[EVENT] remote command=") ->
                 mainHandler.post { if (session === s) onRemoteCommand(line.substringAfter("=").trim()) }
+            line.startsWith("[STATUS] idle_timeout") -> s.idleTimedOut = true
             line.startsWith("[STATUS] error") || line.startsWith("[ERROR]") ->
                 mainHandler.post { if (session === s) emit("error", s.device, line.substringAfter("] ")) }
         }

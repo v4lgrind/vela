@@ -24,7 +24,6 @@ import com.google.android.gms.cast.MediaSeekOptions
 import com.google.android.gms.cast.MediaStatus
 import com.google.android.gms.cast.framework.CastContext
 import com.google.android.gms.cast.framework.CastSession
-import com.google.android.gms.cast.framework.CastState
 import com.google.android.gms.cast.framework.CastStateListener
 import com.google.android.gms.cast.framework.SessionManagerListener
 import com.google.android.gms.cast.framework.media.RemoteMediaClient
@@ -143,8 +142,9 @@ class CastAudioPlugin : Plugin() {
         notifyListeners("sessionEnded", JSObject())
     }
 
-    private fun availability() = JSObject()
-        .put("available", castContext != null && castContext?.castState != CastState.NO_DEVICES_AVAILABLE)
+    // Cast is offered whenever the framework is there: passive discovery often
+    // misses sleeping speakers, and the chooser dialog scans actively itself.
+    private fun availability() = JSObject().put("available", castContext != null)
         .put("deviceName", session?.castDevice?.friendlyName)
 
     private fun onMain(call: PluginCall, block: () -> Unit) {

@@ -104,3 +104,17 @@ committed and pushed straight to `main` one step at a time (user's request).
   player is visible, not only while playing; the mini player has a close
   (✕) button that stops the queue and drops the notification.
 - Verified on the tablet and the Pixel 10 (nightly 1276).
+
+## Follow-up: output picker on home, Libraries tab, 2026-10-20
+- Home header has AirPlay and Cast buttons, so the output can be chosen
+  before anything plays. Cast is now offered whenever the Cast framework is
+  present (passive discovery kept missing the sleeping Nest Mini; the
+  chooser dialog scans actively).
+- cliairplay ends a session after 2 min without audio (`[STATUS]
+  idle_timeout`, connected-but-idle or paused). `AirPlayManager` now keeps
+  the device in standby and spawns a new session when playback starts,
+  without an error toast. Verified: connect from home, wait 2 min, play.
+- New "Biblio." bottom-nav tab (`LibrariesPage.vue`, route `libraryList`):
+  library tiles with a type icon; `libraryItem` pages keep this tab active.
+  Offline guards (router + App.vue) include the new route.
+- Verified on the tablet and the Pixel 10 (nightly 1279).

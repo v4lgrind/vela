@@ -146,3 +146,15 @@ committed and pushed straight to `main` one step at a time (user's request).
 - Not verified: Desktop Head Unit (no display on the build host). Sideloaded apps only show in Android Auto with its developer
   setting "Unknown sources" on. Playback reporting to Jellyfin only runs
   while the app's WebView is alive.
+
+## Album page on phones (cf39349)
+
+- The bottom gap above the nav was 72px of empty space: `html`, `body` and
+  `#app` each added `padding-bottom: env(safe-area-inset-bottom)` on top of
+  the reservation `App.vue` already makes. Removed it from `main.css`.
+- The cover sat under the camera cutout because the hero's padding ignored
+  `--sat`. It now starts at `56px + --sat`, and the hero is `aspect-[4/5]` on
+  phones (16/10 from `sm:`), so square covers stay large.
+- Checked on the Pixel 10 (build 1287): the cover starts 10px below the back
+  button, there is ~56px between the track list and the nav, and the home
+  page bottom is unchanged.

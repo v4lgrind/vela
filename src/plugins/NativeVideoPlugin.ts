@@ -33,6 +33,8 @@ export interface NativeVideoStartOptions {
     creditsStartMs?: number;
     durationHintMs?: number;
     srtFilePath?: string;
+    /** JSON trickplay sheet info for seek-bar thumbnails (see TrickplayThumbnails.kt). */
+    trickplayJson?: string;
 }
 
 export interface NativeVideoProgressEvent {

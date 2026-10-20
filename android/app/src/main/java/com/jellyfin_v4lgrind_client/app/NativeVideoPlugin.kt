@@ -77,6 +77,7 @@ class NativeVideoPlugin : Plugin() {
             putExtra(NativePlayerActivity.EXTRA_CREDITS_START_MS, call.data.optLong("creditsStartMs", -1L))
             putExtra(NativePlayerActivity.EXTRA_DURATION_HINT_MS, call.data.optLong("durationHintMs", 0L))
             putExtra(NativePlayerActivity.EXTRA_SRT_FILE_PATH, call.data.optString("srtFilePath", ""))
+            putExtra(NativePlayerActivity.EXTRA_TRICKPLAY_JSON, call.data.optString("trickplayJson", ""))
         }
         activity.startActivity(intent)
         call.resolve()

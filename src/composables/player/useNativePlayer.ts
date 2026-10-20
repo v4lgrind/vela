@@ -1,4 +1,5 @@
 import { useRouter } from 'vue-router';
+import { useJellyfinStore } from '@/store/jellyfin-store';
 import { usePreferencesStore } from '@/store/preferences-store';
 import { NativeVideo } from '@/plugins/NativeVideoPlugin';
 import { debugLog } from '@/utils/debugLog';
@@ -43,6 +44,7 @@ export function useNativePlayer(
 
     const router = useRouter();
     const preferencesStore = usePreferencesStore();
+    const jellyfinStore = useJellyfinStore();
 
     let nativeSwitchingQuality = false; // suppress 'stopped' → router.back() during native quality switch
 
@@ -131,6 +133,28 @@ export function useNativePlayer(
             nativeSwitchingQuality = false;
             restartInProgress.value = false;
         }
+    }
+
+    /** Trickplay sheet info for seek-bar thumbnails, when the server generated them. */
+    function buildTrickplayJson(): string | undefined {
+        const item = jellyfinStore.currentItem as any;
+        if (item?.Id !== itemId || !item.Trickplay) return undefined;
+        const sourceId = mediaSource.value?.Id ?? itemId;
+        const byWidth = item.Trickplay[sourceId] ?? Object.values(item.Trickplay)[0];
+        const resolutions = Object.values(byWidth ?? {}) as any[];
+        if (!resolutions.length) return undefined;
+        // The preview is ~200dp wide: the smallest sheet that stays sharp is enough.
+        resolutions.sort((a, b) => a.Width - b.Width);
+        const info = resolutions.find((r) => r.Width >= 300) ?? resolutions[resolutions.length - 1];
+        return JSON.stringify({
+            urlTemplate: `${jellyfinStore.serverUrl}/Videos/${itemId}/Trickplay/${info.Width}/{index}.jpg?MediaSourceId=${sourceId}`,
+            width: info.Width,
+            height: info.Height,
+            tileWidth: info.TileWidth,
+            tileHeight: info.TileHeight,
+            thumbnailCount: info.ThumbnailCount,
+            intervalMs: info.Interval,
+        });
     }
 
     async function initNativePlayer(
@@ -464,6 +488,7 @@ export function useNativePlayer(
                 nextEpisodeId: resolvedNextEpisodeId,
                 chaptersJson: chapters?.length ? JSON.stringify(chapters) : undefined,
                 creditsStartMs: skipIntro.creditsStartMs.value,
+                trickplayJson: buildTrickplayJson(),
             });
 
             // Don't clear isLoading here — keep the spinner until tracksReady fires,

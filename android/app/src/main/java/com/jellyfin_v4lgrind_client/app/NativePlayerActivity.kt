@@ -106,6 +106,7 @@ class NativePlayerActivity : AppCompatActivity() {
         const val EXTRA_CREDITS_START_MS = "creditsStartMs"
         const val EXTRA_DURATION_HINT_MS = "durationHintMs"
         const val EXTRA_SRT_FILE_PATH = "srtFilePath"
+        const val EXTRA_TRICKPLAY_JSON = "trickplayJson"
         const val ACTION_NEXT_EPISODE = "com.jellyfin_v4lgrind_client.app.PLAYER_NEXT_EPISODE"
         const val ACTION_SUBTITLE_SIZE_CHANGED = "com.jellyfin_v4lgrind_client.app.SUBTITLE_SIZE_CHANGED"
 
@@ -334,6 +335,12 @@ class NativePlayerActivity : AppCompatActivity() {
     private val SCRUB_MS_PER_PX = 300L
     private lateinit var tvScrubOverlay: TextView
 
+    // Trickplay thumbnails shown while seeking (null when the server has none)
+    private var trickplay: TrickplayThumbnails? = null
+    private lateinit var trickplayPreview: View
+    private lateinit var trickplayImage: android.widget.ImageView
+    private lateinit var trickplayTime: TextView
+
     // Dolby Vision → HEVC fallback: when the device can't decode DV profile 8,
     // restart with a codec selector that maps video/dolby-vision → video/hevc.
     private var dvFallbackMode = false
@@ -403,6 +410,9 @@ class NativePlayerActivity : AppCompatActivity() {
         btnSkipIntro = findViewById(R.id.btn_skip_intro)
         btnNextEpisode = findViewById(R.id.btn_next_episode)
         tvScrubOverlay = findViewById(R.id.tv_scrub_overlay)
+        trickplayPreview = findViewById(R.id.trickplay_preview)
+        trickplayImage = findViewById(R.id.trickplay_image)
+        trickplayTime = findViewById(R.id.trickplay_time)
         loadingSpinner = findViewById(R.id.loading_spinner)
         btnQuality = findViewById(R.id.btn_quality)
         btnInfo = findViewById(R.id.btn_info)
@@ -481,6 +491,10 @@ class NativePlayerActivity : AppCompatActivity() {
         } catch (_: Exception) { chapters = emptyList() }
 
         tvTitle.text = title
+
+        trickplay = TrickplayThumbnails.parse(intent.getStringExtra(EXTRA_TRICKPLAY_JSON))?.let {
+            TrickplayThumbnails(it, authHeader)
+        }
 
         // SRT subtitle overlay — parsed from file, rendered outside ExoPlayer pipeline
         val srtPath = intent.getStringExtra(EXTRA_SRT_FILE_PATH) ?: ""
@@ -593,6 +607,7 @@ class NativePlayerActivity : AppCompatActivity() {
                     val seekMs = if (dragged) updateRelativeSeekPreview(slider, deltaX)
                                  else updateSeekPreviewAt(slider, event.x)
                     isUserSeeking = false
+                    hideTrickplay()
                     safeSeekTo(seekMs)
                     bar.performClick()
                     scheduleHideControls()
@@ -600,6 +615,7 @@ class NativePlayerActivity : AppCompatActivity() {
                 }
                 MotionEvent.ACTION_CANCEL -> {
                     isUserSeeking = false
+                    hideTrickplay()
                     updateTimeUI(player?.currentPosition ?: 0L, effectiveDuration())
                     scheduleHideControls()
                     true
@@ -1663,21 +1679,67 @@ class NativePlayerActivity : AppCompatActivity() {
     private fun showScrubOverlay(posMs: Long) {
         tvScrubOverlay.text = formatTime(posMs)
         tvScrubOverlay.visibility = View.VISIBLE
+        showTrickplay(posMs)
     }
 
     private fun updateScrubOverlay(posMs: Long) {
         tvScrubOverlay.text = formatTime(posMs)
+        showTrickplay(posMs)
     }
 
     private fun hideScrubOverlay() {
         tvScrubOverlay.visibility = View.GONE
+        hideTrickplay()
     }
 
     private fun showSeekPreview(bar: SeekBar, progress: Int): Long {
         bar.progress = progress.coerceIn(0, bar.max)
         val positionMs = (bar.progress.toLong() * effectiveDuration()) / bar.max
         tvCurrentTime.text = formatTime(positionMs)
+        if (isUserSeeking) {
+            val trackWidth = bar.width - bar.paddingLeft - bar.paddingRight
+            val thumbX = bar.paddingLeft + trackWidth * bar.progress.toFloat() / bar.max
+            showTrickplay(positionMs, bar, thumbX)
+        }
         return positionMs
+    }
+
+    /**
+     * Shows the trickplay thumbnail for [positionMs]: above [anchor] centred on
+     * [anchorX] (seek bar), or above the screen centre (long-press scrub).
+     */
+    private fun showTrickplay(positionMs: Long, anchor: View? = null, anchorX: Float = 0f) {
+        val thumbs = trickplay ?: return
+        trickplayTime.text = formatTime(positionMs)
+        // The long-press scrub already shows the time in large type below.
+        trickplayTime.visibility = if (anchor != null) View.VISIBLE else View.GONE
+        if (trickplayImage.drawable == null) {
+            // Reserve the image's space before the first sheet arrives.
+            trickplayImage.minimumHeight = (trickplayImage.layoutParams.width * thumbs.aspectRatio).toInt()
+        }
+        thumbs.load(positionMs) { trickplayImage.setImageBitmap(it) }
+        trickplayPreview.visibility = View.VISIBLE
+        trickplayPreview.post {
+            val root = trickplayPreview.parent as View
+            val margin = 8 * resources.displayMetrics.density
+            val w = trickplayPreview.width
+            val h = trickplayPreview.height
+            if (anchor != null) {
+                val rootLoc = IntArray(2).also { root.getLocationInWindow(it) }
+                val barLoc = IntArray(2).also { anchor.getLocationInWindow(it) }
+                val centerX = barLoc[0] - rootLoc[0] + anchorX
+                trickplayPreview.translationX = (centerX - w / 2f).coerceIn(margin, root.width - w - margin)
+                trickplayPreview.translationY = barLoc[1] - rootLoc[1] - h - margin
+            } else {
+                trickplayPreview.translationX = (root.width - w) / 2f
+                trickplayPreview.translationY = root.height / 2f - tvScrubOverlay.height / 2f - h - margin
+            }
+        }
+    }
+
+    private fun hideTrickplay() {
+        trickplay?.cancel()
+        trickplayPreview.visibility = View.GONE
     }
 
     private fun updateSeekPreviewAt(bar: SeekBar, touchX: Float): Long {
@@ -1955,6 +2017,7 @@ class NativePlayerActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        trickplay?.release()
         sendStoppedBroadcast()
         handler.removeCallbacksAndMessages(null)
         audioSwitchPendingGroupIndex = -1

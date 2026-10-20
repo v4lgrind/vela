@@ -413,7 +413,7 @@ export const useJellyfinStore = defineStore("jellyfin", {
       const resp = await getLibraryApi(this.api).getItems({
         ids: [itemId],
         userId: this.userId,
-        fields: ['MediaStreams', 'UserData', 'People', 'Overview', 'Genres', 'Studios', 'MediaSources'] as any,
+        fields: ['MediaStreams', 'UserData', 'People', 'Overview', 'Genres', 'Studios', 'MediaSources', 'Trickplay'] as any,
         enableUserData: true,
       });
       const item = resp.data.Items?.[0];

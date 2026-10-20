@@ -53,10 +53,11 @@ build_abi() {
   "$cc" -O2 -fPIC -c "$COMPAT" -o /tmp/compat-$abi.o
 
   # LDFLAGS on the command line replaces the Makefile's glibc-specific link flags.
+  # 16 KB segment alignment: required on 16 KB page-size devices (Pixel 10+).
   make -j"$(nproc)" HOST=android PLATFORM="$platform" STATIC=1 VERSION=android \
     CC="$cc" CXX="$cxx" AR=llvm-ar \
     EXTRA_CFLAGS="-include $COMPAT_H" \
-    LDFLAGS="/tmp/compat-$abi.o -static-libstdc++ -lm -ldl -s"
+    LDFLAGS="/tmp/compat-$abi.o -static-libstdc++ -lm -ldl -s -Wl,-z,max-page-size=16384"
 
   mkdir -p "$OUT/$abi"
   # Named lib*.so so Android extracts it next to the app's native libs, where it may be executed.

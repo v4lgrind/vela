@@ -92,8 +92,9 @@ committed and pushed straight to `main` one step at a time (user's request).
 - Verified on the tablet with the Apple TV "Télévision": pairing via the
   dialog, connect while paused, play, next, seek, pause, artwork on the TV,
   Stop AirPlay.
-- Not verified: AirPlay speakers (HomePod/AirPort), volume slider on the
-  TV, long sessions / Wi-Fi drops, arm32 devices (only arm64 is built).
+- Not verified: AirPlay speakers (HomePod/AirPort),
+  long sessions / Wi-Fi drops, arm32 devices (only arm64 is built).
+- Volume slider → TV volume: verified by the user (2026-10-20).
 
 ## Follow-up: 16 KB pages and one player at a time, 2026-10-20
 - The Pixel 10 (16 KB page size) warned the app was incompatible:

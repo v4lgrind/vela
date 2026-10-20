@@ -461,7 +461,8 @@ function resolveInitialBurnInSubtitleIndex(streams: any[]): number | null {
 // ── Lifecycle ──────────────────────────────────────────────────────────────────
 
 onMounted(async () => {
-    if (audioPlayerStore.isPlaying) audioPlayerStore.stop();
+    // Music and video never coexist: a video closes the music player, paused or not.
+    if (audioPlayerStore.isMiniPlayerVisible) audioPlayerStore.stop();
     lockLandscape();
 
     // If offline and item is downloaded, bypass all Jellyfin network calls.

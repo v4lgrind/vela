@@ -33,6 +33,9 @@
         <Button variant="ghost" size="icon" class="size-10 rounded-full text-text-primary hover:bg-white/10" @click="audioStore.next()">
           <SkipForward class="size-5 fill-current" />
         </Button>
+        <Button variant="ghost" size="icon" class="size-10 rounded-full text-text-muted hover:bg-white/10" aria-label="Close player" @click="audioStore.stop()">
+          <X class="size-5" />
+        </Button>
       </div>
     </div>
   </div>
@@ -43,7 +46,7 @@ import { computed } from 'vue';
 import { useAudioPlayerStore } from '@/store/audio-player-store';
 import { useJellyfinStore } from '@/store/jellyfin-store';
 import { Button } from '@/components/ui/button';
-import { Airplay, Cast, SkipBack, SkipForward, Play, Pause } from 'lucide-vue-next';
+import { Airplay, Cast, SkipBack, SkipForward, Play, Pause, X } from 'lucide-vue-next';
 import { useBottomNavVisible } from '@/composables/useBottomNav';
 
 const audioStore = useAudioPlayerStore();

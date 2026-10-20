@@ -119,3 +119,29 @@ committed and pushed straight to `main` one step at a time (user's request).
   library tiles with a type icon; `libraryItem` pages keep this tab active.
   Offline guards (router + App.vue) include the new route.
 - Verified on the tablet and the Pixel 10 (nightly 1279).
+
+## Follow-up: music search, trickplay, Android Auto, 2026-10-20
+- **Search** (`SearchPage.vue`): artists, albums and songs alongside
+  movies/shows/episodes, with their own tabs; a song plays with the other
+  matching songs queued.
+- **Trickplay thumbnails** (`TrickplayThumbnails.kt`, native player): the JS
+  passes the item's `Trickplay` info (now requested in `fetchItemDetails`)
+  as `trickplayJson`; sheets are fetched on demand, tiles cut with a
+  `BitmapRegionDecoder`. Shown above the seek-bar thumb while dragging and
+  above the time during long-press scrub. Server state: ~96 % of movies
+  have trickplay, sampled episodes none (TV libraries likely have it off).
+- **Android Auto**: `MusicService` is a `MediaLibraryService`;
+  `JellyfinLibrary.kt` builds the tree (Ajouts récents / Albums / Artistes /
+  Playlists), search and voice queries natively from credentials the app
+  saves via `NativeAudio.setLibraryConfig`. Car picks (`track:<id>:<parent>`,
+  `album:<id>`, voice query) are resolved in `onSetMediaItems`; the app adopts
+  such a queue on the `externalQueue` event. Artwork through
+  `ArtworkProvider` (`content://<pkg>.artwork/<itemId>`).
+- Verified on the tablet with a temporary MediaBrowser debug method (since
+  removed): root/latest/albums/artists/album/artist/search lists, artwork
+  bytes, track pick → whole album at the right index, voice query, app
+  adopting the queue, normal in-app playback unchanged.
+- Not verified: a real car / Desktop Head Unit (no display on the build
+  host). Sideloaded apps only show in Android Auto with its developer
+  setting "Unknown sources" on. Playback reporting to Jellyfin only runs
+  while the app's WebView is alive.

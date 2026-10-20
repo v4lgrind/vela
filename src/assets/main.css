@@ -91,7 +91,6 @@
   body,
   #app {
     @apply min-h-full m-0 font-sans text-foreground bg-background;
-    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 }
 

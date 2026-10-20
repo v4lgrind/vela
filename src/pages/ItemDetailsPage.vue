@@ -16,11 +16,15 @@
                 <section class="relative">
 
                     <!-- Backdrop -->
-                    <div class="relative w-full aspect-[16/10] max-h-[58vh] overflow-hidden">
+                    <!-- A square cover needs a taller hero on phones to stay a decent size -->
+                    <div class="relative w-full overflow-hidden"
+                        :class="showCoverHero && posterUrl ? 'aspect-[4/5] max-h-[70vh] sm:aspect-[16/10] sm:max-h-[58vh]' : 'aspect-[16/10] max-h-[58vh]'">
                         <template v-if="showCoverHero && posterUrl">
                             <LazyImg :src="posterUrl" alt="" :item-type="item.Type"
                                 class="absolute inset-0 w-full h-full object-cover blur-3xl scale-125 opacity-70" />
-                            <div class="absolute inset-0 flex items-center justify-center pt-12 pb-24">
+                            <!-- Below the top buttons, which sit under the status bar / camera cutout -->
+                            <div class="absolute inset-0 flex items-center justify-center pb-24"
+                                style="padding-top: calc(56px + var(--sat, env(safe-area-inset-top, 0px)))">
                                 <LazyImg :src="posterUrl" :alt="item.Name" :item-type="item.Type"
                                     class="h-full aspect-square rounded-xl object-cover shadow-[0_20px_60px_rgba(0,0,0,0.6)]" />
                             </div>

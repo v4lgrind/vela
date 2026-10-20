@@ -71,7 +71,7 @@ watch(() => preferencesStore.colorScheme, (scheme) => applyTheme(scheme));
 watch(
   () => [offlineStore.isFullyOnline, preferencesStore.forceOfflineMode] as const,
   ([online, forceOffline]) => {
-    if ((!online || forceOffline) && (route.name === 'libraries' || route.name === 'libraryItem')) {
+    if ((!online || forceOffline) && (route.name === 'libraries' || route.name === 'libraryList' || route.name === 'libraryItem')) {
       router.replace({ name: 'offline' });
     }
   },

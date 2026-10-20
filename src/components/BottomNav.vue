@@ -16,13 +16,14 @@
 </template>
 
 <script setup lang="ts">
-import { Home, Search, Download, Settings } from "lucide-vue-next";
+import { Home, LibraryBig, Search, Download, Settings } from "lucide-vue-next";
 import { useRoute } from "vue-router";
 
 const route = useRoute();
 
 const tabs = [
-  { name: "home", label: "Accueil", route: "libraries", icon: Home, match: ["libraries", "libraryItem", "ItemDetails", "PersonDetail"] },
+  { name: "home", label: "Accueil", route: "libraries", icon: Home, match: ["libraries", "ItemDetails", "PersonDetail"] },
+  { name: "library", label: "Biblio.", route: "libraryList", icon: LibraryBig, match: ["libraryList", "libraryItem"] },
   { name: "search", label: "Recherche", route: "search", icon: Search, match: ["search"] },
   { name: "downloads", label: "Téléch.", route: "offline", icon: Download, match: ["offline"] },
   { name: "settings", label: "Réglages", route: "settings", icon: Settings, match: ["settings", "logs"] },

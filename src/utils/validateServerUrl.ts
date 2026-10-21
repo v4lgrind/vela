@@ -1,3 +1,5 @@
+import { i18n } from '@/i18n';
+
 /**
  * Validates a Jellyfin server URL. Returns an error message to display, or
  * null when the URL is acceptable (well-formed and http/https).
@@ -6,10 +8,10 @@ export function validateServerUrl(url: string): string | null {
   try {
     const parsed = new URL(url);
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-      return 'Server URL must use http:// or https://';
+      return i18n.global.t('login.urlProtocol');
     }
     return null;
   } catch {
-    return 'Please enter a valid server URL (e.g. http://192.168.1.10:8096)';
+    return i18n.global.t('login.urlInvalid');
   }
 }

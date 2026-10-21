@@ -236,5 +236,35 @@
       "xl": "Extra large",
       "huge": "Huge"
     }
+  },
+  "login": {
+    "selectAccount": "Select an account to continue",
+    "addServer": "Add new server",
+    "server": "Server",
+    "serverPlaceholder": "http://localhost:8096 or https://example.com",
+    "username": "Username",
+    "password": "Password",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
+    "connecting": "Connecting…",
+    "signIn": "Sign in",
+    "or": "or",
+    "quickConnect": "Use Quick Connect",
+    "quickConnectCode": "Enter this code in your Jellyfin web client",
+    "waitingApproval": "Waiting for approval…",
+    "failed": "Login failed. Please check your credentials.",
+    "qcTimeout": "Quick Connect timed out. Please try again.",
+    "qcDisabled": "Quick Connect is disabled. Enable it in Jellyfin: Dashboard → Advanced → Quick Connect.",
+    "qcUnsupported": "Quick Connect is not supported by this server version.",
+    "urlProtocol": "Server URL must use http:// or https://",
+    "urlInvalid": "Please enter a valid server URL (e.g. http://192.168.1.10:8096)"
+  },
+  "logs": {
+    "entries": "{n} entry | {n} entries",
+    "copied": "Copied!",
+    "copyAll": "Copy all",
+    "clear": "Clear",
+    "all": "All",
+    "empty": "No log entries yet. Play media to generate diagnostic logs."
   }
 }

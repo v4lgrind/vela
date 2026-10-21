@@ -9,7 +9,7 @@
             <CardTitle class="text-center text-2xl font-bold">Vela</CardTitle>
           </CardHeader>
           <CardContent class="flex flex-col gap-3">
-            <p class="text-xs text-text-muted text-center mb-1">Select an account to continue</p>
+            <p class="text-xs text-text-muted text-center mb-1">{{ t('login.selectAccount') }}</p>
             <button
               v-for="s in jellyfin.savedServers"
               :key="s.serverUrl + s.userId"
@@ -29,7 +29,7 @@
               class="text-sm text-accent-purple hover:underline text-center py-1"
               @click="showNewServer = true"
             >
-              + Add new server
+              + {{ t('login.addServer') }}
             </button>
           </CardContent>
         </Card>
@@ -42,7 +42,8 @@
             <button
               v-if="jellyfin.savedServers.length > 0 && showNewServer"
               @click="showNewServer = false"
-              class="p-1 rounded-lg hover:bg-surface-hover transition-colors"
+              :aria-label="t('common.back')"
+              class="flex size-11 items-center justify-center rounded-lg hover:bg-surface-hover transition-colors"
             >
               <ArrowLeft class="size-4 text-text-muted" />
             </button>
@@ -52,27 +53,28 @@
         <CardContent>
           <form @submit.prevent="onSubmit" class="grid gap-4">
             <div class="flex flex-col gap-1.5">
-              <Label for="serverUrl">Server</Label>
+              <Label for="serverUrl">{{ t('login.server') }}</Label>
               <Input id="serverUrl" v-model.trim="serverUrl" type="url"
-                placeholder="http://localhost:8096 or https://example.com"
+                :placeholder="t('login.serverPlaceholder')"
                 :disabled="loading" required />
             </div>
 
             <div class="flex flex-col gap-1.5">
-              <Label for="username">Username</Label>
+              <Label for="username">{{ t('login.username') }}</Label>
               <Input id="username" v-model.trim="username" type="text"
-                placeholder="Username"
+                :placeholder="t('login.username')"
                 :disabled="loading" required autocomplete="username" />
             </div>
 
             <div class="flex flex-col gap-1.5">
-              <Label for="password">Password</Label>
+              <Label for="password">{{ t('login.password') }}</Label>
               <div class="relative">
                 <Input id="password" v-model="password" :type="showPassword ? 'text' : 'password'"
-                  placeholder="Password" class="pr-10"
+                  :placeholder="t('login.password')" class="pr-12"
                   :disabled="loading" required autocomplete="current-password" />
                 <button type="button"
-                  class="absolute inset-y-0 right-0 flex items-center px-3 text-text-muted hover:text-text-default transition-colors"
+                  :aria-label="showPassword ? t('login.hidePassword') : t('login.showPassword')"
+                  class="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-text-muted hover:text-text-default transition-colors"
                   :disabled="loading"
                   @click="showPassword = !showPassword">
                   <Eye v-if="!showPassword" class="size-4" />
@@ -82,7 +84,7 @@
             </div>
 
             <Button type="submit" :disabled="loading" class="w-full">
-              {{ loading ? 'Connecting...' : 'Sign in' }}
+              {{ loading ? t('login.connecting') : t('login.signIn') }}
             </Button>
 
             <p v-if="error" class="text-error text-center text-sm">{{ error }}</p>
@@ -91,7 +93,7 @@
           <!-- Quick Connect divider -->
           <div class="flex items-center gap-3 my-4">
             <div class="flex-1 h-px bg-border-input" />
-            <span class="text-xs text-text-muted">or</span>
+            <span class="text-xs text-text-muted">{{ t('login.or') }}</span>
             <div class="flex-1 h-px bg-border-input" />
           </div>
 
@@ -103,13 +105,13 @@
               :disabled="!serverUrl"
               @click="startQuickConnect"
             >
-              Use Quick Connect
+              {{ t('login.quickConnect') }}
             </Button>
             <p v-if="quickConnectError" class="text-error text-center text-sm mt-2">{{ quickConnectError }}</p>
           </div>
 
           <div v-else class="rounded-xl border border-border-input bg-surface-raised/60 p-4 text-center">
-            <p class="text-xs text-text-muted mb-3">Enter this code in your Jellyfin web client</p>
+            <p class="text-xs text-text-muted mb-3">{{ t('login.quickConnectCode') }}</p>
             <div class="flex justify-center gap-2 mb-3">
               <span
                 v-for="(ch, i) in quickConnectCode.split('')"
@@ -119,12 +121,9 @@
             </div>
             <div class="flex items-center justify-center gap-2 text-xs text-text-muted">
               <Loader2 class="size-3.5 animate-spin" />
-              <span>Waiting for approval…</span>
+              <span>{{ t('login.waitingApproval') }}</span>
             </div>
-            <button
-              class="mt-3 text-xs text-text-muted hover:text-text-default underline"
-              @click="cancelQuickConnect"
-            >Cancel</button>
+            <Button variant="link" class="mt-1 text-xs text-text-muted" @click="cancelQuickConnect">{{ t('common.cancel') }}</Button>
           </div>
         </CardContent>
       </Card>
@@ -135,6 +134,7 @@
 <script setup lang="ts">
 import { ref, onUnmounted } from 'vue'
 import { useJellyfinStore } from '@/store/jellyfin-store'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -145,6 +145,7 @@ import { Eye, EyeOff, ArrowLeft, Loader2 } from 'lucide-vue-next'
 import type { SavedServer } from '@/store/jellyfin-store'
 import { validateServerUrl } from '@/utils/validateServerUrl'
 
+const { t } = useI18n()
 const jellyfin = useJellyfinStore()
 const router = useRouter()
 
@@ -175,7 +176,7 @@ async function onSubmit() {
     await jellyfin.login(serverUrl.value, username.value, password.value)
     router.push({ name: 'libraries' })
   } catch (e) {
-    error.value = e instanceof Error ? e.message : 'Login failed. Please check your credentials.'
+    error.value = e instanceof Error ? e.message : t('login.failed')
     loading.value = false
   }
 }
@@ -220,14 +221,14 @@ async function startQuickConnect() {
     // Auto-cancel after 5 minutes
     qcTimeoutTimer = setTimeout(() => {
       cancelQuickConnect()
-      quickConnectError.value = 'Quick Connect timed out. Please try again.'
+      quickConnectError.value = t('login.qcTimeout')
     }, 5 * 60 * 1000)
   } catch (e: any) {
     const status = e?.response?.status
     if (status === 400 || status === 401 || status === 403) {
-      quickConnectError.value = 'Quick Connect is disabled. Enable it in Jellyfin: Dashboard → Advanced → Quick Connect.'
+      quickConnectError.value = t('login.qcDisabled')
     } else if (status === 404) {
-      quickConnectError.value = 'Quick Connect is not supported by this server version.'
+      quickConnectError.value = t('login.qcUnsupported')
     } else {
       quickConnectError.value = `Quick Connect failed (${status ?? 'network error'}): ${e?.message ?? e}`
     }

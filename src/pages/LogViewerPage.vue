@@ -1,38 +1,21 @@
 <template>
-  <div class="min-h-dvh bg-background text-text-body">
-    <div class="max-w-4xl mx-auto px-4 py-8"
-      style="padding-top: calc(32px + var(--sat, env(safe-area-inset-top, 0px)))">
-      <div class="flex items-center justify-between mb-6">
-        <div class="flex items-center gap-3">
-          <button @click="$router.back()" class="p-2 -ml-2 text-text-muted hover:text-text-heading">
-            <ArrowLeft class="w-5 h-5" />
-          </button>
-          <h1 class="text-xl font-bold text-text-heading">Debug Logs</h1>
-          <span class="text-xs text-text-muted">({{ entries.length }} entries)</span>
-        </div>
-        <div class="flex items-center gap-2">
-          <button @click="copyLogs" class="px-3 py-1.5 text-xs font-medium rounded-lg bg-surface-raised border border-border-input text-text-heading hover:bg-surface-hover">
-            {{ copied ? 'Copied!' : 'Copy All' }}
-          </button>
-          <button @click="handleClear" class="px-3 py-1.5 text-xs font-medium rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30">
-            Clear
-          </button>
-        </div>
-      </div>
+  <AppPage width="content" class="min-h-dvh bg-background pb-6 text-text-body">
+      <PageHeader back :title="t('settings.debugLogs')" :subtitle="t('logs.entries', entries.length)" class="mb-4">
+        <template #actions>
+          <Button variant="secondary" size="sm" @click="copyLogs">{{ copied ? t('logs.copied') : t('logs.copyAll') }}</Button>
+          <Button variant="destructive" size="sm" @click="handleClear">{{ t('logs.clear') }}</Button>
+        </template>
+      </PageHeader>
 
       <!-- Filters -->
-      <div class="flex gap-2 mb-4">
-        <button
-          v-for="f in filters" :key="f.value"
-          @click="activeFilter = f.value"
-          :class="activeFilter === f.value ? 'bg-accent-purple text-white' : 'bg-surface-raised text-text-muted border border-border-input'"
-          class="px-3 py-1 text-xs font-medium rounded-full"
-        >{{ f.label }}</button>
-      </div>
+      <ToggleGroup type="single" variant="outline" size="sm" :model-value="activeFilter" class="mb-4 justify-start gap-2"
+        @update:model-value="(v) => v && (activeFilter = v as typeof activeFilter)">
+        <ToggleGroupItem v-for="f in filters" :key="f.value" :value="f.value">{{ f.label === 'logs.all' ? t(f.label) : f.label }}</ToggleGroupItem>
+      </ToggleGroup>
 
       <!-- Log entries -->
       <div v-if="filtered.length === 0" class="text-center py-16 text-text-muted text-sm">
-        No log entries yet. Play media to generate diagnostic logs.
+        {{ t('logs.empty') }}
       </div>
       <div v-else class="rounded-xl border border-border-input overflow-hidden">
         <div class="max-h-[70vh] overflow-y-auto bg-surface-raised">
@@ -50,21 +33,24 @@
           </div>
         </div>
       </div>
-    </div>
-  </div>
+  </AppPage>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import { ArrowLeft } from 'lucide-vue-next';
+import { useI18n } from 'vue-i18n';
+import { AppPage, PageHeader } from '@/components/layout';
+import { Button } from '@/components/ui/button';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { getLogEntries, clearLogs, dumpLogs } from '@/utils/debugLog';
 
+const { t } = useI18n();
 const entries = computed(() => getLogEntries());
 const activeFilter = ref<'all' | 'vue' | 'kotlin'>('all');
 const copied = ref(false);
 
 const filters = [
-  { label: 'All', value: 'all' as const },
+  { label: 'logs.all', value: 'all' as const },
   { label: 'Vue', value: 'vue' as const },
   { label: 'Kotlin', value: 'kotlin' as const },
 ];

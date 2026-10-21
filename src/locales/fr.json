@@ -236,5 +236,35 @@
       "xl": "Très grande",
       "huge": "Énorme"
     }
+  },
+  "login": {
+    "selectAccount": "Choisissez un compte pour continuer",
+    "addServer": "Ajouter un serveur",
+    "server": "Serveur",
+    "serverPlaceholder": "http://localhost:8096 ou https://exemple.com",
+    "username": "Nom d'utilisateur",
+    "password": "Mot de passe",
+    "showPassword": "Afficher le mot de passe",
+    "hidePassword": "Masquer le mot de passe",
+    "connecting": "Connexion…",
+    "signIn": "Se connecter",
+    "or": "ou",
+    "quickConnect": "Utiliser Quick Connect",
+    "quickConnectCode": "Saisissez ce code dans le client web Jellyfin",
+    "waitingApproval": "En attente de validation…",
+    "failed": "Connexion échouée. Vérifiez vos identifiants.",
+    "qcTimeout": "Quick Connect a expiré. Réessayez.",
+    "qcDisabled": "Quick Connect est désactivé. Activez-le dans Jellyfin : Tableau de bord → Avancé → Quick Connect.",
+    "qcUnsupported": "Quick Connect n'est pas pris en charge par cette version du serveur.",
+    "urlProtocol": "L'adresse du serveur doit commencer par http:// ou https://",
+    "urlInvalid": "Saisissez une adresse de serveur valide (ex. http://192.168.1.10:8096)"
+  },
+  "logs": {
+    "entries": "{n} entrée | {n} entrées",
+    "copied": "Copié !",
+    "copyAll": "Tout copier",
+    "clear": "Effacer",
+    "all": "Tout",
+    "empty": "Aucun journal pour le moment. Lancez une lecture pour en générer."
   }
 }

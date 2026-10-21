@@ -6,7 +6,9 @@
     "markWatched": "Marquer comme vu",
     "markUnwatched": "Marquer comme non vu",
     "downloaded": "Téléchargé",
-    "loading": "Chargement…"
+    "loading": "Chargement…",
+    "close": "Fermer",
+    "cancel": "Annuler"
   },
   "duration": {
     "hoursMinutes": "{h} h {m} min",
@@ -105,6 +107,34 @@
     "showMore": "Voir plus",
     "showLess": "Voir moins",
     "director": "Réalisation",
-    "studio": "Studio"
+    "studio": "Studio",
+    "seasons": "Saisons",
+    "episodesTitle": "Épisodes",
+    "tracks": "Titres",
+    "cast": "Distribution",
+    "moreLikeThis": "Dans le même genre",
+    "allWatched": "Tout vu",
+    "markAllWatchedShort": "Tout marquer vu",
+    "downloading": "Téléchargement {percent} %",
+    "noSynopsis": "Aucun résumé disponible",
+    "mediaInfoTitle": "Informations du média",
+    "mediaInfoFor": "Détails techniques de {name}",
+    "videoStream": "Flux vidéo",
+    "mediaSource": "Source du média",
+    "fileSize": "Taille du fichier",
+    "bulkTitle": "Télécharger {name}",
+    "bulkQuestion": "Quels épisodes voulez-vous télécharger ?",
+    "bulkUnwatched": "Non vus uniquement",
+    "bulkAll": "Tous les épisodes",
+    "loadError": "Impossible de charger la fiche",
+    "confirmDelete": "Supprimer « {name} » du stockage hors ligne ?",
+    "downloadFailed": "Échec du téléchargement. Réessayez.",
+    "deleteFailed": "Suppression impossible",
+    "downloadEpisodeFailed": "Impossible de télécharger « {name} »"
+  },
+  "person": {
+    "titles": "{n} titre | {n} titres",
+    "filmography": "Filmographie",
+    "empty": "Aucun titre trouvé"
   }
 }

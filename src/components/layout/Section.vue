@@ -11,6 +11,7 @@ const { t } = useI18n();
   <section class="mt-section first:mt-0">
     <div class="mb-3 flex items-center justify-between gap-3">
       <h2 class="text-section font-semibold text-text-heading">{{ props.title }}</h2>
+      <slot name="actions" />
       <RouterLink
         v-if="props.to"
         :to="props.to"

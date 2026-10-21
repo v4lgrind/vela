@@ -1,19 +1,14 @@
 <template>
-  <div class="min-h-dvh bg-background text-text-body">
+  <AppPage class="min-h-dvh bg-background pb-8 text-text-body">
     <div v-if="loading" class="flex items-center justify-center py-20">
       <Loader2 class="size-8 text-accent-purple animate-spin" />
     </div>
 
     <template v-else>
-      <!-- Back -->
-      <header class="px-4 pt-5" style="padding-top: calc(20px + var(--sat, env(safe-area-inset-top, 0px)))">
-        <button @click="router.back()" title="Back"
-          class="size-9 rounded-[10px] border border-border-default bg-surface flex items-center justify-center text-text-heading active:opacity-70">
-          <ChevronLeft class="size-[18px]" :stroke-width="2" />
-        </button>
-      </header>
+      <PageHeader back :title="person?.Name ?? ''"
+        :subtitle="filmography.length ? t('person.titles', filmography.length) : undefined" />
       <!-- Hero -->
-      <div class="px-4 pt-4 pb-6 flex gap-5 items-start">
+      <div class="pt-3 pb-2 flex gap-5 items-start">
         <div class="shrink-0 w-28 aspect-[2/3] rounded-2xl overflow-hidden bg-surface-raised shadow-lg">
           <LazyImg
             :src="person?.Id ? store.getImageUrl(person.Id, 'Primary', 300) : ''"
@@ -23,19 +18,14 @@
           />
         </div>
         <div class="flex-1 min-w-0 pt-1">
-          <h2 class="text-xl font-bold text-text-heading leading-tight">{{ person?.Name }}</h2>
-          <p v-if="filmography.length" class="text-xs text-text-muted mt-1">
-            {{ filmography.length }} title{{ filmography.length !== 1 ? 's' : '' }}
-          </p>
-          <p v-if="person?.Overview" class="text-sm text-text-body mt-3 line-clamp-4 leading-relaxed">
+          <p v-if="person?.Overview" class="text-body text-text-body line-clamp-6 leading-relaxed">
             {{ person.Overview }}
           </p>
         </div>
       </div>
 
       <!-- Filmography -->
-      <section v-if="filmography.length" class="px-4 pb-8">
-        <h3 class="text-xs font-semibold text-text-muted uppercase tracking-widest mb-4">Filmography</h3>
+      <Section v-if="filmography.length" :title="t('person.filmography')" class="mt-section">
         <div class="grid grid-cols-3 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(130px,1fr))] sm:gap-4">
           <div
             v-for="item in filmography"
@@ -63,26 +53,29 @@
             <p v-if="item.ProductionYear" class="text-xs text-text-subtle">{{ item.ProductionYear }}</p>
           </div>
         </div>
-      </section>
+      </Section>
 
       <div v-if="!filmography.length && !loading" class="flex flex-col items-center justify-center py-16 text-text-muted">
-        <p class="text-sm">No titles found</p>
+        <p class="text-body">{{ t('person.empty') }}</p>
       </div>
     </template>
-  </div>
+  </AppPage>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
+import { AppPage, PageHeader, Section } from '@/components/layout';
 import { useJellyfinStore } from '@/store/jellyfin-store';
 import LazyImg from '@/components/LazyImg.vue';
-import { Download as DownloadIcon, Loader2, ChevronLeft } from 'lucide-vue-next';
+import { Download as DownloadIcon, Loader2 } from 'lucide-vue-next';
 import { useOfflineStore } from '@/store/offline-store';
 import { useDownloadStore } from '@/store/download-store';
 
 const props = defineProps<{ id: string }>();
 
+const { t } = useI18n();
 const router = useRouter();
 const store = useJellyfinStore();
 const offlineStore = useOfflineStore();

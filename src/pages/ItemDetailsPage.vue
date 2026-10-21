@@ -212,13 +212,12 @@
                             <DialogContent
                                 class="max-w-lg max-h-[85dvh] overflow-y-auto bg-surface-raised border-border-default">
                                 <DialogHeader>
-                                    <DialogTitle class="text-text-heading text-lg">Media Information</DialogTitle>
-                                    <DialogDescription class="text-text-muted text-sm">Technical details for
-                                        {{ item.Name }}</DialogDescription>
+                                    <DialogTitle class="text-text-heading text-lg">{{ t('detail.mediaInfoTitle') }}</DialogTitle>
+                                    <DialogDescription class="text-text-muted text-sm">{{ t('detail.mediaInfoFor', { name: item.Name }) }}</DialogDescription>
                                 </DialogHeader>
 
                                 <div v-if="videoDetails.length" class="mt-4">
-                                    <h4 class="text-sm font-semibold text-accent-purple-light uppercase tracking-wider mb-3">Video Stream</h4>
+                                    <h4 class="text-sm font-semibold text-accent-purple-light uppercase tracking-wider mb-3">{{ t('detail.videoStream') }}</h4>
                                     <div class="grid grid-cols-2 gap-2">
                                         <div v-for="row in videoDetails" :key="`v-${row.label}`"
                                             class="bg-surface-hover/50 rounded-lg px-3 py-2">
@@ -232,7 +231,7 @@
                                     class="my-4 bg-border-default" />
 
                                 <div v-if="sourceDetails.length || fileSizeHuman">
-                                    <h4 class="text-sm font-semibold text-accent-purple-light uppercase tracking-wider mb-3">Media Source</h4>
+                                    <h4 class="text-sm font-semibold text-accent-purple-light uppercase tracking-wider mb-3">{{ t('detail.mediaSource') }}</h4>
                                     <div class="grid grid-cols-2 gap-2">
                                         <template v-for="row in sourceDetails" :key="`s-${row.label}`">
                                             <div class="bg-surface-hover/50 rounded-lg px-3 py-2"
@@ -242,7 +241,7 @@
                                             </div>
                                         </template>
                                         <div v-if="fileSizeHuman" class="bg-surface-hover/50 rounded-lg px-3 py-2">
-                                            <div class="text-[11px] text-text-muted uppercase tracking-wider">File size</div>
+                                            <div class="text-[11px] text-text-muted uppercase tracking-wider">{{ t('detail.fileSize') }}</div>
                                             <div class="text-sm font-medium text-text-heading mt-0.5">{{ fileSizeHuman }}</div>
                                         </div>
                                     </div>
@@ -250,7 +249,7 @@
 
                                 <DialogFooter class="mt-4">
                                     <DialogClose as-child>
-                                        <Button variant="outline" class="min-h-[44px]">Close</Button>
+                                        <Button variant="outline">{{ t('common.close') }}</Button>
                                     </DialogClose>
                                 </DialogFooter>
                             </DialogContent>
@@ -258,55 +257,52 @@
             </Dialog>
 
             <!-- ── SECTIONS ──────────────────────────────────── -->
-            <div class="px-4 sm:px-6 md:px-10 lg:px-16 pb-12 max-w-5xl mx-auto space-y-5">
+            <div class="mx-auto max-w-[1200px] px-gutter pb-12 md:px-gutter-wide">
 
                 <!-- Seasons -->
-                <section v-if="item.Type === 'Series' && seasons.length"
-                    class="bg-surface-raised border border-border-default rounded-2xl p-5 backdrop-blur-sm">
-                    <h3 class="text-xs font-semibold text-text-muted uppercase tracking-widest mb-4">Seasons</h3>
-                    <div class="grid grid-cols-3 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(150px,1fr))] sm:gap-4">
+                <Section v-if="item.Type === 'Series' && seasons.length" :title="t('detail.seasons')">
+                    <MediaRail>
                         <div v-for="season in seasons" :key="season.Id"
-                            class="cursor-pointer group rounded-xl overflow-hidden bg-surface-raised border border-border-default hover:-translate-y-1 hover:border-border-hover transition-all duration-200 active:scale-[0.97] active:opacity-75"
+                            class="w-32 shrink-0 sm:w-36 cursor-pointer group rounded-xl overflow-hidden bg-surface-raised border border-border-default hover:-translate-y-1 hover:border-border-hover transition-all duration-200 active:scale-[0.97] active:opacity-75"
                             @click="goToItem(season.Id)">
                             <div class="relative w-full aspect-[2/3] overflow-hidden">
                                 <LazyImg :src="getImageUrl(season.Id, 'Primary', 300, 450)" :alt="season.Name"
                                     item-type="Season" class="w-full h-full object-cover" />
                                 <button @click.stop="toggleWatchedSeason(season)" :disabled="watchingSeasonId === season.Id"
-                                    class="absolute top-1.5 right-1.5 p-1.5 rounded-full transition-all duration-200 cursor-pointer pointer-events-auto opacity-100 sm:opacity-0 sm:group-hover:opacity-100 disabled:opacity-50"
-                                    :class="season.UserData?.Played ? 'bg-accent-purple text-white shadow' : 'bg-black/50 text-white/70 hover:bg-black/80 hover:text-white'"
-                                    :title="season.UserData?.Played ? 'Mark as unwatched' : 'Mark as watched'">
-                                    <Loader2 v-if="watchingSeasonId === season.Id" class="size-3 animate-spin" />
-                                    <Check v-else class="size-3" />
+                                    class="absolute top-1 right-1 flex size-10 items-center justify-center rounded-full transition-all duration-200 cursor-pointer pointer-events-auto disabled:opacity-50"
+                                    :class="season.UserData?.Played ? 'bg-accent-purple text-white shadow' : 'bg-black/50 text-white/80'"
+                                    :aria-label="season.UserData?.Played ? t('common.markUnwatched') : t('common.markWatched')">
+                                    <Loader2 v-if="watchingSeasonId === season.Id" class="size-4 animate-spin" />
+                                    <Check v-else class="size-4" />
                                 </button>
-                                <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent flex items-end justify-center pb-2 transition-opacity duration-200 sm:opacity-0 sm:group-hover:opacity-100 pointer-events-none">
+                                <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent flex items-end justify-center pb-2 pointer-events-none">
                                     <button @click.stop="playNextInSeason(season)" :disabled="playingSeasonId === season.Id"
-                                        class="bg-white/90 hover:bg-white text-black rounded-full p-1.5 shadow-lg transition-all disabled:opacity-60 pointer-events-auto cursor-pointer">
-                                        <Loader2 v-if="playingSeasonId === season.Id" class="size-3.5 animate-spin" />
-                                        <Play v-else class="size-3.5 fill-black stroke-none" />
+                                        :aria-label="t('common.play')"
+                                        class="flex size-10 items-center justify-center bg-white/90 hover:bg-white text-black rounded-full shadow-lg transition-all disabled:opacity-60 pointer-events-auto cursor-pointer">
+                                        <Loader2 v-if="playingSeasonId === season.Id" class="size-4 animate-spin" />
+                                        <Play v-else class="size-4 fill-black stroke-none" />
                                     </button>
                                 </div>
                             </div>
-                            <div class="px-2 py-2 text-center text-xs font-semibold text-text-primary">{{ season.Name }}</div>
+                            <div class="px-2 py-2 text-center text-caption font-semibold text-text-primary">{{ season.Name }}</div>
                         </div>
-                    </div>
-                </section>
+                    </MediaRail>
+                </Section>
 
                 <!-- Episodes -->
-                <section v-if="item.Type === 'Season' && episodes.length"
-                    class="bg-surface-raised border border-border-default rounded-2xl p-5 backdrop-blur-sm">
-                    <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-xs font-semibold text-text-muted uppercase tracking-widest">Episodes</h3>
+                <Section v-if="item.Type === 'Season' && episodes.length" :title="t('detail.episodesTitle')">
+                    <template #actions>
                         <button :disabled="togglingWatched" @click="toggleWatched"
-                            :title="item.UserData?.Played ? 'Mark all as unwatched' : 'Mark all as watched'"
-                            class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all cursor-pointer"
+                            :aria-label="item.UserData?.Played ? t('detail.markAllUnwatched') : t('detail.markAllWatched')"
+                            class="flex min-h-10 items-center gap-1.5 px-3 rounded-lg border text-caption font-medium transition-all cursor-pointer"
                             :class="item.UserData?.Played
                                 ? 'bg-accent-purple/15 border-accent-purple/40 text-accent-purple hover:bg-accent-purple/25'
                                 : 'bg-surface-hover border-border-input text-text-muted hover:text-text-heading hover:border-border-hover'">
                             <Loader2 v-if="togglingWatched" class="size-3 animate-spin" />
                             <Check v-else class="size-3" />
-                            {{ item.UserData?.Played ? 'All watched' : 'Mark all watched' }}
+                            {{ item.UserData?.Played ? t('detail.allWatched') : t('detail.markAllWatchedShort') }}
                         </button>
-                    </div>
+                    </template>
                     <div class="flex flex-col gap-2">
                         <div v-for="ep in episodes" :key="ep.Id"
                             class="flex gap-3 sm:gap-4 p-2.5 rounded-xl cursor-pointer transition-all duration-200 border border-transparent hover:bg-surface-raised hover:border-border-default active:opacity-75"
@@ -317,9 +313,9 @@
                                 <LazyImg :src="getImageUrl(ep.Id, 'Primary', 240, 135)" :alt="ep.Name"
                                     item-type="Episode" class="w-full h-full object-cover" />
                                 <div class="absolute inset-0 bg-black/50 flex items-center justify-center sm:opacity-0 sm:group-hover:opacity-100 transition-opacity pointer-events-none">
-                                    <button @click.stop="playEpisode(ep)"
-                                        class="bg-white/90 text-black rounded-full p-1.5 sm:p-2 shadow-lg pointer-events-auto active:scale-95 cursor-pointer">
-                                        <Play class="size-3.5 sm:size-4 fill-black stroke-none" />
+                                    <button @click.stop="playEpisode(ep)" :aria-label="t('common.play')"
+                                        class="flex size-10 items-center justify-center bg-white/90 text-black rounded-full shadow-lg pointer-events-auto active:scale-95 cursor-pointer">
+                                        <Play class="size-4 fill-black stroke-none" />
                                     </button>
                                 </div>
                                 <!-- Progress bar -->
@@ -339,25 +335,25 @@
                                         <span v-if="ep.RunTimeTicks"
                                             class="text-xs text-text-subtle hidden sm:block tabular-nums">{{ formatTicksDuration(ep.RunTimeTicks) }}</span>
                                         <span v-if="offlineStore.isItemDownloaded(ep.Id)"
-                                            class="rounded-full p-1.5 bg-accent-purple/20 text-accent-purple"
-                                            title="Downloaded">
+                                            class="flex size-10 items-center justify-center rounded-full bg-accent-purple/20 text-accent-purple"
+                                            :title="t('common.downloaded')">
                                             <DownloadIcon class="size-3.5" />
                                         </span>
                                         <span v-else-if="downloadStore.isDownloading(ep.Id)"
-                                            class="rounded-full p-1.5 bg-accent-purple/20 text-accent-purple animate-pulse"
-                                            :title="'Downloading ' + (downloadStore.getTask(ep.Id)?.progress ?? 0) + '%'">
+                                            class="flex size-10 items-center justify-center rounded-full bg-accent-purple/20 text-accent-purple animate-pulse"
+                                            :title="t('detail.downloading', { percent: downloadStore.getTask(ep.Id)?.progress ?? 0 })">
                                             <Loader2 class="size-3.5 animate-spin" />
                                         </span>
                                         <button v-else
                                             @click.stop="handleEpisodeDownload(ep)"
-                                            class="rounded-full p-1.5 bg-surface-hover text-text-muted hover:bg-surface-raised hover:text-text-heading transition-all active:scale-95 cursor-pointer"
-                                            title="Download">
+                                            class="flex size-10 items-center justify-center rounded-full bg-surface-hover text-text-muted hover:bg-surface-raised hover:text-text-heading transition-all active:scale-95 cursor-pointer"
+                                            :aria-label="t('detail.download')">
                                             <DownloadIcon class="size-3.5" />
                                         </button>
                                         <button @click.stop="toggleWatchedEpisode(ep)" :disabled="watchingEpId === ep.Id"
-                                            class="rounded-full p-1.5 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+                                            class="flex size-10 items-center justify-center rounded-full transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
                                             :class="ep.UserData?.Played ? 'bg-accent-purple text-white' : 'bg-surface-hover text-text-muted hover:bg-surface-raised hover:text-text-heading'"
-                                            :title="ep.UserData?.Played ? 'Mark as unwatched' : 'Mark as watched'">
+                                            :aria-label="ep.UserData?.Played ? t('common.markUnwatched') : t('common.markWatched')">
                                             <Check class="size-3.5" />
                                         </button>
                                     </div>
@@ -366,7 +362,7 @@
                                     class="text-text-muted text-xs leading-relaxed mb-0 line-clamp-2">
                                     {{ ep.Overview }}
                                 </p>
-                                <p v-else class="text-text-subtle text-xs italic mb-0">No synopsis available</p>
+                                <p v-else class="text-text-subtle text-xs italic mb-0">{{ t('detail.noSynopsis') }}</p>
                                 <div v-if="ep.CommunityRating || ep.PremiereDate" class="flex gap-2 mt-1">
                                     <span v-if="ep.CommunityRating" class="text-xs text-yellow-400/70">★ {{ ep.CommunityRating.toFixed(1) }}</span>
                                     <span v-if="ep.PremiereDate" class="text-xs text-text-subtle">{{ new Date(ep.PremiereDate).getFullYear() }}</span>
@@ -374,12 +370,11 @@
                             </div>
                         </div>
                     </div>
-                </section>
+                </Section>
 
                 <!-- Audio Tracks -->
-                <section v-if="(item.Type === 'MusicAlbum' || item.Type === 'Playlist') && audioTracks.length"
-                    class="bg-surface-raised border border-border-default rounded-2xl p-5 backdrop-blur-sm">
-                    <h3 class="text-xs font-semibold text-text-muted uppercase tracking-widest mb-4">Tracks</h3>
+                <Section v-if="(item.Type === 'MusicAlbum' || item.Type === 'Playlist') && audioTracks.length"
+                    :title="t('detail.tracks')">
                     <div class="flex flex-col gap-0.5">
                         <div v-for="(track, i) in audioTracks" :key="track.Id"
                             class="grid grid-cols-[36px_1fr_56px_36px] gap-3 items-center rounded-lg pl-3 pr-1 py-2.5 cursor-pointer transition-all duration-150 hover:bg-surface-raised"
@@ -394,34 +389,20 @@
                                 <div v-if="track.Artists?.length" class="text-text-subtle text-xs mt-0.5 truncate">{{ track.Artists.join(', ') }}</div>
                             </div>
                             <div class="flex items-center gap-1.5 justify-end">
-                                <DownloadIcon v-if="offlineStore.isItemDownloaded(track.Id)" class="size-3.5 text-accent-purple" title="Downloaded" />
+                                <DownloadIcon v-if="offlineStore.isItemDownloaded(track.Id)" class="size-3.5 text-accent-purple" :aria-label="t('common.downloaded')" />
                                 <Loader2 v-else-if="downloadStore.isDownloading(track.Id)" class="size-3.5 text-accent-purple animate-spin" />
                                 <span class="text-text-subtle text-xs tabular-nums">{{ formatTicksDuration(track.RunTimeTicks) }}</span>
                             </div>
                             <TrackActionsMenu @play-next="queueTrack(track, 'next')" @add-to-queue="queueTrack(track, 'end')" />
                         </div>
                     </div>
-                </section>
+                </Section>
 
                 <!-- Cast -->
-                <section v-if="cast.length"
-                    class="bg-surface-raised border border-border-default rounded-2xl p-5 backdrop-blur-sm">
-                    <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-xs font-semibold text-text-muted uppercase tracking-widest">Cast</h3>
-                        <div class="flex gap-1.5">
-                            <button class="p-1.5 rounded-lg bg-surface-raised hover:bg-surface-hover text-text-muted hover:text-text-heading transition-all cursor-pointer" @click="scrollCast('left')">
-                                <ArrowLeft class="size-3.5" />
-                            </button>
-                            <button class="p-1.5 rounded-lg bg-surface-raised hover:bg-surface-hover text-text-muted hover:text-text-heading transition-all cursor-pointer" @click="scrollCast('right')">
-                                <ArrowRight class="size-3.5" />
-                            </button>
-                        </div>
-                    </div>
-                    <div ref="castRail"
-                        class="grid grid-flow-col auto-cols-[minmax(100px,120px)] gap-3 overflow-x-auto overflow-y-hidden snap-x snap-proximity scroll-smooth scrollbar-hide"
-                        role="list">
+                <Section v-if="cast.length" :title="t('detail.cast')">
+                    <MediaRail role="list">
                         <div v-for="p in cast" :key="p.Id || p.Name"
-                            class="snap-center text-center group cursor-pointer" role="listitem" :title="p.Name"
+                            class="w-[110px] shrink-0 text-center group cursor-pointer" role="listitem" :title="p.Name"
                             @click="navigateToPerson(p.Id)">
                             <div class="w-full aspect-[2/3] rounded-xl overflow-hidden bg-surface-raised shadow-lg mb-2 group-hover:-translate-y-1 transition-transform duration-200">
                                 <LazyImg :src="personImageUrl(p)" :alt="p.Name" item-type="person"
@@ -430,13 +411,11 @@
                             <div class="font-medium text-text-primary truncate text-xs">{{ p.Name }}</div>
                             <div v-if="p.Role" class="text-text-subtle text-xs mt-0.5 truncate">{{ p.Role }}</div>
                         </div>
-                    </div>
-                </section>
+                    </MediaRail>
+                </Section>
 
                 <!-- Artist albums -->
-                <section v-if="artistAlbums.length"
-                    class="bg-surface-raised border border-border-default rounded-2xl p-5 backdrop-blur-sm">
-                    <h3 class="text-xs font-semibold text-text-muted uppercase tracking-widest mb-4">Albums</h3>
+                <Section v-if="artistAlbums.length" :title="t('library.music.albums')">
                     <ul class="list-none p-0 m-0 grid grid-cols-[repeat(auto-fill,minmax(130px,1fr))] gap-4">
                         <li v-for="album in artistAlbums" :key="album.Id" class="cursor-pointer active:opacity-75" @click="goToItem(album.Id)">
                             <div class="aspect-square rounded-xl overflow-hidden bg-black/60 shadow-lg">
@@ -447,27 +426,13 @@
                             <div v-if="album.ProductionYear" class="text-[10.5px] text-text-muted">{{ album.ProductionYear }}</div>
                         </li>
                     </ul>
-                </section>
+                </Section>
 
                 <!-- Similar Items -->
-                <section v-if="similarItems.length"
-                    class="bg-surface-raised border border-border-default rounded-2xl p-5 backdrop-blur-sm">
-                    <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-xs font-semibold text-text-muted uppercase tracking-widest">More Like This</h3>
-                        <div class="flex gap-1.5">
-                            <button class="p-1.5 rounded-lg bg-surface-raised hover:bg-surface-hover text-text-muted hover:text-text-heading transition-all cursor-pointer" @click="scrollSimilar('left')">
-                                <ArrowLeft class="size-3.5" />
-                            </button>
-                            <button class="p-1.5 rounded-lg bg-surface-raised hover:bg-surface-hover text-text-muted hover:text-text-heading transition-all cursor-pointer" @click="scrollSimilar('right')">
-                                <ArrowRight class="size-3.5" />
-                            </button>
-                        </div>
-                    </div>
-                    <div ref="similarRail"
-                        class="grid grid-flow-col auto-cols-[minmax(120px,140px)] gap-3 overflow-x-auto overflow-y-hidden snap-x snap-proximity scroll-smooth scrollbar-hide"
-                        role="list">
+                <Section v-if="similarItems.length" :title="t('detail.moreLikeThis')">
+                    <MediaRail role="list">
                         <div v-for="sim in similarItems" :key="sim.Id"
-                            class="snap-center cursor-pointer group rounded-xl overflow-hidden bg-surface-raised border border-border-default hover:-translate-y-1 hover:border-border-hover transition-all duration-200 active:scale-[0.97] active:opacity-75"
+                            class="w-32 shrink-0 sm:w-36 cursor-pointer group rounded-xl overflow-hidden bg-surface-raised border border-border-default hover:-translate-y-1 hover:border-border-hover transition-all duration-200 active:scale-[0.97] active:opacity-75"
                             role="listitem" @click="goToItem(sim.Id)">
                             <div class="relative w-full aspect-[2/3] overflow-hidden">
                                 <LazyImg :src="getImageUrl(sim.Id, 'Primary', 300, 450)" :alt="sim.Name"
@@ -486,8 +451,8 @@
                                 <div class="text-text-subtle text-xs mt-0.5">{{ sim.ProductionYear }}</div>
                             </div>
                         </div>
-                    </div>
-                </section>
+                    </MediaRail>
+                </Section>
 
             </div>
 
@@ -509,21 +474,21 @@
         <DialogContent class="max-w-sm bg-surface-raised border-border-default">
             <DialogHeader>
                 <DialogTitle class="text-text-heading">
-                    Download {{ bulkDownloadTarget === 'series' ? item?.Name : (item?.Type === 'Season' ? item?.Name : item?.SeasonName) }}
+                    {{ t('detail.bulkTitle', { name: bulkDownloadTarget === 'series' ? item?.Name : (item?.Type === 'Season' ? item?.Name : item?.SeasonName) }) }}
                 </DialogTitle>
                 <DialogDescription class="text-text-muted text-sm">
-                    Which episodes would you like to download?
+                    {{ t('detail.bulkQuestion') }}
                 </DialogDescription>
             </DialogHeader>
             <div class="flex flex-col gap-3 mt-2">
                 <Button @click="startBulkDownload('unwatched')" class="w-full justify-center gap-2">
-                    <DownloadIcon class="size-4" /> Unwatched only
+                    <DownloadIcon class="size-4" /> {{ t('detail.bulkUnwatched') }}
                 </Button>
                 <Button variant="outline" @click="startBulkDownload('all')" class="w-full justify-center gap-2">
-                    <DownloadIcon class="size-4" /> All episodes
+                    <DownloadIcon class="size-4" /> {{ t('detail.bulkAll') }}
                 </Button>
                 <DialogClose as-child>
-                    <Button variant="ghost" class="w-full">Cancel</Button>
+                    <Button variant="ghost" class="w-full">{{ t('common.cancel') }}</Button>
                 </DialogClose>
             </div>
         </DialogContent>
@@ -551,7 +516,8 @@ import { formatTicksDuration, formatTicksHuman, formatBytes } from '@/utils/help
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose, DialogTrigger } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
-import { Play, Check, Download as DownloadIcon, ArrowLeft, ArrowRight, ChevronLeft, Loader2, Info, Shuffle, Tv2 } from 'lucide-vue-next';
+import { Play, Check, Download as DownloadIcon, ChevronLeft, Loader2, Info, Shuffle, Tv2 } from 'lucide-vue-next';
+import { MediaRail, Section } from '@/components/layout';
 import CastPlugin, { type CastState } from '@/plugins/CastPlugin';
 import { usePlatform } from '@/composables/usePlatform';
 import { useToast } from '@/composables/useToast';
@@ -742,7 +708,7 @@ async function load() {
         if (cached) {
             item.value = cached.jellyfinItem;
         } else {
-            error.value = 'Failed to load details';
+            error.value = t('detail.loadError');
         }
     } finally {
         if (item.value) await loadCachedArtwork(item.value);
@@ -1018,7 +984,7 @@ async function shuffleAlbum() {
 function enqueue(tracks: AudioTrack[], where: 'next' | 'end') {
     if (where === 'next') audioPlayerStore.playNext(tracks);
     else audioPlayerStore.addToQueue(tracks);
-    toast.show(where === 'next' ? 'Playing next' : 'Added to queue', 'success', 2000);
+    toast.show(where === 'next' ? t('audio.playingNext') : t('audio.addedToQueue'), 'success', 2000);
 }
 
 function queueTrack(track: any, where: 'next' | 'end') {
@@ -1027,25 +993,6 @@ function queueTrack(track: any, where: 'next' | 'end') {
 
 async function queueAlbum(where: 'next' | 'end') {
     enqueue(await collectionTracks(), where);
-}
-
-const castRail = ref<HTMLDivElement | null>(null);
-const similarRail = ref<HTMLDivElement | null>(null);
-
-/** Scroll a horizontal card rail by three cards in the given direction. */
-function scrollRail(rail: HTMLDivElement | null, dir: 'left' | 'right') {
-    if (!rail) return;
-    const cardWidth = 160;
-    const delta = dir === 'left' ? -cardWidth * 3 : cardWidth * 3;
-    rail.scrollBy({ left: delta, behavior: 'smooth' });
-}
-
-function scrollCast(dir: 'left' | 'right') {
-    scrollRail(castRail.value, dir);
-}
-
-function scrollSimilar(dir: 'left' | 'right') {
-    scrollRail(similarRail.value, dir);
 }
 
 const mediaStreams = computed<any[]>(() => item.value?.MediaStreams ?? []);
@@ -1166,11 +1113,11 @@ async function requestDownload(id: string, metadata: any, failMessage: string) {
 
 async function handleDownload() {
     if (!item.value) return;
-    await requestDownload(itemId.value, item.value, 'Download failed. Please try again.');
+    await requestDownload(itemId.value, item.value, t('detail.downloadFailed'));
 }
 
 async function handleEpisodeDownload(ep: any) {
-    await requestDownload(ep.Id, ep, `Failed to download "${ep.Name}"`);
+    await requestDownload(ep.Id, ep, t('detail.downloadEpisodeFailed', { name: ep.Name }));
 }
 
 /**
@@ -1182,14 +1129,14 @@ function startPendingDownloads(options?: TranscodeOptions) {
     if (pendingBulkTranscode.value) {
         for (const ep of pendingBulkTranscode.value) {
             downloadStore.startDownload(ep.Id, ep, options).catch((err: any) => {
-                if (err?.name !== 'AbortError') showError(`Failed to download "${ep.Name}"`);
+                if (err?.name !== 'AbortError') showError(t('detail.downloadEpisodeFailed', { name: ep.Name }));
             });
         }
         pendingBulkTranscode.value = null;
     } else if (pendingTranscodeTarget.value) {
         const { itemId: id, metadata } = pendingTranscodeTarget.value;
         downloadStore.startDownload(id, metadata, options).catch((error: any) => {
-            if (error.name !== 'AbortError') showError('Download failed. Please try again.');
+            if (error.name !== 'AbortError') showError(t('detail.downloadFailed'));
         });
         pendingTranscodeTarget.value = null;
     }
@@ -1205,12 +1152,12 @@ function onTranscodeOriginal() {
 
 async function deleteDownload() {
     if (!item.value) return;
-    if (!confirm(`Delete "${item.value.Name}" from offline storage?`)) return;
+    if (!confirm(t('detail.confirmDelete', { name: item.value.Name }))) return;
     try {
         await downloadService.deleteOfflineFile(itemId.value);
         await offlineStore.removeDownload(itemId.value);
     } catch {
-        showError('Failed to delete');
+        showError(t('detail.deleteFailed'));
     }
 }
 

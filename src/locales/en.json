@@ -6,7 +6,9 @@
     "markWatched": "Mark as watched",
     "markUnwatched": "Mark as unwatched",
     "downloaded": "Downloaded",
-    "loading": "Loading…"
+    "loading": "Loading…",
+    "close": "Close",
+    "cancel": "Cancel"
   },
   "duration": {
     "hoursMinutes": "{h}h {m}m",
@@ -105,6 +107,34 @@
     "showMore": "Show more",
     "showLess": "Show less",
     "director": "Director",
-    "studio": "Studio"
+    "studio": "Studio",
+    "seasons": "Seasons",
+    "episodesTitle": "Episodes",
+    "tracks": "Tracks",
+    "cast": "Cast",
+    "moreLikeThis": "More like this",
+    "allWatched": "All watched",
+    "markAllWatchedShort": "Mark all watched",
+    "downloading": "Downloading {percent}%",
+    "noSynopsis": "No synopsis available",
+    "mediaInfoTitle": "Media information",
+    "mediaInfoFor": "Technical details for {name}",
+    "videoStream": "Video stream",
+    "mediaSource": "Media source",
+    "fileSize": "File size",
+    "bulkTitle": "Download {name}",
+    "bulkQuestion": "Which episodes would you like to download?",
+    "bulkUnwatched": "Unwatched only",
+    "bulkAll": "All episodes",
+    "loadError": "Could not load details",
+    "confirmDelete": "Delete \"{name}\" from offline storage?",
+    "downloadFailed": "Download failed. Please try again.",
+    "deleteFailed": "Could not delete",
+    "downloadEpisodeFailed": "Could not download \"{name}\""
+  },
+  "person": {
+    "titles": "{n} title | {n} titles",
+    "filmography": "Filmography",
+    "empty": "No titles found"
   }
 }

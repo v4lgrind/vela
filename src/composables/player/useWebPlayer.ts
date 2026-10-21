@@ -1,3 +1,4 @@
+import { i18n } from '@/i18n';
 import { ref, watch, nextTick, type Ref } from 'vue';
 import Hls from 'hls.js';
 import { usePreferencesStore } from '@/store/preferences-store';
@@ -277,7 +278,7 @@ export function useWebPlayer(
                     if (onFatalError) {
                         onFatalError();
                     } else {
-                        error.value = `Playback error: ${data.type}`;
+                        error.value = i18n.global.t('player.errors.playbackError', { type: data.type });
                         isLoading.value = false;
                     }
                 }
@@ -389,7 +390,7 @@ export function useWebPlayer(
             selectedSubtitleIndex.value = previousIndex;
             activeBurnInSubtitleIndex.value = previousBurnInIndex;
             persistSubtitleSelection(previousIndex);
-            error.value = 'Subtitle switch failed — reverting to previous track';
+            error.value = i18n.global.t('player.errors.subtitleRevert');
             await initPlayer(
                 movieTime,
                 selectedAudioIndex.value ?? undefined,
@@ -459,7 +460,7 @@ export function useWebPlayer(
             }
         } catch (e: any) {
             logger.error('[initPlayer] error:', e);
-            error.value = 'Failed to initialize player';
+            error.value = i18n.global.t('player.errors.webInitFailed');
             isLoading.value = false;
         }
     }
@@ -477,7 +478,7 @@ export function useWebPlayer(
         const video = videoEl.value;
         if (video) { video.removeAttribute('src'); video.load(); }
 
-        error.value = 'Audio switch failed — reverting to previous track';
+        error.value = i18n.global.t('player.errors.audioRevert');
         selectedAudioIndex.value = previousIndex;
 
         if (!video) { isLoading.value = false; return; }
@@ -670,7 +671,7 @@ export function useWebPlayer(
         } catch (e: any) {
             logger.error('[switchQuality] error:', e);
             selectedBitrate.value = previousBitrate;
-            error.value = 'Failed to switch quality';
+            error.value = i18n.global.t('player.errors.qualitySwitchFailed');
             isLoading.value = false;
         } finally {
             isSwitching.value = false;

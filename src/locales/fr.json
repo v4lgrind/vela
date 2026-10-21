@@ -300,5 +300,39 @@
     "estimatedSize": "Taille estimée",
     "original": "Télécharger l'original (peut ne pas se lire)",
     "unknown": "Inconnue"
+  },
+  "player": {
+    "playPause": "Lecture/Pause",
+    "position": "Position de lecture",
+    "audioTrack": "Piste audio",
+    "quality": "Qualité",
+    "streamInfo": "Infos du flux",
+    "fullscreen": "Plein écran",
+    "size": "Taille",
+    "codec": "Codec",
+    "bitrate": "Débit",
+    "encodeSpeed": "Vitesse d'encodage",
+    "frameRate": "Fréquence d'images",
+    "channels": "Canaux",
+    "stream": "flux",
+    "source": "source",
+    "skipIntro": "Passer l'intro",
+    "video": "Vidéo",
+    "errors": {
+      "fileNotFound": "Fichier téléchargé introuvable sur l’appareil",
+      "noDolbyVision": "Cet appareil ne lit pas le Dolby Vision. Essayez en ligne — le serveur convertira automatiquement.",
+      "unsupportedFormat": "Cet appareil ne lit pas ce format vidéo. Supprimez le téléchargement et relancez-le — l’app le convertira dans un format compatible.",
+      "audioUnsupported": "Piste audio non prise en charge sur cet appareil",
+      "playDownloadFailed": "Impossible de lire le fichier téléchargé",
+      "audioSwitchFailed": "Impossible de changer de piste audio",
+      "subtitleSwitchFailed": "Impossible de changer de sous-titres",
+      "nativeInitFailed": "Impossible de démarrer le lecteur",
+      "qualitySwitchFailed": "Impossible de changer la qualité",
+      "subtitleRevert": "Changement de sous-titres impossible — retour à la piste précédente",
+      "webInitFailed": "Impossible de démarrer le lecteur",
+      "audioRevert": "Changement de piste audio impossible — retour à la piste précédente",
+      "videoError": "Erreur vidéo : {reason}",
+      "playbackError": "Erreur de lecture : {type}"
+    }
   }
 }

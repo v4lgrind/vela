@@ -1,3 +1,4 @@
+import { i18n } from '@/i18n';
 import { type Ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { Filesystem, Directory } from '@capacitor/filesystem';
@@ -85,7 +86,7 @@ export function useOfflinePlayer(
             }
 
             if (!playUrl) {
-                error.value = 'Downloaded file not found on device';
+                error.value = i18n.global.t('player.errors.fileNotFound');
                 isLoading.value = false;
                 return;
             }
@@ -132,11 +133,11 @@ export function useOfflinePlayer(
                 await NativeVideo.addListener('videoError', (data) => {
                     debugLog(`[VideoFallback] offline videoError: reason=${data.reason}`);
                     if (data.reason === 'dolby_vision_unsupported') {
-                        error.value = 'This device cannot play Dolby Vision video. Try playing online — the server will transcode automatically.';
+                        error.value = i18n.global.t('player.errors.noDolbyVision');
                     } else if (data.reason === 'video_codec_unsupported') {
-                        error.value = 'This device cannot play this video format. Delete the download and re-download — the app will automatically transcode it to a compatible format.';
+                        error.value = i18n.global.t('player.errors.unsupportedFormat');
                     } else {
-                        error.value = `Video error: ${data.reason}`;
+                        error.value = i18n.global.t('player.errors.videoError', { reason: data.reason });
                     }
                     isLoading.value = false;
                 });
@@ -245,7 +246,7 @@ export function useOfflinePlayer(
                         await initOfflinePlayer(cachedDownload, lastGoodPositionSec || resumeSeconds, itemTitle, data.groupIndex);
                     } catch (e) {
                         debugLog(`[Offline] audioError restart failed: ${e}`);
-                        error.value = 'Audio track not supported on this device';
+                        error.value = i18n.global.t('player.errors.audioUnsupported');
                         isLoading.value = false;
                     } finally {
                         restartInProgress.value = false;
@@ -349,7 +350,7 @@ export function useOfflinePlayer(
             }
         } catch (e: any) {
             logger.error('[initOfflinePlayer] error:', e);
-            error.value = 'Failed to play downloaded file';
+            error.value = i18n.global.t('player.errors.playDownloadFailed');
             isLoading.value = false;
         }
     }

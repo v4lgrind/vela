@@ -17,7 +17,7 @@
                 style="padding: calc(12px + var(--sat, env(safe-area-inset-top, 0px))) calc(12px + var(--sar, env(safe-area-inset-right, 0px))) 32px calc(12px + var(--sal, env(safe-area-inset-left, 0px)))">
                 <button
                     class="bg-black/40 text-white border-none cursor-pointer p-2 rounded-lg flex items-center transition-colors hover:bg-white/15 shrink-0"
-                    @click="goBack" aria-label="Back">
+                    @click="goBack" :aria-label="t('common.back')">
                     <ArrowLeft class="size-5" />
                 </button>
                 <span v-if="mediaTitle" class="text-white text-[0.95rem] font-medium truncate">{{ mediaTitle }}</span>
@@ -26,7 +26,7 @@
             <!-- Loading overlay -->
             <div v-if="isLoading" class="absolute inset-0 bg-black/90 flex flex-col items-center justify-center z-50">
                 <Loader2 class="size-15 animate-spin text-accent-purple" />
-                <p class="mt-5 text-white text-base font-medium">Loading...</p>
+                <p class="mt-5 text-white text-base font-medium">{{ t('common.loading') }}</p>
             </div>
 
             <!-- Double-tap seek feedback (web player) -->
@@ -61,7 +61,7 @@
             <button v-if="!isNative && !isLoading"
                 :class="controlsVisible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'"
                 class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[55] flex items-center justify-center size-[72px] rounded-full bg-black/45 backdrop-blur-sm text-white transition-all duration-300 hover:bg-black/60 active:scale-95"
-                @click="togglePlayPause" aria-label="Play/Pause">
+                @click="togglePlayPause" :aria-label="t('player.playPause')">
                 <Play v-if="!isPlaying" class="size-9 fill-current translate-x-0.5" />
                 <Pause v-else class="size-9 fill-current" />
             </button>
@@ -71,7 +71,7 @@
                 <button v-if="showSkipIntroButton"
                     class="absolute bottom-32 right-4 z-[60] px-5 py-2.5 bg-accent-purple/85 hover:bg-accent-purple active:bg-accent-purple-light backdrop-blur-sm border border-white/15 text-white text-sm font-semibold rounded-full shadow-lg transition-all cursor-pointer select-none"
                     @click="skipIntro">
-                    Skip Intro
+                    {{ t('player.skipIntro') }}
                 </button>
             </Transition>
 
@@ -86,7 +86,7 @@
                     :value="seekPreview ?? currentTime" :disabled="!Number.isFinite(duration) || duration <= 0"
                     :style="{ '--seek-progress': `${seekProgress}%` }"
                     class="player-seek w-full h-6 mb-2 cursor-pointer disabled:cursor-default"
-                    aria-label="Playback position"
+                    :aria-label="t('player.position')"
                     :aria-valuetext="`${formatTime(seekPreview ?? currentTime)} of ${formatTime(duration)}`"
                     @pointerdown.prevent="beginSeek" @pointermove="moveSeek" @pointerup="finishSeek"
                     @pointercancel="cancelSeek" @input="previewSeek" @change="commitSeek" />
@@ -101,7 +101,7 @@
                         <!-- Audio track selector (only shown when multiple tracks exist) -->
                         <button v-if="audioList.length > 1"
                             class="bg-transparent border-none text-white cursor-pointer p-2 rounded flex items-center transition-colors hover:bg-white/10"
-                            @click="toggleAudioMenu" aria-label="Audio track">
+                            @click="toggleAudioMenu" :aria-label="t('player.audioTrack')">
                             <AudioLines class="size-6" />
                         </button>
 
@@ -109,14 +109,14 @@
                         <button v-if="subtitleList.length > 0"
                             class="bg-transparent border-none text-white cursor-pointer p-2 rounded flex items-center transition-colors hover:bg-white/10"
                             :class="selectedSubtitleIndex !== null ? 'text-accent-purple' : ''"
-                            @click="toggleSubtitleMenu" aria-label="Subtitles">
+                            @click="toggleSubtitleMenu" :aria-label="t('transcode.subtitles')">
                             <Captions class="size-6" />
                         </button>
 
                         <!-- Quality selector -->
                         <button
                             class="bg-transparent border-none text-white cursor-pointer p-2 rounded flex items-center gap-1.5 transition-colors hover:bg-white/10"
-                            @click="toggleQualityMenu" aria-label="Quality">
+                            @click="toggleQualityMenu" :aria-label="t('player.quality')">
                             <Gauge class="size-6" />
                             <span class="text-[0.9rem] font-medium">{{ currentQualityLabel }}</span>
                         </button>
@@ -124,14 +124,14 @@
                         <!-- Stream info -->
                         <button
                             class="bg-transparent border-none text-white cursor-pointer p-2 rounded flex items-center transition-colors hover:bg-white/10"
-                            @click="openInfoModal" aria-label="Stream info">
+                            @click="openInfoModal" :aria-label="t('player.streamInfo')">
                             <Info class="size-6" />
                         </button>
 
                         <!-- Fullscreen -->
                         <button
                             class="bg-transparent border-none text-white cursor-pointer p-2 rounded flex items-center transition-colors hover:bg-white/10"
-                            @click="toggleFullscreen" aria-label="Toggle fullscreen">
+                            @click="toggleFullscreen" :aria-label="t('player.fullscreen')">
                             <Maximize v-if="!isFullscreen" class="size-6" />
                             <Minimize v-else class="size-6" />
                         </button>
@@ -143,20 +143,20 @@
             <template v-if="!isNative">
                 <PlayerBottomSheet
                     :open="audioMenuOpen"
-                    title="Audio Track"
+                    :title="t('player.audioTrack')"
                     :items="audioSheetItems"
                     @select="(k) => switchAudio(Number(k))"
                     @close="audioMenuOpen = false" />
 
                 <PlayerBottomSheet
                     :open="subtitleMenuOpen"
-                    title="Subtitles"
+                    :title="t('transcode.subtitles')"
                     :items="subtitleSheetItems"
                     @select="(k) => switchSubtitle(k === 'off' ? null : Number(k))"
                     @close="subtitleMenuOpen = false">
                     <template v-if="selectedSubtitleIndex !== null && !selectedSubtitleIsBurnIn" #footer>
                         <div class="flex items-center justify-between">
-                            <span class="text-[0.9rem] text-white/60">Size</span>
+                            <span class="text-[0.9rem] text-white/60">{{ t('player.size') }}</span>
                             <div class="flex items-center gap-3">
                                 <button class="w-8 h-8 rounded bg-white/10 hover:bg-white/20 text-white text-lg leading-none flex items-center justify-center" @click="adjustSubtitleSize(-0.25)">−</button>
                                 <span class="text-[0.9rem] w-10 text-center">{{ Math.round(preferencesStore.subtitleSize * 100) }}%</span>
@@ -168,7 +168,7 @@
 
                 <PlayerBottomSheet
                     :open="qualityMenuOpen"
-                    title="Quality"
+                    :title="t('player.quality')"
                     :items="qualitySheetItems"
                     @select="(k) => switchQuality(Number(k))"
                     @close="qualityMenuOpen = false" />
@@ -186,7 +186,7 @@
                     @click.stop>
                     <!-- Header -->
                     <div class="flex items-center justify-between mb-4">
-                        <h3 class="font-semibold text-base text-white">Stream Info</h3>
+                        <h3 class="font-semibold text-base text-white">{{ t('player.streamInfo') }}</h3>
                         <button class="text-white/50 hover:text-white transition-colors p-1" @click="closeInfoModal">✕</button>
                     </div>
 
@@ -208,32 +208,32 @@
 
                     <!-- Video -->
                     <div v-if="videoStream" class="mb-4">
-                        <p class="text-xs font-semibold uppercase tracking-wider text-white/40 mb-2">Video</p>
+                        <p class="text-xs font-semibold uppercase tracking-wider text-white/40 mb-2">{{ t('player.video') }}</p>
                         <div class="grid grid-cols-2 gap-x-4 gap-y-1.5">
-                            <span class="text-white/50">Resolution</span>
+                            <span class="text-white/50">{{ t('transcode.resolution') }}</span>
                             <span class="text-white font-medium">
-                                <template v-if="liveTranscodingInfo?.Width != null">{{ liveTranscodingInfo.Width }}×{{ liveTranscodingInfo.Height }} <span class="text-white/40 text-xs">(stream)</span></template>
-                                <template v-else>{{ videoStream.Width }}×{{ videoStream.Height }} <span class="text-white/40 text-xs">(source)</span></template>
+                                <template v-if="liveTranscodingInfo?.Width != null">{{ liveTranscodingInfo.Width }}×{{ liveTranscodingInfo.Height }} <span class="text-white/40 text-xs">({{ t('player.stream') }})</span></template>
+                                <template v-else>{{ videoStream.Width }}×{{ videoStream.Height }} <span class="text-white/40 text-xs">({{ t('player.source') }})</span></template>
                             </span>
-                            <span class="text-white/50">Codec</span>
+                            <span class="text-white/50">{{ t('player.codec') }}</span>
                             <span class="text-white font-medium uppercase">
                                 {{ liveTranscodingInfo?.VideoCodec ?? videoStream.Codec }}
                                 <span v-if="liveTranscodingInfo" class="text-xs text-white/40 normal-case">
                                     ({{ liveTranscodingInfo.IsVideoDirect ? 'copy' : 'transcoding' }})
                                 </span>
                             </span>
-                            <span class="text-white/50">Bitrate</span>
+                            <span class="text-white/50">{{ t('player.bitrate') }}</span>
                             <span class="text-white font-medium">
-                                <template v-if="liveTranscodingInfo?.Bitrate != null">{{ Math.round(liveTranscodingInfo.Bitrate / 1000) }} kbps <span class="text-white/40 text-xs">(stream)</span></template>
-                                <template v-else-if="videoStream.BitRate">{{ Math.round(videoStream.BitRate / 1000) }} kbps <span class="text-white/40 text-xs">(source)</span></template>
+                                <template v-if="liveTranscodingInfo?.Bitrate != null">{{ Math.round(liveTranscodingInfo.Bitrate / 1000) }} kbps <span class="text-white/40 text-xs">({{ t('player.stream') }})</span></template>
+                                <template v-else-if="videoStream.BitRate">{{ Math.round(videoStream.BitRate / 1000) }} kbps <span class="text-white/40 text-xs">({{ t('player.source') }})</span></template>
                                 <template v-else>—</template>
                             </span>
                             <template v-if="liveTranscodingInfo && !liveTranscodingInfo.IsVideoDirect">
-                                <span class="text-white/50">Encode speed</span>
+                                <span class="text-white/50">{{ t('player.encodeSpeed') }}</span>
                                 <span class="text-white font-medium">{{ liveTranscodingInfo.Framerate?.toFixed(1) ?? '—' }} fps</span>
                             </template>
                             <template v-else>
-                                <span class="text-white/50">Frame rate</span>
+                                <span class="text-white/50">{{ t('player.frameRate') }}</span>
                                 <span class="text-white font-medium">{{ videoStream.RealFrameRate?.toFixed(2) ?? videoStream.AverageFrameRate?.toFixed(2) ?? '—' }} fps</span>
                             </template>
                         </div>
@@ -241,18 +241,18 @@
 
                     <!-- Audio -->
                     <div v-if="activeAudioStream">
-                        <p class="text-xs font-semibold uppercase tracking-wider text-white/40 mb-2">Audio</p>
+                        <p class="text-xs font-semibold uppercase tracking-wider text-white/40 mb-2">{{ t('types.Audio') }}</p>
                         <div class="grid grid-cols-2 gap-x-4 gap-y-1.5">
-                            <span class="text-white/50">Codec</span>
+                            <span class="text-white/50">{{ t('player.codec') }}</span>
                             <span class="text-white font-medium uppercase">
                                 {{ liveTranscodingInfo?.AudioCodec ?? activeAudioStream.Codec }}
                                 <span v-if="liveTranscodingInfo" class="text-xs text-white/40 normal-case">
                                     ({{ liveTranscodingInfo.IsAudioDirect ? 'copy' : 'transcoding' }})
                                 </span>
                             </span>
-                            <span class="text-white/50">Channels</span>
+                            <span class="text-white/50">{{ t('player.channels') }}</span>
                             <span class="text-white font-medium">{{ activeAudioStream.ChannelLayout ?? (activeAudioStream.Channels + 'ch') }}</span>
-                            <span class="text-white/50">Bitrate</span>
+                            <span class="text-white/50">{{ t('player.bitrate') }}</span>
                             <span class="text-white font-medium">{{ activeAudioStream.BitRate ? Math.round(activeAudioStream.BitRate / 1000) + ' kbps' : '—' }}</span>
                         </div>
                     </div>
@@ -263,6 +263,7 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n';
 // Orchestrates the player page. All playback logic lives in the composables
 // under src/composables/player/:
 //   usePlayerSession  — shared state + Jellyfin session API/reporting
@@ -299,6 +300,7 @@ import { ArrowLeft, Play, Pause, AudioLines, Captions, Gauge, Info, Maximize, Mi
 import PlayerBottomSheet from '@/components/PlayerBottomSheet.vue';
 
 const route = useRoute();
+const { t } = useI18n();
 const router = useRouter();
 const store = useJellyfinStore();
 const audioPlayerStore = useAudioPlayerStore();
@@ -353,7 +355,7 @@ const audioSheetItems = computed(() =>
     audioList.value.map(o => ({ key: o.index, label: o.label, selected: o.index === selectedAudioIndex.value }))
 );
 const subtitleSheetItems = computed(() => [
-    { key: 'off', label: 'Off', selected: selectedSubtitleIndex.value === null },
+    { key: 'off', label: t('settings.lang.off'), selected: selectedSubtitleIndex.value === null },
     ...subtitleList.value.map(s => ({ key: s.index, label: s.label, selected: s.index === selectedSubtitleIndex.value })),
 ]);
 const selectedSubtitleIsBurnIn = computed(() =>

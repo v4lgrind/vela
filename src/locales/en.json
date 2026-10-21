@@ -300,5 +300,39 @@
     "estimatedSize": "Estimated size",
     "original": "Download original (may not play)",
     "unknown": "Unknown"
+  },
+  "player": {
+    "playPause": "Play/Pause",
+    "position": "Playback position",
+    "audioTrack": "Audio track",
+    "quality": "Quality",
+    "streamInfo": "Stream info",
+    "fullscreen": "Toggle fullscreen",
+    "size": "Size",
+    "codec": "Codec",
+    "bitrate": "Bitrate",
+    "encodeSpeed": "Encode speed",
+    "frameRate": "Frame rate",
+    "channels": "Channels",
+    "stream": "stream",
+    "source": "source",
+    "skipIntro": "Skip intro",
+    "video": "Video",
+    "errors": {
+      "fileNotFound": "Downloaded file not found on device",
+      "noDolbyVision": "This device cannot play Dolby Vision video. Try playing online — the server will transcode automatically.",
+      "unsupportedFormat": "This device cannot play this video format. Delete the download and re-download — the app will automatically transcode it to a compatible format.",
+      "audioUnsupported": "Audio track not supported on this device",
+      "playDownloadFailed": "Could not play the downloaded file",
+      "audioSwitchFailed": "Could not switch audio track",
+      "subtitleSwitchFailed": "Could not switch subtitle track",
+      "nativeInitFailed": "Could not start the player",
+      "qualitySwitchFailed": "Could not switch quality",
+      "subtitleRevert": "Subtitle switch failed — reverting to previous track",
+      "webInitFailed": "Could not start the player",
+      "audioRevert": "Audio switch failed — reverting to previous track",
+      "videoError": "Video error: {reason}",
+      "playbackError": "Playback error: {type}"
+    }
   }
 }

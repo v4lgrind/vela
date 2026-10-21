@@ -1,3 +1,4 @@
+import { i18n } from '@/i18n';
 import { useRouter } from 'vue-router';
 import { useJellyfinStore } from '@/store/jellyfin-store';
 import { usePreferencesStore } from '@/store/preferences-store';
@@ -85,7 +86,7 @@ export function useNativePlayer(
             debugLog(`[AudioCrash] restartWithAudio: initNativePlayer completed successfully`);
         } catch (e) {
             debugLog(`[AudioCrash] restartWithAudio FAILED: ${e}`);
-            error.value = 'Failed to switch audio track';
+            error.value = i18n.global.t('player.errors.audioSwitchFailed');
             isLoading.value = false;
         } finally {
             nativeSwitchingQuality = false;
@@ -127,7 +128,7 @@ export function useNativePlayer(
             if (previousPreference === null) localStorage.removeItem(preferenceKey);
             else localStorage.setItem(preferenceKey, previousPreference);
             logger.error('[Subtitles] Failed to restart with burn-in subtitle:', e);
-            error.value = 'Failed to switch subtitle track';
+            error.value = i18n.global.t('player.errors.subtitleSwitchFailed');
             isLoading.value = false;
         } finally {
             nativeSwitchingQuality = false;
@@ -291,7 +292,7 @@ export function useNativePlayer(
                     // from TranscodingProfiles so Jellyfin picks H.264 instead
                     await initNativePlayer(resumeSec, selectedAudioIndex.value ?? undefined, title, false, true, undefined, true);
                 } else {
-                    error.value = `Video error: ${data.reason}`;
+                    error.value = i18n.global.t('player.errors.videoError', { reason: data.reason });
                     isLoading.value = false;
                 }
             });
@@ -495,7 +496,7 @@ export function useNativePlayer(
             // so fallback restarts (e.g. codec unsupported → transcode) remain invisible.
         } catch (e: any) {
             logger.error('[initNativePlayer] error:', e);
-            error.value = 'Failed to initialize native player';
+            error.value = i18n.global.t('player.errors.nativeInitFailed');
             isLoading.value = false;
         }
     }
@@ -546,7 +547,7 @@ export function useNativePlayer(
         } catch (e: any) {
             logger.error('[switchQualityNative] error:', e);
             selectedBitrate.value = previousBitrate;
-            error.value = 'Failed to switch quality';
+            error.value = i18n.global.t('player.errors.qualitySwitchFailed');
             isLoading.value = false;
         } finally {
             nativeSwitchingQuality = false;

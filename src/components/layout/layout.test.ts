@@ -32,6 +32,15 @@ describe('PageHeader', () => {
     expect(replace).toHaveBeenCalledWith({ name: 'libraries' });
   });
 
+  it('calls onBack instead of the router when given one', async () => {
+    const onBack = vi.fn();
+    const { wrapper, router } = mountWith(PageHeader, { props: { title: 'Season 1', back: true, onBack } });
+    const replace = vi.spyOn(router, 'replace');
+    await wrapper.get('button[aria-label]').trigger('click');
+    expect(onBack).toHaveBeenCalledOnce();
+    expect(replace).not.toHaveBeenCalled();
+  });
+
   it('clamps long titles to two lines and keeps actions from shrinking', () => {
     const { wrapper } = mountWith(PageHeader, {
       props: { title: 'Astérix & Obélix : Le Combat des Chefs' },

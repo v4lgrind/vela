@@ -6,14 +6,16 @@ import { useRouter } from 'vue-router';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
-const props = defineProps<{ title: string; subtitle?: string; back?: boolean; overImage?: boolean }>();
+// onBack overrides the router back (pages with in-component sub-views).
+const props = defineProps<{ title: string; subtitle?: string; back?: boolean; overImage?: boolean; onBack?: () => void }>();
 
 const { t } = useI18n();
 const router = useRouter();
 
 // Deep links (Android Auto, notifications) open a page with nothing behind it: land on Home.
 function goBack() {
-  if (window.history.state?.back) router.back();
+  if (props.onBack) props.onBack();
+  else if (window.history.state?.back) router.back();
   else router.replace({ name: 'libraries' });
 }
 </script>

@@ -26,5 +26,22 @@
     "MusicAlbum": "Album",
     "Audio": "Audio",
     "Person": "Personne"
+  },
+  "nav": {
+    "home": "Accueil",
+    "library": "Bibliothèque",
+    "search": "Recherche",
+    "downloads": "Téléchargés",
+    "settings": "Réglages"
+  },
+  "home": {
+    "title": "Accueil",
+    "refresh": "Actualiser l'accueil",
+    "continueWatching": "Reprendre",
+    "nextUp": "À suivre",
+    "recentlyAdded": "Ajouts récents · {library}",
+    "myLibraries": "Mes bibliothèques",
+    "markPlayed": "Marquer comme vu",
+    "loadError": "Impossible de charger vos bibliothèques"
   }
 }

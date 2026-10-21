@@ -4,7 +4,7 @@
     v-if="isAuthenticated && audioStore.isMiniPlayerVisible && !audioStore.isExpanded"
   />
   <ExpandedAudioPlayer v-if="isAuthenticated && audioStore.isExpanded" />
-  <BottomNav v-if="showBottomNav" />
+  <AppNav v-if="showBottomNav" />
   <AppToast />
 </template>
 
@@ -13,7 +13,7 @@ import { computed, onMounted, onBeforeUnmount, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import MiniAudioPlayer from "@/components/MiniAudioPlayer.vue";
 import ExpandedAudioPlayer from "@/components/ExpandedAudioPlayer.vue";
-import BottomNav from "@/components/BottomNav.vue";
+import AppNav from "@/components/AppNav.vue";
 import AppToast from "@/components/ui/toast/AppToast.vue";
 import { useJellyfinStore } from "@/store/jellyfin-store";
 import { useAudioPlayerStore } from "@/store/audio-player-store";
@@ -22,6 +22,7 @@ import { usePreferencesStore } from "@/store/preferences-store";
 import { useDpadNavigation } from "@/composables/useDpadNavigation";
 import { usePlatform } from "@/composables/usePlatform";
 import { useBottomNavVisible } from "@/composables/useBottomNav";
+import { useWideLayout } from "@/composables/useWideLayout";
 import { App as CapacitorApp } from "@capacitor/app";
 import { StatusBar, Style } from "@capacitor/status-bar";
 import { NativeVideo } from "@/plugins/NativeVideoPlugin";
@@ -42,6 +43,7 @@ const isAuthenticated = computed(() => store.isAuthenticated);
 // fullscreen player, the login screen, and while the expanded audio player
 // covers the UI. Shared with MiniAudioPlayer so it can stack above the nav.
 const showBottomNav = useBottomNavVisible();
+const wide = useWideLayout();
 
 // ── Theme ──────────────────────────────────────────────────────────────────────
 
@@ -176,6 +178,13 @@ const routerViewStyle = computed(() => {
   // (plus the gesture-bar inset) so page content never hides behind it. The
   // mini player stacks above the nav, so add its height on top when both show.
   const navClear = "98px";
+  // Wide screens: the nav is a left rail, so reserve its width instead.
+  if (showBottomNav.value && wide.value) {
+    return {
+      paddingLeft: "calc(88px + var(--sal, env(safe-area-inset-left, 0px)))",
+      paddingBottom: miniVisible ? "72px" : undefined,
+    };
+  }
   if (showBottomNav.value && miniVisible) {
     return { paddingBottom: `calc(${navClear} + 64px + var(--sab, env(safe-area-inset-bottom, 0px)))` };
   }

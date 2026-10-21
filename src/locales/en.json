@@ -26,5 +26,22 @@
     "MusicAlbum": "Album",
     "Audio": "Audio",
     "Person": "Person"
+  },
+  "nav": {
+    "home": "Home",
+    "library": "Library",
+    "search": "Search",
+    "downloads": "Downloads",
+    "settings": "Settings"
+  },
+  "home": {
+    "title": "Home",
+    "refresh": "Refresh home",
+    "continueWatching": "Continue watching",
+    "nextUp": "Next up",
+    "recentlyAdded": "Recently added · {library}",
+    "myLibraries": "My libraries",
+    "markPlayed": "Mark as played",
+    "loadError": "Could not load your libraries"
   }
 }

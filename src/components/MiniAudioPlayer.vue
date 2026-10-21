@@ -1,8 +1,8 @@
 <template>
   <div
     class="fixed inset-x-0 h-16 bg-surface-raised/95 backdrop-blur-sm z-90 flex flex-col cursor-pointer"
-    :class="navVisible ? '' : 'safe-pb bottom-0'"
-    :style="navVisible ? miniAboveNavStyle : undefined"
+    :class="aboveBar ? '' : 'safe-pb bottom-0'"
+    :style="positionStyle"
     @click="expand">
     <!-- Progress bar -->
     <div class="w-full h-[3px] bg-white/10 cursor-pointer shrink-0" @click.stop="seekFromProgress">
@@ -48,16 +48,22 @@ import { useJellyfinStore } from '@/store/jellyfin-store';
 import { Button } from '@/components/ui/button';
 import { Airplay, Cast, SkipBack, SkipForward, Play, Pause, X } from 'lucide-vue-next';
 import { useBottomNavVisible } from '@/composables/useBottomNav';
+import { useWideLayout } from '@/composables/useWideLayout';
 
 const audioStore = useAudioPlayerStore();
 const jellyfinStore = useJellyfinStore();
 
 // When the bottom nav is on screen, sit just above it (nav: 66px tall, 16px
 // offset, +8px gap) instead of flush to the bottom edge.
+// On wide screens the nav is a left rail: stay at the bottom, right of the rail.
 const navVisible = useBottomNavVisible();
-const miniAboveNavStyle = {
-  bottom: 'calc(90px + var(--sab, env(safe-area-inset-bottom, 0px)))',
-};
+const wide = useWideLayout();
+const aboveBar = computed(() => navVisible.value && !wide.value);
+const positionStyle = computed(() => {
+  if (aboveBar.value) return { bottom: 'calc(90px + var(--sab, env(safe-area-inset-bottom, 0px)))' };
+  if (navVisible.value) return { left: 'calc(88px + var(--sal, env(safe-area-inset-left, 0px)))' };
+  return undefined;
+});
 
 const currentTrack = computed(() => audioStore.currentTrack);
 

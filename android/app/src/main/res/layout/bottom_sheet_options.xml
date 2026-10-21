@@ -43,7 +43,7 @@
             android:background="?attr/selectableItemBackgroundBorderless"
             android:tint="#99FFFFFF"
             android:padding="8dp"
-            android:contentDescription="Close" />
+            android:contentDescription="@string/player_close" />
     </LinearLayout>
 
     <!-- Option rows added programmatically -->

@@ -976,7 +976,7 @@ class NativePlayerActivity : AppCompatActivity() {
         nm.createNotificationChannel(
             NotificationChannel(
                 NOTIFICATION_CHANNEL_ID,
-                "Media Playback",
+                getString(R.string.player_channel_name),
                 NotificationManager.IMPORTANCE_LOW
             )
         )
@@ -1235,7 +1235,7 @@ class NativePlayerActivity : AppCompatActivity() {
     private fun buildSubtitleSizeFooter(footer: LinearLayout) {
         val d = resources.displayMetrics.density
         val label = TextView(this).apply {
-            text = "Size"
+            text = getString(R.string.player_size)
             setTextColor(0x99FFFFFF.toInt())
             textSize = 14f
             layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
@@ -1285,7 +1285,7 @@ class NativePlayerActivity : AppCompatActivity() {
                 val label = "${format.language ?: "und"} ${if (format.channelCount > 0) "(${format.channelCount}ch)" else ""} ${if (!format.codecs.isNullOrEmpty()) "- ${format.codecs!!.uppercase()}" else ""}".trim()
                 SheetOption(label, groupIndex == selectedAudioGroupIndex) { selectAudioTrack(groupIndex) }
             }
-            showOptionSheet("Audio Track", options)
+            showOptionSheet(getString(R.string.player_audio_track), options)
         } else if (jellyfinAudioTracks.isNotEmpty()) {
             // Use the Jellyfin audio index that was requested for this session.
             // Language matching is unreliable here because the transcoded stream
@@ -1300,7 +1300,7 @@ class NativePlayerActivity : AppCompatActivity() {
                     sendBroadcast(broadcastIntent)
                 }
             }
-            showOptionSheet("Audio Track", options)
+            showOptionSheet(getString(R.string.player_audio_track), options)
         }
     }
 
@@ -1344,19 +1344,19 @@ class NativePlayerActivity : AppCompatActivity() {
         // SRT subtitle (offline transcoded downloads) — on/off toggle with size stepper
         if (srtCues.isNotEmpty()) {
             val options = listOf(
-                SheetOption("Off", !srtEnabled) {
+                SheetOption(getString(R.string.player_off), !srtEnabled) {
                     srtEnabled = false
                     tvSrtSubtitle?.visibility = View.GONE
                     btnSubtitle.setBackgroundResource(R.drawable.bg_player_button)
                     sendSubtitleSelectedBroadcast(-1, "Off")
                 },
-                SheetOption("Subtitles", srtEnabled) {
+                SheetOption(getString(R.string.player_subtitles), srtEnabled) {
                     srtEnabled = true
                     btnSubtitle.setBackgroundResource(R.drawable.bg_player_button_selected)
                     sendSubtitleSelectedBroadcast(0, "Subtitles")
                 }
             )
-            showOptionSheet("Subtitles", options) { footer -> buildSubtitleSizeFooter(footer) }
+            showOptionSheet(getString(R.string.player_subtitles), options) { footer -> buildSubtitleSizeFooter(footer) }
             return
         }
 
@@ -1371,12 +1371,12 @@ class NativePlayerActivity : AppCompatActivity() {
             else addSidecarSubtitleOptions()
             addBurnInSubtitleOptions()
         }
-        showOptionSheet("Subtitles", options) { footer -> buildSubtitleSizeFooter(footer) }
+        showOptionSheet(getString(R.string.player_subtitles), options) { footer -> buildSubtitleSizeFooter(footer) }
     }
 
     private fun MutableList<SheetOption>.addOffSubtitleOption() {
         val isOff = selectedSubtitleGroupIndex < 0 && selectedBurnInSubtitleIndex < 0
-        add(SheetOption("Off", isOff) { selectSubtitleOff() })
+        add(SheetOption(getString(R.string.player_off), isOff) { selectSubtitleOff() })
     }
 
     private fun selectSubtitleOff() {
@@ -1477,7 +1477,7 @@ class NativePlayerActivity : AppCompatActivity() {
                 sendBroadcast(broadcastIntent)
             }
         }
-        showOptionSheet("Quality", options)
+        showOptionSheet(getString(R.string.player_quality), options)
     }
 
     private fun showStreamInfoDialog() {
@@ -1524,11 +1524,11 @@ class NativePlayerActivity : AppCompatActivity() {
             val vDirect = info.optBoolean("isVideoDirect", true)
             val fps = info.optDouble("framerate", 0.0)
             if (vCodec.isNotEmpty() || vRes.isNotEmpty()) {
-                addInfoSection(content, "Video")
-                if (vRes.isNotEmpty()) addInfoRow(content, "Resolution", vRes)
-                if (vCodec.isNotEmpty()) addInfoRow(content, "Codec", "${vCodec.uppercase()} ${if (vDirect) "(copy)" else "(transcoding)"}")
-                if (vBitrate > 0) addInfoRow(content, "Bitrate", "${vBitrate / 1000} kbps")
-                if (fps > 0) addInfoRow(content, "Frame rate", "%.1f fps".format(fps))
+                addInfoSection(content, getString(R.string.player_video))
+                if (vRes.isNotEmpty()) addInfoRow(content, getString(R.string.player_resolution), vRes)
+                if (vCodec.isNotEmpty()) addInfoRow(content, getString(R.string.player_codec), "${vCodec.uppercase()} ${if (vDirect) getString(R.string.player_copy) else getString(R.string.player_transcoding)}")
+                if (vBitrate > 0) addInfoRow(content, getString(R.string.player_bitrate), "${vBitrate / 1000} kbps")
+                if (fps > 0) addInfoRow(content, getString(R.string.player_frame_rate), "%.1f fps".format(fps))
             }
 
             // Audio
@@ -1537,10 +1537,10 @@ class NativePlayerActivity : AppCompatActivity() {
             val aBitrate = info.optInt("audioBitrate", 0)
             val aDirect = info.optBoolean("isAudioDirect", true)
             if (aCodec.isNotEmpty() || aChannels.isNotEmpty()) {
-                addInfoSection(content, "Audio")
-                if (aCodec.isNotEmpty()) addInfoRow(content, "Codec", "${aCodec.uppercase()} ${if (aDirect) "(copy)" else "(transcoding)"}")
-                if (aChannels.isNotEmpty()) addInfoRow(content, "Channels", aChannels)
-                if (aBitrate > 0) addInfoRow(content, "Bitrate", "${aBitrate / 1000} kbps")
+                addInfoSection(content, getString(R.string.player_audio))
+                if (aCodec.isNotEmpty()) addInfoRow(content, getString(R.string.player_codec), "${aCodec.uppercase()} ${if (aDirect) getString(R.string.player_copy) else getString(R.string.player_transcoding)}")
+                if (aChannels.isNotEmpty()) addInfoRow(content, getString(R.string.player_channels), aChannels)
+                if (aBitrate > 0) addInfoRow(content, getString(R.string.player_bitrate), "${aBitrate / 1000} kbps")
             }
 
             dialog.window?.apply {

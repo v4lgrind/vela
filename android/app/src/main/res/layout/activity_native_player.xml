@@ -65,7 +65,7 @@
             android:background="@drawable/bg_player_button"
             android:tint="#FFFFFF"
             android:padding="10dp"
-            android:contentDescription="Back"
+            android:contentDescription="@string/player_back"
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             android:layout_marginTop="12dp"
@@ -97,7 +97,7 @@
             android:tint="#FFFFFF"
             android:padding="16dp"
             android:scaleType="fitCenter"
-            android:contentDescription="Play/Pause"
+            android:contentDescription="@string/player_play_pause"
             android:visibility="invisible"
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintBottom_toBottomOf="parent"
@@ -120,7 +120,7 @@
                 android:id="@+id/seek_bar"
                 android:layout_width="match_parent"
                 android:layout_height="32dp"
-                android:contentDescription="Playback position"
+                android:contentDescription="@string/player_position"
                 android:progressDrawable="@drawable/seekbar_progress"
                 android:thumb="@drawable/seekbar_thumb"
                 android:splitTrack="false" />
@@ -185,7 +185,7 @@
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:tint="#FFFFFF"
                 android:padding="9dp"
-                android:contentDescription="Audio track"
+                android:contentDescription="@string/player_audio_track"
                 android:visibility="gone" />
 
             <ImageButton
@@ -196,7 +196,7 @@
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:tint="#FFFFFF"
                 android:padding="9dp"
-                android:contentDescription="Subtitles"
+                android:contentDescription="@string/player_subtitles"
                 android:visibility="gone" />
 
             <ImageButton
@@ -207,7 +207,7 @@
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:tint="#FFFFFF"
                 android:padding="9dp"
-                android:contentDescription="Quality"
+                android:contentDescription="@string/player_quality"
                 android:visibility="gone" />
 
             <ImageButton
@@ -218,7 +218,7 @@
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:tint="#FFFFFF"
                 android:padding="9dp"
-                android:contentDescription="Stream info"
+                android:contentDescription="@string/player_stream_info"
                 android:visibility="gone" />
 
             <ImageButton
@@ -229,7 +229,7 @@
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:tint="#FFFFFF"
                 android:padding="9dp"
-                android:contentDescription="Toggle fullscreen" />
+                android:contentDescription="@string/player_fullscreen" />
 
         </LinearLayout>
 
@@ -299,7 +299,7 @@
         android:layout_gravity="bottom|end"
         android:layout_marginEnd="16dp"
         android:layout_marginBottom="80dp"
-        android:text="Skip Intro"
+        android:text="@string/player_skip_intro"
         android:textColor="#FFFFFF"
         android:textSize="14sp"
         android:textAllCaps="false"
@@ -365,7 +365,7 @@
         android:layout_gravity="bottom|start"
         android:layout_marginStart="16dp"
         android:layout_marginBottom="80dp"
-        android:text="Next Episode"
+        android:text="@string/player_next_episode"
         android:textColor="#FFFFFF"
         android:textSize="14sp"
         android:textAllCaps="false"

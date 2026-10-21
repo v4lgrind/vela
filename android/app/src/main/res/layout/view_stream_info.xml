@@ -32,7 +32,7 @@
             android:textColor="#FFFFFF"
             android:textSize="16sp"
             android:fontFamily="sans-serif-medium"
-            android:text="Stream Info" />
+            android:text="@string/player_stream_info" />
 
         <ImageButton
             android:id="@+id/info_close"
@@ -42,7 +42,7 @@
             android:background="?attr/selectableItemBackgroundBorderless"
             android:tint="#99FFFFFF"
             android:padding="8dp"
-            android:contentDescription="Close" />
+            android:contentDescription="@string/player_close" />
     </LinearLayout>
 
     <!-- Play-method badge + transcode reason (populated in code) -->

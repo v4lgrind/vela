@@ -90,7 +90,7 @@ class DownloadService : Service() {
                     persistQueue()
                 }
                 ServiceCompat.startForeground(
-                    this, NOTIF_ID, buildNotif("Preparing download…", "", 0L, -1L),
+                    this, NOTIF_ID, buildNotif(getString(R.string.download_preparing), "", 0L, -1L),
                     ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
                 )
                 ensureWorkerRunning()
@@ -327,7 +327,7 @@ class DownloadService : Service() {
                 this, itemId.hashCode(),
                 cancelIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
-            builder.addAction(android.R.drawable.ic_delete, "Cancel", cancelPi)
+            builder.addAction(android.R.drawable.ic_delete, getString(R.string.download_cancel), cancelPi)
         }
         return builder.build()
     }
@@ -335,8 +335,8 @@ class DownloadService : Service() {
     private fun mb(bytes: Long) = "%.1f".format(bytes / 1_048_576.0)
 
     private fun createChannel() {
-        val ch = NotificationChannel(CHANNEL_ID, "Downloads", NotificationManager.IMPORTANCE_LOW)
-        ch.description = "File download progress"
+        val ch = NotificationChannel(CHANNEL_ID, getString(R.string.download_channel_name), NotificationManager.IMPORTANCE_LOW)
+        ch.description = getString(R.string.download_channel_desc)
         (getSystemService(NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(ch)
     }
 
@@ -385,7 +385,7 @@ class DownloadService : Service() {
         }
         if (queue.isNotEmpty()) {
             ServiceCompat.startForeground(
-                this, NOTIF_ID, buildNotif("Resuming downloads…", "", 0L, -1L),
+                this, NOTIF_ID, buildNotif(getString(R.string.download_resuming), "", 0L, -1L),
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
             )
             ensureWorkerRunning()

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="player_stream_info">Infos du flux</string>
+    <string name="player_close">Fermer</string>
+    <string name="player_selected">Sélectionné</string>
+    <string name="player_back">Retour</string>
+    <string name="player_play_pause">Lecture/Pause</string>
+    <string name="player_position">Position de lecture</string>
+    <string name="player_audio_track">Piste audio</string>
+    <string name="player_subtitles">Sous-titres</string>
+    <string name="player_quality">Qualité</string>
+    <string name="player_fullscreen">Plein écran</string>
+    <string name="player_skip_intro">Passer l\'intro</string>
+    <string name="player_next_episode">Épisode suivant</string>
+    <string name="player_size">Taille</string>
+    <string name="player_off">Désactivés</string>
+    <string name="player_video">Vidéo</string>
+    <string name="player_audio">Audio</string>
+    <string name="player_resolution">Résolution</string>
+    <string name="player_codec">Codec</string>
+    <string name="player_bitrate">Débit</string>
+    <string name="player_frame_rate">Fréquence d\'images</string>
+    <string name="player_channels">Canaux</string>
+    <string name="player_copy">(copie)</string>
+    <string name="player_transcoding">(conversion)</string>
+    <string name="player_channel_name">Lecture multimédia</string>
+    <string name="download_preparing">Préparation du téléchargement…</string>
+    <string name="download_resuming">Reprise des téléchargements…</string>
+    <string name="download_cancel">Annuler</string>
+    <string name="download_channel_name">Téléchargements</string>
+    <string name="download_channel_desc">Progression des téléchargements</string>
+    <string name="auto_latest">Ajouts récents</string>
+    <string name="auto_albums">Albums</string>
+    <string name="auto_artists">Artistes</string>
+    <string name="auto_playlists">Playlists</string>
+</resources>

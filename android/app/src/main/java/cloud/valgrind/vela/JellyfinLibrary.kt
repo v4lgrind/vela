@@ -52,10 +52,10 @@ class JellyfinLibrary(private val context: Context) {
     /** Blocking (network). Children of a browsable [parentId]. */
     fun children(parentId: String): List<MediaItem> = when {
         parentId == ROOT -> listOf(
-            folder("latest", "Ajouts récents"),
-            folder("albums", "Albums"),
-            folder("artists", "Artistes"),
-            folder("playlists", "Playlists"),
+            folder("latest", context.getString(R.string.auto_latest)),
+            folder("albums", context.getString(R.string.auto_albums)),
+            folder("artists", context.getString(R.string.auto_artists)),
+            folder("playlists", context.getString(R.string.auto_playlists)),
         )
         parentId == "latest" -> latestAlbums().map(::albumItem)
         parentId == "albums" -> items("IncludeItemTypes" to "MusicAlbum", "SortBy" to "SortName").map(::albumItem)

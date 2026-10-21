@@ -192,7 +192,8 @@
     "deleteSomeFailed": "Could not delete some items",
     "confirmDeleteSeries": "Delete the {n} episode of \"{name}\"? | Delete all {n} episodes of \"{name}\"?",
     "confirmDeleteSeason": "Delete the {n} episode of season {season}? | Delete all {n} episodes of season {season}?",
-    "deleteEpisodesFailed": "Could not delete some episodes"
+    "deleteEpisodesFailed": "Could not delete some episodes",
+    "seasons": "{n} season | {n} seasons"
   },
   "settings": {
     "title": "Settings",
@@ -286,7 +287,8 @@
     "pair": "Pair",
     "playingThrough": "Music is playing through AirPlay.",
     "description": "Play the music on an Apple TV or AirPlay speaker.",
-    "pairFailed": "Pairing failed, check the code and try again."
+    "pairFailed": "Pairing failed, check the code and try again.",
+    "connectionLost": "connection lost"
   },
   "transcode": {
     "title": "Download options",
@@ -332,7 +334,9 @@
       "webInitFailed": "Could not start the player",
       "audioRevert": "Audio switch failed — reverting to previous track",
       "videoError": "Video error: {reason}",
-      "playbackError": "Playback error: {type}"
+      "playbackError": "Playback error: {type}",
+      "hlsUnsupported": "HLS playback is not supported on this device",
+      "generic": "Playback error — please go back and try again"
     }
   }
 }

@@ -117,7 +117,7 @@
                   <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
                   <div class="absolute bottom-0 left-0 right-0 px-2 pb-2">
                     <span class="text-[0.65rem] text-white/70">
-                      {{ series.seasons.length }} season{{ series.seasons.length !== 1 ? 's' : '' }}
+                      {{ t('downloads.seasons', series.seasons.length) }}
                     </span>
                   </div>
                 </div>

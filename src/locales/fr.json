@@ -192,7 +192,8 @@
     "deleteSomeFailed": "Certains éléments n’ont pas pu être supprimés",
     "confirmDeleteSeries": "Supprimer l’épisode de « {name} » ? | Supprimer les {n} épisodes de « {name} » ?",
     "confirmDeleteSeason": "Supprimer l’épisode de la saison {season} ? | Supprimer les {n} épisodes de la saison {season} ?",
-    "deleteEpisodesFailed": "Certains épisodes n’ont pas pu être supprimés"
+    "deleteEpisodesFailed": "Certains épisodes n’ont pas pu être supprimés",
+    "seasons": "{n} saison | {n} saisons"
   },
   "settings": {
     "title": "Réglages",
@@ -286,7 +287,8 @@
     "pair": "Appairer",
     "playingThrough": "La musique est diffusée via AirPlay.",
     "description": "Écoutez la musique sur une Apple TV ou une enceinte AirPlay.",
-    "pairFailed": "L'appairage a échoué, vérifiez le code et réessayez."
+    "pairFailed": "L'appairage a échoué, vérifiez le code et réessayez.",
+    "connectionLost": "connexion perdue"
   },
   "transcode": {
     "title": "Options de téléchargement",
@@ -332,7 +334,9 @@
       "webInitFailed": "Impossible de démarrer le lecteur",
       "audioRevert": "Changement de piste audio impossible — retour à la piste précédente",
       "videoError": "Erreur vidéo : {reason}",
-      "playbackError": "Erreur de lecture : {type}"
+      "playbackError": "Erreur de lecture : {type}",
+      "hlsUnsupported": "La lecture HLS n'est pas prise en charge sur cet appareil",
+      "generic": "Erreur de lecture — revenez en arrière et réessayez"
     }
   }
 }

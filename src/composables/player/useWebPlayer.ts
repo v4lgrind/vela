@@ -289,7 +289,7 @@ export function useWebPlayer(
             video.play().catch(() => { });
             startProgressReporting();
         } else {
-            error.value = 'HLS playback is not supported on this device';
+            error.value = i18n.global.t('player.errors.hlsUnsupported');
             isLoading.value = false;
         }
     }
@@ -515,7 +515,7 @@ export function useWebPlayer(
             setTimeout(() => { if (error.value?.startsWith('Audio switch failed')) error.value = null; }, 3000);
         } catch (e) {
             logger.error('[rollbackAudio] failed:', e);
-            error.value = 'Playback error — please go back and try again';
+            error.value = i18n.global.t('player.errors.generic');
             isLoading.value = false;
         }
     }

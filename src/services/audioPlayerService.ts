@@ -1,3 +1,4 @@
+import { i18n } from '@/i18n';
 import { Capacitor } from '@capacitor/core';
 import { watch } from 'vue';
 import {
@@ -149,7 +150,7 @@ class AudioPlayerService implements AudioController {
       store.airplayDevice = state === 'connecting' || state === 'connected' ? deviceName ?? 'AirPlay' : null;
       if (state === 'error') {
         logger.error('[AudioPlayer] AirPlay error:', error);
-        useToast().showError(`AirPlay: ${error ?? 'connection lost'}`);
+        useToast().showError(`AirPlay: ${error ?? i18n.global.t('airplay.connectionLost')}`);
       }
     });
   }

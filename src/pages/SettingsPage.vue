@@ -1,12 +1,10 @@
 <template>
-  <div class="min-h-dvh bg-background text-text-body">
-    <div class="max-w-2xl mx-auto px-5 pt-6 pb-4"
-      style="padding-top: calc(24px + var(--sat, env(safe-area-inset-top, 0px)))">
-      <h1 class="text-2xl font-bold text-text-heading tracking-tight mb-7">Settings</h1>
+  <AppPage width="content" class="min-h-dvh bg-background pb-6 text-text-body">
+      <PageHeader :title="t('settings.title')" class="mb-5" />
 
       <!-- Account -->
       <section class="mb-7">
-        <p class="settings-label">Account</p>
+        <p class="settings-label">{{ t('settings.account') }}</p>
         <div class="settings-card divide-y divide-border-default">
           <div class="flex items-center gap-3 px-4 py-3.5">
             <span class="size-10 shrink-0 rounded-full bg-gradient-to-br from-accent-purple to-[#0a4f8a]" />
@@ -14,66 +12,54 @@
               <div class="text-[14.5px] font-semibold text-text-heading truncate">{{ currentServerName }}</div>
               <p class="text-xs text-text-muted mt-0.5 truncate">{{ jellyfinStore.serverUrl }}</p>
             </div>
-            <span class="text-xs font-semibold text-accent-purple">Active</span>
+            <span class="text-xs font-semibold text-accent-purple">{{ t('settings.active') }}</span>
           </div>
-          <button class="settings-row" @click="router.push('/login')">
-            <Server class="size-[19px] text-text-muted shrink-0" :stroke-width="1.8" />
-            <span class="flex-1 text-[14.5px] text-text-heading">Switch Server</span>
-            <ChevronRight class="size-[17px] text-text-muted" />
-          </button>
-          <button class="settings-row" @click="signOut">
-            <LogOut class="size-[19px] text-error shrink-0" :stroke-width="1.8" />
-            <span class="flex-1 text-[14.5px] font-medium text-error">Sign Out</span>
-          </button>
+          <ListRow :icon="Server" :label="t('settings.switchServer')" :to="{ name: 'login' }" />
+          <ListRow :icon="LogOut" :label="t('settings.signOut')" destructive @click="signOut" />
         </div>
       </section>
 
       <!-- Appearance -->
       <section class="mb-7">
-        <p class="settings-label">Appearance <span class="text-accent-purple font-bold">· new</span></p>
+        <p class="settings-label">{{ t('settings.appearance') }}</p>
         <div class="settings-card p-4">
           <div class="flex items-center gap-3 mb-3.5">
             <Palette class="size-[19px] text-text-muted" :stroke-width="1.8" />
-            <span class="text-[14.5px] font-medium text-text-heading">Theme</span>
+            <span class="text-body font-medium text-text-heading">{{ t('settings.theme') }}</span>
           </div>
-          <div class="flex gap-1.5 p-1 bg-surface-hover rounded-xl">
-            <button
-              v-for="opt in themeOptions" :key="opt.value"
-              class="flex-1 py-2 rounded-lg text-[12.5px] font-semibold transition-colors"
-              :class="preferencesStore.colorScheme === opt.value
-                ? 'bg-accent-purple text-accent-ink'
-                : 'text-text-primary'"
-              @click="preferencesStore.colorScheme = opt.value">
-              {{ opt.label }}
-            </button>
-          </div>
-          <p class="text-[11.5px] text-text-muted mt-2.5 leading-relaxed">“Auto” follows your Android system display mode.</p>
+          <ToggleGroup type="single" variant="outline" :model-value="preferencesStore.colorScheme" class="grid grid-cols-3 gap-2"
+            @update:model-value="(v) => v && (preferencesStore.colorScheme = v as typeof preferencesStore.colorScheme)">
+            <ToggleGroupItem v-for="opt in themeOptions" :key="opt.value" :value="opt.value">
+              {{ t(opt.label) }}
+            </ToggleGroupItem>
+          </ToggleGroup>
+          <p class="text-caption text-text-muted mt-2.5 leading-relaxed">{{ t('settings.themeHint') }}</p>
         </div>
       </section>
 
       <!-- Language Preferences -->
       <section class="mb-7">
-        <p class="settings-label">Language Preferences</p>
-        <p class="settings-sub">Applied to all new items. Per-item overrides take precedence.</p>
+        <p class="settings-label">{{ t('settings.languages') }}</p>
+        <p class="settings-sub">{{ t('settings.languagesHint') }}</p>
         <div class="settings-card divide-y divide-border-default">
           <label class="settings-row">
-            <span class="flex-1 text-[14.5px] text-text-heading">Audio Language</span>
+            <span class="flex-1 text-body text-text-heading">{{ t('settings.audioLanguage') }}</span>
             <select v-model="preferencesStore.preferredAudioLanguage" class="settings-select">
-              <option v-for="lang in LANGUAGES" :key="lang.code" :value="lang.code">{{ lang.label }}</option>
+              <option v-for="lang in LANGUAGES" :key="lang.code" :value="lang.code">{{ t(lang.label) }}</option>
             </select>
             <ChevronRight class="size-[17px] text-text-muted shrink-0" />
           </label>
           <label class="settings-row">
-            <span class="flex-1 text-[14.5px] text-text-heading">Subtitle Language</span>
+            <span class="flex-1 text-body text-text-heading">{{ t('settings.subtitleLanguage') }}</span>
             <select v-model="preferencesStore.preferredSubtitleLanguage" class="settings-select">
-              <option v-for="lang in SUBTITLE_LANGUAGES" :key="lang.code" :value="lang.code">{{ lang.label }}</option>
+              <option v-for="lang in SUBTITLE_LANGUAGES" :key="lang.code" :value="lang.code">{{ t(lang.label) }}</option>
             </select>
             <ChevronRight class="size-[17px] text-text-muted shrink-0" />
           </label>
           <label class="settings-row">
-            <span class="flex-1 text-[14.5px] text-text-heading">Subtitle Size</span>
+            <span class="flex-1 text-body text-text-heading">{{ t('settings.subtitleSize') }}</span>
             <select v-model.number="preferencesStore.subtitleSize" class="settings-select">
-              <option v-for="s in SUBTITLE_SIZES" :key="s.value" :value="s.value">{{ s.label }}</option>
+              <option v-for="s in SUBTITLE_SIZES" :key="s.value" :value="s.value">{{ t(s.label) }}</option>
             </select>
             <ChevronRight class="size-[17px] text-text-muted shrink-0" />
           </label>
@@ -85,7 +71,7 @@
                 class="relative text-white text-center leading-snug px-3 pb-2.5 font-semibold subtitle-preview-text"
                 :style="{ fontSize: `${Math.round(15 * preferencesStore.subtitleSize)}px` }"
               >
-                The quick brown fox jumps over the lazy dog
+                {{ t('settings.subtitlePreview') }}
               </p>
             </div>
           </div>
@@ -94,22 +80,22 @@
 
       <!-- Playback -->
       <section class="mb-7">
-        <p class="settings-label">Playback</p>
-        <p class="settings-sub">Default quality for all streams. Can be overridden per-item in the player.</p>
+        <p class="settings-label">{{ t('settings.playback') }}</p>
+        <p class="settings-sub">{{ t('settings.playbackHint') }}</p>
         <div class="settings-card">
           <label class="settings-row">
             <MonitorPlay class="size-[19px] text-text-muted shrink-0" :stroke-width="1.8" />
-            <span class="flex-1 text-[14.5px] text-text-heading">Max Resolution</span>
+            <span class="flex-1 text-body text-text-heading">{{ t('settings.maxResolution') }}</span>
             <select v-model.number="preferencesStore.preferredBitrate" class="settings-select">
-              <option v-for="q in QUALITY_PRESETS" :key="q.bitrate" :value="q.bitrate">{{ q.label }}</option>
+              <option v-for="q in QUALITY_PRESETS" :key="q.bitrate" :value="q.bitrate">{{ q.label.startsWith('settings.') ? t(q.label) : q.label }}</option>
             </select>
             <ChevronRight class="size-[17px] text-text-muted shrink-0" />
           </label>
           <label class="settings-row">
             <Music class="size-[19px] text-text-muted shrink-0" :stroke-width="1.8" />
-            <span class="flex-1 text-[14.5px] text-text-heading">Music Quality</span>
+            <span class="flex-1 text-body text-text-heading">{{ t('settings.musicQuality') }}</span>
             <select v-model.number="preferencesStore.musicMaxBitrate" class="settings-select">
-              <option v-for="q in MUSIC_QUALITY_PRESETS" :key="q.bitrate" :value="q.bitrate">{{ q.label }}</option>
+              <option v-for="q in MUSIC_QUALITY_PRESETS" :key="q.bitrate" :value="q.bitrate">{{ q.label.startsWith('settings.') ? t(q.label) : q.label }}</option>
             </select>
             <ChevronRight class="size-[17px] text-text-muted shrink-0" />
           </label>
@@ -118,61 +104,54 @@
 
       <!-- Connectivity -->
       <section class="mb-7">
-        <p class="settings-label">Connectivity</p>
+        <p class="settings-label">{{ t('settings.connectivity') }}</p>
         <div class="settings-card">
-          <div class="flex items-center gap-3 px-4 py-3.5">
+          <label class="flex min-h-12 items-center gap-3 px-4 py-3.5">
             <div class="flex-1">
-              <div class="text-[14.5px] text-text-heading">Force Offline Mode</div>
-              <p class="text-[11.5px] text-text-muted mt-0.5">Disable all Jellyfin network requests</p>
+              <div class="text-body text-text-heading">{{ t('settings.forceOffline') }}</div>
+              <p class="text-caption text-text-muted mt-0.5">{{ t('settings.forceOfflineHint') }}</p>
             </div>
-            <button
-              role="switch"
-              :aria-checked="preferencesStore.forceOfflineMode"
-              @click="preferencesStore.forceOfflineMode = !preferencesStore.forceOfflineMode"
-              :class="preferencesStore.forceOfflineMode ? 'bg-accent-purple' : 'bg-surface-hover border border-border-default'"
-              class="relative inline-flex h-[27px] w-[46px] shrink-0 items-center rounded-full transition-colors focus:outline-none"
-            >
-              <span
-                :class="preferencesStore.forceOfflineMode ? 'translate-x-[22px] bg-white' : 'translate-x-[3px] bg-text-subtle'"
-                class="inline-block size-[21px] rounded-full transition-transform"
-              />
-            </button>
-          </div>
+            <Switch v-model="preferencesStore.forceOfflineMode" />
+          </label>
         </div>
       </section>
 
       <!-- Diagnostics -->
       <section class="mb-2">
-        <p class="settings-label">Diagnostics</p>
+        <p class="settings-label">{{ t('settings.diagnostics') }}</p>
         <div class="settings-card">
           <router-link to="/logs" class="settings-row">
             <div class="flex-1">
-              <div class="text-[14.5px] text-text-heading">Debug Logs</div>
-              <p class="text-[11.5px] text-text-muted mt-0.5">View and export playback diagnostic logs</p>
+              <div class="text-body text-text-heading">{{ t('settings.debugLogs') }}</div>
+              <p class="text-caption text-text-muted mt-0.5">{{ t('settings.debugLogsHint') }}</p>
             </div>
             <ChevronRight class="size-[17px] text-text-muted shrink-0" />
           </router-link>
         </div>
       </section>
-    </div>
-  </div>
+  </AppPage>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
+import { AppPage, ListRow, PageHeader } from '@/components/layout';
+import { Switch } from '@/components/ui/switch';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { ChevronRight, LogOut, Server, Palette, MonitorPlay, Music } from 'lucide-vue-next';
 import { usePreferencesStore } from '@/store/preferences-store';
 import { useJellyfinStore } from '@/store/jellyfin-store';
 
+const { t } = useI18n();
 const router = useRouter();
 const jellyfinStore = useJellyfinStore();
 const preferencesStore = usePreferencesStore();
 
 const themeOptions = [
-  { value: 'system' as const, label: 'Auto' },
-  { value: 'light' as const, label: 'Light' },
-  { value: 'dark' as const, label: 'Dark' },
+  { value: 'system' as const, label: 'settings.themeAuto' },
+  { value: 'light' as const, label: 'settings.themeLight' },
+  { value: 'dark' as const, label: 'settings.themeDark' },
 ];
 
 const currentServerName = computed(() => {
@@ -188,35 +167,35 @@ async function signOut() {
 }
 
 const LANGUAGES = [
-  { code: '',    label: 'None – use default' },
-  { code: 'eng', label: 'English' },
-  { code: 'fra', label: 'French' },
-  { code: 'spa', label: 'Spanish' },
-  { code: 'deu', label: 'German' },
-  { code: 'ita', label: 'Italian' },
-  { code: 'jpn', label: 'Japanese' },
-  { code: 'kor', label: 'Korean' },
-  { code: 'por', label: 'Portuguese' },
-  { code: 'rus', label: 'Russian' },
-  { code: 'zho', label: 'Chinese' },
-  { code: 'ara', label: 'Arabic' },
+  { code: '',    label: 'settings.lang.none' },
+  { code: 'eng', label: 'settings.lang.eng' },
+  { code: 'fra', label: 'settings.lang.fra' },
+  { code: 'spa', label: 'settings.lang.spa' },
+  { code: 'deu', label: 'settings.lang.deu' },
+  { code: 'ita', label: 'settings.lang.ita' },
+  { code: 'jpn', label: 'settings.lang.jpn' },
+  { code: 'kor', label: 'settings.lang.kor' },
+  { code: 'por', label: 'settings.lang.por' },
+  { code: 'rus', label: 'settings.lang.rus' },
+  { code: 'zho', label: 'settings.lang.zho' },
+  { code: 'ara', label: 'settings.lang.ara' },
 ];
 
 const SUBTITLE_LANGUAGES = [
-  { code: '',    label: 'Off' },
+  { code: '',    label: 'settings.lang.off' },
   ...LANGUAGES.slice(1),
 ];
 
 const SUBTITLE_SIZES = [
-  { value: 0.75, label: 'Small' },
-  { value: 1.0,  label: 'Normal' },
-  { value: 1.25, label: 'Large' },
-  { value: 1.5,  label: 'Extra Large' },
-  { value: 2.0,  label: 'Huge' },
+  { value: 0.75, label: 'settings.size.small' },
+  { value: 1.0,  label: 'settings.size.normal' },
+  { value: 1.25, label: 'settings.size.large' },
+  { value: 1.5,  label: 'settings.size.xl' },
+  { value: 2.0,  label: 'settings.size.huge' },
 ];
 
 const QUALITY_PRESETS = [
-  { bitrate: 0,          label: 'Auto' },
+  { bitrate: 0,          label: 'settings.themeAuto' },
   { bitrate: 80_000_000, label: '4K' },
   { bitrate: 20_000_000, label: '1080p' },
   { bitrate:  8_000_000, label: '720p' },
@@ -226,7 +205,7 @@ const QUALITY_PRESETS = [
 
 // Above the limit (e.g. FLAC on a 320 kbps cap) the server transcodes to MP3.
 const MUSIC_QUALITY_PRESETS = [
-  { bitrate: 0,       label: 'Original' },
+  { bitrate: 0,       label: 'settings.original' },
   { bitrate: 320_000, label: '320 kbps' },
   { bitrate: 192_000, label: '192 kbps' },
   { bitrate: 128_000, label: '128 kbps' },

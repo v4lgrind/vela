@@ -1,54 +1,44 @@
 <template>
-  <div class="bg-background text-text-primary p-4"
-    style="padding-top: calc(16px + var(--sat, env(safe-area-inset-top, 0px)))">
-
-    <header class="flex items-center justify-between mb-4">
-      <h1 class="text-2xl sm:text-3xl font-bold text-foreground">Accueil</h1>
-      <div class="flex items-center gap-2">
+  <AppPage class="bg-background pb-6 text-text-primary">
+    <PageHeader :title="t('home.title')" class="mb-4">
+      <template #actions>
         <!-- Pick the music output before playing anything -->
-        <button
+        <Button
           v-if="audioStore.airplaySupported && !audioStore.castDevice"
-          type="button"
+          variant="ghost" size="icon" class="rounded-full"
           :title="audioStore.airplayDevice ?? 'AirPlay'"
           aria-label="AirPlay"
-          class="size-10 rounded-full border border-border-default bg-surface-raised
-                 flex items-center justify-center active:scale-95 transition"
           :class="audioStore.airplayDevice ? 'text-accent-purple' : 'text-text-muted'"
           @click="showAirPlay = true">
-          <Airplay class="size-4" />
-        </button>
-        <button
+          <Airplay class="size-5" />
+        </Button>
+        <Button
           v-if="(audioStore.castAvailable || audioStore.castDevice) && !audioStore.airplayDevice"
-          type="button"
+          variant="ghost" size="icon" class="rounded-full"
           :title="audioStore.castDevice ?? 'Cast'"
           aria-label="Cast"
-          class="size-10 rounded-full border border-border-default bg-surface-raised
-                 flex items-center justify-center active:scale-95 transition"
           :class="audioStore.castDevice ? 'text-accent-purple' : 'text-text-muted'"
           @click="audioPlayerService.openCastDialog()">
-          <Cast class="size-4" />
-        </button>
-        <button
-          type="button"
-          title="Actualiser l’accueil"
-          aria-label="Actualiser l’accueil"
+          <Cast class="size-5" />
+        </Button>
+        <Button
+          variant="ghost" size="icon" class="rounded-full text-text-muted"
+          :title="t('home.refresh')"
+          :aria-label="t('home.refresh')"
           :disabled="refreshing"
-          class="size-10 rounded-full border border-border-default bg-surface-raised text-text-muted
-                 flex items-center justify-center active:scale-95 transition disabled:opacity-50"
           @click="loadMedia(true)">
-          <RefreshCw class="size-4" :class="{ 'animate-spin': refreshing }" />
-        </button>
-      </div>
-    </header>
+          <RefreshCw class="size-5" :class="{ 'animate-spin': refreshing }" />
+        </Button>
+      </template>
+    </PageHeader>
     <AirPlayDialog v-model:open="showAirPlay" />
 
     <!-- Continue Watching -->
-    <section v-if="resumeItems.length" class="mb-5">
-      <h2 class="text-xl sm:text-2xl font-bold text-foreground mb-4">Continue Watching</h2>
-      <div class="flex gap-3 overflow-x-auto pt-2 pb-1 scrollbar-hide">
+    <Section v-if="resumeItems.length" :title="t('home.continueWatching')">
+      <MediaRail>
         <div v-for="item in resumeItems" :key="item.Id" class="shrink-0 w-44 sm:w-52 group">
           <!-- Thumbnail -->
-          <div class="relative rounded-xl overflow-hidden aspect-video mb-1.5
+          <div class="relative rounded-xl overflow-hidden bg-surface-raised aspect-video mb-1.5
                       group-hover:-translate-y-1 group-hover:shadow-xl transition-all duration-200 cursor-pointer active:scale-[0.97] active:opacity-75"
                @click="playResume(item)">
             <LazyImg :src="getResumeImageUrl(item)" :alt="item.Name ?? undefined" :item-type="item.Type"
@@ -74,7 +64,7 @@
             </div>
 
             <!-- Mark as played button -->
-            <button @click.stop="markPlayed(item)" title="Mark as played"
+            <button @click.stop="markPlayed(item)" :title="t('home.markPlayed')" :aria-label="t('home.markPlayed')"
               class="absolute top-1.5 right-1.5 p-1.5 rounded-full bg-black/50 text-white/70
                      opacity-100 sm:opacity-0 sm:group-hover:opacity-100 hover:bg-black/80 hover:text-white
                      transition-all duration-200 cursor-pointer pointer-events-auto">
@@ -99,20 +89,19 @@
               S{{ item.ParentIndexNumber }}E{{ item.IndexNumber }}
             </div>
             <div v-if="remainingTime(item)" class="text-xs text-text-muted mt-0.5">
-              {{ remainingTime(item) }} left
+              {{ remainingTime(item) }}
             </div>
           </div>
         </div>
-      </div>
-    </section>
+      </MediaRail>
+    </Section>
 
     <!-- Next Up -->
-    <section v-if="nextUpItems.length" class="mb-5">
-      <h2 class="text-xl sm:text-2xl font-bold text-foreground mb-4">Next Up</h2>
-      <div class="flex gap-3 overflow-x-auto pt-2 pb-1 scrollbar-hide">
+    <Section v-if="nextUpItems.length" :title="t('home.nextUp')">
+      <MediaRail>
         <div v-for="item in nextUpItems" :key="item.Id" class="shrink-0 w-44 sm:w-52 group">
           <!-- Thumbnail -->
-          <div class="relative rounded-xl overflow-hidden aspect-video mb-1.5
+          <div class="relative rounded-xl overflow-hidden bg-surface-raised aspect-video mb-1.5
                       group-hover:-translate-y-1 group-hover:shadow-xl transition-all duration-200 cursor-pointer active:scale-[0.97] active:opacity-75"
                @click="playResume(item)">
             <LazyImg :src="getResumeImageUrl(item)" :alt="item.Name ?? undefined" :item-type="item.Type"
@@ -138,7 +127,7 @@
             </div>
 
             <!-- Mark as played button -->
-            <button @click.stop="markPlayed(item)" title="Mark as played"
+            <button @click.stop="markPlayed(item)" :title="t('home.markPlayed')" :aria-label="t('home.markPlayed')"
               class="absolute top-1.5 right-1.5 p-1.5 rounded-full bg-black/50 text-white/70
                      opacity-100 sm:opacity-0 sm:group-hover:opacity-100 hover:bg-black/80 hover:text-white
                      transition-all duration-200 cursor-pointer pointer-events-auto">
@@ -158,30 +147,27 @@
             </div>
           </div>
         </div>
-      </div>
-    </section>
+      </MediaRail>
+    </Section>
 
     <!-- Recently Added per library -->
     <template v-if="latestLoading">
-      <section v-for="lib in mediaItems" :key="'latest-skeleton-' + lib.Id" class="mb-5">
-        <Skeleton class="h-6 w-56 mb-4 rounded-md" />
-        <div class="flex gap-3 overflow-x-auto pt-2 pb-1 scrollbar-hide">
-          <Skeleton v-for="i in 5" :key="i" class="shrink-0 w-32 sm:w-36 aspect-[2/3] rounded-xl" />
-        </div>
+      <section v-for="lib in mediaItems" :key="'latest-skeleton-' + lib.Id" class="mt-section">
+        <Skeleton class="mb-3 h-6 w-56 rounded-md" />
+        <MediaRail>
+          <Skeleton v-for="i in 5" :key="i" class="aspect-[2/3] w-32 shrink-0 rounded-xl sm:w-36" />
+        </MediaRail>
       </section>
     </template>
     <template v-else>
-      <section v-for="lib in mediaItems" :key="'latest-' + lib.Id"
-        class="mb-5"
-        v-show="latestByLibrary[lib.Id]?.length">
-        <h2 class="text-xl sm:text-2xl font-bold text-foreground mb-4">
-          Recently Added · {{ lib.Name }}
-        </h2>
-        <div class="flex gap-3 overflow-x-auto pt-2 pb-1 scrollbar-hide">
+      <Section v-for="lib in mediaItems" :key="'latest-' + lib.Id"
+        v-show="latestByLibrary[lib.Id]?.length"
+        :title="t('home.recentlyAdded', { library: lib.Name })">
+        <MediaRail>
           <div v-for="item in latestByLibrary[lib.Id]" :key="item.Id"
             class="shrink-0 w-32 sm:w-36 group cursor-pointer active:scale-[0.97] active:opacity-75 transition-all duration-200"
             @click="goToItem(item)">
-            <div class="relative rounded-xl overflow-hidden mb-1.5 aspect-[2/3]
+            <div class="relative rounded-xl overflow-hidden bg-surface-raised mb-1.5 aspect-[2/3]
                         group-hover:-translate-y-1 group-hover:shadow-xl transition-all duration-200">
               <LazyImg :src="getLatestImageUrl(item)" :alt="item.Name ?? undefined" :item-type="item.Type"
                 class="block w-full h-full object-cover" />
@@ -213,21 +199,20 @@
                    hover:bg-white/10 hover:border-white/20 transition-colors group">
             <ArrowRight class="size-6 text-text-muted group-hover:text-accent-purple-light transition-colors" />
             <span class="text-xs font-medium text-text-muted group-hover:text-accent-purple-light transition-colors">
-              View all
+              {{ t('common.seeAll') }}
             </span>
           </router-link>
-        </div>
-      </section>
+        </MediaRail>
+      </Section>
     </template>
 
     <!-- Libraries -->
-    <section>
-      <h2 class="text-xl sm:text-2xl font-bold text-foreground mb-4">My Library</h2>
+    <Section :title="t('home.myLibraries')">
 
       <!-- Loading state -->
-      <div v-if="loading" class="flex gap-3 overflow-x-auto pt-2 pb-1 scrollbar-hide">
-        <Skeleton v-for="i in 6" :key="i" class="shrink-0 w-44 sm:w-52 aspect-video rounded-xl" />
-      </div>
+      <MediaRail v-if="loading">
+        <Skeleton v-for="i in 6" :key="i" class="aspect-video w-44 shrink-0 rounded-xl sm:w-52" />
+      </MediaRail>
 
       <!-- Error state -->
       <div v-else-if="error" class="p-10 text-center">
@@ -235,11 +220,11 @@
       </div>
 
       <!-- Library row -->
-      <div v-else class="flex gap-3 overflow-x-auto pt-2 pb-1 scrollbar-hide">
+      <MediaRail v-else>
         <router-link v-for="item in mediaItems" :key="item.Id"
           class="shrink-0 w-44 sm:w-52 group active:scale-[0.97] active:opacity-75 transition-all duration-200"
           :to="{ name: 'libraryItem', params: { id: item.Id, name: item.Name } }">
-          <div class="relative rounded-xl overflow-hidden aspect-video mb-1.5
+          <div class="relative rounded-xl overflow-hidden bg-surface-raised aspect-video mb-1.5
                       group-hover:-translate-y-1 group-hover:shadow-xl transition-all duration-200">
             <LazyImg :src="item.imageUrl" :alt="item.Name" :item-type="item.Type"
               class="block w-full h-full object-cover" />
@@ -249,19 +234,23 @@
             {{ item.Name }}
           </div>
         </router-link>
-      </div>
-    </section>
-  </div>
+      </MediaRail>
+    </Section>
+  </AppPage>
 </template>
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 import type { BaseItemDto } from '@jellyfin/sdk/lib/generated-client/models/base-item-dto';
 import { useJellyfinStore } from '@/store/jellyfin-store';
 import type { HomeCache, HomeItem, HomeLibraryCard } from '@/store/jellyfin-store';
 import LazyImg from '@/components/LazyImg.vue';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import { AppPage, MediaRail, PageHeader, Section } from '@/components/layout';
+import { formatRemaining } from '@/i18n/format';
 import { Airplay, ArrowRight, Cast, Check, Download as DownloadIcon, Loader2, Play, RefreshCw } from 'lucide-vue-next';
 import AirPlayDialog from '@/components/AirPlayDialog.vue';
 import { useAudioPlayerStore } from '@/store/audio-player-store';
@@ -269,6 +258,7 @@ import { audioPlayerService } from '@/services/audioPlayerService';
 import { useOfflineStore } from '@/store/offline-store';
 import { useDownloadStore } from '@/store/download-store';
 
+const { t } = useI18n();
 const store = useJellyfinStore();
 const offlineStore = useOfflineStore();
 const downloadStore = useDownloadStore();
@@ -352,7 +342,7 @@ async function loadMedia(force = false) {
     latestByLibrary.value = latestMap;
     cacheCurrentHome();
   } catch {
-    if (!hasCachedContent) error.value = 'Failed to load media libraries';
+    if (!hasCachedContent) error.value = t('home.loadError');
   } finally {
     loading.value = false;
     latestLoading.value = false;
@@ -388,9 +378,7 @@ function remainingTime(item: HomeItem): string {
   if (!total || !position) return '';
   const remainingSecs = Math.max(0, Math.floor((total - position) / 10_000_000));
   if (remainingSecs < 60) return '';
-  const h = Math.floor(remainingSecs / 3600);
-  const m = Math.floor((remainingSecs % 3600) / 60);
-  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+  return formatRemaining(remainingSecs);
 }
 
 const markingPlayed = ref<Set<string>>(new Set());

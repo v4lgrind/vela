@@ -1,4 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
+
+import { setLocale } from '@/i18n';
 import {
   formatTime,
   formatBytes,
@@ -27,6 +29,14 @@ describe('formatTime', () => {
 });
 
 describe('formatBytes', () => {
+  beforeEach(() => setLocale('fr'));
+
+  it('uses English units in English', () => {
+    setLocale('en');
+    expect(formatBytes(2048)).toBe('2.00 KB');
+    expect(formatBytes(512)).toBe('512 B');
+  });
+
   it('returns null for empty or non-positive sizes', () => {
     expect(formatBytes(null)).toBeNull();
     expect(formatBytes(0)).toBeNull();
@@ -51,6 +61,8 @@ describe('formatBytes', () => {
 });
 
 describe('formatTicksHuman', () => {
+  beforeEach(() => setLocale('en'));
+
   it('returns null for missing ticks', () => {
     expect(formatTicksHuman(undefined)).toBeNull();
     expect(formatTicksHuman(0)).toBeNull();
@@ -60,10 +72,24 @@ describe('formatTicksHuman', () => {
     expect(formatTicksHuman(30 * 60 * 10_000_000)).toBe('30m');
     expect(formatTicksHuman(90 * 60 * 10_000_000)).toBe('1h 30m');
   });
+
+  it('formats in French', () => {
+    setLocale('fr');
+    expect(formatTicksHuman(90 * 60 * 10_000_000)).toBe('1 h 30 min');
+  });
 });
 
 describe('typeLabel', () => {
+  it('maps known Jellyfin types to English labels', () => {
+    setLocale('en');
+    expect(typeLabel('Movie')).toBe('Movie');
+    expect(typeLabel('Series')).toBe('Series');
+    expect(typeLabel('Episode')).toBe('Episode');
+    expect(typeLabel('Person')).toBe('Person');
+  });
+
   it('maps known Jellyfin types to French labels', () => {
+    setLocale('fr');
     expect(typeLabel('Movie')).toBe('Film');
     expect(typeLabel('Series')).toBe('Série');
     expect(typeLabel('Episode')).toBe('Épisode');

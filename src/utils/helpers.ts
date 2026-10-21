@@ -1,16 +1,14 @@
+import { i18n } from '@/i18n';
+import { formatDuration } from '@/i18n/format';
+
 export function isAudioType(type: string): boolean {
   return type === 'Audio' || type === 'MusicAlbum' || type === 'MusicArtist';
 }
 
 export function typeLabel(t?: string): string {
-  if (t === 'Movie') return 'Film';
-  if (t === 'Series') return 'Série';
-  if (t === 'Season') return 'Saison';
-  if (t === 'Episode') return 'Épisode';
-  if (t === 'MusicAlbum') return 'Album';
-  if (t === 'Audio') return 'Audio';
-  if (t === 'Person') return 'Personne';
-  return t || '';
+  if (!t) return '';
+  const key = `types.${t}`;
+  return i18n.global.te(key) ? i18n.global.t(key) : t;
 }
 
 export function formatTime(seconds: number): string {
@@ -26,7 +24,7 @@ export function formatTime(seconds: number): string {
 
 export function formatBytes(bytes?: number | null): string | null {
   if (!bytes || bytes <= 0) return null;
-  const units = ['octets', 'Ko', 'Mo', 'Go', 'To'];
+  const units = ['b', 'kb', 'mb', 'gb', 'tb'];
   let i = 0;
   let val = bytes;
   while (val >= 1024 && i < units.length - 1) {
@@ -34,7 +32,7 @@ export function formatBytes(bytes?: number | null): string | null {
     i++;
   }
   const fixed = val >= 100 ? val.toFixed(0) : val >= 10 ? val.toFixed(1) : val.toFixed(2);
-  return `${fixed} ${units[i]}`;
+  return `${fixed} ${i18n.global.t(`units.bytes.${units[i]}`)}`;
 }
 
 export function formatTicksDuration(ticks?: number): string {
@@ -47,8 +45,5 @@ export function formatTicksDuration(ticks?: number): string {
 
 export function formatTicksHuman(ticks?: number): string | null {
   if (!ticks) return null;
-  const totalSec = Math.floor(ticks / 10_000_000);
-  const h = Math.floor(totalSec / 3600);
-  const m = Math.floor((totalSec % 3600) / 60);
-  return h ? `${h}h ${m}m` : `${m}m`;
+  return formatDuration(Math.floor(ticks / 10_000_000));
 }

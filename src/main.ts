@@ -3,6 +3,7 @@ import "./assets/main.css";
 import { createApp } from "vue";
 import { createPinia } from "pinia";
 import App from "./App.vue";
+import { i18n } from "./i18n";
 import { router } from "./router";
 import piniaPluginPersistedstate from "pinia-plugin-persistedstate";
 import { Capacitor } from "@capacitor/core";
@@ -15,6 +16,7 @@ const app = createApp(App);
 
 app.use(router);
 app.use(pinia);
+app.use(i18n);
 app.mount("#app");
 
 if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {

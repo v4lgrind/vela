@@ -1,0 +1,30 @@
+{
+  "common": {
+    "back": "Retour",
+    "seeAll": "Tout voir"
+  },
+  "duration": {
+    "hoursMinutes": "{h} h {m} min",
+    "hours": "{h} h",
+    "minutes": "{m} min",
+    "remaining": "Reste {d}"
+  },
+  "units": {
+    "bytes": {
+      "b": "octets",
+      "kb": "Ko",
+      "mb": "Mo",
+      "gb": "Go",
+      "tb": "To"
+    }
+  },
+  "types": {
+    "Movie": "Film",
+    "Series": "Série",
+    "Season": "Saison",
+    "Episode": "Épisode",
+    "MusicAlbum": "Album",
+    "Audio": "Audio",
+    "Person": "Personne"
+  }
+}

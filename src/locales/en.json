@@ -1,0 +1,30 @@
+{
+  "common": {
+    "back": "Back",
+    "seeAll": "See all"
+  },
+  "duration": {
+    "hoursMinutes": "{h}h {m}m",
+    "hours": "{h}h",
+    "minutes": "{m}m",
+    "remaining": "{d} left"
+  },
+  "units": {
+    "bytes": {
+      "b": "B",
+      "kb": "KB",
+      "mb": "MB",
+      "gb": "GB",
+      "tb": "TB"
+    }
+  },
+  "types": {
+    "Movie": "Movie",
+    "Series": "Series",
+    "Season": "Season",
+    "Episode": "Episode",
+    "MusicAlbum": "Album",
+    "Audio": "Audio",
+    "Person": "Person"
+  }
+}

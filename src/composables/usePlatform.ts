@@ -25,7 +25,7 @@ export function getClientDeviceInfo(): ClientDeviceInfo {
 
   if (platform === 'android') {
     return {
-      clientName: 'Jellyfin V4lgrind Android',
+      clientName: 'Vela Android',
       deviceIdPrefix: 'jellyfin-android',
       deviceName: 'Android',
     };
@@ -36,14 +36,14 @@ export function getClientDeviceInfo(): ClientDeviceInfo {
       ? 'macOS'
       : `${platform.charAt(0).toUpperCase()}${platform.slice(1)}`;
     return {
-      clientName: 'Jellyfin V4lgrind Desktop',
+      clientName: 'Vela Desktop',
       deviceIdPrefix: `jellyfin-${platform}`,
       deviceName: desktopName,
     };
   }
 
   return {
-    clientName: 'Jellyfin V4lgrind Web',
+    clientName: 'Vela Web',
     deviceIdPrefix: 'jellyfin-web',
     deviceName: 'Web Browser',
   };

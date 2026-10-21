@@ -1,4 +1,4 @@
-package com.jellyfin_v4lgrind_client.app
+package cloud.valgrind.vela
 
 import android.content.Context
 import android.os.Handler
@@ -199,7 +199,7 @@ object AirPlayManager {
         val args = mutableListOf(
             binary(context).path, "--protocol", "auto", "--port", device.port.toString(),
             "--dacp", dacpId(context), "--volume", airplayVolume.toString(),
-            "--cmdpipe", cmdPipe.path, "--name", "Jellyfin",
+            "--cmdpipe", cmdPipe.path, "--name", "Vela",
             "--txt", device.txt.entries.joinToString(" ") { "${it.key}=${it.value}" },
         )
         prefs(context).getString("creds:${device.id}", null)?.let { args += listOf("--auth", it) }

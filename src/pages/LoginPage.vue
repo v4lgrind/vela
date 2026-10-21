@@ -6,7 +6,7 @@
       <template v-if="jellyfin.savedServers.length > 0 && !showNewServer">
         <Card class="bg-surface-raised/85 border-border-default">
           <CardHeader>
-            <CardTitle class="text-center text-2xl font-bold">Jellyfin Client</CardTitle>
+            <CardTitle class="text-center text-2xl font-bold">Vela</CardTitle>
           </CardHeader>
           <CardContent class="flex flex-col gap-3">
             <p class="text-xs text-text-muted text-center mb-1">Select an account to continue</p>
@@ -46,7 +46,7 @@
             >
               <ArrowLeft class="size-4 text-text-muted" />
             </button>
-            <CardTitle class="text-center text-3xl font-bold flex-1">Jellyfin Client</CardTitle>
+            <CardTitle class="text-center text-3xl font-bold flex-1">Vela</CardTitle>
           </div>
         </CardHeader>
         <CardContent>

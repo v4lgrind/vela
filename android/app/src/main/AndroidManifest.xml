@@ -70,7 +70,7 @@
 
         <meta-data
             android:name="com.google.android.gms.cast.framework.OPTIONS_PROVIDER_CLASS_NAME"
-            android:value="com.jellyfin_v4lgrind_client.app.CastOptionsProvider" />
+            android:value="cloud.valgrind.vela.CastOptionsProvider" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

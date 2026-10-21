@@ -112,8 +112,8 @@ jobs:
         shell: bash
         run: |
           mkdir -p release-assets
-          cp android/app/build/outputs/apk/debug/mediaserver-client.apk \
-             "release-assets/Jellyfin.V4lgrind-${{ needs.prepare.outputs.version }}-android.apk"
+          cp android/app/build/outputs/apk/debug/vela.apk \
+             "release-assets/Vela-${{ needs.prepare.outputs.version }}-android.apk"
 
       - name: Upload Android release asset
         uses: actions/upload-artifact@v4
@@ -190,7 +190,7 @@ jobs:
         run: |
           gh release create "${{ needs.prepare.outputs.tag }}" \
             --target "${{ github.sha }}" \
-            --title "Jellyfin V4lgrind ${{ needs.prepare.outputs.tag }}" \
+            --title "Vela ${{ needs.prepare.outputs.tag }}" \
             --generate-notes \
             ${{ inputs.prerelease && '--prerelease' || '' }} \
             release-assets/*

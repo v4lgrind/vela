@@ -2,10 +2,10 @@ apply plugin: 'com.android.application'
 apply plugin: 'kotlin-android'
 
 android {
-    namespace = "com.jellyfin_v4lgrind_client.app"
+    namespace = "cloud.valgrind.vela"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.jellyfin_v4lgrind_client.app"
+        applicationId "cloud.valgrind.vela"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         // Local/Docker builds pass an explicit ANDROID_VERSION_CODE. CI builds
@@ -61,7 +61,7 @@ android {
     }
     applicationVariants.all { variant ->
         variant.outputs.all {
-            outputFileName = "mediaserver-client.apk"
+            outputFileName = "vela.apk"
         }
     }
 }

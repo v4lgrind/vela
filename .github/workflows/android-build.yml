@@ -72,7 +72,7 @@ jobs:
             --prerelease \
             --target "${{ github.sha }}" || true
           gh release upload "$NIGHTLY_TAG" \
-            android/app/build/outputs/apk/debug/mediaserver-client.apk --clobber
+            android/app/build/outputs/apk/debug/vela.apk --clobber
 
       # Purge dans ce seul workflow pour éviter les suppressions concurrentes.
       # Ne touche jamais aux 3 plus récentes, dont celle du build en cours.

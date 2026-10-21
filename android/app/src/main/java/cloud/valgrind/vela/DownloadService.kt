@@ -1,4 +1,4 @@
-package com.jellyfin_v4lgrind_client.app
+package cloud.valgrind.vela
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -32,11 +32,11 @@ import java.util.concurrent.LinkedBlockingDeque
 class DownloadService : Service() {
 
     companion object {
-        const val ACTION_ENQUEUE  = "com.jellyfin_v4lgrind_client.app.DOWNLOAD_ENQUEUE"
-        const val ACTION_CANCEL   = "com.jellyfin_v4lgrind_client.app.DOWNLOAD_CANCEL"
-        const val ACTION_PROGRESS = "com.jellyfin_v4lgrind_client.app.DL_PROGRESS"
-        const val ACTION_COMPLETE = "com.jellyfin_v4lgrind_client.app.DL_COMPLETE"
-        const val ACTION_FAILED   = "com.jellyfin_v4lgrind_client.app.DL_FAILED"
+        const val ACTION_ENQUEUE  = "cloud.valgrind.vela.DOWNLOAD_ENQUEUE"
+        const val ACTION_CANCEL   = "cloud.valgrind.vela.DOWNLOAD_CANCEL"
+        const val ACTION_PROGRESS = "cloud.valgrind.vela.DL_PROGRESS"
+        const val ACTION_COMPLETE = "cloud.valgrind.vela.DL_COMPLETE"
+        const val ACTION_FAILED   = "cloud.valgrind.vela.DL_FAILED"
 
         private const val CHANNEL_ID = "dl_channel"
         private const val NOTIF_ID   = 3001

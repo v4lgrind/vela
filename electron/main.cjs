@@ -71,7 +71,7 @@ function createMainWindow() {
   void mainWindow.loadURL(DEV_SERVER_URL);
 }
 
-app.setAppUserModelId("com.v4lgrind.jellyfinclient");
+app.setAppUserModelId("cloud.valgrind.vela");
 
 app.whenReady().then(async () => {
   await migrateLegacyMedia();

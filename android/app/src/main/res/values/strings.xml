@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Jellyfin V4lgrind</string>
-    <string name="title_activity_main">Jellyfin V4lgrind</string>
-    <string name="package_name">com.jellyfin_v4lgrind_client.app</string>
-    <string name="custom_url_scheme">com.jellyfin_v4lgrind_client.app</string>
+    <string name="app_name">Vela</string>
+    <string name="title_activity_main">Vela</string>
+    <string name="package_name">cloud.valgrind.vela</string>
+    <string name="custom_url_scheme">cloud.valgrind.vela</string>
 </resources>

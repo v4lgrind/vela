@@ -1,8 +1,8 @@
 import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.jellyfin_v4lgrind_client.app',
-  appName: 'Jellyfin V4lgrind',
+  appId: 'cloud.valgrind.vela',
+  appName: 'Vela',
   webDir: 'dist',
   server: {
     androidScheme: 'https',

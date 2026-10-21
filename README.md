@@ -1,4 +1,4 @@
-# Jellyfin V4lgrind Client
+# Vela
 
 A modern Jellyfin media client built with Vue 3, Capacitor, and Electron. Android uses
 native playback while Windows and Linux use the shared web player.
@@ -109,7 +109,7 @@ cd android
 ./gradlew assembleDebug  # or assembleRelease
 ```
 
-**Output:** `android/app/build/outputs/apk/debug/mediaserver-client.apk`
+**Output:** `android/app/build/outputs/apk/debug/vela.apk`
 
 #### Docker Android Build
 
@@ -120,7 +120,7 @@ It runs `npm ci`, the web build with type checking, Capacitor sync and Gradle
 ```bash
 docker build -f Dockerfile.android --target apk \
   --output type=local,dest=./out .
-# APK: out/mediaserver-client.apk
+# APK: out/vela.apk
 ```
 
 The default local APK has Android `versionCode` 1. If the phone already has a
@@ -131,7 +131,7 @@ when the installed code is 251). CI builds use the workflow run number plus
 install. Then install without clearing app data:
 
 ```bash
-adb install -r out/mediaserver-client.apk
+adb install -r out/vela.apk
 ```
 
 Do not uninstall the existing app just to bypass a version downgrade.
@@ -139,9 +139,9 @@ Do not uninstall the existing app just to bypass a version downgrade.
 To keep the build environment as an image instead of exporting only the APK:
 
 ```bash
-docker build -f Dockerfile.android -t mediaserver-android .
-container=$(docker create mediaserver-android)
-docker cp "$container":/workspace/android/app/build/outputs/apk/debug/mediaserver-client.apk ./mediaserver-client.apk
+docker build -f Dockerfile.android -t vela-android .
+container=$(docker create vela-android)
+docker cp "$container":/workspace/android/app/build/outputs/apk/debug/vela.apk ./vela.apk
 docker rm "$container"
 ```
 
@@ -168,8 +168,8 @@ Desktop builds are platform-specific:
 
 The GitHub Actions desktop workflow builds both platforms independently.
 
-Offline media is stored in the user-visible `Videos/Jellyfin V4lgrind` folder on Windows,
-`Downloads/Jellyfin V4lgrind` on Linux, and `Documents/Jellyfin V4lgrind` on Android.
+Offline media is stored in the user-visible `Videos/Vela` folder on Windows,
+`Downloads/Vela` on Linux, and `Documents/Vela` on Android.
 Unsupported offline video formats are requested from Jellyfin as H.264/AAC MP4 files so
 they remain playable on both Windows and Linux.
 
@@ -184,7 +184,7 @@ organization policy may block them until they are code signed or explicitly allo
 
 ```bash
 # Via ADB
-adb install android/app/build/outputs/apk/debug/mediaserver-client-debug.apk
+adb install android/app/build/outputs/apk/debug/vela.apk
 
 # Or drag & drop the APK to your device
 ```
@@ -192,7 +192,7 @@ adb install android/app/build/outputs/apk/debug/mediaserver-client-debug.apk
 ## Project Structure
 
 ```
-mediaserver-client/
+vela/
 ├── src/
 │   ├── components/      # Vue components
 │   ├── views/          # Page views
@@ -211,8 +211,8 @@ mediaserver-client/
 
 ### Capacitor Config (`capacitor.config.ts`)
 
-- **App ID:** `com.jellyfin_v4lgrind_client.app`
-- **App Name:** Jellyfin V4lgrind
+- **App ID:** `cloud.valgrind.vela`
+- **App Name:** Vela
 - **Web Directory:** `dist`
 - **Cleartext Traffic:** Enabled (for local HTTP Jellyfin servers)
 

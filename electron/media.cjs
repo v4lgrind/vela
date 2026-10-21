@@ -108,7 +108,7 @@ async function findMediaPath(relativePath) {
 }
 
 async function migrateLegacyMedia() {
-  const relativeRoot = "Jellyfin V4lgrind";
+  const relativeRoot = "Vela";
   const currentRoot = resolveMediaPath(relativeRoot);
 
   for (const fallbackRoot of getFallbackMediaRoots()) {

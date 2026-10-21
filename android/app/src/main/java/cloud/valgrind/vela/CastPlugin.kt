@@ -1,4 +1,4 @@
-package com.jellyfin_v4lgrind_client.app
+package cloud.valgrind.vela
 
 import com.getcapacitor.JSObject
 import com.getcapacitor.Plugin

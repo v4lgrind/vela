@@ -41,8 +41,8 @@ RUN --mount=type=cache,target=/opt/gradle-cache \
 # To export only the APK:
 # docker build -f Dockerfile.android --target apk --output type=local,dest=./out .
 FROM scratch AS apk
-COPY --from=build /workspace/android/app/build/outputs/apk/debug/mediaserver-client.apk /mediaserver-client.apk
+COPY --from=build /workspace/android/app/build/outputs/apk/debug/vela.apk /vela.apk
 
 # The default image retains the toolchain and compiled project. Its APK is at
-# /workspace/android/app/build/outputs/apk/debug/mediaserver-client.apk.
+# /workspace/android/app/build/outputs/apk/debug/vela.apk.
 FROM build AS android-builder

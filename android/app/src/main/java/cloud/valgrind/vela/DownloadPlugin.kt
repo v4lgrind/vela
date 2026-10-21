@@ -1,4 +1,4 @@
-package com.jellyfin_v4lgrind_client.app
+package cloud.valgrind.vela
 
 import android.Manifest
 import android.content.BroadcastReceiver

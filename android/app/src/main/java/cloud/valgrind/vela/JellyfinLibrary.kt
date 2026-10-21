@@ -1,4 +1,4 @@
-package com.jellyfin_v4lgrind_client.app
+package cloud.valgrind.vela
 
 import android.content.Context
 import android.net.Uri
@@ -47,7 +47,7 @@ class JellyfinLibrary(private val context: Context) {
 
     // --- Browse tree ---
 
-    fun root(): MediaItem = folder(ROOT, "Jellyfin")
+    fun root(): MediaItem = folder(ROOT, "Vela")
 
     /** Blocking (network). Children of a browsable [parentId]. */
     fun children(parentId: String): List<MediaItem> = when {

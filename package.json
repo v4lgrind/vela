@@ -1,5 +1,5 @@
 {
-  "name": "jellyfin-v4lgrind-client",
+  "name": "vela",
   "private": true,
   "version": "0.1.0",
   "description": "A cross-platform Jellyfin media client for Android, Windows, and Linux.",

@@ -1,5 +1,5 @@
-appId: com.v4lgrind.jellyfinclient
-productName: Jellyfin V4lgrind
+appId: cloud.valgrind.vela
+productName: Vela
 asar: true
 npmRebuild: false
 

@@ -27,6 +27,7 @@
 
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
         <item name="android:background">@drawable/splash</item>
+        <item name="windowSplashScreenBackground">#000000</item>
     </style>
 
     <!-- Slide-up window animation for the player bottom sheet -->

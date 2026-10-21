@@ -463,7 +463,7 @@ class DownloadService {
   private buildFilePath(metadata: any, filename: string): string {
     const s = (v: string | undefined | null, fallback: string) =>
       this.sanitizeFilename(v || fallback);
-    const root = 'Jellyfin V4lgrind';
+    const root = 'Vela';
     switch (metadata.Type) {
       case 'Movie':
         return `${root}/Movies/${s(metadata.Name, 'Unknown')}/${filename}`;
@@ -506,7 +506,7 @@ class DownloadService {
     itemId: string,
     imageType: OfflineArtworkType = 'Primary',
   ): Promise<string | null> {
-    const imgPath = `Jellyfin V4lgrind/Images/${itemId}_${imageType}.jpg`;
+    const imgPath = `Vela/Images/${itemId}_${imageType}.jpg`;
     try {
       await this.statFile(imgPath);
       return await this.getFileUrl(imgPath);
@@ -526,7 +526,7 @@ class DownloadService {
     imageType: OfflineArtworkType = 'Primary',
     maxWidth = 400,
   ): Promise<void> {
-    const imgPath = `Jellyfin V4lgrind/Images/${itemId}_${imageType}.jpg`;
+    const imgPath = `Vela/Images/${itemId}_${imageType}.jpg`;
     try {
       await this.statFile(imgPath);
       return;

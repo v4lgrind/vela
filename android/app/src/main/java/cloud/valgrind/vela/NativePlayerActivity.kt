@@ -1,4 +1,4 @@
-package com.jellyfin_v4lgrind_client.app
+package cloud.valgrind.vela
 
 import android.app.Dialog
 import android.content.BroadcastReceiver
@@ -69,19 +69,19 @@ class NativePlayerActivity : AppCompatActivity() {
         const val EXTRA_BURN_IN_SUBTITLE_TRACKS = "burnInSubtitleTracks"
         const val EXTRA_SELECTED_BURN_IN_SUBTITLE_INDEX = "selectedBurnInSubtitleIndex"
 
-        const val ACTION_COMMAND = "com.jellyfin_v4lgrind_client.app.PLAYER_COMMAND"
-        const val ACTION_PROGRESS = "com.jellyfin_v4lgrind_client.app.PLAYER_PROGRESS"
-        const val ACTION_ENDED = "com.jellyfin_v4lgrind_client.app.PLAYER_ENDED"
-        const val ACTION_STOPPED = "com.jellyfin_v4lgrind_client.app.PLAYER_STOPPED"
-        const val ACTION_ERROR = "com.jellyfin_v4lgrind_client.app.PLAYER_ERROR"
-        const val ACTION_TRACKS = "com.jellyfin_v4lgrind_client.app.PLAYER_TRACKS"
-        const val ACTION_AUDIO_SELECTED = "com.jellyfin_v4lgrind_client.app.AUDIO_SELECTED"
-        const val ACTION_SUBTITLE_SELECTED = "com.jellyfin_v4lgrind_client.app.SUBTITLE_SELECTED"
-        const val ACTION_QUALITY_SELECTED = "com.jellyfin_v4lgrind_client.app.QUALITY_SELECTED"
-        const val ACTION_AUDIO_ERROR = "com.jellyfin_v4lgrind_client.app.AUDIO_ERROR"
-        const val ACTION_AUDIO_SWITCH_JELLYFIN = "com.jellyfin_v4lgrind_client.app.AUDIO_SWITCH_JELLYFIN"
-        const val ACTION_VIDEO_ERROR = "com.jellyfin_v4lgrind_client.app.VIDEO_ERROR"
-        const val ACTION_DEBUG_LOG = "com.jellyfin_v4lgrind_client.app.DEBUG_LOG"
+        const val ACTION_COMMAND = "cloud.valgrind.vela.PLAYER_COMMAND"
+        const val ACTION_PROGRESS = "cloud.valgrind.vela.PLAYER_PROGRESS"
+        const val ACTION_ENDED = "cloud.valgrind.vela.PLAYER_ENDED"
+        const val ACTION_STOPPED = "cloud.valgrind.vela.PLAYER_STOPPED"
+        const val ACTION_ERROR = "cloud.valgrind.vela.PLAYER_ERROR"
+        const val ACTION_TRACKS = "cloud.valgrind.vela.PLAYER_TRACKS"
+        const val ACTION_AUDIO_SELECTED = "cloud.valgrind.vela.AUDIO_SELECTED"
+        const val ACTION_SUBTITLE_SELECTED = "cloud.valgrind.vela.SUBTITLE_SELECTED"
+        const val ACTION_QUALITY_SELECTED = "cloud.valgrind.vela.QUALITY_SELECTED"
+        const val ACTION_AUDIO_ERROR = "cloud.valgrind.vela.AUDIO_ERROR"
+        const val ACTION_AUDIO_SWITCH_JELLYFIN = "cloud.valgrind.vela.AUDIO_SWITCH_JELLYFIN"
+        const val ACTION_VIDEO_ERROR = "cloud.valgrind.vela.VIDEO_ERROR"
+        const val ACTION_DEBUG_LOG = "cloud.valgrind.vela.DEBUG_LOG"
 
         const val EXTRA_AUDIO_TRACKS = "audioTracks"
         const val EXTRA_SELECTED_AUDIO_INDEX = "selectedAudioIndex"
@@ -107,8 +107,8 @@ class NativePlayerActivity : AppCompatActivity() {
         const val EXTRA_DURATION_HINT_MS = "durationHintMs"
         const val EXTRA_SRT_FILE_PATH = "srtFilePath"
         const val EXTRA_TRICKPLAY_JSON = "trickplayJson"
-        const val ACTION_NEXT_EPISODE = "com.jellyfin_v4lgrind_client.app.PLAYER_NEXT_EPISODE"
-        const val ACTION_SUBTITLE_SIZE_CHANGED = "com.jellyfin_v4lgrind_client.app.SUBTITLE_SIZE_CHANGED"
+        const val ACTION_NEXT_EPISODE = "cloud.valgrind.vela.PLAYER_NEXT_EPISODE"
+        const val ACTION_SUBTITLE_SIZE_CHANGED = "cloud.valgrind.vela.SUBTITLE_SIZE_CHANGED"
 
         const val NOTIFICATION_ID = 1001
         const val NOTIFICATION_CHANNEL_ID = "media_playback"

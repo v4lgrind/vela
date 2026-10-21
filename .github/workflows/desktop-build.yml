@@ -13,9 +13,9 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            artifact-name: jellyfin-v4lgrind-windows
+            artifact-name: vela-windows
           - os: ubuntu-22.04
-            artifact-name: jellyfin-v4lgrind-linux
+            artifact-name: vela-linux
 
     runs-on: ${{ matrix.os }}
     permissions:

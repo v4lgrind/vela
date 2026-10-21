@@ -1,12 +1,1 @@
-<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="grad2" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
-      <stop offset="50%" style="stop-color:#764ba2;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#f093fb;stop-opacity:1" />
-    </linearGradient>
-  </defs>
-  <rect width="512" height="512" rx="120" fill="#0f0f1e"/>
-  <path d="M 280 120 L 280 320 Q 280 400 200 400 Q 120 400 120 320 L 180 320 Q 180 340 200 340 Q 220 340 220 320 L 220 120 Z" 
-        fill="url(#grad2)" stroke="url(#grad2)" stroke-width="20"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="18 18 72 72" width="512" height="512"><rect x="18" y="18" width="72" height="72" rx="16" fill="#04121F"/><path d="M42.48,36.08 C55.28,41.2 64.24,48.88 68.08,57.84 L42.48,70.64 Z" fill="none" stroke="#2F9BFF" stroke-opacity="0.4" stroke-width="1.2" stroke-linejoin="round"/><circle cx="53.36" cy="40.56" r="1.92" fill="#2F9BFF"/><circle cx="61.68" cy="47.6" r="2.24" fill="#2F9BFF"/><circle cx="55.28" cy="64.24" r="1.92" fill="#2F9BFF"/><circle cx="42.48" cy="53.36" r="1.92" fill="#2F9BFF"/><circle cx="42.48" cy="36.08" r="3.2" fill="#F5F8FA"/><circle cx="42.48" cy="70.64" r="3.2" fill="#F5F8FA"/><circle cx="68.08" cy="57.84" r="4.16" fill="#F5F8FA"/></svg>

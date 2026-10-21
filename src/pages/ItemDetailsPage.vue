@@ -3,7 +3,7 @@
 
         <!-- Loading -->
         <section v-if="loading"
-            class="flex items-center justify-center min-h-dvh text-text-muted text-lg">Loading…</section>
+            class="flex items-center justify-center min-h-dvh text-text-muted text-lg">{{ t('common.loading') }}</section>
 
         <!-- Error -->
         <section v-else-if="error"
@@ -39,20 +39,20 @@
                         <!-- Floating glass top buttons -->
                         <div class="absolute inset-x-0 top-0 flex items-center justify-between px-3.5 pb-2"
                             style="padding-top: calc(10px + var(--sat, env(safe-area-inset-top, 0px)))">
-                            <button @click="router.back()" title="Back"
-                                class="size-9 rounded-full bg-black/35 backdrop-blur-md text-white flex items-center justify-center active:scale-95 transition cursor-pointer">
+                            <button @click="goBack" :aria-label="t('common.back')"
+                                class="size-11 rounded-full bg-black/40 backdrop-blur-md text-white flex items-center justify-center active:scale-95 transition cursor-pointer">
                                 <ChevronLeft class="size-5" />
                             </button>
                             <div class="flex gap-2">
                                 <button v-if="isPlayable(item) && castState !== 'NO_DEVICES_AVAILABLE'" @click="castItem"
-                                    :title="castState === 'CONNECTED' ? 'Casting' : 'Cast to TV'"
-                                    class="size-9 rounded-full backdrop-blur-md flex items-center justify-center active:scale-95 transition cursor-pointer"
+                                    :aria-label="castState === 'CONNECTED' ? t('detail.casting') : t('detail.castToTv')"
+                                    class="size-11 rounded-full backdrop-blur-md flex items-center justify-center active:scale-95 transition cursor-pointer"
                                     :class="castState === 'CONNECTED' ? 'bg-accent-purple text-accent-ink' : 'bg-black/35 text-white'">
                                     <Tv2 class="size-[18px]" />
                                 </button>
                                 <DialogTrigger v-if="videoDetails.length || sourceDetails.length || fileSizeHuman" as-child>
-                                    <button title="Media info"
-                                        class="size-9 rounded-full bg-black/35 backdrop-blur-md text-white flex items-center justify-center active:scale-95 transition cursor-pointer">
+                                    <button :aria-label="t('detail.mediaInfo')"
+                                        class="size-11 rounded-full bg-black/40 backdrop-blur-md text-white flex items-center justify-center active:scale-95 transition cursor-pointer">
                                         <Info class="size-[18px]" />
                                     </button>
                                 </DialogTrigger>
@@ -60,7 +60,8 @@
                         </div>
 
                         <!-- Title + meta overlaid on backdrop bottom -->
-                        <div class="absolute inset-x-0 bottom-0 px-5 pb-1">
+                        <div class="absolute inset-x-0 bottom-0 pb-1">
+                          <div class="mx-auto max-w-[1200px] px-gutter md:px-gutter-wide">
                             <!-- Breadcrumb -->
                             <div v-if="item.SeriesId || item.SeasonId"
                                 class="flex items-center gap-1.5 text-sm text-white/70 mb-1.5">
@@ -76,37 +77,37 @@
                                     class="hover:text-white underline-offset-4 hover:underline cursor-pointer">{{ artist.Name }}</button>
                             </div>
                             <div class="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[12.5px] text-white/80">
-                                <span v-if="year">{{ year }}</span>
-                                <span v-if="year && duration" class="text-white/40">·</span>
-                                <span v-if="duration">{{ duration }}</span>
+                                <template v-for="(part, i) in heroMeta" :key="part">
+                                    <span v-if="i" class="text-white/40">·</span>
+                                    <span>{{ part }}</span>
+                                </template>
                                 <template v-if="item.CommunityRating">
                                     <span class="text-white/40">·</span>
                                     <span class="text-yellow-300 font-semibold">★ {{ item.CommunityRating.toFixed(1) }}</span>
                                 </template>
-                                <span v-if="item.Type === 'Season' && episodes.length" class="text-white/70">{{ episodes.length }} episodes</span>
-                                <span v-if="item.Type === 'Season' && item.PremiereDate" class="text-white/70">{{ new Date(item.PremiereDate).getFullYear() }}</span>
                                 <span v-if="videoResolution" class="ml-1 px-2 py-0.5 rounded-md bg-white/16 text-[10.5px] font-semibold">{{ videoResolution }}</span>
                                 <span v-if="videoCodec" class="px-2 py-0.5 rounded-md bg-white/16 text-[10.5px] font-semibold uppercase">{{ videoCodec }}</span>
                             </div>
+                          </div>
                         </div>
                     </div>
 
                     <!-- Body below backdrop -->
-                    <div class="px-5 pt-4 pb-6 max-w-5xl mx-auto">
+                    <div class="mx-auto max-w-[1200px] px-gutter pt-4 pb-6 md:px-gutter-wide">
 
                         <!-- Actions -->
                         <div class="flex flex-wrap items-center gap-2.5 mb-4">
                             <button v-if="isPlayable(item)" @click="playMedia"
                                 class="flex-1 min-w-[180px] flex items-center justify-center gap-2 h-[50px] rounded-2xl bg-accent-purple text-accent-ink font-bold text-[15px] active:scale-[0.98] transition shadow-lg cursor-pointer">
                                 <Play class="size-4 fill-current stroke-none" />
-                                {{ resumePositionLabel ? `Resume · ${resumePositionLabel}` : 'Play' }}
+                                {{ resumePositionLabel ? t('detail.resume', { time: resumePositionLabel }) : t('common.play') }}
                             </button>
 
                             <button v-if="isMusicCollection" @click="playAlbum"
                                 class="flex-1 min-w-[180px] flex items-center justify-center gap-2 h-[50px] rounded-2xl bg-accent-purple text-accent-ink font-bold text-[15px] active:scale-[0.98] transition cursor-pointer">
-                                <Play class="size-4 fill-current stroke-none" /> {{ item.Type === 'MusicAlbum' ? 'Play album' : 'Play all' }}
+                                <Play class="size-4 fill-current stroke-none" /> {{ item.Type === 'MusicAlbum' ? t('detail.playAlbum') : t('detail.playAll') }}
                             </button>
-                            <button v-if="isMusicCollection" @click="shuffleAlbum" title="Shuffle"
+                            <button v-if="isMusicCollection" @click="shuffleAlbum" :aria-label="t('detail.shuffle')"
                                 class="flex items-center justify-center size-[50px] rounded-2xl bg-surface border border-border-default text-text-heading active:scale-95 transition cursor-pointer">
                                 <Shuffle class="size-5" />
                             </button>
@@ -116,17 +117,17 @@
 
                             <!-- Download (single item) -->
                             <button v-if="isItemDownloaded && !isDownloading" @click="deleteDownload"
-                                title="Downloaded — tap to delete"
+                                :aria-label="t('detail.downloadedDelete')"
                                 class="flex items-center justify-center size-[50px] rounded-2xl bg-accent-purple/15 border border-accent-purple/40 text-accent-purple active:scale-95 transition cursor-pointer">
                                 <Check class="size-5" />
                             </button>
                             <button v-else-if="canDownload(item) && !isItemDownloaded && !isDownloading" @click="handleDownload"
-                                title="Download"
+                                :aria-label="t('detail.download')"
                                 class="flex items-center justify-center size-[50px] rounded-2xl bg-surface border border-border-default text-text-heading active:scale-95 transition cursor-pointer">
                                 <DownloadIcon class="size-5" />
                             </button>
                             <button v-if="isDownloading" @click="cancelDownload"
-                                :title="`Downloading ${downloadProgress}% — tap to cancel`"
+                                :aria-label="t('detail.downloadingCancel', { percent: downloadProgress })"
                                 class="flex items-center justify-center size-[50px] rounded-2xl bg-red-500/10 border border-red-500/30 text-red-400 active:scale-95 transition cursor-pointer">
                                 <Loader2 class="size-5 animate-spin" />
                             </button>
@@ -134,31 +135,31 @@
                             <!-- Bulk download Season / Series -->
                             <button v-if="item.Type === 'Season'" @click="openBulkDialog('season')"
                                 class="flex items-center gap-2 px-4 h-[50px] rounded-2xl bg-surface border border-border-default text-text-heading text-sm font-medium active:scale-95 transition cursor-pointer">
-                                <DownloadIcon class="size-4" /> Season
+                                <DownloadIcon class="size-4" /> {{ t('types.Season') }}
                             </button>
                             <button v-if="item.Type === 'Series'" @click="openBulkDialog('series')"
                                 class="flex items-center gap-2 px-4 h-[50px] rounded-2xl bg-surface border border-border-default text-text-heading text-sm font-medium active:scale-95 transition cursor-pointer">
-                                <DownloadIcon class="size-4" /> Series
+                                <DownloadIcon class="size-4" /> {{ t('types.Series') }}
                             </button>
 
                             <!-- Mark all watched (Series / Season) -->
                             <button v-if="item.Type === 'Series' || item.Type === 'Season'"
                                 :disabled="togglingWatched" @click="toggleWatched"
-                                :title="item.UserData?.Played ? 'Mark all as unwatched' : 'Mark all as watched'"
+                                :aria-label="item.UserData?.Played ? t('detail.markAllUnwatched') : t('detail.markAllWatched')"
                                 class="flex items-center gap-2 px-4 h-[50px] rounded-2xl border text-sm font-medium active:scale-95 transition cursor-pointer"
                                 :class="item.UserData?.Played
                                     ? 'bg-accent-purple/15 border-accent-purple/40 text-accent-purple'
                                     : 'bg-surface border-border-default text-text-heading'">
                                 <Loader2 v-if="togglingWatched" class="size-4 animate-spin" />
                                 <Check v-else class="size-4" />
-                                {{ item.UserData?.Played ? 'Watched' : 'Mark watched' }}
+                                {{ item.UserData?.Played ? t('library.watched') : t('detail.markWatchedShort') }}
                             </button>
 
                             <!-- Watched toggle (single playable) -->
                             <button
                                 v-if="item.Type !== 'Series' && item.Type !== 'Season' && item.Type !== 'MusicAlbum' && item.Type !== 'MusicArtist' && item.Type !== 'Playlist' && item.Type !== 'BoxSet'"
                                 :disabled="togglingWatched" @click="toggleWatched"
-                                :title="item.UserData?.Played ? 'Mark as unwatched' : 'Mark as watched'"
+                                :aria-label="item.UserData?.Played ? t('common.markUnwatched') : t('common.markWatched')"
                                 class="flex items-center justify-center size-[50px] rounded-2xl border active:scale-95 transition cursor-pointer"
                                 :class="item.UserData?.Played
                                     ? 'bg-accent-purple/15 border-accent-purple/40 text-accent-purple'
@@ -176,13 +177,13 @@
 
                         <!-- Overview -->
                         <div v-if="item.Overview" class="mb-4 max-w-2xl">
-                            <p class="text-[13.5px] leading-relaxed text-text-body m-0 transition-all"
+                            <p class="text-body leading-relaxed text-text-body m-0 transition-all"
                                 :class="overviewExpanded ? '' : 'line-clamp-3'">
                                 {{ item.Overview }}
                             </p>
                             <button @click="overviewExpanded = !overviewExpanded"
-                                class="mt-1.5 text-xs text-accent-purple hover:text-accent-purple-light transition-colors cursor-pointer">
-                                {{ overviewExpanded ? 'Show less' : 'Show more' }}
+                                class="mt-1 min-h-11 text-caption font-medium text-accent-purple hover:text-accent-purple-light transition-colors cursor-pointer">
+                                {{ overviewExpanded ? t('detail.showLess') : t('detail.showMore') }}
                             </button>
                         </div>
 
@@ -197,11 +198,11 @@
                         <!-- Director / Studio inline -->
                         <div class="flex flex-wrap gap-x-5 gap-y-1 text-xs">
                             <span v-if="directorNames.length">
-                                <span class="text-text-subtle uppercase tracking-wider text-[10px] mr-1.5">Director</span>
+                                <span class="text-text-subtle uppercase tracking-wider text-[10px] mr-1.5">{{ t('detail.director') }}</span>
                                 <span class="text-text-primary">{{ directorNames.join(', ') }}</span>
                             </span>
                             <span v-if="studioNames.length">
-                                <span class="text-text-subtle uppercase tracking-wider text-[10px] mr-1.5">Studio</span>
+                                <span class="text-text-subtle uppercase tracking-wider text-[10px] mr-1.5">{{ t('detail.studio') }}</span>
                                 <span class="text-text-primary">{{ studioNames.join(', ') }}</span>
                             </span>
                         </div>
@@ -532,6 +533,7 @@
 
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, computed, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
 import { useJellyfinStore } from '@/store/jellyfin-store';
 import { useOfflineStore } from '@/store/offline-store';
@@ -557,6 +559,7 @@ import { logger } from '@/utils/logger';
 import TranscodeDownloadDialog from '@/components/TranscodeDownloadDialog.vue';
 import TrackActionsMenu from '@/components/TrackActionsMenu.vue';
 import { toAudioTrack } from '@/utils/audioTrack';
+import { heroImage, metaParts } from '@/utils/detailMeta';
 import type { TranscodeOptions } from '@/store/download-store';
 
 const store = useJellyfinStore();
@@ -566,6 +569,13 @@ const downloadStore = useDownloadStore();
 const metadataCache = useMetadataCacheStore();
 const route = useRoute();
 const router = useRouter();
+const { t } = useI18n();
+
+// Deep links (Android Auto, notifications) open a detail page with nothing behind it: land on Home.
+function goBack() {
+    if (window.history.state?.back) router.back();
+    else router.replace({ name: 'libraries' });
+}
 const toast = useToast();
 const { showError } = toast;
 
@@ -815,16 +825,15 @@ const posterUrl = computed(() => {
 
 const backdropUrl = computed(() => {
     if (!item.value?.Id) return '';
-    const backdropId = item.value.Type === 'Episode' && item.value.SeriesId
-        ? item.value.SeriesId
-        : item.value.Id;
-    const cached = cachedArtworkUrl(backdropId, 'Backdrop');
+    // Seasons and episodes borrow the series backdrop (a season poster upscaled looks pixelated).
+    const hero = heroImage(item.value);
+    const cached = cachedArtworkUrl(hero.itemId, 'Backdrop');
     if (cached) return cached;
     // Requesting a backdrop the item doesn't have 404s and shows the error
     // placeholder instead of falling back to the poster.
-    if (item.value.Type !== 'Episode' && !item.value.BackdropImageTags?.length) return '';
+    if (hero.type !== 'Backdrop') return '';
     return offlineStore.isFullyOnline
-        ? store.getImageUrl(backdropId, 'Backdrop', 1920, 1080) || ''
+        ? store.getImageUrl(hero.itemId, 'Backdrop', 1920, 1080) || ''
         : '';
 });
 
@@ -858,8 +867,7 @@ const resumePositionLabel = computed(() => {
     return formatTicksHuman(ticks);
 });
 
-const year = computed(() => item.value?.ProductionYear || null);
-const duration = computed(() => formatTicksHuman(item.value?.RunTimeTicks));
+const heroMeta = computed(() => (item.value ? metaParts(item.value, t, episodes.value.length || undefined) : []));
 const genres = computed<string[]>(() => item.value?.Genres || []);
 
 type Person = { Id?: string; Name: string; Role?: string; Type?: string; PrimaryImageTag?: string };

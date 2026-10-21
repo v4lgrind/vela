@@ -5,7 +5,8 @@
     "play": "Play",
     "markWatched": "Mark as watched",
     "markUnwatched": "Mark as unwatched",
-    "downloaded": "Downloaded"
+    "downloaded": "Downloaded",
+    "loading": "Loading…"
   },
   "duration": {
     "hoursMinutes": "{h}h {m}m",
@@ -85,5 +86,25 @@
   "audio": {
     "playingNext": "Playing next",
     "addedToQueue": "Added to queue"
+  },
+  "detail": {
+    "episodes": "{n} episode | {n} episodes",
+    "casting": "Casting",
+    "castToTv": "Cast to TV",
+    "mediaInfo": "Media info",
+    "resume": "Resume · {time}",
+    "playAlbum": "Play album",
+    "playAll": "Play all",
+    "shuffle": "Shuffle",
+    "downloadedDelete": "Downloaded — tap to delete",
+    "download": "Download",
+    "downloadingCancel": "Downloading {percent}% — tap to cancel",
+    "markAllWatched": "Mark all as watched",
+    "markAllUnwatched": "Mark all as unwatched",
+    "markWatchedShort": "Mark watched",
+    "showMore": "Show more",
+    "showLess": "Show less",
+    "director": "Director",
+    "studio": "Studio"
   }
 }

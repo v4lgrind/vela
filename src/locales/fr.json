@@ -5,7 +5,8 @@
     "play": "Lire",
     "markWatched": "Marquer comme vu",
     "markUnwatched": "Marquer comme non vu",
-    "downloaded": "Téléchargé"
+    "downloaded": "Téléchargé",
+    "loading": "Chargement…"
   },
   "duration": {
     "hoursMinutes": "{h} h {m} min",
@@ -85,5 +86,25 @@
   "audio": {
     "playingNext": "Lecture à suivre",
     "addedToQueue": "Ajouté à la file"
+  },
+  "detail": {
+    "episodes": "{n} épisode | {n} épisodes",
+    "casting": "Diffusion en cours",
+    "castToTv": "Diffuser sur la TV",
+    "mediaInfo": "Infos du média",
+    "resume": "Reprendre · {time}",
+    "playAlbum": "Lire l'album",
+    "playAll": "Tout lire",
+    "shuffle": "Aléatoire",
+    "downloadedDelete": "Téléchargé — toucher pour supprimer",
+    "download": "Télécharger",
+    "downloadingCancel": "Téléchargement {percent} % — toucher pour annuler",
+    "markAllWatched": "Tout marquer comme vu",
+    "markAllUnwatched": "Tout marquer comme non vu",
+    "markWatchedShort": "Marquer vu",
+    "showMore": "Voir plus",
+    "showLess": "Voir moins",
+    "director": "Réalisation",
+    "studio": "Studio"
   }
 }

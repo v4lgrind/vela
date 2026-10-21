@@ -1,7 +1,11 @@
 {
   "common": {
     "back": "Retour",
-    "seeAll": "Tout voir"
+    "seeAll": "Tout voir",
+    "play": "Lire",
+    "markWatched": "Marquer comme vu",
+    "markUnwatched": "Marquer comme non vu",
+    "downloaded": "Téléchargé"
   },
   "duration": {
     "hoursMinutes": "{h} h {m} min",
@@ -45,6 +49,41 @@
     "loadError": "Impossible de charger vos bibliothèques"
   },
   "library": {
-    "title": "Bibliothèques"
+    "title": "Bibliothèques",
+    "shown": "{n} affichés",
+    "alphaIndex": "Aller à la lettre",
+    "filters": "Filtres",
+    "unwatched": "Non vus",
+    "watched": "Vus",
+    "favorites": "Favoris",
+    "reset": "Réinitialiser",
+    "toggleView": "Basculer grille / liste",
+    "ascending": "Croissant",
+    "descending": "Décroissant",
+    "allItems": "Tout",
+    "allGenres": "Tous les genres",
+    "empty": "Rien ici pour le moment",
+    "previous": "Précédent",
+    "next": "Suivant",
+    "page": "Page {n}",
+    "loadError": "Impossible de charger les éléments",
+    "sort": {
+      "name": "Nom",
+      "releaseDate": "Date de sortie",
+      "dateAdded": "Date d'ajout",
+      "rating": "Note",
+      "playCount": "Nombre de lectures",
+      "random": "Aléatoire"
+    },
+    "music": {
+      "albums": "Albums",
+      "artists": "Artistes",
+      "songs": "Titres",
+      "playlists": "Playlists"
+    }
+  },
+  "audio": {
+    "playingNext": "Lecture à suivre",
+    "addedToQueue": "Ajouté à la file"
   }
 }

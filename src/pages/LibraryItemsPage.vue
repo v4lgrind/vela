@@ -1,87 +1,68 @@
 <template>
-  <div class="min-h-dvh bg-background text-text-primary p-5 flex flex-col"
-    style="padding-top: calc(20px + var(--sat, env(safe-area-inset-top, 0px)))">
-    <!-- Header -->
-    <header class="flex items-center justify-between mb-4">
-      <div class="flex items-center gap-2.5 min-w-0">
-        <button @click="router.back()" title="Back"
-          class="size-9 shrink-0 rounded-[10px] border border-border-default bg-surface flex items-center justify-center text-text-heading active:opacity-70">
-          <ChevronLeft class="size-[18px]" :stroke-width="2" />
-        </button>
-        <h1 class="text-[22px] font-bold text-text-heading tracking-tight truncate">{{ libraryName }}</h1>
-      </div>
-      <span class="text-xs text-text-muted shrink-0 ml-2">{{ items.length }} shown</span>
-    </header>
+  <AppPage class="flex min-h-dvh flex-col bg-background pb-6 text-text-primary" :class="showIndex && 'pr-12 md:pr-12'">
+    <PageHeader back :title="libraryName" :subtitle="t('library.shown', { n: items.length })" class="mb-3" />
 
-    <!-- Music library sections -->
-    <nav v-if="isMusicLibrary" class="flex gap-2 mb-3 overflow-x-auto scrollbar-hide">
-      <button v-for="tab in MUSIC_TABS" :key="tab.value" @click="selectMusicTab(tab.value)"
-        class="shrink-0 px-4 py-2 rounded-full text-sm font-semibold transition-colors"
-        :class="musicTab === tab.value ? 'bg-accent-purple text-accent-ink' : 'bg-surface-hover text-text-primary'">
-        {{ tab.label }}
-      </button>
-    </nav>
+    <!-- Music library sections: tabs switch what is listed -->
+    <Tabs v-if="isMusicLibrary" :model-value="musicTab" class="mb-3" @update:model-value="selectMusicTab($event as MusicTab)">
+      <TabsList>
+        <TabsTrigger v-for="tab in MUSIC_TABS" :key="tab.value" :value="tab.value">{{ t(tab.label) }}</TabsTrigger>
+      </TabsList>
+    </Tabs>
 
     <!-- Filters and Sorting -->
     <section class="mb-4">
       <!-- Quick filter pills -->
       <div class="flex items-center gap-2 overflow-x-auto scrollbar-hide">
-        <button
-          @click="showFilters = !showFilters"
-          class="flex items-center gap-1.5 shrink-0 px-3.5 py-2 rounded-full text-[12.5px] font-semibold transition-colors"
-          :class="hasActiveFilters ? 'bg-accent-purple text-accent-ink' : 'bg-surface-hover text-text-primary'">
+        <Toggle variant="outline" size="sm" class="shrink-0 gap-1.5"
+          :model-value="showFilters || hasActiveFilters" @update:model-value="showFilters = !showFilters">
           <SlidersHorizontal class="size-3.5" />
-          Filters
+          {{ t('library.filters') }}
           <ChevronDown class="size-3 transition-transform duration-200" :class="showFilters ? 'rotate-180' : ''" />
-        </button>
-        <button v-if="!isMusicLibrary"
-          @click="quickFilter('IsUnplayed')"
-          class="shrink-0 px-3.5 py-2 rounded-full text-[12.5px] font-medium transition-colors"
-          :class="filter === 'IsUnplayed' ? 'bg-accent-purple text-accent-ink' : 'bg-surface-hover text-text-primary'">
-          Unwatched
-        </button>
-        <button
-          @click="quickFilter('IsFavorite')"
-          class="shrink-0 px-3.5 py-2 rounded-full text-[12.5px] font-medium transition-colors"
-          :class="filter === 'IsFavorite' ? 'bg-accent-purple text-accent-ink' : 'bg-surface-hover text-text-primary'">
-          Favorites
-        </button>
-        <Button v-if="hasActiveFilters" variant="ghost" size="sm" @click="resetFilters" class="text-xs px-2 text-text-muted shrink-0">Reset</Button>
+        </Toggle>
+        <Toggle v-if="!isMusicLibrary" variant="outline" size="sm" class="shrink-0"
+          :model-value="filter === 'IsUnplayed'" @update:model-value="quickFilter('IsUnplayed')">
+          {{ t('library.unwatched') }}
+        </Toggle>
+        <Toggle variant="outline" size="sm" class="shrink-0"
+          :model-value="filter === 'IsFavorite'" @update:model-value="quickFilter('IsFavorite')">
+          {{ t('library.favorites') }}
+        </Toggle>
+        <Button v-if="hasActiveFilters" variant="link" size="sm" @click="resetFilters" class="shrink-0 px-2 text-caption text-text-muted">{{ t('library.reset') }}</Button>
 
         <div class="flex-1" />
 
         <!-- View mode toggle -->
-        <button v-if="!showSongList" @click="toggleViewMode" class="shrink-0 size-9 rounded-full bg-surface-hover text-text-primary flex items-center justify-center transition-colors" title="Toggle view">
-          <List v-if="viewMode === 'grid'" class="size-4" />
-          <LayoutGrid v-else class="size-4" />
-        </button>
+        <Button v-if="!showSongList" variant="ghost" size="icon" class="shrink-0 rounded-full" :aria-label="t('library.toggleView')" @click="toggleViewMode">
+          <List v-if="viewMode === 'grid'" class="size-5" />
+          <LayoutGrid v-else class="size-5" />
+        </Button>
       </div>
 
       <!-- Collapsible filter panel -->
       <div v-show="showFilters" class="flex flex-wrap gap-2 items-center mt-3">
-        <select v-model="sortBy" @change="onFilterChange" class="bg-surface border border-border-default rounded-xl px-3 py-2 text-sm text-text-primary cursor-pointer focus:border-accent-purple transition-colors">
-          <option value="SortName">Name</option>
-          <option value="PremiereDate">Release Date</option>
-          <option value="DateCreated">Date Added</option>
-          <option value="CommunityRating">Rating</option>
-          <option value="PlayCount">Play Count</option>
-          <option value="Random">Random</option>
+        <select v-model="sortBy" @change="onFilterChange" class="min-h-11 bg-surface border border-border-default rounded-xl px-3 py-2 text-sm text-text-primary cursor-pointer focus:border-accent-purple transition-colors">
+          <option value="SortName">{{ t('library.sort.name') }}</option>
+          <option value="PremiereDate">{{ t('library.sort.releaseDate') }}</option>
+          <option value="DateCreated">{{ t('library.sort.dateAdded') }}</option>
+          <option value="CommunityRating">{{ t('library.sort.rating') }}</option>
+          <option value="PlayCount">{{ t('library.sort.playCount') }}</option>
+          <option value="Random">{{ t('library.sort.random') }}</option>
         </select>
 
-        <select v-model="sortOrder" @change="onFilterChange" class="bg-surface border border-border-default rounded-xl px-3 py-2 text-sm text-text-primary cursor-pointer focus:border-accent-purple transition-colors">
-          <option value="Ascending">↑ Asc</option>
-          <option value="Descending">↓ Desc</option>
+        <select v-model="sortOrder" @change="onFilterChange" class="min-h-11 bg-surface border border-border-default rounded-xl px-3 py-2 text-sm text-text-primary cursor-pointer focus:border-accent-purple transition-colors">
+          <option value="Ascending">↑ {{ t('library.ascending') }}</option>
+          <option value="Descending">↓ {{ t('library.descending') }}</option>
         </select>
 
-        <select v-model="filter" @change="onFilterChange" class="bg-surface border border-border-default rounded-xl px-3 py-2 text-sm text-text-primary cursor-pointer focus:border-accent-purple transition-colors">
-          <option value="">All Items</option>
-          <option value="IsUnplayed">Unwatched</option>
-          <option value="IsPlayed">Watched</option>
-          <option value="IsFavorite">Favorites</option>
+        <select v-model="filter" @change="onFilterChange" class="min-h-11 bg-surface border border-border-default rounded-xl px-3 py-2 text-sm text-text-primary cursor-pointer focus:border-accent-purple transition-colors">
+          <option value="">{{ t('library.allItems') }}</option>
+          <option value="IsUnplayed">{{ t('library.unwatched') }}</option>
+          <option value="IsPlayed">{{ t('library.watched') }}</option>
+          <option value="IsFavorite">{{ t('library.favorites') }}</option>
         </select>
 
-        <select v-model="selectedGenre" @change="onFilterChange" class="bg-surface border border-border-default rounded-xl px-3 py-2 text-sm text-text-primary cursor-pointer focus:border-accent-purple transition-colors">
-          <option value="">All Genres</option>
+        <select v-model="selectedGenre" @change="onFilterChange" class="min-h-11 bg-surface border border-border-default rounded-xl px-3 py-2 text-sm text-text-primary cursor-pointer focus:border-accent-purple transition-colors">
+          <option value="">{{ t('library.allGenres') }}</option>
           <option v-for="genre in availableGenres" :key="genre" :value="genre">{{ genre }}</option>
         </select>
       </div>
@@ -89,7 +70,7 @@
 
     <section class="flex-1 relative">
       <!-- Songs: tap plays this page from that song -->
-      <ul v-if="showSongList" class="list-none p-0 m-0 flex flex-col pr-5">
+      <ul v-if="showSongList" class="list-none p-0 m-0 flex flex-col">
         <li v-for="(song, i) in items" :key="song.Id"
           class="flex items-center gap-3 py-2 px-1 border-b border-border-default cursor-pointer active:opacity-80"
           :class="audioStore.currentTrack?.id === song.Id && 'bg-accent-purple/10'"
@@ -144,18 +125,18 @@
               <button
                 @click.prevent.stop="playItem(item)"
                 :disabled="playingId === item.Id"
-                class="bg-white/90 hover:bg-white text-black rounded-full p-1.5 shadow-lg transition-all active:scale-95 disabled:opacity-60 pointer-events-auto"
-                title="Play">
-                <Loader2 v-if="playingId === item.Id" class="size-3 animate-spin" />
-                <Play v-else class="size-3 fill-black stroke-none" />
+                class="flex size-10 items-center justify-center bg-white/90 hover:bg-white text-black rounded-full shadow-lg transition-all active:scale-95 disabled:opacity-60 pointer-events-auto"
+                :aria-label="t('common.play')">
+                <Loader2 v-if="playingId === item.Id" class="size-4 animate-spin" />
+                <Play v-else class="size-4 fill-black stroke-none" />
               </button>
               <button
                 @click.prevent.stop="toggleWatched(item)"
                 :disabled="watchingId === item.Id"
-                class="rounded-full p-1.5 shadow-lg transition-all active:scale-95 disabled:opacity-60 pointer-events-auto"
+                class="flex size-10 items-center justify-center rounded-full shadow-lg transition-all active:scale-95 disabled:opacity-60 pointer-events-auto"
                 :class="item.UserData?.Played ? 'bg-accent-purple text-accent-ink' : 'bg-white/90 hover:bg-white text-black'"
-                :title="item.UserData?.Played ? 'Mark as unwatched' : 'Mark as watched'">
-                <Check class="size-3" />
+                :aria-label="item.UserData?.Played ? t('common.markUnwatched') : t('common.markWatched')">
+                <Check class="size-4" />
               </button>
             </div>
           </div>
@@ -197,7 +178,7 @@
             <!-- Right side: download + watched + actions -->
             <div class="flex items-center gap-2 shrink-0">
               <div v-if="offlineStore.isItemDownloaded(item.Id)"
-                class="rounded-full p-1 bg-accent-purple/20 text-accent-purple" title="Downloaded">
+                class="rounded-full p-1 bg-accent-purple/20 text-accent-purple" :title="t('common.downloaded')">
                 <DownloadIcon class="size-3" />
               </div>
               <div v-else-if="downloadStore.isDownloading(item.Id)"
@@ -210,8 +191,8 @@
               <button v-if="!isSquare(item) && item.Type !== 'BoxSet'"
                 @click.prevent.stop="playItem(item)"
                 :disabled="playingId === item.Id"
-                class="bg-surface-raised border border-border-default rounded-full p-2 hover:border-accent-purple transition-colors"
-                title="Play">
+                class="flex size-11 items-center justify-center bg-surface-raised border border-border-default rounded-full hover:border-accent-purple transition-colors"
+                :aria-label="t('common.play')">
                 <Loader2 v-if="playingId === item.Id" class="size-4 animate-spin" />
                 <Play v-else class="size-4 fill-text-primary stroke-none" />
               </button>
@@ -220,38 +201,31 @@
         </li>
       </ul>
 
-      <p v-if="!loading && !error && !items.length" class="text-center text-sm text-text-muted py-12">Nothing here yet</p>
+      <p v-if="!loading && !error && !items.length" class="py-12 text-center text-body text-text-muted">{{ t('library.empty') }}</p>
 
       <!-- A-Z Quick Jump Sidebar -->
-      <div v-if="sortBy === 'SortName'" class="fixed right-0.5 top-1/2 -translate-y-1/2 flex flex-col items-center z-10 py-1">
-        <button
-          v-for="letter in alphabet" :key="letter"
-          @click="jumpToLetter(letter)"
-          class="px-1.5 py-[1px] text-[10px] font-bold leading-tight transition-colors"
-          :class="nameStartsWith === letter ? 'text-accent-purple' : 'text-text-muted hover:text-text-primary'">
-          {{ letter }}
-        </button>
-      </div>
+      <AlphaIndex v-if="showIndex" :letters="alphabet" :active="nameStartsWith" @select="jumpToLetter" />
 
       <!-- Pagination -->
       <div class="flex items-center justify-center gap-3 mt-6">
         <Button variant="outline" :disabled="startIndex === 0" @click="prevPage" class="min-h-[44px] px-4">
-          <ArrowLeft class="size-4 mr-1" /> Previous
+          <ArrowLeft class="size-4 mr-1" /> {{ t('library.previous') }}
         </Button>
         <span class="text-text-primary font-semibold">
-          Page {{ currentPage }}
+          {{ t('library.page', { n: currentPage }) }}
           <span v-if="nameStartsWith" class="text-accent-purple ml-1">({{ nameStartsWith }})</span>
         </span>
         <Button variant="outline" :disabled="!hasNextPage" @click="nextPage" class="min-h-[44px] px-4">
-          Next <ArrowRight class="size-4 ml-1" />
+          {{ t('library.next') }} <ArrowRight class="size-4 ml-1" />
         </Button>
       </div>
     </section>
-  </div>
+  </AppPage>
 </template>
 
 <script setup lang="ts">
 import { onMounted, ref, computed, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { logger } from '@/utils/logger';
 import { useRoute, useRouter } from 'vue-router';
 import { useJellyfinStore } from '@/store/jellyfin-store';
@@ -263,10 +237,16 @@ import TrackActionsMenu from '@/components/TrackActionsMenu.vue';
 import { useAudioPlayerStore } from '@/store/audio-player-store';
 import { useToast } from '@/composables/useToast';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ArrowRight, Play, Check, Download as DownloadIcon, Loader2, SlidersHorizontal, ChevronDown, ChevronLeft, LayoutGrid, List } from 'lucide-vue-next';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Toggle } from '@/components/ui/toggle';
+import { AppPage, PageHeader } from '@/components/layout';
+import AlphaIndex from '@/components/AlphaIndex.vue';
+import { formatDuration } from '@/i18n/format';
+import { ArrowLeft, ArrowRight, Play, Check, Download as DownloadIcon, Loader2, SlidersHorizontal, ChevronDown, LayoutGrid, List } from 'lucide-vue-next';
 import { useOfflineStore } from '@/store/offline-store';
 import { useDownloadStore } from '@/store/download-store';
 
+const { t } = useI18n();
 const store = useJellyfinStore();
 const offlineStore = useOfflineStore();
 const downloadStore = useDownloadStore();
@@ -298,10 +278,10 @@ const selectedGenre = ref('');
 
 type MusicTab = 'albums' | 'artists' | 'songs' | 'playlists';
 const MUSIC_TABS: { value: MusicTab; label: string }[] = [
-  { value: 'albums', label: 'Albums' },
-  { value: 'artists', label: 'Artists' },
-  { value: 'songs', label: 'Songs' },
-  { value: 'playlists', label: 'Playlists' },
+  { value: 'albums', label: 'library.music.albums' },
+  { value: 'artists', label: 'library.music.artists' },
+  { value: 'songs', label: 'library.music.songs' },
+  { value: 'playlists', label: 'library.music.playlists' },
 ];
 const musicTab = ref<MusicTab>('albums');
 const isMusicLibrary = computed(() =>
@@ -324,7 +304,7 @@ function playSongs(index: number) {
 function enqueueSong(song: any, where: 'next' | 'end') {
   if (where === 'next') audioStore.playNext([toAudioTrack(song)]);
   else audioStore.addToQueue([toAudioTrack(song)]);
-  toast.show(where === 'next' ? 'Playing next' : 'Added to queue', 'success', 2000);
+  toast.show(where === 'next' ? t('audio.playingNext') : t('audio.addedToQueue'), 'success', 2000);
 }
 const nameStartsWith = ref('');
 const hasActiveFilters = computed(() =>
@@ -402,6 +382,9 @@ function toggleViewMode() {
 
 // A-Z sidebar
 const alphabet = ['#', ...Array.from({ length: 26 }, (_, i) => String.fromCharCode(65 + i))];
+// Short lists don't need an index; keep it while a letter is applied so it can be changed or cleared.
+const showIndex = computed(() =>
+  sortBy.value === 'SortName' && (items.value.length >= 30 || hasNextPage.value || nameStartsWith.value !== ''));
 
 function jumpToLetter(letter: string) {
   if (nameStartsWith.value === letter) {
@@ -421,9 +404,7 @@ function getImageUrl(id: string, itemType?: string) {
 }
 
 function formatRuntime(ticks: number): string {
-  const minutes = Math.round(ticks / 600_000_000);
-  if (minutes < 60) return `${minutes}m`;
-  return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+  return formatDuration(Math.round(ticks / 600_000_000) * 60);
 }
 
 async function loadPage() {
@@ -446,7 +427,7 @@ async function loadPage() {
     items.value = pageItems;
     hasNextPage.value = pageItems.length === limit.value;
   } catch (e) {
-    if (request === pageRequest) error.value = 'Failed to load items';
+    if (request === pageRequest) error.value = t('library.loadError');
   } finally {
     if (request === pageRequest) loading.value = false;
   }

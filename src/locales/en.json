@@ -43,5 +43,8 @@
     "myLibraries": "My libraries",
     "markPlayed": "Mark as played",
     "loadError": "Could not load your libraries"
+  },
+  "library": {
+    "title": "Libraries"
   }
 }

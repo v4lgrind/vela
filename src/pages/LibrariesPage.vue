@@ -1,7 +1,6 @@
 <template>
-  <div class="bg-background text-text-primary p-4"
-    style="padding-top: calc(16px + var(--sat, env(safe-area-inset-top, 0px)))">
-    <h1 class="text-2xl sm:text-3xl font-bold text-foreground mb-4">Bibliothèques</h1>
+  <AppPage class="bg-background pb-6 text-text-primary">
+    <PageHeader :title="t('library.title')" class="mb-4" />
 
     <div v-if="loading" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
       <Skeleton v-for="i in 6" :key="i" class="aspect-video rounded-xl" />
@@ -26,17 +25,20 @@
         </span>
       </router-link>
     </div>
-  </div>
+  </AppPage>
 </template>
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 import type { BaseItemDto } from '@jellyfin/sdk/lib/generated-client/models/base-item-dto';
 import { BookOpen, Film, Folder, Library, Music, Tv } from 'lucide-vue-next';
 import LazyImg from '@/components/LazyImg.vue';
+import { AppPage, PageHeader } from '@/components/layout';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useJellyfinStore } from '@/store/jellyfin-store';
 
+const { t } = useI18n();
 const store = useJellyfinStore();
 // Libraries already fetched by the home page render right away.
 const libraries = ref<BaseItemDto[]>(store.libraries ?? []);
@@ -59,7 +61,7 @@ onMounted(async () => {
   try {
     libraries.value = (await store.fetchLibraries()).filter((lib) => lib.Id);
   } catch {
-    if (!libraries.value.length) error.value = 'Failed to load media libraries';
+    if (!libraries.value.length) error.value = t('home.loadError');
   } finally {
     loading.value = false;
   }

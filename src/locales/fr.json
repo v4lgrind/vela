@@ -43,5 +43,8 @@
     "myLibraries": "Mes bibliothèques",
     "markPlayed": "Marquer comme vu",
     "loadError": "Impossible de charger vos bibliothèques"
+  },
+  "library": {
+    "title": "Bibliothèques"
   }
 }

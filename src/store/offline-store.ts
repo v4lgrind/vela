@@ -40,12 +40,7 @@ export const useOfflineStore = defineStore('offline', {
     isOnline: () => offlineDetection.isOnline.value,
 
     /**
-     * Get server reachability status
-     */
-    serverReachable: () => offlineDetection.serverReachable.value,
-
-    /**
-     * Get fully online status (browser online AND server reachable)
+     * Get fully online status (device online AND offline mode not forced)
      */
     isFullyOnline: (state) => {
       if (!state.initialized) return true;
@@ -165,21 +160,6 @@ export const useOfflineStore = defineStore('offline', {
           logger.error('[OfflineStore] Reconcile failed:', reconcileError);
         }
 
-        // Initialize offline detection with server URL and await the first check
-        // so that serverReachable is accurate before we set initialized = true.
-        // Without this, the watcher in App.vue sees isFullyOnline=false immediately
-        // on page reload and incorrectly redirects to the offline library.
-        try {
-          const jellyfinStore = useJellyfinStore();
-          if (jellyfinStore.serverUrl) {
-            offlineDetection.init(jellyfinStore.serverUrl);
-            await offlineDetection.checkNow();
-            logger.log('[OfflineStore] Offline detection initialized');
-          }
-        } catch (detectionError) {
-          logger.error('[OfflineStore] Offline detection init failed:', detectionError);
-        }
-
         // Setup auto-sync when coming back online
         try {
           this.setupAutoSync();
@@ -197,7 +177,7 @@ export const useOfflineStore = defineStore('offline', {
     },
 
     /**
-     * Re-check server reachability right now and return true if fully online.
+     * Re-check device connectivity right now and return true if fully online.
      */
     async recheckOnline(): Promise<boolean> {
       await offlineDetection.checkNow();

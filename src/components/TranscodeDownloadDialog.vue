@@ -3,10 +3,10 @@
     <DialogContent class="max-h-[85dvh] overflow-y-auto">
       <DialogHeader>
         <DialogTitle class="text-text-heading">
-          Download options
+          {{ t('transcode.title') }}
         </DialogTitle>
         <DialogDescription class="text-text-muted text-sm">
-          Choose the quality and tracks for your offline copy.
+          {{ t('transcode.description') }}
         </DialogDescription>
       </DialogHeader>
 
@@ -23,14 +23,14 @@
         <Check v-else class="size-4 flex-shrink-0" />
         <span>
           {{ needsConversion
-            ? 'Not compatible with this device — it will be converted for playback.'
-            : 'Compatible with this device — plays as-is.' }}
+            ? t('transcode.notCompatible')
+            : t('transcode.compatible') }}
         </span>
       </div>
 
       <!-- Resolution selection -->
       <div class="flex flex-col gap-2">
-        <label class="text-xs font-medium text-text-muted uppercase tracking-wide">Resolution</label>
+        <label class="text-xs font-medium text-text-muted uppercase tracking-wide">{{ t('transcode.resolution') }}</label>
         <div class="flex flex-wrap gap-1.5">
           <button
             v-for="preset in resolutionPresets"
@@ -43,14 +43,14 @@
                 : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10',
             ]"
           >
-            {{ preset.label === 'Auto' ? 'Original' : preset.label }}
+            {{ preset.label === 'Auto' ? t('settings.original') : preset.label }}
           </button>
         </div>
       </div>
 
       <!-- Audio track selection -->
       <div v-if="audioTracks.length > 0" class="flex flex-col gap-2">
-        <label class="text-xs font-medium text-text-muted uppercase tracking-wide">Audio</label>
+        <label class="text-xs font-medium text-text-muted uppercase tracking-wide">{{ t('types.Audio') }}</label>
         <div class="flex flex-col gap-1 max-h-48 overflow-y-auto">
           <button
             v-for="track in audioTracks"
@@ -78,7 +78,7 @@
 
       <!-- Subtitle track selection -->
       <div v-if="subtitleTracks.length > 0" class="flex flex-col gap-2">
-        <label class="text-xs font-medium text-text-muted uppercase tracking-wide">Subtitles</label>
+        <label class="text-xs font-medium text-text-muted uppercase tracking-wide">{{ t('transcode.subtitles') }}</label>
         <div class="flex flex-col gap-1 max-h-48 overflow-y-auto">
           <button
             @click="selectedSubtitle = -1"
@@ -97,7 +97,7 @@
             >
               <div v-if="selectedSubtitle === -1" class="size-2 rounded-full bg-accent-blue" />
             </div>
-            <span>None</span>
+            <span>{{ t('transcode.none') }}</span>
           </button>
           <button
             v-for="track in subtitleTracks"
@@ -126,7 +126,7 @@
       <!-- Estimated size -->
       <div class="flex items-center justify-between px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm">
         <span class="text-text-muted">
-          {{ itemCount > 1 ? `Estimated total (${itemCount} items)` : 'Estimated size' }}
+          {{ itemCount > 1 ? t('transcode.estimatedTotal', { n: itemCount }) : t('transcode.estimatedSize') }}
         </span>
         <span class="font-medium text-white">{{ sizeLabel }}</span>
       </div>
@@ -134,13 +134,13 @@
       <!-- Actions -->
       <div class="flex flex-col gap-2 pt-2">
         <Button @click="handleConfirm" class="w-full justify-center gap-2">
-          <Download class="size-4" /> Download
+          <Download class="size-4" /> {{ t('detail.download') }}
         </Button>
         <Button v-if="needsConversion" variant="outline" @click="handleOriginal" class="w-full justify-center gap-2">
-          <Download class="size-4" /> Download original (may not play)
+          <Download class="size-4" /> {{ t('transcode.original') }}
         </Button>
         <DialogClose as-child>
-          <Button variant="ghost" class="w-full">Cancel</Button>
+          <Button variant="ghost" class="w-full">{{ t('common.cancel') }}</Button>
         </DialogClose>
       </div>
     </DialogContent>
@@ -148,6 +148,7 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n';
 import { ref, computed, watch } from 'vue';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -155,6 +156,7 @@ import { Download, Check, AlertTriangle } from 'lucide-vue-next';
 import { QUALITY_PRESETS } from '@/constants';
 import { formatBytes } from '@/utils/helpers';
 
+const { t } = useI18n();
 const props = defineProps<{
   /** Representative item — drives audio/subtitle track lists and source resolution. */
   item: any;
@@ -214,7 +216,7 @@ function estimateItemBytes(it: any, bitrate: number): number {
 const totalBytes = computed(() =>
   downloadItems.value.reduce((sum, it) => sum + estimateItemBytes(it, selectedBitrate.value), 0)
 );
-const sizeLabel = computed(() => formatBytes(totalBytes.value) ?? 'Unknown');
+const sizeLabel = computed(() => formatBytes(totalBytes.value) ?? t('transcode.unknown'));
 
 // Pre-select default tracks and reset resolution when dialog opens
 watch(open, (isOpen) => {

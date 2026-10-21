@@ -88,7 +88,16 @@
   },
   "audio": {
     "playingNext": "Lecture à suivre",
-    "addedToQueue": "Ajouté à la file"
+    "addedToQueue": "Ajouté à la file",
+    "cover": "Pochette",
+    "closePlayer": "Fermer le lecteur",
+    "nowPlaying": "Lecture en cours",
+    "queue": "File d'attente",
+    "dragToReorder": "Glisser pour réordonner",
+    "removeFromQueue": "Retirer de la file",
+    "more": "Plus",
+    "playNext": "Lire ensuite",
+    "addToQueue": "Ajouter à la file"
   },
   "detail": {
     "episodes": "{n} épisode | {n} épisodes",
@@ -266,5 +275,30 @@
     "clear": "Effacer",
     "all": "Tout",
     "empty": "Aucun journal pour le moment. Lancez une lecture pour en générer."
+  },
+  "airplay": {
+    "stop": "Arrêter AirPlay",
+    "searching": "Recherche sur le réseau…",
+    "needsPin": "Demande un code PIN unique",
+    "askingCode": "Demande du code à la TV…",
+    "pairing": "Appairage…",
+    "pin": "PIN",
+    "pair": "Appairer",
+    "playingThrough": "La musique est diffusée via AirPlay.",
+    "description": "Écoutez la musique sur une Apple TV ou une enceinte AirPlay.",
+    "pairFailed": "L'appairage a échoué, vérifiez le code et réessayez."
+  },
+  "transcode": {
+    "title": "Options de téléchargement",
+    "description": "Choisissez la qualité et les pistes de votre copie hors ligne.",
+    "notCompatible": "Incompatible avec cet appareil — il sera converti pour la lecture.",
+    "compatible": "Compatible avec cet appareil — lu tel quel.",
+    "resolution": "Résolution",
+    "subtitles": "Sous-titres",
+    "none": "Aucun",
+    "estimatedTotal": "Total estimé ({n} éléments)",
+    "estimatedSize": "Taille estimée",
+    "original": "Télécharger l'original (peut ne pas se lire)",
+    "unknown": "Inconnue"
   }
 }

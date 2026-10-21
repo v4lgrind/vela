@@ -10,7 +10,7 @@
     </div>
     <!-- Content -->
     <div class="flex-1 flex items-center px-3 gap-3">
-      <img v-if="albumArtUrl" :src="albumArtUrl" class="size-12 rounded-md object-cover shrink-0" alt="Cover" />
+      <img v-if="albumArtUrl" :src="albumArtUrl" class="size-12 rounded-md object-cover shrink-0" :alt="t('audio.cover')" />
       <div v-else class="size-12 rounded-md bg-border-input shrink-0"></div>
       <div class="flex-1 min-w-0">
         <div class="text-sm font-semibold text-text-heading truncate">{{ currentTrack?.name || '' }}</div>
@@ -33,7 +33,7 @@
         <Button variant="ghost" size="icon" class="size-10 rounded-full text-text-primary hover:bg-white/10" @click="audioStore.next()">
           <SkipForward class="size-5 fill-current" />
         </Button>
-        <Button variant="ghost" size="icon" class="size-10 rounded-full text-text-muted hover:bg-white/10" aria-label="Close player" @click="audioStore.stop()">
+        <Button variant="ghost" size="icon" class="size-11 rounded-full text-text-muted hover:bg-white/10" :aria-label="t('audio.closePlayer')" @click="audioStore.stop()">
           <X class="size-5" />
         </Button>
       </div>
@@ -42,6 +42,7 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n';
 import { computed } from 'vue';
 import { useAudioPlayerStore } from '@/store/audio-player-store';
 import { useJellyfinStore } from '@/store/jellyfin-store';
@@ -50,6 +51,7 @@ import { Airplay, Cast, SkipBack, SkipForward, Play, Pause, X } from 'lucide-vue
 import { useBottomNavVisible } from '@/composables/useBottomNav';
 import { useWideLayout } from '@/composables/useWideLayout';
 
+const { t } = useI18n();
 const audioStore = useAudioPlayerStore();
 const jellyfinStore = useJellyfinStore();
 

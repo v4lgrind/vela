@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n';
 import { cn } from '@/lib/utils';
 import { Check, X } from 'lucide-vue-next';
 
+const { t } = useI18n();
 export interface SheetItem {
     key: string | number;
     label: string;
@@ -35,7 +37,7 @@ const emit = defineEmits<{
                     <!-- Header -->
                     <div class="flex items-center justify-between px-5 pt-1 pb-2">
                         <h3 class="text-base font-semibold text-white">{{ title }}</h3>
-                        <button class="text-white/50 hover:text-white transition-colors p-1 -mr-1" @click="emit('close')">
+                        <button :aria-label="t('common.close')" class="flex size-11 items-center justify-center text-white/50 hover:text-white transition-colors -mr-2" @click="emit('close')">
                             <X class="size-5" />
                         </button>
                     </div>

@@ -88,7 +88,16 @@
   },
   "audio": {
     "playingNext": "Playing next",
-    "addedToQueue": "Added to queue"
+    "addedToQueue": "Added to queue",
+    "cover": "Cover",
+    "closePlayer": "Close player",
+    "nowPlaying": "Now playing",
+    "queue": "Queue",
+    "dragToReorder": "Drag to reorder",
+    "removeFromQueue": "Remove from queue",
+    "more": "More",
+    "playNext": "Play next",
+    "addToQueue": "Add to queue"
   },
   "detail": {
     "episodes": "{n} episode | {n} episodes",
@@ -266,5 +275,30 @@
     "clear": "Clear",
     "all": "All",
     "empty": "No log entries yet. Play media to generate diagnostic logs."
+  },
+  "airplay": {
+    "stop": "Stop AirPlay",
+    "searching": "Searching the network…",
+    "needsPin": "Needs a one-time PIN",
+    "askingCode": "Asking the TV for a code…",
+    "pairing": "Pairing…",
+    "pin": "PIN",
+    "pair": "Pair",
+    "playingThrough": "Music is playing through AirPlay.",
+    "description": "Play the music on an Apple TV or AirPlay speaker.",
+    "pairFailed": "Pairing failed, check the code and try again."
+  },
+  "transcode": {
+    "title": "Download options",
+    "description": "Choose the quality and tracks for your offline copy.",
+    "notCompatible": "Not compatible with this device — it will be converted for playback.",
+    "compatible": "Compatible with this device — plays as-is.",
+    "resolution": "Resolution",
+    "subtitles": "Subtitles",
+    "none": "None",
+    "estimatedTotal": "Estimated total ({n} items)",
+    "estimatedSize": "Estimated size",
+    "original": "Download original (may not play)",
+    "unknown": "Unknown"
   }
 }

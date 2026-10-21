@@ -15,7 +15,7 @@
       <span v-else-if="audioStore.airplayDevice" class="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-accent-purple truncate">
         <Airplay class="size-4 shrink-0" /> {{ audioStore.airplayDevice }}
       </span>
-      <span v-else class="text-xs font-semibold uppercase tracking-wide text-text-muted">Now Playing</span>
+      <span v-else class="text-xs font-semibold uppercase tracking-wide text-text-muted">{{ t('audio.nowPlaying') }}</span>
       <div class="flex items-center">
         <Button v-if="audioStore.airplaySupported && !audioStore.castDevice" variant="ghost" size="icon" title="AirPlay"
           class="size-11 rounded-full hover:bg-white/10"
@@ -29,7 +29,7 @@
           @click="audioPlayerService.openCastDialog()">
           <Cast class="size-6" />
         </Button>
-        <Button variant="ghost" size="icon" class="size-11 rounded-full text-text-primary hover:bg-white/10" @click="showQueue = !showQueue">
+        <Button variant="ghost" size="icon" class="size-11 rounded-full text-text-primary hover:bg-white/10" :aria-label="t('audio.queue')" @click="showQueue = !showQueue">
           <ListMusic class="size-7" />
         </Button>
       </div>
@@ -37,7 +37,7 @@
 
     <!-- Main Player -->
     <div v-if="!showQueue" class="flex-1 flex flex-col items-center justify-center gap-6 py-4">
-      <img v-if="albumArtUrl" :src="albumArtUrl" class="size-70 rounded-xl object-cover shadow-[0_20px_60px_rgba(0,0,0,0.5)]" alt="Cover" />
+      <img v-if="albumArtUrl" :src="albumArtUrl" class="size-70 rounded-xl object-cover shadow-[0_20px_60px_rgba(0,0,0,0.5)]" :alt="t('audio.cover')" />
       <div v-else class="size-70 rounded-xl bg-border-input"></div>
 
       <div class="text-center max-w-full">
@@ -59,7 +59,7 @@
 
       <!-- Controls -->
       <div class="flex items-center gap-4">
-        <Button variant="ghost" size="icon" title="Shuffle"
+        <Button variant="ghost" size="icon" :aria-label="t('detail.shuffle')"
           class="size-12 rounded-full hover:bg-white/10"
           :class="audioStore.shuffle ? 'text-accent-purple' : 'text-text-muted'"
           @click="audioStore.toggleShuffle()">
@@ -95,7 +95,7 @@
 
     <!-- Queue -->
     <div v-else class="flex-1 flex flex-col overflow-hidden">
-      <h3 class="text-lg font-semibold mb-3">Queue</h3>
+      <h3 class="text-lg font-semibold mb-3">{{ t('audio.queue') }}</h3>
       <div data-queue-scroll class="flex-1 overflow-y-auto flex flex-col gap-0.5 scrollbar-hide">
         <div
           v-for="(track, i) in audioStore.queue"
@@ -109,7 +109,7 @@
           :style="{ transform: `translateY(${rowShift(i)}px)` }"
           @click="jumpToTrack(i)"
         >
-          <button data-no-swipe title="Drag to reorder" class="size-10 flex items-center justify-center text-text-subtle touch-none cursor-grab shrink-0"
+          <button data-no-swipe :aria-label="t('audio.dragToReorder')" class="size-10 flex items-center justify-center text-text-subtle touch-none cursor-grab shrink-0"
             @click.stop @pointerdown="onDragStart($event, i)" @pointermove="onDragMove" @pointerup="onDragEnd" @pointercancel="onDragEnd">
             <GripVertical class="size-5" />
           </button>
@@ -117,7 +117,7 @@
             <div class="font-semibold text-text-heading truncate" :class="i === audioStore.currentIndex && 'text-accent-purple-light'">{{ track.name }}</div>
             <div class="text-xs text-text-muted truncate">{{ track.artist }}</div>
           </div>
-          <Button v-if="i !== audioStore.currentIndex" variant="ghost" size="icon" title="Remove from queue"
+          <Button v-if="i !== audioStore.currentIndex" variant="ghost" size="icon" :aria-label="t('audio.removeFromQueue')"
             class="size-10 rounded-full text-text-subtle hover:bg-white/10 shrink-0"
             @click.stop="audioStore.removeFromQueue(i)">
             <X class="size-5" />
@@ -130,6 +130,7 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n';
 import { ref, computed } from 'vue';
 import { useAudioPlayerStore } from '@/store/audio-player-store';
 import { useJellyfinStore } from '@/store/jellyfin-store';
@@ -140,6 +141,7 @@ import { audioPlayerService } from '@/services/audioPlayerService';
 import AirPlayDialog from '@/components/AirPlayDialog.vue';
 import { Airplay, Cast, ChevronDown, GripVertical, ListMusic, SkipBack, SkipForward, Play, Pause, Repeat, Repeat1, Shuffle, Volume2, Volume1, VolumeX, X } from 'lucide-vue-next';
 
+const { t } = useI18n();
 const audioStore = useAudioPlayerStore();
 const jellyfinStore = useJellyfinStore();
 

@@ -1,7 +1,7 @@
 <template>
   <div class="flex flex-col h-dvh bg-background">
     <!-- Header: pill search field + cancel -->
-    <div class="flex items-center gap-2.5 px-5 pb-3.5"
+    <div class="flex items-center gap-2.5 px-gutter pb-3 md:px-gutter-wide"
       style="padding-top: calc(12px + var(--sat, env(safe-area-inset-top, 0px)))">
       <div class="flex-1 flex items-center gap-2.5 bg-surface border border-border-default rounded-2xl px-4 py-3 focus-within:border-accent-purple transition-colors">
         <Search class="size-[19px] text-text-muted shrink-0" :stroke-width="1.9" />
@@ -9,55 +9,45 @@
           ref="inputEl"
           v-model="searchQuery"
           type="search"
-          placeholder="Search movies, shows, music..."
-          class="flex-1 min-w-0 bg-transparent text-[14.5px] text-text-heading placeholder:text-text-muted outline-none"
+          :placeholder="t('search.placeholder')"
+          class="flex-1 min-w-0 bg-transparent text-body text-text-heading placeholder:text-text-muted outline-none"
           @input="onInput"
           @keydown.esc="router.back()"
         />
       </div>
-      <button class="shrink-0 text-sm font-semibold text-accent-purple cursor-pointer" @click="router.back()">
-        Cancel
-      </button>
+      <Button variant="link" class="shrink-0 px-1 font-semibold text-accent-purple" @click="router.back()">
+        {{ t('common.cancel') }}
+      </Button>
     </div>
 
     <!-- Filter tabs -->
-    <div class="flex gap-2 px-5 pb-3 overflow-x-auto scrollbar-hide shrink-0">
-      <button
-        v-for="tab in tabs" :key="tab.value"
-        class="shrink-0 px-3.5 py-2 rounded-full text-[12.5px] font-semibold transition-colors cursor-pointer"
-        :class="activeTab === tab.value
-          ? 'bg-accent-purple text-accent-ink'
-          : 'bg-surface-hover text-text-primary'"
-        @click="activeTab = tab.value">
-        {{ tab.label }}
+    <ToggleGroup type="single" variant="outline" size="sm" :model-value="activeTab"
+      class="flex shrink-0 justify-start gap-2 overflow-x-auto px-gutter pb-3 scrollbar-hide md:px-gutter-wide"
+      @update:model-value="(v) => v && (activeTab = v as typeof activeTab)">
+      <ToggleGroupItem v-for="tab in tabs" :key="tab.value" :value="tab.value" class="shrink-0">
+        {{ t(tab.label) }}
         <span v-if="tab.value !== 'all' && tabCount(tab.value) > 0" class="ml-1 opacity-70">
           {{ tabCount(tab.value) }}
         </span>
-      </button>
-    </div>
+      </ToggleGroupItem>
+    </ToggleGroup>
 
     <!-- Body -->
     <div class="flex-1 overflow-y-auto">
       <!-- No query yet -->
-      <div v-if="!searchQuery.trim()" class="flex flex-col items-center justify-center h-full gap-3 text-text-muted">
-        <Search class="size-10 opacity-40" />
-        <p class="text-sm">Type to search your library</p>
-      </div>
+      <EmptyState v-if="!searchQuery.trim()" :icon="Search" :title="t('search.hint')" />
 
       <!-- Searching -->
       <div v-else-if="isSearching" class="flex items-center justify-center gap-2.5 py-16 text-text-muted">
         <Loader2 class="size-5 animate-spin" />
-        <span class="text-sm">Searching...</span>
+        <span class="text-body">{{ t('search.searching') }}</span>
       </div>
 
       <!-- No results -->
-      <div v-else-if="filteredResults.length === 0" class="flex flex-col items-center justify-center h-full gap-3 text-text-muted">
-        <Search class="size-10 opacity-40" />
-        <p class="text-sm">No results for "{{ searchQuery }}"</p>
-      </div>
+      <EmptyState v-else-if="filteredResults.length === 0" :icon="Search" :title="t('search.noResults', { query: searchQuery })" />
 
       <!-- Grid -->
-      <ul v-else class="list-none p-4 m-0 grid grid-cols-3 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(140px,1fr))] sm:gap-4"
+      <ul v-else class="list-none px-gutter py-4 md:px-gutter-wide m-0 grid grid-cols-3 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(140px,1fr))] sm:gap-4"
         style="padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px))">
         <li v-for="item in filteredResults" :key="item.Id" class="cursor-pointer" @click="goToItem(item)">
           <!-- Poster -->
@@ -83,10 +73,11 @@
               v-if="!isMusic(item)"
               @click.stop="toggleWatched(item)"
               :disabled="watchingId === item.Id"
-              class="absolute top-1.5 right-1.5 size-[18px] rounded-full flex items-center justify-center shadow transition-all active:scale-95 disabled:opacity-60"
+              :aria-label="item.UserData?.Played ? t('common.markUnwatched') : t('common.markWatched')"
+              class="absolute top-1 right-1 size-9 rounded-full flex items-center justify-center shadow transition-all active:scale-95 disabled:opacity-60"
               :class="item.UserData?.Played ? 'bg-accent-purple text-accent-ink' : 'bg-black/50 text-white/60 hover:bg-black/75 hover:text-white'">
-              <Loader2 v-if="watchingId === item.Id" class="size-[11px] animate-spin" />
-              <Check v-else class="size-[11px]" :stroke-width="3" />
+              <Loader2 v-if="watchingId === item.Id" class="size-3.5 animate-spin" />
+              <Check v-else class="size-3.5" :stroke-width="3" />
             </button>
             <!-- Song: tap plays -->
             <div v-if="item.Type === 'Audio'"
@@ -119,7 +110,11 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
+import { EmptyState } from '@/components/layout';
+import { Button } from '@/components/ui/button';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useJellyfinStore } from '@/store/jellyfin-store';
 import LazyImg from '@/components/LazyImg.vue';
 import { Download as DownloadIcon, Loader2, Play, Search, Check } from 'lucide-vue-next';
@@ -132,6 +127,7 @@ import { toAudioTrack } from '@/utils/audioTrack';
 const route = useRoute();
 const offlineStore = useOfflineStore();
 const downloadStore = useDownloadStore();
+const { t } = useI18n();
 const router = useRouter();
 const store = useJellyfinStore();
 const { showError } = useToast();
@@ -166,13 +162,13 @@ const activeTab = ref<'all' | SearchType>('all');
 let debounceId: number | undefined;
 
 const tabs = [
-  { value: 'all' as const,     label: 'All' },
-  { value: 'Movie' as const,   label: 'Movies' },
-  { value: 'Series' as const,  label: 'TV Shows' },
-  { value: 'Episode' as const, label: 'Episodes' },
-  { value: 'MusicArtist' as const, label: 'Artists' },
-  { value: 'MusicAlbum' as const, label: 'Albums' },
-  { value: 'Audio' as const, label: 'Songs' },
+  { value: 'all' as const,     label: 'search.tabs.all' },
+  { value: 'Movie' as const,   label: 'search.tabs.movies' },
+  { value: 'Series' as const,  label: 'search.tabs.shows' },
+  { value: 'Episode' as const, label: 'search.tabs.episodes' },
+  { value: 'MusicArtist' as const, label: 'search.tabs.artists' },
+  { value: 'MusicAlbum' as const, label: 'search.tabs.albums' },
+  { value: 'Audio' as const, label: 'search.tabs.songs' },
 ];
 
 function isMusic(item: any) {
@@ -235,7 +231,7 @@ async function doSearch(term: string) {
     });
   } catch {
     results.value = [];
-    showError('Search failed. Please check your connection.');
+    showError(t('search.failed'));
   } finally {
     isSearching.value = false;
   }

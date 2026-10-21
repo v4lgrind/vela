@@ -136,5 +136,21 @@
     "titles": "{n} titre | {n} titres",
     "filmography": "Filmographie",
     "empty": "Aucun titre trouvé"
+  },
+  "search": {
+    "placeholder": "Rechercher films, séries, musique…",
+    "hint": "Tapez pour chercher dans votre bibliothèque",
+    "searching": "Recherche…",
+    "noResults": "Aucun résultat pour « {query} »",
+    "tabs": {
+      "all": "Tout",
+      "movies": "Films",
+      "shows": "Séries",
+      "episodes": "Épisodes",
+      "artists": "Artistes",
+      "albums": "Albums",
+      "songs": "Titres"
+    },
+    "failed": "La recherche a échoué. Vérifiez votre connexion."
   }
 }

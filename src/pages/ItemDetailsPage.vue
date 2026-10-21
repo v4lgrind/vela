@@ -71,7 +71,7 @@
                                 <button v-if="item.SeasonId" @click="goToItem(item.SeasonId)"
                                     class="hover:text-white transition-colors cursor-pointer">{{ item.SeasonName }}</button>
                             </div>
-                            <h1 class="text-[2rem] sm:text-4xl font-bold text-white leading-none tracking-tight mb-2">{{ item.Name }}</h1>
+                            <h1 class="line-clamp-2 text-page sm:text-4xl font-bold text-white leading-tight tracking-tight mb-2">{{ item.Name }}</h1>
                             <div v-if="item.Type === 'MusicAlbum' && item.AlbumArtists?.length" class="flex flex-wrap gap-x-2 mb-1.5 text-[15px] font-semibold text-white/85">
                                 <button v-for="artist in item.AlbumArtists" :key="artist.Id" @click="goToItem(artist.Id)"
                                     class="hover:text-white underline-offset-4 hover:underline cursor-pointer">{{ artist.Name }}</button>

@@ -80,11 +80,11 @@
         </div>
         <!-- Storage breakdown by type -->
         <div v-if="offlineStore.downloadCount > 0" class="text-xs text-text-muted mb-8">
-          <span v-if="movieStorageBytes > 0">{{ t('downloads.movies') }} : {{ formatSize(movieStorageBytes) }}</span>
+          <span v-if="movieStorageBytes > 0">{{ t('downloads.storageOf', { type: t('downloads.movies'), size: formatSize(movieStorageBytes) }) }}</span>
           <span v-if="movieStorageBytes > 0 && tvStorageBytes > 0"> · </span>
-          <span v-if="tvStorageBytes > 0">{{ t('downloads.shows') }} : {{ formatSize(tvStorageBytes) }}</span>
+          <span v-if="tvStorageBytes > 0">{{ t('downloads.storageOf', { type: t('downloads.shows'), size: formatSize(tvStorageBytes) }) }}</span>
           <span v-if="(movieStorageBytes > 0 || tvStorageBytes > 0) && musicStorageBytes > 0"> · </span>
-          <span v-if="musicStorageBytes > 0">{{ t('downloads.music') }} : {{ formatSize(musicStorageBytes) }}</span>
+          <span v-if="musicStorageBytes > 0">{{ t('downloads.storageOf', { type: t('downloads.music'), size: formatSize(musicStorageBytes) }) }}</span>
         </div>
 
         <!-- Movies -->

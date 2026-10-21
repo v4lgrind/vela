@@ -78,7 +78,7 @@ const error = ref('');
 const listeners: PluginListenerHandle[] = [];
 
 const description = computed(() => {
-  if (step.value === 'enterPin') return `Enter the code shown on ${pairingDevice.value?.name}.`;
+  if (step.value === 'enterPin') return t('airplay.enterCode', { name: pairingDevice.value?.name ?? '' });
   if (audioStore.airplayDevice) return t('airplay.playingThrough');
   return t('airplay.description');
 });

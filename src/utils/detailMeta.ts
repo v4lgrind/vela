@@ -24,7 +24,9 @@ export function metaParts(item: BaseItemDto, t: Translate, episodeCount = item.C
 
 /** Image behind a detail hero: seasons and episodes borrow the series backdrop. */
 export function heroImage(item: BaseItemDto): { itemId: string; type: 'Backdrop' | 'Primary' } {
-  if (item.Type === 'Season' || item.Type === 'Episode') {
+  // Episodes always asked the series for a backdrop; a season only does when the series has one,
+  // otherwise its own poster beats a 404.
+  if (item.Type === 'Episode' || (item.Type === 'Season' && item.ParentBackdropImageTags?.length)) {
     const parent = item.ParentBackdropItemId || item.SeriesId;
     if (parent) return { itemId: parent, type: 'Backdrop' };
   }

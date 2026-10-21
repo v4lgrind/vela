@@ -14,4 +14,10 @@ describe('cn', () => {
     expect(cn('p-2', 'p-4')).toBe('p-4');
     expect(cn('text-red-500', 'text-blue-500')).toBe('text-blue-500');
   });
+
+  it('keeps the app font-size tokens next to text colours', () => {
+    expect(cn('text-page font-bold text-text-heading')).toBe('text-page font-bold text-text-heading');
+    expect(cn('text-text-primary', 'text-caption')).toBe('text-text-primary text-caption');
+    expect(cn('text-body', 'text-caption')).toBe('text-caption');
+  });
 });

@@ -1,4 +1,5 @@
 import { i18n } from '@/i18n';
+import { isAudioRevertNotice } from '@/utils/playerNotices';
 import { ref, watch, nextTick, type Ref } from 'vue';
 import Hls from 'hls.js';
 import { usePreferencesStore } from '@/store/preferences-store';
@@ -512,7 +513,7 @@ export function useWebPlayer(
             }
 
             // Clear the revert notice once the player has recovered
-            setTimeout(() => { if (error.value?.startsWith('Audio switch failed')) error.value = null; }, 3000);
+            setTimeout(() => { if (isAudioRevertNotice(error.value)) error.value = null; }, 3000);
         } catch (e) {
             logger.error('[rollbackAudio] failed:', e);
             error.value = i18n.global.t('player.errors.generic');

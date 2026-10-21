@@ -1,5 +1,7 @@
 <template>
-  <router-view :key="route.path" :style="routerViewStyle" />
+  <div :style="{ marginLeft: shellStyle.marginLeft }">
+    <router-view :key="route.path" :style="{ paddingBottom: shellStyle.paddingBottom }" />
+  </div>
   <MiniAudioPlayer
     v-if="isAuthenticated && audioStore.isMiniPlayerVisible && !audioStore.isExpanded"
   />
@@ -23,6 +25,7 @@ import { useDpadNavigation } from "@/composables/useDpadNavigation";
 import { usePlatform } from "@/composables/usePlatform";
 import { useBottomNavVisible } from "@/composables/useBottomNav";
 import { useWideLayout } from "@/composables/useWideLayout";
+import { contentStyle } from "@/utils/shellLayout";
 import { App as CapacitorApp } from "@capacitor/app";
 import { StatusBar, Style } from "@capacitor/status-bar";
 import { NativeVideo } from "@/plugins/NativeVideoPlugin";
@@ -172,28 +175,9 @@ onMounted(async () => {
   }
 });
 
-const routerViewStyle = computed(() => {
-  const miniVisible = audioStore.isMiniPlayerVisible && !audioStore.isExpanded;
-  // Bottom nav floats ~66px tall with a 16px offset + an 8px gap; reserve that
-  // (plus the gesture-bar inset) so page content never hides behind it. The
-  // mini player stacks above the nav, so add its height on top when both show.
-  const navClear = "98px";
-  // Wide screens: the nav is a left rail, so reserve its width instead.
-  if (showBottomNav.value && wide.value) {
-    return {
-      paddingLeft: "calc(88px + var(--sal, env(safe-area-inset-left, 0px)))",
-      paddingBottom: miniVisible ? "72px" : undefined,
-    };
-  }
-  if (showBottomNav.value && miniVisible) {
-    return { paddingBottom: `calc(${navClear} + 64px + var(--sab, env(safe-area-inset-bottom, 0px)))` };
-  }
-  if (showBottomNav.value) {
-    return { paddingBottom: `calc(${navClear} + var(--sab, env(safe-area-inset-bottom, 0px)))` };
-  }
-  if (miniVisible) {
-    return { paddingBottom: "72px" };
-  }
-  return {};
-});
+const shellStyle = computed(() => contentStyle({
+  navVisible: showBottomNav.value,
+  wide: wide.value,
+  miniVisible: audioStore.isMiniPlayerVisible && !audioStore.isExpanded,
+}));
 </script>

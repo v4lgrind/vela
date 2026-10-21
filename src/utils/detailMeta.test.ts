@@ -27,8 +27,13 @@ describe('metaParts', () => {
 
 describe('heroImage', () => {
   it('uses the series backdrop for a season instead of its poster', () => {
-    const season = { Type: 'Season', Id: 's1', SeriesId: 'x', ParentBackdropItemId: 'x' } as BaseItemDto;
+    const season = { Type: 'Season', Id: 's1', SeriesId: 'x', ParentBackdropItemId: 'x', ParentBackdropImageTags: ['t'] } as BaseItemDto;
     expect(heroImage(season)).toEqual({ itemId: 'x', type: 'Backdrop' });
+  });
+
+  it('falls back to the season poster when the series has no backdrop', () => {
+    const season = { Type: 'Season', Id: 's1', SeriesId: 'x', ParentBackdropImageTags: [] } as BaseItemDto;
+    expect(heroImage(season)).toEqual({ itemId: 's1', type: 'Primary' });
   });
 
   it('uses the item backdrop when it has one, else its primary image', () => {

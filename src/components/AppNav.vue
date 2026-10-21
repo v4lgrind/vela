@@ -17,17 +17,17 @@
   <!-- Phones and portrait tablets: floating bottom bar. -->
   <nav
     v-else
-    class="fixed left-3 right-3 z-40 flex h-[66px] items-center justify-around rounded-[25px] border border-border-default
+    class="fixed left-3 right-3 z-40 flex h-[66px] items-center rounded-[25px] border border-border-default
            bg-nav-bg px-2 shadow-[0_8px_30px_-12px_rgba(0,0,0,0.5)] backdrop-blur-xl"
     :style="barStyle">
     <RouterLink
       v-for="tab in tabs" :key="tab.section"
       :to="{ name: tab.route }"
       :aria-current="section === tab.section ? 'page' : undefined"
-      class="flex min-w-14 flex-col items-center gap-1 px-2 py-1 text-label font-medium transition-colors"
+      class="flex min-w-0 flex-1 flex-col items-center gap-1 px-0.5 py-1 text-label font-medium transition-colors"
       :class="section === tab.section ? 'text-accent-purple' : 'text-text-subtle'">
       <component :is="tab.icon" class="size-[22px]" :stroke-width="1.8" />
-      {{ t(tab.label) }}
+      <span class="max-w-full truncate">{{ t(tab.label) }}</span>
     </RouterLink>
   </nav>
 </template>

@@ -193,7 +193,8 @@
     "confirmDeleteSeries": "Delete the {n} episode of \"{name}\"? | Delete all {n} episodes of \"{name}\"?",
     "confirmDeleteSeason": "Delete the {n} episode of season {season}? | Delete all {n} episodes of season {season}?",
     "deleteEpisodesFailed": "Could not delete some episodes",
-    "seasons": "{n} season | {n} seasons"
+    "seasons": "{n} season | {n} seasons",
+    "storageOf": "{type}: {size}"
   },
   "settings": {
     "title": "Settings",
@@ -288,7 +289,8 @@
     "playingThrough": "Music is playing through AirPlay.",
     "description": "Play the music on an Apple TV or AirPlay speaker.",
     "pairFailed": "Pairing failed, check the code and try again.",
-    "connectionLost": "connection lost"
+    "connectionLost": "connection lost",
+    "enterCode": "Enter the code shown on {name}."
   },
   "transcode": {
     "title": "Download options",

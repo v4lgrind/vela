@@ -1,7 +1,7 @@
 <template>
   <div
     class="fixed inset-x-0 h-16 bg-surface-raised/95 backdrop-blur-sm z-90 flex flex-col cursor-pointer"
-    :class="aboveBar ? '' : 'safe-pb bottom-0'"
+    :class="positionStyle ? '' : 'safe-pb bottom-0'"
     :style="positionStyle"
     @click="expand">
     <!-- Progress bar -->
@@ -50,6 +50,7 @@ import { Button } from '@/components/ui/button';
 import { Airplay, Cast, SkipBack, SkipForward, Play, Pause, X } from 'lucide-vue-next';
 import { useBottomNavVisible } from '@/composables/useBottomNav';
 import { useWideLayout } from '@/composables/useWideLayout';
+import { miniPlayerStyle } from '@/utils/shellLayout';
 
 const { t } = useI18n();
 const audioStore = useAudioPlayerStore();
@@ -60,12 +61,7 @@ const jellyfinStore = useJellyfinStore();
 // On wide screens the nav is a left rail: stay at the bottom, right of the rail.
 const navVisible = useBottomNavVisible();
 const wide = useWideLayout();
-const aboveBar = computed(() => navVisible.value && !wide.value);
-const positionStyle = computed(() => {
-  if (aboveBar.value) return { bottom: 'calc(90px + var(--sab, env(safe-area-inset-bottom, 0px)))' };
-  if (navVisible.value) return { left: 'calc(88px + var(--sal, env(safe-area-inset-left, 0px)))' };
-  return undefined;
-});
+const positionStyle = computed(() => miniPlayerStyle({ navVisible: navVisible.value, wide: wide.value }));
 
 const currentTrack = computed(() => audioStore.currentTrack);
 

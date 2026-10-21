@@ -193,7 +193,8 @@
     "confirmDeleteSeries": "Supprimer l’épisode de « {name} » ? | Supprimer les {n} épisodes de « {name} » ?",
     "confirmDeleteSeason": "Supprimer l’épisode de la saison {season} ? | Supprimer les {n} épisodes de la saison {season} ?",
     "deleteEpisodesFailed": "Certains épisodes n’ont pas pu être supprimés",
-    "seasons": "{n} saison | {n} saisons"
+    "seasons": "{n} saison | {n} saisons",
+    "storageOf": "{type} : {size}"
   },
   "settings": {
     "title": "Réglages",
@@ -288,7 +289,8 @@
     "playingThrough": "La musique est diffusée via AirPlay.",
     "description": "Écoutez la musique sur une Apple TV ou une enceinte AirPlay.",
     "pairFailed": "L'appairage a échoué, vérifiez le code et réessayez.",
-    "connectionLost": "connexion perdue"
+    "connectionLost": "connexion perdue",
+    "enterCode": "Saisissez le code affiché sur {name}."
   },
   "transcode": {
     "title": "Options de téléchargement",

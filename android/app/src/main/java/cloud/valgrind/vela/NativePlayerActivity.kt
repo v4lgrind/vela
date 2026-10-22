@@ -17,6 +17,7 @@ import android.os.Looper
 import android.util.TypedValue
 import android.view.GestureDetector
 import android.view.MotionEvent
+import android.view.ScaleGestureDetector
 import android.view.ViewConfiguration
 import android.view.View
 import android.view.ViewGroup
@@ -52,6 +53,7 @@ import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.MediaSession
+import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerNotificationManager
 import androidx.media3.ui.PlayerView
 import org.json.JSONArray
@@ -140,6 +142,7 @@ class NativePlayerActivity : AppCompatActivity() {
     private lateinit var seekFeedbackBack: LinearLayout
     private lateinit var seekFeedbackFwd: LinearLayout
     private lateinit var gestureDetector: GestureDetectorCompat
+    private lateinit var scaleDetector: ScaleGestureDetector
 
     private val handler = Handler(Looper.getMainLooper())
     private var controlsVisible = true
@@ -441,6 +444,25 @@ class NativePlayerActivity : AppCompatActivity() {
                 controlsOverlay.visibility = View.INVISIBLE
                 controlsVisible = false
                 showScrubOverlay(scrubStartPositionMs)
+            }
+        })
+
+        // Pinch out fills the screen (cropping the edges), pinch in shows the whole frame.
+        scaleDetector = ScaleGestureDetector(this, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+            private var pinchScale = 1f
+            override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
+                pinchScale = 1f
+                return !isScrubbing
+            }
+            override fun onScale(detector: ScaleGestureDetector): Boolean {
+                pinchScale *= detector.scaleFactor
+                return true
+            }
+            override fun onScaleEnd(detector: ScaleGestureDetector) {
+                when {
+                    pinchScale > 1.1f -> playerView.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                    pinchScale < 0.9f -> playerView.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                }
             }
         })
 
@@ -1625,6 +1647,7 @@ class NativePlayerActivity : AppCompatActivity() {
 
     override fun dispatchTouchEvent(ev: MotionEvent?): Boolean {
         if (ev != null) {
+            scaleDetector.onTouchEvent(ev)
             gestureDetector.onTouchEvent(ev)
             when (ev.action) {
                 MotionEvent.ACTION_MOVE -> {

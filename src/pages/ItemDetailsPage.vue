@@ -64,29 +64,29 @@
                           <div class="mx-auto max-w-[1200px] px-gutter md:px-gutter-wide">
                             <!-- Breadcrumb -->
                             <div v-if="item.SeriesId || item.SeasonId"
-                                class="flex items-center gap-1.5 text-sm text-white/70 mb-1.5">
+                                class="flex items-center gap-1.5 text-sm text-text-muted mb-1.5">
                                 <button v-if="item.SeriesId" @click="goToItem(item.SeriesId)"
-                                    class="hover:text-white transition-colors cursor-pointer">{{ item.SeriesName }}</button>
-                                <span v-if="item.SeriesId && item.SeasonId" class="text-white/40">/</span>
+                                    class="hover:text-text-heading transition-colors cursor-pointer">{{ item.SeriesName }}</button>
+                                <span v-if="item.SeriesId && item.SeasonId" class="text-text-subtle">/</span>
                                 <button v-if="item.SeasonId" @click="goToItem(item.SeasonId)"
-                                    class="hover:text-white transition-colors cursor-pointer">{{ item.SeasonName }}</button>
+                                    class="hover:text-text-heading transition-colors cursor-pointer">{{ item.SeasonName }}</button>
                             </div>
-                            <h1 class="line-clamp-2 text-page sm:text-4xl font-bold text-white leading-tight tracking-tight mb-2">{{ item.Name }}</h1>
-                            <div v-if="item.Type === 'MusicAlbum' && item.AlbumArtists?.length" class="flex flex-wrap gap-x-2 mb-1.5 text-[15px] font-semibold text-white/85">
+                            <h1 class="line-clamp-2 text-page sm:text-4xl font-bold text-text-heading leading-tight tracking-tight mb-2">{{ item.Name }}</h1>
+                            <div v-if="item.Type === 'MusicAlbum' && item.AlbumArtists?.length" class="flex flex-wrap gap-x-2 mb-1.5 text-[15px] font-semibold text-text-primary">
                                 <button v-for="artist in item.AlbumArtists" :key="artist.Id" @click="goToItem(artist.Id)"
-                                    class="hover:text-white underline-offset-4 hover:underline cursor-pointer">{{ artist.Name }}</button>
+                                    class="hover:text-text-heading underline-offset-4 hover:underline cursor-pointer">{{ artist.Name }}</button>
                             </div>
-                            <div class="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[12.5px] text-white/80">
+                            <div class="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[12.5px] text-text-primary">
                                 <template v-for="(part, i) in heroMeta" :key="part">
-                                    <span v-if="i" class="text-white/40">·</span>
+                                    <span v-if="i" class="text-text-subtle">·</span>
                                     <span>{{ part }}</span>
                                 </template>
                                 <template v-if="item.CommunityRating">
-                                    <span class="text-white/40">·</span>
-                                    <span class="text-yellow-300 font-semibold">★ {{ item.CommunityRating.toFixed(1) }}</span>
+                                    <span class="text-text-subtle">·</span>
+                                    <span class="text-amber-500 font-semibold">★ {{ item.CommunityRating.toFixed(1) }}</span>
                                 </template>
-                                <span v-if="videoResolution" class="ml-1 px-2 py-0.5 rounded-md bg-white/16 text-[10.5px] font-semibold">{{ videoResolution }}</span>
-                                <span v-if="videoCodec" class="px-2 py-0.5 rounded-md bg-white/16 text-[10.5px] font-semibold uppercase">{{ videoCodec }}</span>
+                                <span v-if="videoResolution" class="ml-1 px-2 py-0.5 rounded-md bg-text-heading/15 text-[10.5px] font-semibold">{{ videoResolution }}</span>
+                                <span v-if="videoCodec" class="px-2 py-0.5 rounded-md bg-text-heading/15 text-[10.5px] font-semibold uppercase">{{ videoCodec }}</span>
                             </div>
                           </div>
                         </div>

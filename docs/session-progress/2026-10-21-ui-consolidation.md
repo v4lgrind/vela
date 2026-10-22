@@ -24,10 +24,15 @@ Spec: `docs/superpowers/specs/2026-10-21-ui-consolidation-design.md` · Plan:
 - **Native Android**: `res/values/strings.xml` (EN) + `res/values-fr/strings.xml`:
   download notifications, native player (labels, sheets, info panel), Android Auto folders.
 
-## Not verified on device
-The tablet and the phone stayed locked (secure lock screen) for the whole run:
-**no screenshots of the new screens**. Build + 157 tests green, Docker APK OK
-(versionCode 6, in `out/vela.apk`).
+## Device check (2026-10-22, tablet OPD2304, versionCode 7)
+Checked on the tablet: rail in landscape, bottom bar in portrait, Home, Libraries,
+Series grid + A–Z index (M → 12 results), series detail, Settings dark + light.
+Two bugs found and fixed (test RED→GREEN each, suite 160/160):
+- Light theme: detail hero title/meta were fixed white on the light fade → theme tokens.
+- Back from a tab (Library → detail → Settings → back) left the Settings tab active →
+  each history entry now stores its nav section (`history.state.navSection`).
+Not checked: phone (disconnected), system language in English, download notification,
+native player info panel.
 
 ## Next
 1. Unlock the tablet → install `out/vela.apk` (or rebuild with versionCode 6) and go through:

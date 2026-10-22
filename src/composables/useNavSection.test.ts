@@ -19,4 +19,13 @@ describe('resolveNavSection', () => {
     expect(resolveNavSection('ItemDetails', null)).toBe('home');
     expect(resolveNavSection(undefined, null)).toBe('home');
   });
+
+  it('restores the section stored on a history entry when going back to it', () => {
+    // Library → detail → Settings → back: the detail entry remembers Library.
+    expect(resolveNavSection('ItemDetails', 'settings', 'library')).toBe('library');
+  });
+
+  it('ignores a stored section on tab routes', () => {
+    expect(resolveNavSection('settings', 'library', 'library')).toBe('settings');
+  });
 });

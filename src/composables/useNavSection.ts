@@ -13,22 +13,36 @@ const TAB_ROUTES: Record<string, NavSection> = {
   logs: 'settings',
 };
 
-/** Tab routes own their section; detail routes inherit the tab they were opened from. */
-export function resolveNavSection(routeName: string | undefined, previous: NavSection | null): NavSection {
-  return (routeName && TAB_ROUTES[routeName]) || previous || 'home';
+/**
+ * Tab routes own their section; detail routes keep the section stored on their history
+ * entry (set when first opened), else inherit the tab they were opened from.
+ */
+export function resolveNavSection(
+  routeName: string | undefined,
+  previous: NavSection | null,
+  stored?: NavSection,
+): NavSection {
+  return (routeName && TAB_ROUTES[routeName]) || stored || previous || 'home';
 }
 
 // Shared across the app so every consumer agrees on the section we came from.
 const lastTab = ref<NavSection | null>(null);
+const current = ref<NavSection>('home');
 
 export function useNavSection(): ComputedRef<NavSection> {
   const route = useRoute();
   watch(
-    () => route.name?.toString(),
-    (name) => {
-      if (name && TAB_ROUTES[name]) lastTab.value = TAB_ROUTES[name];
+    () => route.fullPath,
+    () => {
+      const stored = window.history.state?.navSection as NavSection | undefined;
+      current.value = resolveNavSection(route.name?.toString(), lastTab.value, stored);
+      lastTab.value = current.value;
+      // Remember it on this history entry so going back here restores the same tab.
+      if (stored !== current.value) {
+        window.history.replaceState({ ...window.history.state, navSection: current.value }, '');
+      }
     },
     { immediate: true },
   );
-  return computed(() => resolveNavSection(route.name?.toString(), lastTab.value));
+  return computed(() => current.value);
 }

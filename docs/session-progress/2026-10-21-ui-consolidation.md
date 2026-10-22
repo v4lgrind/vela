@@ -31,8 +31,12 @@ Two bugs found and fixed (test RED→GREEN each, suite 160/160):
 - Light theme: detail hero title/meta were fixed white on the light fade → theme tokens.
 - Back from a tab (Library → detail → Settings → back) left the Settings tab active →
   each history entry now stores its nav section (`history.state.navSection`).
-Not checked: phone (disconnected), system language in English, download notification,
-native player info panel.
+Rail narrowed 88 → 72px (highlight around the icon only), validated by the user.
+Phone (Pixel 10): Home, Library, Series grid, bottom bar OK; English checked via per-app
+locale (`cmd locale set-app-locales … --locales en-US`, then reset with `""`).
+Fixed on phone: library card Play/Watched buttons were 40px and covered the posters →
+28px visual + 44px hit area (`after:-inset-2`), gap 16px.
+Download notification and native player info panel: tested by the user, OK.
 
 ## Next
 1. Unlock the tablet → install `out/vela.apk` (or rebuild with versionCode 6) and go through:

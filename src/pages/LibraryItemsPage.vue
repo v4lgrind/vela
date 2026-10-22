@@ -121,22 +121,22 @@
 
             <!-- Action overlay: always visible on mobile, hover-only on desktop -->
             <div v-if="!isSquare(item) && item.Type !== 'BoxSet'"
-              class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent flex items-end justify-center gap-2 pb-2 transition-opacity duration-200 sm:opacity-0 sm:group-hover:opacity-100 pointer-events-none">
+              class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent flex items-end justify-center gap-4 pb-2.5 transition-opacity duration-200 sm:opacity-0 sm:group-hover:opacity-100 pointer-events-none">
               <button
                 @click.prevent.stop="playItem(item)"
                 :disabled="playingId === item.Id"
-                class="flex size-10 items-center justify-center bg-white/90 hover:bg-white text-black rounded-full shadow-lg transition-all active:scale-95 disabled:opacity-60 pointer-events-auto"
+                class="relative flex size-7 items-center justify-center after:absolute after:-inset-2 after:content-[''] bg-white/90 hover:bg-white text-black rounded-full shadow-lg transition-all active:scale-95 disabled:opacity-60 pointer-events-auto"
                 :aria-label="t('common.play')">
-                <Loader2 v-if="playingId === item.Id" class="size-4 animate-spin" />
-                <Play v-else class="size-4 fill-black stroke-none" />
+                <Loader2 v-if="playingId === item.Id" class="size-3.5 animate-spin" />
+                <Play v-else class="size-3.5 fill-black stroke-none" />
               </button>
               <button
                 @click.prevent.stop="toggleWatched(item)"
                 :disabled="watchingId === item.Id"
-                class="flex size-10 items-center justify-center rounded-full shadow-lg transition-all active:scale-95 disabled:opacity-60 pointer-events-auto"
+                class="relative flex size-7 items-center justify-center after:absolute after:-inset-2 after:content-[''] rounded-full shadow-lg transition-all active:scale-95 disabled:opacity-60 pointer-events-auto"
                 :class="item.UserData?.Played ? 'bg-accent-purple text-accent-ink' : 'bg-white/90 hover:bg-white text-black'"
                 :aria-label="item.UserData?.Played ? t('common.markUnwatched') : t('common.markWatched')">
-                <Check class="size-4" />
+                <Check class="size-3.5" />
               </button>
             </div>
           </div>

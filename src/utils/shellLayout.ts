@@ -1,7 +1,7 @@
 // Space the app shell (nav bar or rail, mini player) takes around the routed page.
 // --sab/--sal are the measured insets (MainActivity), env() is the web fallback.
 const SAB = 'var(--sab, env(safe-area-inset-bottom, 0px))';
-const RAIL = 'calc(88px + var(--sal, env(safe-area-inset-left, 0px)))';
+const RAIL = 'calc(72px + var(--sal, env(safe-area-inset-left, 0px)))';
 // Floating bar: 66px tall, 16px offset, 8px gap. Mini player: 64px.
 const BAR_CLEAR = '98px';
 const MINI = '64px';

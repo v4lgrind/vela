@@ -27,3 +27,21 @@ describe('AppNav bottom bar', () => {
     }
   });
 });
+
+describe('AppNav rail', () => {
+  it('stays 72px wide in landscape, the highlight hugging the icon only', async () => {
+    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() })));
+    const Blank = { template: '<div />' };
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: ['libraries', 'libraryList', 'search', 'offline', 'settings'].map((name) => ({ path: `/${name}`, name, component: Blank })),
+    });
+    router.push('/libraries');
+    await router.isReady();
+    const wrapper = mount(AppNav, { global: { plugins: [router, i18n] } });
+    expect(wrapper.get('nav').classes()).toContain('w-[72px]');
+    const active = wrapper.get('a[aria-current="page"]');
+    expect(active.classes().join(' ')).not.toMatch(/bg-/);
+    expect(active.get('span').classes().join(' ')).toMatch(/bg-accent-purple/);
+  });
+});

@@ -2,15 +2,20 @@
   <!-- Wide screens (tablet landscape, desktop): vertical rail on the left. -->
   <nav
     v-if="wide"
-    class="fixed inset-y-0 left-0 z-40 flex w-[88px] flex-col items-center gap-2 border-r border-border-default
+    class="fixed inset-y-0 left-0 z-40 flex w-[72px] flex-col items-center gap-3 border-r border-border-default
            bg-nav-bg pt-[calc(var(--sat,env(safe-area-inset-top,0px))+16px)] backdrop-blur-xl">
     <RouterLink
       v-for="tab in tabs" :key="tab.section"
       :to="{ name: tab.route }"
       :aria-current="section === tab.section ? 'page' : undefined"
-      class="flex w-[72px] flex-col items-center gap-1 rounded-2xl py-2.5 text-label font-medium transition-colors"
-      :class="section === tab.section ? 'bg-accent-purple/12 text-accent-purple' : 'text-text-subtle'">
-      <component :is="tab.icon" class="size-6" :stroke-width="1.8" />
+      class="flex w-full flex-col items-center gap-1 py-1 text-label font-medium transition-colors"
+      :class="section === tab.section ? 'text-accent-purple' : 'text-text-subtle'">
+      <!-- Active highlight hugs the icon only, so the rail stays narrow. -->
+      <span
+        class="flex h-8 w-14 items-center justify-center rounded-full transition-colors"
+        :class="section === tab.section && 'bg-accent-purple/12'">
+        <component :is="tab.icon" class="size-6" :stroke-width="1.8" />
+      </span>
       {{ t(tab.label) }}
     </RouterLink>
   </nav>

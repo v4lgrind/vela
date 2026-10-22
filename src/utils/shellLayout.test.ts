@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { contentStyle, miniPlayerStyle } from './shellLayout';
 
 const SAB = 'var(--sab, env(safe-area-inset-bottom, 0px))';
-const RAIL = 'calc(88px + var(--sal, env(safe-area-inset-left, 0px)))';
+const RAIL = 'calc(72px + var(--sal, env(safe-area-inset-left, 0px)))';
 
 describe('contentStyle', () => {
   it('offsets the page by the rail (margin, so the page keeps its own gutter) and reserves the bottom inset', () => {

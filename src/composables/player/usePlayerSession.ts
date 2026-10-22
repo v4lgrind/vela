@@ -9,6 +9,7 @@ import {
     getDeviceCapabilities,
     getDisplayBoundsForSource,
     getRecommendedNativeTranscodeBitrate,
+    withAacTranscodeAudio,
     withDeviceAudioCodecs,
 } from '@/utils/codecDetection';
 import { buildPlaybackUrl, withMaxVideoSize } from '@/utils/playbackUrl';
@@ -265,8 +266,9 @@ export function usePlayerSession(videoEl: Ref<HTMLVideoElement | null>, isNative
             }
             : baseDeviceProfile.DeviceProfile;
 
+        const transcodeProfile = transcodeAudio ? withAacTranscodeAudio(patchedDeviceProfile) : patchedDeviceProfile;
         const baseProfile = stripDirectPlay
-            ? { ...patchedDeviceProfile, DirectPlayProfiles: [], MaxStreamingBitrate: bitrateCap }
+            ? { ...transcodeProfile, DirectPlayProfiles: [], MaxStreamingBitrate: bitrateCap }
             : patchedDeviceProfile;
 
         // AllowVideoStreamCopy: false forces a real re-encode so the bitrate cap

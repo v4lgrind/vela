@@ -11,6 +11,7 @@ import {
   getVideoMime,
   isAudioStreamSupported,
   isDolbyVision,
+  withAacTranscodeAudio,
   withDeviceAudioCodecs,
 } from './codecDetection';
 
@@ -140,6 +141,24 @@ describe('withDeviceAudioCodecs', () => {
 
   it('leaves the profile unchanged when device capabilities are unavailable', () => {
     expect(withDeviceAudioCodecs(profile, { ...capabilities, androidApi: 0 })).toBe(profile);
+  });
+});
+
+describe('withAacTranscodeAudio', () => {
+  it('makes AAC the only audio target of video transcodes', () => {
+    // With 'aac,eac3,ac3' Jellyfin keeps an E-AC3 Atmos source's codec as the
+    // target, then serves MP3 under an HLS CODECS list with no audio codec, so
+    // ExoPlayer exposes no audio track.
+    const result = withAacTranscodeAudio({
+      TranscodingProfiles: [
+        { Container: 'ts', Type: 'Video', AudioCodec: 'aac,eac3,ac3' },
+        { Container: 'mp3', Type: 'Audio', AudioCodec: 'mp3' },
+      ],
+    });
+    expect(result.TranscodingProfiles).toEqual([
+      { Container: 'ts', Type: 'Video', AudioCodec: 'aac' },
+      { Container: 'mp3', Type: 'Audio', AudioCodec: 'mp3' },
+    ]);
   });
 });
 

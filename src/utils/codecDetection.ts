@@ -145,6 +145,22 @@ export function withDeviceAudioCodecs<T extends {
   };
 }
 
+/**
+ * Make AAC the only audio target of video transcodes. When the source audio
+ * must be re-encoded, a list like 'aac,eac3,ac3' lets Jellyfin keep the
+ * source codec (E-AC3 Atmos) as the target; it then serves MP3 under an HLS
+ * CODECS list without an audio codec, and ExoPlayer exposes no audio track.
+ */
+export function withAacTranscodeAudio<T extends { TranscodingProfiles?: CodecListProfile[] }>(
+  deviceProfile: T,
+): T {
+  return {
+    ...deviceProfile,
+    TranscodingProfiles: deviceProfile.TranscodingProfiles
+      ?.map(profile => (profile.Type === 'Video' ? { ...profile, AudioCodec: 'aac' } : profile)),
+  };
+}
+
 export async function canHardwareDecodeVideo(stream: MediaStream): Promise<VideoDecodeResult> {
   const mime = getVideoMime(stream);
   if (!mime) {

@@ -10,6 +10,16 @@ import { Capacitor } from '@capacitor/core';
 import { DownloadPlugin } from '@/plugins/DownloadPlugin';
 import { logger } from '@/utils/logger';
 
+/** Background jobs in flight: a second call joins the running one instead of racing it. */
+const running = new Map<string, Promise<void>>();
+function once(key: string, job: () => Promise<void>): Promise<void> {
+  const current = running.get(key);
+  if (current) return current;
+  const started = job().finally(() => running.delete(key));
+  running.set(key, started);
+  return started;
+}
+
 interface State {
   downloads: DownloadedMedia[];
   syncInProgress: boolean;
@@ -158,7 +168,8 @@ export const useOfflineStore = defineStore('offline', {
         // Records saved before sizes and library ids were stored: fix them in the background.
         this.backfillSizes()
           .then(() => this.backfillLibraryIds())
-          .then(() => this.refreshDownloadedUserData())
+          // Progress watched offline before the app was closed goes out now (then user data is refreshed).
+          .then(() => this.syncWatchProgress())
           .then(() => this.cacheLibraryArtwork())
           .catch((error) => logger.error('[OfflineStore] Backfill failed:', error));
       } catch (error) {
@@ -212,7 +223,7 @@ export const useOfflineStore = defineStore('offline', {
           try {
             const detailed = await jellyfinStore.fetchItemDetails(download.itemId);
             metadata = { ...metadata, ...detailed };
-            await offlineDatabase.addDownload({ ...download, jellyfinItem: metadata });
+            await offlineDatabase.patchDownload(download.itemId, { jellyfinItem: metadata });
           } catch (error) {
             complete = false;
             logger.warn('[OfflineStore] Could not refresh downloaded metadata:', download.itemId, error);
@@ -356,21 +367,23 @@ export const useOfflineStore = defineStore('offline', {
     },
 
     /** Library of each download, from Jellyfin, for records that lack it (online only). */
-    async backfillLibraryIds() {
-      if (!this.isFullyOnline) return;
-      const jellyfinStore = useJellyfinStore();
-      if (!jellyfinStore.serverUrl || !jellyfinStore.accessToken) return;
-      const missing = this.downloads.filter((download) => !download.libraryId);
-      if (!missing.length) return;
-      for (const download of missing) {
-        try {
-          const libraryId = await jellyfinStore.fetchLibraryIdOf(download.itemId);
-          if (libraryId) await offlineDatabase.addDownload({ ...download, libraryId });
-        } catch (error) {
-          logger.warn('[OfflineStore] Could not find the library of', download.itemId, error);
+    backfillLibraryIds(): Promise<void> {
+      return once('libraryIds', async () => {
+        if (!this.isFullyOnline) return;
+        const jellyfinStore = useJellyfinStore();
+        if (!jellyfinStore.serverUrl || !jellyfinStore.accessToken) return;
+        const missing = this.downloads.filter((download) => !download.libraryId);
+        if (!missing.length) return;
+        for (const download of missing) {
+          try {
+            const libraryId = await jellyfinStore.fetchLibraryIdOf(download.itemId);
+            if (libraryId) await offlineDatabase.patchDownload(download.itemId, { libraryId });
+          } catch (error) {
+            logger.warn('[OfflineStore] Could not find the library of', download.itemId, error);
+          }
         }
-      }
-      await this.loadDownloads();
+        await this.loadDownloads();
+      });
     },
 
     /**
@@ -386,7 +399,7 @@ export const useOfflineStore = defineStore('offline', {
         const userData = new Map(items.map((item) => [item.Id, item.UserData]));
         for (const download of this.downloads) {
           const fresh = userData.get(download.itemId);
-          if (fresh) await offlineDatabase.addDownload({ ...download, jellyfinItem: { ...download.jellyfinItem, UserData: fresh } });
+          if (fresh) await offlineDatabase.patchDownload(download.itemId, { jellyfinItem: { ...download.jellyfinItem, UserData: fresh } });
         }
         await this.loadDownloads();
       } catch (error) {
@@ -402,7 +415,7 @@ export const useOfflineStore = defineStore('offline', {
       for (const download of missing) {
         try {
           const { size } = await DownloadPlugin.size({ uri: download.filePath });
-          await offlineDatabase.addDownload({ ...download, fileSize: size });
+          await offlineDatabase.patchDownload(download.itemId, { fileSize: size });
         } catch (error) {
           logger.warn('[OfflineStore] Could not read the size of', download.itemId, error);
         }

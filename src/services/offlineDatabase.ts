@@ -190,6 +190,30 @@ class OfflineDatabase {
     });
   }
 
+  /**
+   * Merge `patch` into a stored record in one transaction. Does nothing (false)
+   * when the record is gone, so background updates never bring back a
+   * download deleted meanwhile.
+   */
+  public async patchDownload(itemId: string, patch: Partial<DownloadedMedia>): Promise<boolean> {
+    const db = await this.ensureDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(["downloads"], "readwrite");
+      const store = transaction.objectStore("downloads");
+      const read = store.get(itemId);
+      read.onsuccess = () => {
+        if (!read.result) {
+          resolve(false);
+          return;
+        }
+        const write = store.put({ ...read.result, ...JSON.parse(JSON.stringify(patch)) });
+        write.onsuccess = () => resolve(true);
+        write.onerror = () => reject(write.error);
+      };
+      read.onerror = () => reject(read.error);
+    });
+  }
+
   public async getDownload(itemId: string): Promise<DownloadedMedia | null> {
     const db = await this.ensureDB();
     return new Promise((resolve, reject) => {

@@ -91,7 +91,9 @@
       "playlists": "Playlists",
       "shuffleAll": "Lecture aléatoire",
       "shuffleFailed": "Impossible de lancer la lecture aléatoire"
-    }
+    },
+    "downloaded": "Téléchargés",
+    "offlineLocked": "Hors ligne : le filtre reste activé."
   },
   "audio": {
     "playingNext": "Lecture à suivre",

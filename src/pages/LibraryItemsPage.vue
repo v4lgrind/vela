@@ -13,12 +13,16 @@
     <!-- Music library sections: tabs switch what is listed -->
     <Tabs v-if="isMusicLibrary" :model-value="musicTab" class="mb-3" @update:model-value="selectMusicTab($event as MusicTab)">
       <TabsList>
-        <TabsTrigger v-for="tab in MUSIC_TABS" :key="tab.value" :value="tab.value">{{ t(tab.label) }}</TabsTrigger>
+        <TabsTrigger v-for="tab in visibleMusicTabs" :key="tab.value" :value="tab.value">{{ t(tab.label) }}</TabsTrigger>
       </TabsList>
     </Tabs>
 
     <!-- Quick toggle, active filters summary, view mode, sort & filter sheet -->
     <section class="mb-4 flex items-center gap-2">
+      <Toggle variant="outline" class="shrink-0 gap-1.5" :model-value="localMode" :disabled="isOffline"
+        @update:model-value="toggleDownloaded">
+        <WifiOff v-if="isOffline" /><DownloadIcon v-else /> {{ t('library.downloaded') }}
+      </Toggle>
       <Toggle v-if="!isMusicLibrary" variant="outline" class="shrink-0 gap-1.5"
         :model-value="unplayedOnly" @update:model-value="toggleUnplayed">
         <EyeOff /> {{ t('library.unwatched') }}
@@ -46,6 +50,7 @@
         </span>
       </Button>
     </section>
+    <p v-if="isOffline" class="-mt-2 mb-3 text-caption text-text-muted">{{ t('library.offlineLocked') }}</p>
 
     <Drawer v-model:open="sheetOpen" :should-scale-background="false">
       <DrawerContent class="max-h-[85dvh] border-border-default bg-surface md:mx-auto md:max-w-xl">
@@ -252,7 +257,7 @@
 </template>
 
 <script setup lang="ts">
-import { onActivated, onMounted, ref, computed } from 'vue';
+import { onActivated, onMounted, ref, computed, watch } from 'vue';
 import { useIntersectionObserver } from '@vueuse/core';
 import { useRetryWhileFailed } from '@/composables/useRetryWhileFailed';
 import { useI18n } from 'vue-i18n';
@@ -273,9 +278,13 @@ import { Drawer, DrawerClose, DrawerContent, DrawerDescription, DrawerTitle } fr
 import { AppPage, PageHeader } from '@/components/layout';
 import AlphaIndex from '@/components/AlphaIndex.vue';
 import { formatDuration } from '@/i18n/format';
-import { Play, Check, Download as DownloadIcon, Loader2, SlidersHorizontal, LayoutGrid, List, Shuffle, EyeOff, Heart } from 'lucide-vue-next';
+import { Play, Check, Download as DownloadIcon, Loader2, SlidersHorizontal, LayoutGrid, List, Shuffle, EyeOff, Heart, WifiOff } from 'lucide-vue-next';
 import { useOfflineStore } from '@/store/offline-store';
 import { useDownloadStore } from '@/store/download-store';
+import { useMetadataCacheStore } from '@/store/metadata-cache-store';
+import { useOfflineArtwork } from '@/composables/useOfflineArtwork';
+import { shuffleAround } from '@/utils/audioQueue';
+import { downloadedTracks, downloadsInLibrary, localGenres, localLibraryPage, type LocalView } from '@/utils/offlineLibrary';
 
 const { t } = useI18n();
 const store = useJellyfinStore();
@@ -331,8 +340,35 @@ const MUSIC_TABS: { value: MusicTab; label: string }[] = [
   { value: 'playlists', label: 'library.music.playlists' },
 ];
 const musicTab = ref<MusicTab>('albums');
-const isMusicLibrary = computed(() =>
-  store.libraries.find((l) => l.Id === libraryId.value)?.CollectionType === 'music');
+const currentLibrary = computed(() =>
+  store.libraries.find((l) => l.Id === libraryId.value) ?? { Id: libraryId.value, CollectionType: undefined });
+const isMusicLibrary = computed(() => currentLibrary.value.CollectionType === 'music');
+
+// "Téléchargés": list only downloaded media, built from the device (forced on offline).
+const metadataCache = useMetadataCacheStore();
+const { artworkUrl, preload } = useOfflineArtwork();
+const downloadedOnly = ref(false);
+const isOffline = computed(() => !offlineStore.isFullyOnline);
+const localMode = computed(() => downloadedOnly.value || isOffline.value);
+// Playlists are never downloaded as a whole: nothing to list with the filter on.
+const visibleMusicTabs = computed(() => MUSIC_TABS.filter((tab) => !localMode.value || tab.value !== 'playlists'));
+let localSeed = 1;
+
+function libraryDownloads() {
+  return downloadsInLibrary(offlineStore.downloads, currentLibrary.value, store.libraries);
+}
+
+function leavePlaylistsTab() {
+  if (localMode.value && musicTab.value === 'playlists') musicTab.value = 'albums';
+}
+
+function toggleDownloaded() {
+  if (isOffline.value) return;
+  downloadedOnly.value = !downloadedOnly.value;
+  leavePlaylistsTab();
+  loadGenres();
+  onFilterChange();
+}
 const showSongList = computed(() => isMusicLibrary.value && musicTab.value === 'songs');
 
 function selectMusicTab(tab: MusicTab) {
@@ -352,6 +388,11 @@ const shuffleLoading = ref(false);
 
 /** Random songs from this library; audioPlayerService adds more as they run out. */
 async function shuffleLibrary() {
+  if (localMode.value) {
+    const tracks = downloadedTracks(libraryDownloads()).map((song) => toAudioTrack(song));
+    if (tracks.length) audioStore.playAlbum(shuffleAround(tracks, Math.floor(Math.random() * tracks.length)), 0);
+    return;
+  }
   const id = libraryId.value;
   shuffleLoading.value = true;
   try {
@@ -395,6 +436,7 @@ type LibraryState = {
   selectedGenres: string[];
   nameStartsWith: string;
   musicTab: MusicTab;
+  downloadedOnly: boolean;
 };
 
 function stateKey(id: string) {
@@ -409,6 +451,7 @@ function restoreLibraryState() {
   selectedGenres.value = [];
   nameStartsWith.value = '';
   musicTab.value = 'albums';
+  downloadedOnly.value = false;
 
   try {
     const saved = sessionStorage.getItem(stateKey(libraryId.value));
@@ -423,6 +466,7 @@ function restoreLibraryState() {
       if (Array.isArray(state.selectedGenres)) selectedGenres.value = state.selectedGenres.filter((g) => typeof g === 'string');
       if (typeof state.nameStartsWith === 'string') nameStartsWith.value = state.nameStartsWith;
       if (MUSIC_TABS.some((t) => t.value === state.musicTab)) musicTab.value = state.musicTab!;
+      downloadedOnly.value = state.downloadedOnly === true;
     }
   } catch (e) {
     logger.warn('Failed to restore library state', e);
@@ -439,6 +483,7 @@ function saveLibraryState() {
       selectedGenres: selectedGenres.value,
       nameStartsWith: nameStartsWith.value,
       musicTab: musicTab.value,
+      downloadedOnly: downloadedOnly.value,
     } satisfies LibraryState));
   } catch (e) {
     logger.warn('Failed to save library state', e);
@@ -474,7 +519,7 @@ const countLabel = computed(() => {
 
 function getImageUrl(id: string, itemType?: string) {
   const isAudio = itemType && isAudioType(itemType);
-  return store.getImageUrl(id, 'Primary', isAudio ? 150 : 130, isAudio ? 150 : 195) || '';
+  return artworkUrl(id, store.getImageUrl(id, 'Primary', isAudio ? 150 : 130, isAudio ? 150 : 195) || '');
 }
 
 function formatRuntime(ticks: number): string {
@@ -499,6 +544,7 @@ function queryOptions() {
 /** First page for the current tab / filters; replaces what was listed. */
 async function loadPage() {
   saveLibraryState();
+  localSeed = Date.now();
   const id = libraryId.value;
   const request = ++pageRequest;
   loading.value = true;
@@ -547,7 +593,26 @@ useIntersectionObserver(sentinel, ([entry]) => {
 
 type PageOptions = ReturnType<typeof queryOptions> & { startIndex: number };
 
-function fetchPage(id: string, opts: PageOptions) {
+function localPage(opts: PageOptions) {
+  const view: LocalView = !isMusicLibrary.value ? 'items'
+    : musicTab.value === 'artists' ? 'artists'
+    : musicTab.value === 'songs' ? 'songs'
+    : 'albums';
+  return localLibraryPage(libraryDownloads(), view, currentLibrary.value.CollectionType, {
+    startIndex: opts.startIndex,
+    limit: opts.limit,
+    sortBy: sortBy.value,
+    sortOrder: sortOrder.value === 'Descending' ? 'Descending' : 'Ascending',
+    unplayedOnly: unplayedOnly.value && !isMusicLibrary.value,
+    favoritesOnly: favoritesOnly.value,
+    genres: selectedGenres.value,
+    nameStartsWith: nameStartsWith.value,
+    seed: localSeed,
+  }, (seriesId) => metadataCache.get(seriesId, true) ?? undefined);
+}
+
+async function fetchPage(id: string, opts: PageOptions) {
+  if (localMode.value) return localPage(opts);
   if (!isMusicLibrary.value) return store.fetchItems(id, opts);
   switch (musicTab.value) {
     case 'artists': return store.fetchAlbumArtists(id, opts);
@@ -558,6 +623,10 @@ function fetchPage(id: string, opts: PageOptions) {
 }
 
 async function loadGenres() {
+  if (localMode.value) {
+    availableGenres.value = localGenres(libraryDownloads().map((download) => download.jellyfinItem));
+    return;
+  }
   const id = libraryId.value;
   try {
     const genres = await store.fetchGenres(id);
@@ -615,7 +684,9 @@ async function playItem(item: any) {
   if (playingId.value) return;
   playingId.value = item.Id;
   try {
-    if (item.Type === 'Series') {
+    if (item.Type === 'Series' && isOffline.value) {
+      router.push({ name: 'ItemDetails', params: { id: item.Id } });
+    } else if (item.Type === 'Series') {
       const nextEp = await store.fetchNextUp(item.Id);
       if (nextEp) {
         router.push({ name: 'Player', params: { id: nextEp.Id } });
@@ -660,11 +731,20 @@ onActivated(() => {
   if (!loading.value) loadPage();
 });
 
+// Losing or getting back the connection switches between local and server data.
+watch(isOffline, () => {
+  leavePlaylistsTab();
+  loadGenres();
+  loadPage();
+});
+watch(items, (list) => { void preload(list.flatMap((item) => [item.Id, item.AlbumId]).filter(Boolean)); });
+
 onMounted(async () => {
   restoreLibraryState();
+  leavePlaylistsTab();
   loadGenres();
   // Needed to tell a music library apart (deep link / reload).
-  if (!store.libraries.length) {
+  if (!store.libraries.length && !isOffline.value) {
     try {
       await store.fetchLibraries();
     } catch (e) {

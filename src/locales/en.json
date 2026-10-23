@@ -91,7 +91,9 @@
       "playlists": "Playlists",
       "shuffleAll": "Shuffle all",
       "shuffleFailed": "Could not start shuffle"
-    }
+    },
+    "downloaded": "Downloaded",
+    "offlineLocked": "Offline: the filter stays on."
   },
   "audio": {
     "playingNext": "Playing next",

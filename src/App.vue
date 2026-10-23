@@ -1,6 +1,12 @@
 <template>
   <div :style="{ marginLeft: shellStyle.marginLeft }">
-    <router-view :key="route.path" :style="{ paddingBottom: shellStyle.paddingBottom }" />
+    <!-- Library lists stay alive while an item opened from them is shown, so
+         going back keeps their loaded pages and scroll position. -->
+    <router-view v-slot="{ Component }">
+      <keep-alive include="LibraryItemsPage" :max="3">
+        <component :is="Component" :key="route.path" :style="{ paddingBottom: shellStyle.paddingBottom }" />
+      </keep-alive>
+    </router-view>
   </div>
   <MiniAudioPlayer
     v-if="isAuthenticated && audioStore.isMiniPlayerVisible && !audioStore.isExpanded"

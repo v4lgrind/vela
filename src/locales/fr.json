@@ -54,9 +54,7 @@
   },
   "library": {
     "title": "Bibliothèques",
-    "shown": "{n} affichés",
     "alphaIndex": "Aller à la lettre",
-    "filters": "Filtres",
     "unwatched": "Non vus",
     "watched": "Vus",
     "favorites": "Favoris",
@@ -64,12 +62,7 @@
     "toggleView": "Basculer grille / liste",
     "ascending": "Croissant",
     "descending": "Décroissant",
-    "allItems": "Tout",
-    "allGenres": "Tous les genres",
     "empty": "Rien ici pour le moment",
-    "previous": "Précédent",
-    "next": "Suivant",
-    "page": "Page {n}",
     "loadError": "Impossible de charger les éléments",
     "sort": {
       "name": "Nom",
@@ -78,6 +71,18 @@
       "rating": "Note",
       "playCount": "Nombre de lectures",
       "random": "Aléatoire"
+    },
+    "sortAndFilter": "Trier et filtrer",
+    "sortBy": "Trier par",
+    "show": "Afficher",
+    "genres": "Genres",
+    "showResults": "Voir {count}",
+    "count": {
+      "albums": "{n} album | {n} albums",
+      "artists": "{n} artiste | {n} artistes",
+      "songs": "{n} titre | {n} titres",
+      "playlists": "{n} playlist | {n} playlists",
+      "items": "{n} élément | {n} éléments"
     },
     "music": {
       "albums": "Albums",

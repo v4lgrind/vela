@@ -354,7 +354,7 @@ export const useJellyfinStore = defineStore("jellyfin", {
 
       const resp = await getLibraryApi(this.api).getItems(apiParams);
       this.items = resp.data.Items || [];
-      return this.items;
+      return { items: this.items, total: resp.data.TotalRecordCount ?? this.items.length };
     },
 
     async fetchGenres(libraryId: string) {
@@ -630,7 +630,8 @@ export const useJellyfinStore = defineStore("jellyfin", {
         nameStartsWith: options.nameStartsWith,
         enableUserData: true,
       });
-      return resp.data.Items ?? [];
+      const items = resp.data.Items ?? [];
+      return { items, total: resp.data.TotalRecordCount ?? items.length };
     },
     /** The user's audio playlists (they live outside the music library). */
     async fetchAudioPlaylists(options: { startIndex: number; limit: number; sortOrder: string[]; nameStartsWith?: string }) {
@@ -646,7 +647,8 @@ export const useJellyfinStore = defineStore("jellyfin", {
         sortOrder: options.sortOrder as any,
         nameStartsWith: options.nameStartsWith,
       });
-      return resp.data.Items ?? [];
+      const items = resp.data.Items ?? [];
+      return { items, total: resp.data.TotalRecordCount ?? items.length };
     },
     async fetchArtistAlbums(artistId: string) {
       this.initializeApi();

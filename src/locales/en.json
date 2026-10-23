@@ -54,9 +54,7 @@
   },
   "library": {
     "title": "Libraries",
-    "shown": "{n} shown",
     "alphaIndex": "Jump to letter",
-    "filters": "Filters",
     "unwatched": "Unwatched",
     "watched": "Watched",
     "favorites": "Favorites",
@@ -64,12 +62,7 @@
     "toggleView": "Switch grid / list",
     "ascending": "Ascending",
     "descending": "Descending",
-    "allItems": "All items",
-    "allGenres": "All genres",
     "empty": "Nothing here yet",
-    "previous": "Previous",
-    "next": "Next",
-    "page": "Page {n}",
     "loadError": "Could not load items",
     "sort": {
       "name": "Name",
@@ -78,6 +71,18 @@
       "rating": "Rating",
       "playCount": "Play count",
       "random": "Random"
+    },
+    "sortAndFilter": "Sort and filter",
+    "sortBy": "Sort by",
+    "show": "Show",
+    "genres": "Genres",
+    "showResults": "Show {count}",
+    "count": {
+      "albums": "{n} album | {n} albums",
+      "artists": "{n} artist | {n} artists",
+      "songs": "{n} song | {n} songs",
+      "playlists": "{n} playlist | {n} playlists",
+      "items": "{n} item | {n} items"
     },
     "music": {
       "albums": "Albums",

@@ -1,6 +1,14 @@
 <template>
   <AppPage class="flex min-h-dvh flex-col bg-background pb-6 text-text-primary" :class="showIndex && 'pr-12 md:pr-12'">
-    <PageHeader back :title="libraryName" :subtitle="t('library.shown', { n: items.length })" class="mb-3" />
+    <PageHeader back compact :title="libraryName" :subtitle="countLabel" class="mb-2">
+      <template v-if="isMusicLibrary" #actions>
+        <Button variant="secondary" size="icon" class="rounded-full" :aria-label="t('library.music.shuffleAll')"
+          :disabled="shuffleLoading" @click="shuffleLibrary">
+          <Loader2 v-if="shuffleLoading" class="size-5 animate-spin" />
+          <Shuffle v-else class="size-5" />
+        </Button>
+      </template>
+    </PageHeader>
 
     <!-- Music library sections: tabs switch what is listed -->
     <Tabs v-if="isMusicLibrary" :model-value="musicTab" class="mb-3" @update:model-value="selectMusicTab($event as MusicTab)">
@@ -9,64 +17,90 @@
       </TabsList>
     </Tabs>
 
-    <!-- Filters and Sorting -->
-    <section class="mb-4">
-      <!-- Quick filter pills -->
-      <div class="flex items-center gap-2 overflow-x-auto scrollbar-hide">
-        <Toggle variant="outline" size="sm" class="shrink-0 gap-1.5"
-          :model-value="showFilters || hasActiveFilters" @update:model-value="showFilters = !showFilters">
-          <SlidersHorizontal class="size-3.5" />
-          {{ t('library.filters') }}
-          <ChevronDown class="size-3 transition-transform duration-200" :class="showFilters ? 'rotate-180' : ''" />
-        </Toggle>
-        <Toggle v-if="!isMusicLibrary" variant="outline" size="sm" class="shrink-0"
-          :model-value="filter === 'IsUnplayed'" @update:model-value="quickFilter('IsUnplayed')">
-          {{ t('library.unwatched') }}
-        </Toggle>
-        <Toggle variant="outline" size="sm" class="shrink-0"
-          :model-value="filter === 'IsFavorite'" @update:model-value="quickFilter('IsFavorite')">
-          {{ t('library.favorites') }}
-        </Toggle>
-        <Button v-if="hasActiveFilters" variant="link" size="sm" @click="resetFilters" class="shrink-0 px-2 text-caption text-text-muted">{{ t('library.reset') }}</Button>
+    <!-- Quick toggle, active filters summary, view mode, sort & filter sheet -->
+    <section class="mb-4 flex items-center gap-2">
+      <Toggle v-if="!isMusicLibrary" variant="outline" class="shrink-0 gap-1.5"
+        :model-value="unplayedOnly" @update:model-value="toggleUnplayed">
+        <EyeOff /> {{ t('library.unwatched') }}
+      </Toggle>
+      <Toggle v-else variant="outline" class="shrink-0 gap-1.5"
+        :model-value="favoritesOnly" @update:model-value="toggleFavorites">
+        <Heart /> {{ t('library.favorites') }}
+      </Toggle>
+      <button v-if="filterSummary" class="min-h-11 min-w-0 flex-1 truncate text-left text-caption text-text-muted"
+        @click="sheetOpen = true">
+        {{ filterSummary }}
+      </button>
+      <div v-else class="flex-1" />
 
-        <div class="flex-1" />
-
-        <!-- View mode toggle -->
-        <Button v-if="!showSongList" variant="ghost" size="icon" class="shrink-0 rounded-full" :aria-label="t('library.toggleView')" @click="toggleViewMode">
-          <List v-if="viewMode === 'grid'" class="size-5" />
-          <LayoutGrid v-else class="size-5" />
-        </Button>
-      </div>
-
-      <!-- Collapsible filter panel -->
-      <div v-show="showFilters" class="flex flex-wrap gap-2 items-center mt-3">
-        <select v-model="sortBy" @change="onFilterChange" class="min-h-11 bg-surface border border-border-default rounded-xl px-3 py-2 text-sm text-text-primary cursor-pointer focus:border-accent-purple transition-colors">
-          <option value="SortName">{{ t('library.sort.name') }}</option>
-          <option value="PremiereDate">{{ t('library.sort.releaseDate') }}</option>
-          <option value="DateCreated">{{ t('library.sort.dateAdded') }}</option>
-          <option value="CommunityRating">{{ t('library.sort.rating') }}</option>
-          <option value="PlayCount">{{ t('library.sort.playCount') }}</option>
-          <option value="Random">{{ t('library.sort.random') }}</option>
-        </select>
-
-        <select v-model="sortOrder" @change="onFilterChange" class="min-h-11 bg-surface border border-border-default rounded-xl px-3 py-2 text-sm text-text-primary cursor-pointer focus:border-accent-purple transition-colors">
-          <option value="Ascending">↑ {{ t('library.ascending') }}</option>
-          <option value="Descending">↓ {{ t('library.descending') }}</option>
-        </select>
-
-        <select v-model="filter" @change="onFilterChange" class="min-h-11 bg-surface border border-border-default rounded-xl px-3 py-2 text-sm text-text-primary cursor-pointer focus:border-accent-purple transition-colors">
-          <option value="">{{ t('library.allItems') }}</option>
-          <option value="IsUnplayed">{{ t('library.unwatched') }}</option>
-          <option value="IsPlayed">{{ t('library.watched') }}</option>
-          <option value="IsFavorite">{{ t('library.favorites') }}</option>
-        </select>
-
-        <select v-model="selectedGenre" @change="onFilterChange" class="min-h-11 bg-surface border border-border-default rounded-xl px-3 py-2 text-sm text-text-primary cursor-pointer focus:border-accent-purple transition-colors">
-          <option value="">{{ t('library.allGenres') }}</option>
-          <option v-for="genre in availableGenres" :key="genre" :value="genre">{{ genre }}</option>
-        </select>
-      </div>
+      <Button v-if="!showSongList" variant="ghost" size="icon" class="shrink-0 rounded-full" :aria-label="t('library.toggleView')" @click="toggleViewMode">
+        <List v-if="viewMode === 'grid'" class="size-5" />
+        <LayoutGrid v-else class="size-5" />
+      </Button>
+      <Button variant="secondary" size="icon" class="relative shrink-0 rounded-full"
+        :aria-label="t('library.sortAndFilter')" @click="sheetOpen = true">
+        <SlidersHorizontal class="size-5" />
+        <span v-if="activeFilterCount"
+          class="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-accent-purple px-1 text-[11px] font-bold text-accent-ink">
+          {{ activeFilterCount }}
+        </span>
+      </Button>
     </section>
+
+    <Drawer v-model:open="sheetOpen" :should-scale-background="false">
+      <DrawerContent class="max-h-[85dvh] border-border-default bg-surface md:mx-auto md:max-w-xl">
+        <div class="flex flex-col gap-3 overflow-y-auto px-4 pt-3 pb-[calc(16px+var(--sab,env(safe-area-inset-bottom,0px)))]">
+          <div class="flex items-center justify-between">
+            <DrawerTitle class="text-section font-bold text-text-heading">{{ t('library.sortAndFilter') }}</DrawerTitle>
+            <Button v-if="activeFilterCount || unplayedOnly || favoritesOnly" variant="link" size="sm"
+              class="text-accent-purple" @click="resetFilters">
+              {{ t('library.reset') }}
+            </Button>
+          </div>
+          <DrawerDescription class="sr-only">{{ t('library.sortAndFilter') }}</DrawerDescription>
+
+          <h3 class="text-label font-semibold uppercase tracking-wide text-text-muted">{{ t('library.sortBy') }}</h3>
+          <div class="flex flex-wrap gap-2">
+            <Toggle v-for="option in SORT_OPTIONS" :key="option.value" variant="outline" size="sm"
+              :model-value="sortBy === option.value" @update:model-value="setSort(option.value)">
+              {{ t(option.label) }}
+            </Toggle>
+          </div>
+          <div class="grid grid-cols-2 gap-1 rounded-full border border-border-default bg-surface-hover p-1">
+            <button v-for="order in SORT_ORDERS" :key="order.value"
+              class="h-9 rounded-full text-sm font-medium transition-colors"
+              :class="sortOrder === order.value ? 'bg-accent-purple text-accent-ink' : 'text-text-muted'"
+              :aria-pressed="sortOrder === order.value" @click="setOrder(order.value)">
+              {{ order.arrow }} {{ t(order.label) }}
+            </button>
+          </div>
+
+          <h3 class="mt-2 text-label font-semibold uppercase tracking-wide text-text-muted">{{ t('library.show') }}</h3>
+          <div class="flex flex-wrap gap-2">
+            <Toggle v-if="!isMusicLibrary" variant="outline" size="sm" :model-value="unplayedOnly" @update:model-value="toggleUnplayed">
+              {{ t('library.unwatched') }}
+            </Toggle>
+            <Toggle variant="outline" size="sm" :model-value="favoritesOnly" @update:model-value="toggleFavorites">
+              {{ t('library.favorites') }}
+            </Toggle>
+          </div>
+
+          <template v-if="availableGenres.length">
+            <h3 class="mt-2 text-label font-semibold uppercase tracking-wide text-text-muted">{{ t('library.genres') }}</h3>
+            <div class="flex flex-wrap gap-2">
+              <Toggle v-for="genre in availableGenres" :key="genre" variant="outline" size="sm"
+                :model-value="selectedGenres.includes(genre)" @update:model-value="toggleGenre(genre)">
+                {{ genre }}
+              </Toggle>
+            </div>
+          </template>
+
+          <DrawerClose as-child>
+            <Button class="mt-3 h-12 rounded-2xl text-body font-bold">{{ t('library.showResults', { count: countLabel ?? '' }) }}</Button>
+          </DrawerClose>
+        </div>
+      </DrawerContent>
+    </Drawer>
 
     <section class="flex-1 relative">
       <!-- Songs: tap plays this page from that song -->
@@ -84,8 +118,10 @@
               :class="audioStore.currentTrack?.id === song.Id && 'text-accent-purple-light'">{{ song.Name }}</div>
             <div class="text-xs text-text-muted truncate">{{ [song.AlbumArtist || song.Artists?.[0], song.Album].filter(Boolean).join(' · ') }}</div>
           </div>
+          <DownloadIcon v-if="offlineStore.isItemDownloaded(song.Id)" class="size-3.5 shrink-0 text-accent-purple" :aria-label="t('common.downloaded')" />
+          <Loader2 v-else-if="downloadStore.isDownloading(song.Id)" class="size-3.5 shrink-0 animate-spin text-accent-purple" />
           <span v-if="song.RunTimeTicks" class="text-xs text-text-subtle tabular-nums shrink-0">{{ formatTicksDuration(song.RunTimeTicks) }}</span>
-          <TrackActionsMenu @play-next="enqueueSong(song, 'next')" @add-to-queue="enqueueSong(song, 'end')" />
+          <TrackActionsMenu :track="song" @play-next="enqueueSong(song, 'next')" @add-to-queue="enqueueSong(song, 'end')" />
         </li>
       </ul>
 
@@ -201,33 +237,27 @@
         </li>
       </ul>
 
+      <p v-if="error && !items.length" class="py-12 text-center text-body text-error">{{ error }}</p>
       <p v-if="!loading && !error && !items.length" class="py-12 text-center text-body text-text-muted">{{ t('library.empty') }}</p>
 
       <!-- A-Z Quick Jump Sidebar -->
       <AlphaIndex v-if="showIndex" :letters="alphabet" :active="nameStartsWith" @select="jumpToLetter" />
 
-      <!-- Pagination -->
-      <div class="flex items-center justify-center gap-3 mt-6">
-        <Button variant="outline" :disabled="startIndex === 0" @click="prevPage" class="min-h-[44px] px-4">
-          <ArrowLeft class="size-4 mr-1" /> {{ t('library.previous') }}
-        </Button>
-        <span class="text-text-primary font-semibold">
-          {{ t('library.page', { n: currentPage }) }}
-          <span v-if="nameStartsWith" class="text-accent-purple ml-1">({{ nameStartsWith }})</span>
-        </span>
-        <Button variant="outline" :disabled="!hasNextPage" @click="nextPage" class="min-h-[44px] px-4">
-          {{ t('library.next') }} <ArrowRight class="size-4 ml-1" />
-        </Button>
+      <!-- Infinite scroll: the next page loads as this comes near the viewport -->
+      <div ref="sentinel" class="flex justify-center py-6">
+        <Loader2 v-if="loadingMore" class="size-5 animate-spin text-text-muted" />
       </div>
     </section>
   </AppPage>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, computed, watch } from 'vue';
+import { onActivated, onMounted, ref, computed } from 'vue';
+import { useIntersectionObserver } from '@vueuse/core';
+import { useRetryWhileFailed } from '@/composables/useRetryWhileFailed';
 import { useI18n } from 'vue-i18n';
 import { logger } from '@/utils/logger';
-import { useRoute, useRouter } from 'vue-router';
+import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router';
 import { useJellyfinStore } from '@/store/jellyfin-store';
 import { usePreferencesStore } from '@/store/preferences-store';
 import LazyImg from '@/components/LazyImg.vue';
@@ -239,10 +269,11 @@ import { useToast } from '@/composables/useToast';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Toggle } from '@/components/ui/toggle';
+import { Drawer, DrawerClose, DrawerContent, DrawerDescription, DrawerTitle } from '@/components/ui/drawer';
 import { AppPage, PageHeader } from '@/components/layout';
 import AlphaIndex from '@/components/AlphaIndex.vue';
 import { formatDuration } from '@/i18n/format';
-import { ArrowLeft, ArrowRight, Play, Check, Download as DownloadIcon, Loader2, SlidersHorizontal, ChevronDown, LayoutGrid, List } from 'lucide-vue-next';
+import { Play, Check, Download as DownloadIcon, Loader2, SlidersHorizontal, LayoutGrid, List, Shuffle, EyeOff, Heart } from 'lucide-vue-next';
 import { useOfflineStore } from '@/store/offline-store';
 import { useDownloadStore } from '@/store/download-store';
 
@@ -255,26 +286,42 @@ const toast = useToast();
 const prefs = usePreferencesStore();
 const route = useRoute();
 const router = useRouter();
-const libraryId = computed(() => route.params.id as string);
-const libraryName = computed(() => (route.params.name as string) || 'Library');
+// Fixed for this instance: App.vue keeps it alive (keyed by path) while an
+// item opened from it changes the route.
+const libraryId = ref(route.params.id as string);
+const libraryName = ref((route.params.name as string) || 'Library');
 
 const playingId = ref<string | null>(null);
 const watchingId = ref<string | null>(null);
 
 const items = ref<any[]>([]);
-const limit = ref(50);
-const startIndex = ref(0);
-const hasNextPage = ref(false);
+const total = ref(0);
+const limit = 50;
+const hasMore = computed(() => items.value.length < total.value);
 const loading = ref(true);
+const loadingMore = ref(false);
 const error = ref<string | null>(null);
 
 let pageRequest = 0;
-// Filtering and sorting
-const showFilters = ref(false);
+// Filtering and sorting: changes apply at once, the sheet shows the live total.
+const sheetOpen = ref(false);
 const sortBy = ref('SortName');
 const sortOrder = ref('Ascending');
-const filter = ref('');
-const selectedGenre = ref('');
+const unplayedOnly = ref(false);
+const favoritesOnly = ref(false);
+const selectedGenres = ref<string[]>([]);
+const SORT_OPTIONS = [
+  { value: 'SortName', label: 'library.sort.name' },
+  { value: 'PremiereDate', label: 'library.sort.releaseDate' },
+  { value: 'DateCreated', label: 'library.sort.dateAdded' },
+  { value: 'CommunityRating', label: 'library.sort.rating' },
+  { value: 'PlayCount', label: 'library.sort.playCount' },
+  { value: 'Random', label: 'library.sort.random' },
+];
+const SORT_ORDERS = [
+  { value: 'Ascending', label: 'library.ascending', arrow: '↑' },
+  { value: 'Descending', label: 'library.descending', arrow: '↓' },
+];
 
 type MusicTab = 'albums' | 'artists' | 'songs' | 'playlists';
 const MUSIC_TABS: { value: MusicTab; label: string }[] = [
@@ -301,25 +348,52 @@ function playSongs(index: number) {
   audioStore.playAlbum(items.value.map((song) => toAudioTrack(song)), index);
 }
 
+const shuffleLoading = ref(false);
+
+/** Random songs from this library; audioPlayerService adds more as they run out. */
+async function shuffleLibrary() {
+  const id = libraryId.value;
+  shuffleLoading.value = true;
+  try {
+    const songs = await store.fetchRandomTracks(id);
+    if (songs.length) audioStore.playLibraryShuffle(id, songs.map((song) => toAudioTrack(song)));
+  } catch (e) {
+    logger.error('Library shuffle failed', e);
+    toast.showError(t('library.music.shuffleFailed'));
+  } finally {
+    shuffleLoading.value = false;
+  }
+}
+
 function enqueueSong(song: any, where: 'next' | 'end') {
   if (where === 'next') audioStore.playNext([toAudioTrack(song)]);
   else audioStore.addToQueue([toAudioTrack(song)]);
   toast.show(where === 'next' ? t('audio.playingNext') : t('audio.addedToQueue'), 'success', 2000);
 }
 const nameStartsWith = ref('');
-const hasActiveFilters = computed(() =>
-  sortBy.value !== 'SortName' || sortOrder.value !== 'Ascending' || filter.value !== '' ||
-  selectedGenre.value !== '' || nameStartsWith.value !== ''
-);
+const sortChanged = computed(() => sortBy.value !== 'SortName' || sortOrder.value !== 'Ascending');
+// The quick toggle (Non vus, or Favoris in music) is visible on its own: not counted.
+const activeFilterCount = computed(() =>
+  (sortChanged.value ? 1 : 0) + (selectedGenres.value.length ? 1 : 0) + (!isMusicLibrary.value && favoritesOnly.value ? 1 : 0));
+const filterSummary = computed(() => {
+  const parts: string[] = [];
+  if (sortChanged.value) {
+    const sort = SORT_OPTIONS.find((o) => o.value === sortBy.value);
+    parts.push(`${sort ? t(sort.label) : sortBy.value} ${sortOrder.value === 'Ascending' ? '↑' : '↓'}`);
+  }
+  if (!isMusicLibrary.value && favoritesOnly.value) parts.push(t('library.favorites'));
+  if (selectedGenres.value.length) parts.push(selectedGenres.value.join(', '));
+  return parts.join(' · ');
+});
 const availableGenres = ref<string[]>([]);
 
 type LibraryState = {
   sortBy: string;
   sortOrder: string;
-  filter: string;
-  selectedGenre: string;
+  unplayedOnly: boolean;
+  favoritesOnly: boolean;
+  selectedGenres: string[];
   nameStartsWith: string;
-  startIndex: number;
   musicTab: MusicTab;
 };
 
@@ -330,10 +404,10 @@ function stateKey(id: string) {
 function restoreLibraryState() {
   sortBy.value = 'SortName';
   sortOrder.value = 'Ascending';
-  filter.value = '';
-  selectedGenre.value = '';
+  unplayedOnly.value = false;
+  favoritesOnly.value = false;
+  selectedGenres.value = [];
   nameStartsWith.value = '';
-  startIndex.value = 0;
   musicTab.value = 'albums';
 
   try {
@@ -344,18 +418,15 @@ function restoreLibraryState() {
         sortBy.value = state.sortBy!;
       }
       if (state.sortOrder === 'Ascending' || state.sortOrder === 'Descending') sortOrder.value = state.sortOrder;
-      if (['', 'IsUnplayed', 'IsPlayed', 'IsFavorite'].includes(state.filter ?? '')) filter.value = state.filter!;
-      if (typeof state.selectedGenre === 'string') selectedGenre.value = state.selectedGenre;
+      unplayedOnly.value = state.unplayedOnly === true;
+      favoritesOnly.value = state.favoritesOnly === true;
+      if (Array.isArray(state.selectedGenres)) selectedGenres.value = state.selectedGenres.filter((g) => typeof g === 'string');
       if (typeof state.nameStartsWith === 'string') nameStartsWith.value = state.nameStartsWith;
       if (MUSIC_TABS.some((t) => t.value === state.musicTab)) musicTab.value = state.musicTab!;
-      if (typeof state.startIndex === 'number' && Number.isInteger(state.startIndex) && state.startIndex >= 0) {
-        startIndex.value = state.startIndex;
-      }
     }
   } catch (e) {
     logger.warn('Failed to restore library state', e);
   }
-  showFilters.value = hasActiveFilters.value;
 }
 
 function saveLibraryState() {
@@ -363,10 +434,10 @@ function saveLibraryState() {
     sessionStorage.setItem(stateKey(libraryId.value), JSON.stringify({
       sortBy: sortBy.value,
       sortOrder: sortOrder.value,
-      filter: filter.value,
-      selectedGenre: selectedGenre.value,
+      unplayedOnly: unplayedOnly.value,
+      favoritesOnly: favoritesOnly.value,
+      selectedGenres: selectedGenres.value,
       nameStartsWith: nameStartsWith.value,
-      startIndex: startIndex.value,
       musicTab: musicTab.value,
     } satisfies LibraryState));
   } catch (e) {
@@ -384,7 +455,7 @@ function toggleViewMode() {
 const alphabet = ['#', ...Array.from({ length: 26 }, (_, i) => String.fromCharCode(65 + i))];
 // Short lists don't need an index; keep it while a letter is applied so it can be changed or cleared.
 const showIndex = computed(() =>
-  sortBy.value === 'SortName' && (items.value.length >= 30 || hasNextPage.value || nameStartsWith.value !== ''));
+  sortBy.value === 'SortName' && (items.value.length >= 30 || hasMore.value || nameStartsWith.value !== ''));
 
 function jumpToLetter(letter: string) {
   if (nameStartsWith.value === letter) {
@@ -392,11 +463,14 @@ function jumpToLetter(letter: string) {
   } else {
     nameStartsWith.value = letter;
   }
-  startIndex.value = 0;
   loadPage();
 }
 
-const currentPage = computed(() => Math.floor(startIndex.value / limit.value) + 1);
+const countLabel = computed(() => {
+  if (loading.value && !items.value.length) return undefined;
+  const key = isMusicLibrary.value ? `library.count.${musicTab.value}` : 'library.count.items';
+  return t(key, total.value);
+});
 
 function getImageUrl(id: string, itemType?: string) {
   const isAudio = itemType && isAudioType(itemType);
@@ -407,33 +481,71 @@ function formatRuntime(ticks: number): string {
   return formatDuration(Math.round(ticks / 600_000_000) * 60);
 }
 
+function queryOptions() {
+  const filters = [
+    ...(unplayedOnly.value && !isMusicLibrary.value ? ['IsUnplayed'] : []),
+    ...(favoritesOnly.value ? ['IsFavorite'] : []),
+  ];
+  return {
+    limit,
+    sortBy: [sortBy.value],
+    sortOrder: [sortOrder.value],
+    filters: filters.length ? filters : undefined,
+    genres: selectedGenres.value.length ? selectedGenres.value : undefined,
+    nameStartsWith: nameStartsWith.value === '#' ? '#' : nameStartsWith.value || undefined,
+  };
+}
+
+/** First page for the current tab / filters; replaces what was listed. */
 async function loadPage() {
   saveLibraryState();
   const id = libraryId.value;
   const request = ++pageRequest;
   loading.value = true;
+  loadingMore.value = false;
   error.value = null;
   try {
-    const pageItems = await fetchPage(id, {
-      startIndex: startIndex.value,
-      limit: limit.value,
-      sortBy: [sortBy.value],
-      sortOrder: [sortOrder.value],
-      filters: filter.value ? [filter.value] : undefined,
-      genres: selectedGenre.value ? [selectedGenre.value] : undefined,
-      nameStartsWith: nameStartsWith.value === '#' ? '#' : nameStartsWith.value || undefined,
-    });
+    const page = await fetchPage(id, { ...queryOptions(), startIndex: 0 });
     if (request !== pageRequest) return;
-    items.value = pageItems;
-    hasNextPage.value = pageItems.length === limit.value;
+    items.value = page.items;
+    total.value = page.total;
   } catch (e) {
     if (request === pageRequest) error.value = t('library.loadError');
   } finally {
     if (request === pageRequest) loading.value = false;
   }
+  if (request === pageRequest && !error.value && sentinelVisible) loadMore();
 }
 
-type PageOptions = Parameters<typeof store.fetchItems>[1] & { startIndex: number; limit: number; sortOrder: string[] };
+async function loadMore() {
+  if (loading.value || loadingMore.value || !hasMore.value) return;
+  const request = pageRequest;
+  loadingMore.value = true;
+  try {
+    const page = await fetchPage(libraryId.value, { ...queryOptions(), startIndex: items.value.length });
+    if (request !== pageRequest) return;
+    items.value = [...items.value, ...page.items];
+    total.value = page.total;
+    error.value = null;
+  } catch (e) {
+    if (request === pageRequest) error.value = t('library.loadError');
+  } finally {
+    if (request === pageRequest) loadingMore.value = false;
+  }
+  // Still in view (short page or tall screen): keep filling.
+  if (request === pageRequest && !error.value && sentinelVisible) loadMore();
+}
+
+useRetryWhileFailed(computed(() => error.value !== null), () => (items.value.length ? loadMore() : loadPage()));
+
+const sentinel = ref<HTMLElement | null>(null);
+let sentinelVisible = false;
+useIntersectionObserver(sentinel, ([entry]) => {
+  sentinelVisible = entry?.isIntersecting ?? false;
+  if (sentinelVisible) loadMore();
+}, { rootMargin: '800px' });
+
+type PageOptions = ReturnType<typeof queryOptions> & { startIndex: number };
 
 function fetchPage(id: string, opts: PageOptions) {
   if (!isMusicLibrary.value) return store.fetchItems(id, opts);
@@ -457,46 +569,46 @@ async function loadGenres() {
 
 function onFilterChange() {
   nameStartsWith.value = '';
-  startIndex.value = 0;
   loadPage();
 }
 
-function quickFilter(value: string) {
-  filter.value = filter.value === value ? '' : value;
+function toggleUnplayed() {
+  unplayedOnly.value = !unplayedOnly.value;
+  onFilterChange();
+}
+
+function toggleFavorites() {
+  favoritesOnly.value = !favoritesOnly.value;
+  onFilterChange();
+}
+
+function toggleGenre(genre: string) {
+  selectedGenres.value = selectedGenres.value.includes(genre)
+    ? selectedGenres.value.filter((g) => g !== genre)
+    : [...selectedGenres.value, genre];
+  onFilterChange();
+}
+
+function setSort(value: string) {
+  if (sortBy.value === value) return;
+  sortBy.value = value;
+  onFilterChange();
+}
+
+function setOrder(value: string) {
+  if (sortOrder.value === value) return;
+  sortOrder.value = value;
   onFilterChange();
 }
 
 function resetFilters() {
   sortBy.value = 'SortName';
   sortOrder.value = 'Ascending';
-  filter.value = '';
-  selectedGenre.value = '';
+  unplayedOnly.value = false;
+  favoritesOnly.value = false;
+  selectedGenres.value = [];
   nameStartsWith.value = '';
-  startIndex.value = 0;
-  showFilters.value = false;
   loadPage();
-}
-
-async function nextPage() {
-  if (hasNextPage.value) {
-    startIndex.value += limit.value;
-    await loadPage();
-    scrollTopSmooth();
-  }
-}
-
-async function prevPage() {
-  if (startIndex.value >= limit.value) {
-    startIndex.value -= limit.value;
-  } else {
-    startIndex.value = 0;
-  }
-  await loadPage();
-  scrollTopSmooth();
-}
-
-function scrollTopSmooth() {
-  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 async function playItem(item: any) {
@@ -535,6 +647,19 @@ async function toggleWatched(item: any) {
   }
 }
 
+// Kept alive by App.vue: going back from something opened here keeps the list
+// as it was; arriving from anywhere else (or after a failed load) reloads it.
+const DRILL_DOWN_ROUTES = ['ItemDetails', 'libraryItem', 'PersonDetail', 'Player'];
+let reloadOnReturn = false;
+onBeforeRouteLeave((to) => {
+  reloadOnReturn = !DRILL_DOWN_ROUTES.includes(String(to.name));
+});
+onActivated(() => {
+  if (!reloadOnReturn && !error.value && items.value.length) return;
+  reloadOnReturn = false;
+  if (!loading.value) loadPage();
+});
+
 onMounted(async () => {
   restoreLibraryState();
   loadGenres();
@@ -549,12 +674,4 @@ onMounted(async () => {
   loadPage();
 });
 
-watch(() => route.params.id, (newId) => {
-  if (!newId) return;
-  items.value = [];
-  availableGenres.value = [];
-  restoreLibraryState();
-  loadGenres();
-  loadPage();
-});
 </script>

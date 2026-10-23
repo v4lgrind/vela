@@ -7,7 +7,10 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 // onBack overrides the router back (pages with in-component sub-views).
-const props = defineProps<{ title: string; subtitle?: string; back?: boolean; overImage?: boolean; onBack?: () => void }>();
+// compact: a single-line, smaller title for list pages where content matters more.
+const props = defineProps<{
+  title: string; subtitle?: string; back?: boolean; overImage?: boolean; compact?: boolean; onBack?: () => void;
+}>();
 
 const { t } = useI18n();
 const router = useRouter();
@@ -21,7 +24,7 @@ function goBack() {
 </script>
 
 <template>
-  <header class="flex items-start gap-3 py-2">
+  <header :class="cn('flex gap-3', props.compact ? 'items-center py-1' : 'items-start py-2')">
     <Button
       v-if="props.back"
       variant="ghost"
@@ -31,15 +34,18 @@ function goBack() {
       @click="goBack">
       <ChevronLeft class="size-5" />
     </Button>
-    <div :class="cn('min-w-0 flex-1', props.back && 'pt-1')">
+    <div :class="cn('min-w-0 flex-1', props.back && !props.compact && 'pt-1')">
       <h1
         :class="cn(
           'line-clamp-2 text-page font-bold text-text-heading lg:text-page-wide',
+          props.compact && 'line-clamp-1 text-xl lg:text-xl',
           props.overImage && 'sr-only',
         )">
         {{ props.title }}
       </h1>
-      <p v-if="props.subtitle && !props.overImage" class="mt-1 text-caption text-text-muted">{{ props.subtitle }}</p>
+      <p v-if="props.subtitle && !props.overImage" :class="cn('mt-1 text-caption text-text-muted', props.compact && 'mt-0')">
+        {{ props.subtitle }}
+      </p>
     </div>
     <div v-if="$slots.actions" class="flex shrink-0 items-center gap-2">
       <slot name="actions" />

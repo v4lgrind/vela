@@ -2,7 +2,7 @@
 
 Spec: `docs/superpowers/specs/2026-10-23-offline-library-design.md`
 Plan: `docs/superpowers/plans/2026-10-23-offline-library.md`
-Branch: `feat/offline-library` (not merged)
+Branch: `feat/offline-library`, merged into `main` (fast-forward, 2026-10-23); installed as v30 on the tablet and the Pixel
 
 ## What was built
 
@@ -43,6 +43,25 @@ Branch: `feat/offline-library` (not merged)
 - Going offline with a library page open: 171 → 1 element, no error, back to 171.
 - Téléchargés tab: album row "4 titres sur 8 · 50 %", delete removes the files.
 - Pixel (v27): filter on Musiques shows the empty state, phone layout fine.
+
+## Final review fixes (each with a failing test first)
+
+- Offline playback resumed from the local position even when another device
+  went further (then overwrote it on sync): `offlineResumeSeconds` in PlayerPage
+  and the detail page. Verified on the tablet: "Reprendre · 3 min", start 200 s.
+- Progress watched offline is pushed when the app starts online.
+- Background updates use `offlineDatabase.patchDownload` (one transaction, skips
+  deleted records) and the library backfill runs once at a time.
+- Réessayer keeps the transcode options; the library id is recorded at download.
+- A partial offline rewatch no longer sends `Played:false`.
+- Also: download options dialog readable in the light theme; dialogs no longer
+  get wider than the screen (grid column capped).
+
+Deferred minors from the review: filtered list not rebuilt when downloads change,
+mark-watched button calls the server offline, no genres for series libraries,
+failure reason not shown, header lacks "téléchargés", album row total shrinks after
+a failure, "SundefinedEundefined" for episodes without numbers, books/mixed
+libraries empty offline, artwork lookup never retried.
 
 ## Left / known
 

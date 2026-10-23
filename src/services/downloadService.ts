@@ -134,6 +134,8 @@ class DownloadService {
     const activeDownload: ActiveDownload = { aborted: false };
     this.downloads.set(itemId, activeDownload);
     let storedFilePath = filePath;
+    // Reported by the native downloader: its content:// files can't be stat'ed.
+    let fileSize = 0;
 
     try {
       if (isDesktop) {
@@ -159,7 +161,7 @@ class DownloadService {
         // Android ForegroundService keeps downloads alive while the app is backgrounded.
         // Persist metadata so offline-store can reconcile a completed native download.
         localStorage.setItem(`dl_meta_${itemId}`, JSON.stringify({ metadata, filePath }));
-        storedFilePath = await this.downloadAndroidFile({
+        ({ filePath: storedFilePath, fileSize } = await this.downloadAndroidFile({
           activeDownload,
           estimatedSize,
           headers: authHeaders,
@@ -174,7 +176,7 @@ class DownloadService {
             const percentage = total > 0 ? Math.min(99, Math.round((loaded / total) * 100)) : -1;
             callback({ filename, itemId, loaded, percentage, total });
           },
-        });
+        }));
       }
 
       if (activeDownload.aborted) {
@@ -184,11 +186,12 @@ class DownloadService {
       logger.log('💾 Download complete:', filePath);
 
       // Actual file size after completion
-      let fileSize = 0;
-      try {
-        const stat = await this.statFile(storedFilePath);
-        fileSize = stat.size ?? 0;
-      } catch { /* ignore */ }
+      if (!fileSize) {
+        try {
+          const stat = await this.statFile(storedFilePath);
+          fileSize = stat.size ?? 0;
+        } catch { /* ignore */ }
+      }
 
       const downloadedMedia: DownloadedMedia = buildDownloadedMedia(metadata, storedFilePath, fileSize);
 
@@ -210,7 +213,7 @@ class DownloadService {
                 operationId: `subtitle-${itemId}`,
                 relativePath: subPath,
                 url: subUrl,
-              });
+              }).then((result) => result.filePath);
           downloadedMedia.subtitleLabel = subtitleInfo.label;
           downloadedMedia.subtitleLanguage = subtitleInfo.language;
           logger.log('✅ Subtitle downloaded:', subPath);
@@ -375,7 +378,7 @@ class DownloadService {
     return filePath;
   }
 
-  private async downloadAndroidFile(options: NativeDownloadOptions): Promise<string> {
+  private async downloadAndroidFile(options: NativeDownloadOptions): Promise<{ filePath: string; fileSize: number }> {
     const handles: PluginListenerHandle[] = [];
     if (options.activeDownload) {
       options.activeDownload.nativeOperationId = options.operationId;
@@ -387,7 +390,7 @@ class DownloadService {
       }
     };
 
-    return new Promise<string>((resolve, reject) => {
+    return new Promise<{ filePath: string; fileSize: number }>((resolve, reject) => {
       (async () => {
         handles.push(await DownloadPlugin.addListener('downloadProgress', (event) => {
           if (event.itemId !== options.operationId) return;
@@ -400,7 +403,7 @@ class DownloadService {
         handles.push(await DownloadPlugin.addListener('downloadComplete', async (event) => {
           if (event.itemId !== options.operationId) return;
           await cleanup();
-          resolve(event.filePath || options.relativePath);
+          resolve({ filePath: event.filePath || options.relativePath, fileSize: event.fileSize || 0 });
         }));
         handles.push(await DownloadPlugin.addListener('downloadFailed', async (event) => {
           if (event.itemId !== options.operationId) return;

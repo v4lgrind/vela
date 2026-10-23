@@ -511,6 +511,8 @@ import {
     type OfflineArtworkType,
 } from '@/services/downloadService';
 import { offlineDatabase } from '@/services/offlineDatabase';
+import { localLibraryPage, type LocalQuery } from '@/utils/offlineLibrary';
+import { effectiveProgress } from '@/utils/watchProgress';
 import LazyImg from '@/components/LazyImg.vue';
 import { formatTicksDuration, formatTicksHuman, formatBytes } from '@/utils/helpers';
 import { Button } from '@/components/ui/button';
@@ -579,6 +581,11 @@ const watchingEpId = ref<string | null>(null);
 const togglingWatched = ref(false);
 const offlineProgressSeconds = ref<number | null>(null);
 const cachedArtworkUrls = ref<Record<string, string>>({});
+/** Every downloaded album of an artist or the one album of a page, by year then name. */
+const ALL_LOCAL: LocalQuery = {
+    startIndex: 0, limit: 1000, sortBy: 'PremiereDate', sortOrder: 'Ascending',
+    unplayedOnly: false, favoritesOnly: false, genres: [], nameStartsWith: '', seed: 1,
+};
 
 async function loadCachedArtwork(metadata: {
     Id?: string;
@@ -591,7 +598,7 @@ async function loadCachedArtwork(metadata: {
     for (const target of buildOfflineArtworkTargets(metadata)) {
         targets.set(`${target.itemId}:${target.imageType}`, target);
     }
-    for (const child of [...seasons.value, ...episodes.value]) {
+    for (const child of [...seasons.value, ...episodes.value, ...artistAlbums.value]) {
         if (child.Id) {
             targets.set(`${child.Id}:Primary`, { itemId: child.Id, imageType: 'Primary' });
         }
@@ -633,10 +640,33 @@ async function load() {
         if (isOffline && cached) {
             item.value = cached.jellyfinItem;
             const progress = await offlineDatabase.getWatchProgress(itemId.value);
-            if (progress && progress.position > 0 && !progress.completed) {
-                offlineProgressSeconds.value = progress.position;
+            // The most recent playback wins: this device offline, or another one before.
+            const resume = effectiveProgress(cached.jellyfinItem, progress ?? undefined);
+            if (resume.position > 0 && !resume.played && resume.percentage < 90) {
+                offlineProgressSeconds.value = resume.position;
             }
             return;
+        }
+
+        // ── Offline: album or artist with downloaded tracks ──────────────────
+        if (isOffline) {
+            const tracks = offlineStore.downloads.filter((d) => d.type === 'Audio');
+            const albumTracks = tracks.filter((d) => d.albumId === itemId.value);
+            if (albumTracks.length) {
+                const album = localLibraryPage(albumTracks, 'albums', 'music', ALL_LOCAL).items[0];
+                item.value = metadataCache.get(itemId.value, true) ?? album;
+                audioTracks.value = albumTracks.map((d) => d.jellyfinItem).sort((a, b) =>
+                    (a.ParentIndexNumber ?? 0) - (b.ParentIndexNumber ?? 0) || (a.IndexNumber ?? 0) - (b.IndexNumber ?? 0));
+                return;
+            }
+            const artistTracks = tracks.filter((d) =>
+                (d.jellyfinItem?.AlbumArtists ?? []).some((artist: any) => artist.Id === itemId.value));
+            if (artistTracks.length) {
+                const artist = artistTracks[0].jellyfinItem.AlbumArtists.find((a: any) => a.Id === itemId.value);
+                item.value = metadataCache.get(itemId.value, true) ?? { Id: itemId.value, Name: artist?.Name ?? '', Type: 'MusicArtist' };
+                artistAlbums.value = localLibraryPage(artistTracks, 'albums', 'music', ALL_LOCAL).items;
+                return;
+            }
         }
 
         // ── Offline: Series page (has downloaded episodes) ──────────────────

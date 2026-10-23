@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 
 import { downloadService } from '@/services/downloadService';
+import { offlineDatabase } from '@/services/offlineDatabase';
 
 import { useDownloadStore, withForcedVideoParams } from './download-store';
 
@@ -12,7 +13,15 @@ vi.mock('@/services/downloadService', () => ({
   },
 }));
 vi.mock('./jellyfin-store', () => ({
-  useJellyfinStore: () => ({ serverUrl: 'https://jf.example', accessToken: 'token', fetchItemDetails: async (id: string) => ({ Id: id }) }),
+  useJellyfinStore: () => ({
+    serverUrl: 'https://jf.example', accessToken: 'token', libraries: [],
+    fetchItemDetails: async (id: string) => ({ Id: id }),
+    fetchLibraryIdOf: async () => 'music',
+  }),
+}));
+vi.mock('@/services/offlineDatabase', async (importActual) => ({
+  ...(await importActual<typeof import('@/services/offlineDatabase')>()),
+  offlineDatabase: { getAllDownloads: vi.fn(async () => []), patchDownload: vi.fn(async () => true) },
 }));
 
 describe('withForcedVideoParams', () => {
@@ -90,5 +99,32 @@ describe('download retry', () => {
 
     expect(vi.mocked(downloadService.downloadForOffline).mock.calls.map((call) => call[1])).toEqual(['t1', 't1']);
     expect(store.getTask('t1')?.status).toBe('downloading');
+  });
+});
+
+describe('download bookkeeping', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.mocked(downloadService.downloadForOffline).mockClear();
+  });
+
+  it('retries with the transcode choices of the first attempt', async () => {
+    vi.mocked(downloadService.downloadForOffline).mockRejectedValueOnce(new Error('HTTP 500'));
+    const store = useDownloadStore();
+    store.startDownload('m1', { Name: 'Dune', Type: 'Movie' }, { maxBitrate: 8_000_000, audioStreamIndex: 2 });
+    await new Promise((resolve) => setTimeout(resolve));
+    expect(store.getTask('m1')?.status).toBe('failed');
+
+    await store.retry('m1');
+
+    expect(store._transcodeOptionsQueue.get('m1')).toEqual({ maxBitrate: 8_000_000, audioStreamIndex: 2 });
+  });
+
+  it('records the library of a finished download', async () => {
+    vi.mocked(downloadService.downloadForOffline).mockResolvedValueOnce(undefined);
+    const store = useDownloadStore();
+    store.startDownload('t1', { Name: 'Adagio', Type: 'Audio' });
+
+    await vi.waitFor(() => expect(offlineDatabase.patchDownload).toHaveBeenCalledWith('t1', { libraryId: 'music' }));
   });
 });

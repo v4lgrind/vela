@@ -6,6 +6,7 @@ import { useToast } from '@/composables/useToast';
 import { QUALITY_PRESETS } from '@/constants';
 import { i18n } from '@/i18n';
 import { downloadService } from '@/services/downloadService';
+import { offlineDatabase } from '@/services/offlineDatabase';
 import {
   canHardwareDecodeVideo,
   canSoftwareDecodeVideo,
@@ -131,8 +132,9 @@ export interface DownloadTask {
   /** Album of a track: the Téléchargés tab shows an album's tracks as one row. */
   groupId?: string;
   groupName?: string;
-  /** Kept after a failure, so the download can be retried. */
+  /** Kept after a failure, so the download can be retried as it was asked. */
   metadata?: any;
+  transcodeOptions?: TranscodeOptions;
 }
 
 export interface TranscodeOptions {
@@ -299,6 +301,9 @@ export const useDownloadStore = defineStore('downloads', {
       } catch (error) {
         logger.warn('[DownloadStore] Could not enrich offline metadata:', itemId, error);
       }
+      // Recorded with the download (online now) so it is listed in the right
+      // library even if the app is offline before any backfill runs.
+      const libraryId = await jellyfinStore.fetchLibraryIdOf(itemId).catch(() => undefined);
       if (this.tasks.get(itemId)?.status === 'cancelled') {
         this._processQueue();
         return;
@@ -362,6 +367,7 @@ export const useDownloadStore = defineStore('downloads', {
         const t = this.tasks.get(itemId);
         if (t) { t.status = 'completed'; t.progress = 100; }
 
+        if (libraryId) await offlineDatabase.patchDownload(itemId, { libraryId });
         const offlineStore = useOfflineStore();
         await offlineStore.loadDownloads();
         void offlineStore.backfillLibraryIds();
@@ -379,6 +385,7 @@ export const useDownloadStore = defineStore('downloads', {
           if (t.status === 'failed') {
             t.error = error.message || 'Download failed';
             t.metadata = metadata;
+            t.transcodeOptions = transcodeOptions;
           }
         }
         // The download runs after startDownload() resolved, so no caller sees this failure.
@@ -608,7 +615,7 @@ export const useDownloadStore = defineStore('downloads', {
     async retry(itemId: string) {
       const task = this.tasks.get(itemId);
       if (task?.status !== 'failed' || !task.metadata) return;
-      await this.startDownload(itemId, task.metadata);
+      await this.startDownload(itemId, task.metadata, task.transcodeOptions);
     },
 
     cancelDownload(itemId: string) {

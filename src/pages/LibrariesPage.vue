@@ -29,7 +29,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import type { BaseItemDto } from '@jellyfin/sdk/lib/generated-client/models/base-item-dto';
 import { BookOpen, Film, Folder, Library, Music, Tv } from 'lucide-vue-next';
@@ -37,6 +37,7 @@ import LazyImg from '@/components/LazyImg.vue';
 import { AppPage, PageHeader } from '@/components/layout';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useJellyfinStore } from '@/store/jellyfin-store';
+import { useRetryWhileFailed } from '@/composables/useRetryWhileFailed';
 
 const { t } = useI18n();
 const store = useJellyfinStore();
@@ -57,13 +58,17 @@ function iconFor(collectionType?: string | null) {
   return (collectionType && ICONS[collectionType]) || Folder;
 }
 
-onMounted(async () => {
+async function loadLibraries() {
   try {
     libraries.value = (await store.fetchLibraries()).filter((lib) => lib.Id);
+    error.value = null;
   } catch {
     if (!libraries.value.length) error.value = t('home.loadError');
   } finally {
     loading.value = false;
   }
-});
+}
+
+useRetryWhileFailed(computed(() => error.value !== null), loadLibraries);
+onMounted(loadLibraries);
 </script>

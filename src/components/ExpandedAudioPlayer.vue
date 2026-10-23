@@ -37,7 +37,7 @@
 
     <!-- Main Player -->
     <div v-if="!showQueue" class="flex-1 flex flex-col items-center justify-center gap-6 py-4">
-      <img v-if="albumArtUrl" :src="albumArtUrl" class="size-70 rounded-xl object-cover shadow-[0_20px_60px_rgba(0,0,0,0.5)]" :alt="t('audio.cover')" />
+      <img v-if="albumArtUrl && !artFailed" :key="artAttempt" @error="artFailed = true" :src="albumArtUrl" class="size-70 rounded-xl object-cover shadow-[0_20px_60px_rgba(0,0,0,0.5)]" :alt="t('audio.cover')" />
       <div v-else class="size-70 rounded-xl bg-border-input"></div>
 
       <div class="text-center max-w-full">
@@ -131,7 +131,8 @@
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n';
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
+import { useRetryWhileFailed } from '@/composables/useRetryWhileFailed';
 import { useAudioPlayerStore } from '@/store/audio-player-store';
 import { useJellyfinStore } from '@/store/jellyfin-store';
 import { formatTime } from '@/utils/helpers';
@@ -154,6 +155,15 @@ const albumArtUrl = computed(() => {
   const track = currentTrack.value;
   if (!track) return '';
   return jellyfinStore.getImageUrl(track.albumId || track.id, 'Primary', 560, 560);
+});
+
+// A cover that failed to load (network cut while locked) is fetched again.
+const artFailed = ref(false);
+const artAttempt = ref(0);
+watch(albumArtUrl, () => { artFailed.value = false; });
+useRetryWhileFailed(artFailed, () => {
+  artFailed.value = false;
+  artAttempt.value++;
 });
 
 // While the thumb is dragged, show its position; seek once on release.

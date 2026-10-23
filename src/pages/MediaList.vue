@@ -240,7 +240,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 import type { BaseItemDto } from '@jellyfin/sdk/lib/generated-client/models/base-item-dto';
@@ -257,6 +257,7 @@ import { useAudioPlayerStore } from '@/store/audio-player-store';
 import { audioPlayerService } from '@/services/audioPlayerService';
 import { useOfflineStore } from '@/store/offline-store';
 import { useDownloadStore } from '@/store/download-store';
+import { useRetryWhileFailed } from '@/composables/useRetryWhileFailed';
 
 const { t } = useI18n();
 const store = useJellyfinStore();
@@ -408,6 +409,8 @@ function playResume(item: HomeItem) {
 function goToItem(item: HomeItem) {
   router.push({ name: 'ItemDetails', params: { id: item.Id } });
 }
+
+useRetryWhileFailed(computed(() => error.value !== null), () => loadMedia());
 
 onMounted(() => {
   loadMedia();

@@ -10,7 +10,8 @@
     </div>
     <!-- Content -->
     <div class="flex-1 flex items-center px-3 gap-3">
-      <img v-if="albumArtUrl" :src="albumArtUrl" class="size-12 rounded-md object-cover shrink-0" :alt="t('audio.cover')" />
+      <img v-if="albumArtUrl && !artFailed" :key="artAttempt" :src="albumArtUrl" class="size-12 rounded-md object-cover shrink-0" :alt="t('audio.cover')"
+        @error="artFailed = true" />
       <div v-else class="size-12 rounded-md bg-border-input shrink-0"></div>
       <div class="flex-1 min-w-0">
         <div class="text-sm font-semibold text-text-heading truncate">{{ currentTrack?.name || '' }}</div>
@@ -43,13 +44,14 @@
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n';
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useAudioPlayerStore } from '@/store/audio-player-store';
 import { useJellyfinStore } from '@/store/jellyfin-store';
 import { Button } from '@/components/ui/button';
 import { Airplay, Cast, SkipBack, SkipForward, Play, Pause, X } from 'lucide-vue-next';
 import { useBottomNavVisible } from '@/composables/useBottomNav';
 import { useWideLayout } from '@/composables/useWideLayout';
+import { useRetryWhileFailed } from '@/composables/useRetryWhileFailed';
 import { miniPlayerStyle } from '@/utils/shellLayout';
 
 const { t } = useI18n();
@@ -69,6 +71,15 @@ const albumArtUrl = computed(() => {
   const track = currentTrack.value;
   if (!track) return '';
   return jellyfinStore.getImageUrl(track.albumId || track.id, 'Primary', 96, 96);
+});
+
+// A cover that failed to load (network cut while locked) is fetched again.
+const artFailed = ref(false);
+const artAttempt = ref(0);
+watch(albumArtUrl, () => { artFailed.value = false; });
+useRetryWhileFailed(artFailed, () => {
+  artFailed.value = false;
+  artAttempt.value++;
 });
 
 function expand() {

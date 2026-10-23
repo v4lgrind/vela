@@ -328,6 +328,7 @@ async function loadMedia(force = false) {
       store.fetchAllNextUp(20),
     ]);
     const validLibraries = libs.filter(hasHomeItemId);
+    void offlineStore.cacheLibraryArtwork();
     mediaItems.value = validLibraries.map(lib => ({
       Id: lib.Id,
       Name: lib.Name || '',

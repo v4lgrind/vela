@@ -19,9 +19,13 @@
         :aria-label="lib.Name ?? undefined"
         class="group relative rounded-xl overflow-hidden aspect-video bg-surface-raised
                active:scale-[0.97] active:opacity-75 transition-all duration-200">
-        <!-- Jellyfin's generated library images already carry the name -->
-        <LazyImg :src="artworkUrl(lib.Id, store.getImageUrl(lib.Id!, 'Primary', 800, 450) || '')" :alt="lib.Name ?? undefined"
+        <!-- Jellyfin's generated library images already carry the name; offline
+             without a cached image, the name is written instead. -->
+        <LazyImg v-if="tileImage(lib.Id!)" :src="tileImage(lib.Id!)" :alt="lib.Name ?? undefined"
           :item-type="lib.Type" class="block w-full h-full object-cover" />
+        <span v-else class="absolute inset-0 flex items-center justify-center px-3 text-center text-body font-semibold text-text-heading">
+          {{ lib.Name }}
+        </span>
         <span class="absolute top-2 left-2 size-8 rounded-full bg-black/50 backdrop-blur-sm
                      flex items-center justify-center">
           <component :is="iconFor(lib.CollectionType)" class="size-4 text-white/90" />
@@ -43,7 +47,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useJellyfinStore } from '@/store/jellyfin-store';
 import { useRetryWhileFailed } from '@/composables/useRetryWhileFailed';
 import { useOfflineArtwork } from '@/composables/useOfflineArtwork';
-import { downloadService } from '@/services/downloadService';
 import { useOfflineStore } from '@/store/offline-store';
 import { librariesWithDownloads } from '@/utils/offlineLibrary';
 
@@ -72,12 +75,8 @@ function iconFor(collectionType?: string | null) {
   return (collectionType && ICONS[collectionType]) || Folder;
 }
 
-/** Library tiles are cached so the list still has its images offline. */
-function cacheLibraryArtwork() {
-  if (!store.serverUrl || !store.accessToken) return;
-  for (const lib of libraries.value) {
-    void downloadService.cacheArtworkById(store.serverUrl, store.accessToken, lib.Id!, 'Primary', 800);
-  }
+function tileImage(id: string): string {
+  return artworkUrl(id, store.getImageUrl(id, 'Primary', 800, 450) || '');
 }
 
 async function loadLibraries() {
@@ -88,7 +87,7 @@ async function loadLibraries() {
   try {
     libraries.value = (await store.fetchLibraries()).filter((lib) => lib.Id);
     error.value = null;
-    cacheLibraryArtwork();
+    void offlineStore.cacheLibraryArtwork();
   } catch {
     if (!libraries.value.length) error.value = t('home.loadError');
   } finally {

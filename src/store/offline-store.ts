@@ -159,6 +159,7 @@ export const useOfflineStore = defineStore('offline', {
         this.backfillSizes()
           .then(() => this.backfillLibraryIds())
           .then(() => this.refreshDownloadedUserData())
+          .then(() => this.cacheLibraryArtwork())
           .catch((error) => logger.error('[OfflineStore] Backfill failed:', error));
       } catch (error) {
         logger.error('[OfflineStore] Failed to initialize:', error);
@@ -342,6 +343,16 @@ export const useOfflineStore = defineStore('offline', {
      */
     async getSeasonDownloads(seasonId: string): Promise<DownloadedMedia[]> {
       return await offlineDatabase.getDownloadsBySeason(seasonId);
+    },
+
+    /** Library tiles are cached so the library list still has its images offline. */
+    async cacheLibraryArtwork() {
+      const jellyfinStore = useJellyfinStore();
+      const { serverUrl, accessToken } = jellyfinStore;
+      if (!this.isFullyOnline || !serverUrl || !accessToken) return;
+      await Promise.allSettled(jellyfinStore.libraries
+        .filter((library) => library.Id)
+        .map((library) => downloadService.cacheArtworkById(serverUrl, accessToken, library.Id!, 'Primary', 800)));
     },
 
     /** Library of each download, from Jellyfin, for records that lack it (online only). */

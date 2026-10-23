@@ -297,7 +297,6 @@ class DownloadService {
       const download = await offlineDatabase.getDownload(itemId);
       if (!download) { logger.warn('File already deleted:', itemId); return; }
       try {
-        await this.statFile(download.filePath);
         await this.deleteFile(download.filePath);
         logger.log('🗑️ File deleted:', download.filePath);
       } catch { /* file doesn't exist */ }
@@ -329,6 +328,10 @@ class DownloadService {
   private async deleteFile(filePath: string): Promise<void> {
     if (isDesktop) {
       await deleteDesktopMedia(filePath);
+      return;
+    }
+    if (filePath.startsWith('content://')) {
+      await DownloadPlugin.delete({ uri: filePath });
       return;
     }
     await Filesystem.deleteFile(this.getAndroidFileOptions(filePath));

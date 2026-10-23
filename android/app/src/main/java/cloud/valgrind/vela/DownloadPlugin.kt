@@ -92,6 +92,18 @@ class DownloadPlugin : Plugin() {
         call.resolve()
     }
 
+    /** Deletes a content:// download (the Filesystem plugin only handles file paths). */
+    @PluginMethod
+    fun delete(call: PluginCall) {
+        val uri = call.getString("uri") ?: run { call.reject("uri is required"); return }
+        try {
+            context.contentResolver.delete(android.net.Uri.parse(uri), null, null)
+            call.resolve()
+        } catch (e: Exception) {
+            call.reject("Unable to delete $uri: ${e.message}")
+        }
+    }
+
     /**
      * Returns downloads that completed natively while the JS layer was not running
      * (e.g. app was killed). Clears the list after reading so items are only returned once.

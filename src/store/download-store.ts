@@ -357,6 +357,7 @@ export const useDownloadStore = defineStore('downloads', {
 
         const offlineStore = useOfflineStore();
         await offlineStore.loadDownloads();
+        void offlineStore.backfillLibraryIds();
 
         // Parent metadata and artwork are part of a completed episode download.
         if (metadata.Type === 'Episode') {

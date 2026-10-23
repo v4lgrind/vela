@@ -35,4 +35,9 @@ describe('buildOfflineArtworkTargets', () => {
       { itemId: 'movie-1', imageType: 'Backdrop', maxWidth: 1920 },
     ]);
   });
+
+  it('caches the album cover of a track', () => {
+    expect(buildOfflineArtworkTargets({ Id: 't', Type: 'Audio', AlbumId: 'al' }))
+      .toContainEqual({ itemId: 'al', imageType: 'Primary', maxWidth: 600 });
+  });
 });

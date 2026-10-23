@@ -56,6 +56,7 @@ interface OfflineArtworkMetadata {
   Type?: string;
   SeriesId?: string;
   SeasonId?: string;
+  AlbumId?: string;
   People?: Array<{
     Id?: string;
     PrimaryImageTag?: string;
@@ -81,6 +82,8 @@ export function buildOfflineArtworkTargets(metadata: OfflineArtworkMetadata): Of
     add(metadata.SeriesId, 'Backdrop', 1920);
     add(metadata.SeasonId, 'Primary', 600);
   }
+  // A track rarely has its own image: the album cover is what lists show.
+  if (metadata.Type === 'Audio') add(metadata.AlbumId, 'Primary', 600);
 
   for (const person of (metadata.People || []).slice(0, 20)) {
     if (person.PrimaryImageTag) add(person.Id, 'Primary', 400);

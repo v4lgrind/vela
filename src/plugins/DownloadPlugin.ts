@@ -31,6 +31,7 @@ export interface DownloadPluginInterface {
   enqueue(opts: DownloadEnqueueOptions): Promise<void>;
   cancel(opts: { itemId: string }): Promise<void>;
   delete(opts: { uri: string }): Promise<void>;
+  size(opts: { uri: string }): Promise<{ size: number }>;
   getPendingCompletions(): Promise<{ items: Array<{ itemId: string; filePath: string; fileSize: number }> }>;
   addListener(event: 'downloadProgress', handler: (e: DownloadProgressEvent) => void): Promise<PluginListenerHandle>;
   addListener(event: 'downloadComplete', handler: (e: DownloadCompleteEvent) => void): Promise<PluginListenerHandle>;

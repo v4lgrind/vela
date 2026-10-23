@@ -104,6 +104,25 @@ class DownloadPlugin : Plugin() {
         }
     }
 
+    /** Size in bytes of a content:// download, for records saved before sizes were stored. */
+    @PluginMethod
+    fun size(call: PluginCall) {
+        val uri = call.getString("uri") ?: run { call.reject("uri is required"); return }
+        try {
+            context.contentResolver.query(
+                android.net.Uri.parse(uri), arrayOf(android.provider.OpenableColumns.SIZE), null, null, null,
+            )?.use { cursor ->
+                if (cursor.moveToFirst() && !cursor.isNull(0)) {
+                    call.resolve(JSObject().put("size", cursor.getLong(0)))
+                    return
+                }
+            }
+            call.reject("No size for $uri")
+        } catch (e: Exception) {
+            call.reject("Unable to read the size of $uri: ${e.message}")
+        }
+    }
+
     /**
      * Returns downloads that completed natively while the JS layer was not running
      * (e.g. app was killed). Clears the list after reading so items are only returned once.

@@ -15,6 +15,7 @@ import {
 import { Preferences } from "@capacitor/preferences";
 
 import { getClientDeviceInfo } from "@/composables/usePlatform";
+import { pickLibraryId } from "@/utils/libraryOf";
 
 const CLIENT_VERSION = "1.0.0";
 const clientDeviceInfo = getClientDeviceInfo();
@@ -162,7 +163,8 @@ export const useJellyfinStore = defineStore("jellyfin", {
     homeCache: null,
   }),
   persist: {
-    pick: ['serverUrl', 'savedServers', '_qcDeviceId'],
+    // libraries: remembered so the offline library list shows the real ones.
+    pick: ['serverUrl', 'savedServers', '_qcDeviceId', 'libraries'],
   },
   actions: {
     async initializeApiAsync() {
@@ -355,6 +357,30 @@ export const useJellyfinStore = defineStore("jellyfin", {
       const resp = await getLibraryApi(this.api).getItems(apiParams);
       this.items = resp.data.Items || [];
       return { items: this.items, total: resp.data.TotalRecordCount ?? this.items.length };
+    },
+
+    /** The library (user view) an item belongs to, from its ancestors. */
+    async fetchLibraryIdOf(itemId: string): Promise<string | undefined> {
+      this.initializeApi();
+      const resp = await getLibraryApi(this.api).getAncestors({ itemId, userId: this.userId });
+      const libraryIds = this.libraries.map((library) => library.Id).filter((id): id is string => !!id);
+      return pickLibraryId(resp.data ?? [], libraryIds);
+    },
+
+    /** Items by id, with their user data (100 ids per request). */
+    async fetchItemsByIds(ids: string[]): Promise<BaseItemDto[]> {
+      this.initializeApi();
+      const items: BaseItemDto[] = [];
+      for (let i = 0; i < ids.length; i += 100) {
+        const resp = await getLibraryApi(this.api).getItems({
+          userId: this.userId,
+          ids: ids.slice(i, i + 100),
+          recursive: true,
+          enableUserData: true,
+        });
+        items.push(...(resp.data.Items ?? []));
+      }
+      return items;
     },
 
     async fetchGenres(libraryId: string) {

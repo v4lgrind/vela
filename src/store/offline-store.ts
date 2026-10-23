@@ -169,6 +169,11 @@ export const useOfflineStore = defineStore('offline', {
 
         // Mark as initialized
         this.initialized = true;
+
+        // Records saved before sizes and library ids were stored: fix them in the background.
+        this.backfillSizes()
+          .then(() => this.backfillLibraryIds())
+          .catch((error) => logger.error('[OfflineStore] Backfill failed:', error));
       } catch (error) {
         logger.error('[OfflineStore] Failed to initialize:', error);
         // Mark as initialized even on error to prevent UI crashes
@@ -353,6 +358,40 @@ export const useOfflineStore = defineStore('offline', {
       return await offlineDatabase.getDownloadsBySeason(seasonId);
     },
 
+    /** Library of each download, from Jellyfin, for records that lack it (online only). */
+    async backfillLibraryIds() {
+      if (!this.isFullyOnline) return;
+      const jellyfinStore = useJellyfinStore();
+      if (!jellyfinStore.serverUrl || !jellyfinStore.accessToken) return;
+      const missing = this.downloads.filter((download) => !download.libraryId);
+      if (!missing.length) return;
+      for (const download of missing) {
+        try {
+          const libraryId = await jellyfinStore.fetchLibraryIdOf(download.itemId);
+          if (libraryId) await offlineDatabase.addDownload({ ...download, libraryId });
+        } catch (error) {
+          logger.warn('[OfflineStore] Could not find the library of', download.itemId, error);
+        }
+      }
+      await this.loadDownloads();
+    },
+
+    /** Real size of Android downloads recorded as 0 B (content:// files can't be stat'ed). */
+    async backfillSizes() {
+      if (!Capacitor.isNativePlatform()) return;
+      const missing = this.downloads.filter((download) => !download.fileSize && download.filePath.startsWith('content://'));
+      if (!missing.length) return;
+      for (const download of missing) {
+        try {
+          const { size } = await DownloadPlugin.size({ uri: download.filePath });
+          await offlineDatabase.addDownload({ ...download, fileSize: size });
+        } catch (error) {
+          logger.warn('[OfflineStore] Could not read the size of', download.itemId, error);
+        }
+      }
+      await this.loadDownloads();
+    },
+
     /**
      * Setup auto-sync when coming back online
      */
@@ -367,6 +406,7 @@ export const useOfflineStore = defineStore('offline', {
         if (!previousOnlineStatus && currentOnlineStatus) {
           logger.log('[OfflineStore] Back online, triggering sync...');
           this.syncWatchProgress();
+          this.backfillLibraryIds();
         }
 
         previousOnlineStatus = currentOnlineStatus;

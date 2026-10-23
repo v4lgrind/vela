@@ -23,6 +23,7 @@ export interface DownloadedMedia {
   episodeNumber?: number;
   albumId?: string; // For music tracks
   albumName?: string;
+  libraryId?: string; // Jellyfin library (user view) holding the item; backfilled while online
 
   // Cached Jellyfin item for details page
   jellyfinItem: any; // Full item object

@@ -350,5 +350,8 @@
       "hlsUnsupported": "HLS playback is not supported on this device",
       "generic": "Playback error — please go back and try again"
     }
+  },
+  "offline": {
+    "banner": "Offline · only your downloads are shown"
   }
 }

@@ -350,5 +350,8 @@
       "hlsUnsupported": "La lecture HLS n'est pas prise en charge sur cet appareil",
       "generic": "Erreur de lecture — revenez en arrière et réessayez"
     }
+  },
+  "offline": {
+    "banner": "Hors ligne · seuls vos téléchargements sont affichés"
   }
 }

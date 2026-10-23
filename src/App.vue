@@ -78,16 +78,6 @@ function applyTheme(scheme: 'dark' | 'light' | 'system') {
 
 watch(() => preferencesStore.colorScheme, (scheme) => applyTheme(scheme));
 
-// Redirect to offline library when going offline while on a server-browsing page
-watch(
-  () => [offlineStore.isFullyOnline, preferencesStore.forceOfflineMode] as const,
-  ([online, forceOffline]) => {
-    if ((!online || forceOffline) && (route.name === 'libraries' || route.name === 'libraryList' || route.name === 'libraryItem')) {
-      router.replace({ name: 'offline' });
-    }
-  },
-);
-
 // Sync offline watch progress when forceOfflineMode is disabled
 watch(
   () => preferencesStore.forceOfflineMode,

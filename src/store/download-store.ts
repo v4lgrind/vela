@@ -2,7 +2,9 @@ import { defineStore } from 'pinia';
 import { Capacitor } from '@capacitor/core';
 
 import { getClientPlatform } from '@/composables/usePlatform';
+import { useToast } from '@/composables/useToast';
 import { QUALITY_PRESETS } from '@/constants';
+import { i18n } from '@/i18n';
 import { downloadService } from '@/services/downloadService';
 import {
   canHardwareDecodeVideo,
@@ -367,6 +369,10 @@ export const useDownloadStore = defineStore('downloads', {
         if (t) {
           t.status = error?.name === 'AbortError' ? 'cancelled' : 'failed';
           if (t.status === 'failed') t.error = error.message || 'Download failed';
+        }
+        // The download runs after startDownload() resolved, so no caller sees this failure.
+        if (error?.name !== 'AbortError') {
+          useToast().showError(i18n.global.t('detail.downloadEpisodeFailed', { name: metadata.Name }));
         }
       } finally {
         this._metadataQueue.delete(itemId);

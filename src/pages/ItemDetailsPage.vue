@@ -393,7 +393,7 @@
                                 <Loader2 v-else-if="downloadStore.isDownloading(track.Id)" class="size-3.5 text-accent-purple animate-spin" />
                                 <span class="text-text-subtle text-xs tabular-nums">{{ formatTicksDuration(track.RunTimeTicks) }}</span>
                             </div>
-                            <TrackActionsMenu @play-next="queueTrack(track, 'next')" @add-to-queue="queueTrack(track, 'end')" />
+                            <TrackActionsMenu :track="track" @play-next="queueTrack(track, 'next')" @add-to-queue="queueTrack(track, 'end')" />
                         </div>
                     </div>
                 </Section>

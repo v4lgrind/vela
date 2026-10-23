@@ -16,6 +16,17 @@
           @select="emit('addToQueue')">
           <ListPlus class="size-4" /> {{ t('audio.addToQueue') }}
         </DropdownMenuItem>
+        <template v-if="track">
+          <DropdownMenuItem v-if="isDownloaded" class="flex items-center gap-2.5 min-h-11 rounded-lg px-3 py-2.5 text-sm text-text-primary outline-none data-highlighted:bg-white/10 cursor-pointer" @select="removeDownload">
+            <Trash2 class="size-4" /> {{ t('audio.removeDownload') }}
+          </DropdownMenuItem>
+          <DropdownMenuItem v-else-if="isDownloading" class="flex items-center gap-2.5 min-h-11 rounded-lg px-3 py-2.5 text-sm text-text-primary outline-none data-highlighted:bg-white/10 cursor-pointer" @select="downloadStore.cancelDownload(track.Id)">
+            <X class="size-4" /> {{ t('audio.cancelDownload') }}
+          </DropdownMenuItem>
+          <DropdownMenuItem v-else class="flex items-center gap-2.5 min-h-11 rounded-lg px-3 py-2.5 text-sm text-text-primary outline-none data-highlighted:bg-white/10 cursor-pointer" @select="download">
+            <Download class="size-4" /> {{ t('detail.download') }}
+          </DropdownMenuItem>
+        </template>
       </DropdownMenuContent>
     </DropdownMenuPortal>
   </DropdownMenuRoot>
@@ -24,11 +35,39 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n';
 import { DropdownMenuContent, DropdownMenuItem, DropdownMenuPortal, DropdownMenuRoot, DropdownMenuTrigger } from 'reka-ui';
-import { EllipsisVertical, ListPlus, ListStart } from 'lucide-vue-next';
+import { Download, EllipsisVertical, ListPlus, ListStart, Trash2, X } from 'lucide-vue-next';
+import { computed } from 'vue';
+import { useToast } from '@/composables/useToast';
 import { cn } from '@/lib/utils';
+import { downloadService } from '@/services/downloadService';
+import { useDownloadStore } from '@/store/download-store';
+import { useOfflineStore } from '@/store/offline-store';
 
 const { t } = useI18n();
-defineProps<{ triggerClass?: string }>();
+// track: the Jellyfin Audio item; when given, the menu also downloads it for offline play.
+const props = defineProps<{ triggerClass?: string; track?: any }>();
+const downloadStore = useDownloadStore();
+const offlineStore = useOfflineStore();
+const toast = useToast();
+
+const isDownloaded = computed(() => !!props.track && offlineStore.isItemDownloaded(props.track.Id));
+const isDownloading = computed(() => !!props.track && downloadStore.isDownloading(props.track.Id));
+
+function download() {
+  downloadStore.startDownload(props.track.Id, props.track).catch((error: any) => {
+    if (error?.name !== 'AbortError') toast.showError(t('detail.downloadFailed'));
+  });
+}
+
+async function removeDownload() {
+  if (!confirm(t('detail.confirmDelete', { name: props.track.Name }))) return;
+  try {
+    await downloadService.deleteOfflineFile(props.track.Id);
+    await offlineStore.removeDownload(props.track.Id);
+  } catch {
+    toast.showError(t('detail.deleteFailed'));
+  }
+}
 
 const emit = defineEmits<{ playNext: []; addToQueue: [] }>();
 </script>

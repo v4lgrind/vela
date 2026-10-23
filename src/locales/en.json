@@ -99,7 +99,9 @@
     "removeFromQueue": "Remove from queue",
     "more": "More",
     "playNext": "Play next",
-    "addToQueue": "Add to queue"
+    "addToQueue": "Add to queue",
+    "removeDownload": "Remove download",
+    "cancelDownload": "Cancel download"
   },
   "detail": {
     "episodes": "{n} episode | {n} episodes",

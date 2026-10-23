@@ -99,7 +99,9 @@
     "removeFromQueue": "Retirer de la file",
     "more": "Plus",
     "playNext": "Lire ensuite",
-    "addToQueue": "Ajouter à la file"
+    "addToQueue": "Ajouter à la file",
+    "removeDownload": "Supprimer le téléchargement",
+    "cancelDownload": "Annuler le téléchargement"
   },
   "detail": {
     "episodes": "{n} épisode | {n} épisodes",

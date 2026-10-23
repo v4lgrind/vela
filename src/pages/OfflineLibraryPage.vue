@@ -1,364 +1,156 @@
 <template>
   <AppPage class="min-h-dvh bg-background pb-6 text-text-primary">
-    <PageHeader :title="pageTitle" :back="showBackButton" :on-back="navigateBack" class="mb-4" />
+    <PageHeader :title="t('downloads.title')" class="mb-4" />
 
-    <!-- Active Downloads -->
-    <section v-if="activeDownloads.length > 0 && view === 'root'" class="mb-8">
-      <div class="flex items-center justify-between mb-4">
-        <h2 class="text-xl font-semibold text-accent-purple-light flex items-center gap-2">
-          <Loader2 class="size-5 animate-spin" />
-          {{ t('downloads.active', { n: activeDownloads.length }) }}
-        </h2>
-        <Button variant="ghost" size="sm" class="text-red-400 hover:text-red-300 hover:bg-red-500/10" @click="cancelAll">
-          <X class="size-4 mr-1" /> {{ t('downloads.cancelAll') }}
-        </Button>
-      </div>
-      <div class="space-y-3">
-        <Card v-for="task in activeDownloads" :key="task.itemId" class="bg-surface-raised border-border-default p-4">
-          <div class="flex items-center justify-between gap-4 mb-2">
-            <div class="flex-1 min-w-0">
-              <div class="font-medium text-text-heading truncate">{{ task.name }}</div>
-              <div class="text-xs text-text-muted">
-                <template v-if="task.status === 'queued'">{{ t('downloads.queued') }}</template>
-                <template v-else-if="!task.total">
-                  {{ task.transcoding ? t('downloads.transcodingDownloading') : t('downloads.downloading') }} {{ formatSize(task.loaded) }}
-                </template>
-                <template v-else>{{ formatSize(task.loaded) }} / {{ formatSize(task.total) }}</template>
-              </div>
-            </div>
-            <div class="flex items-center gap-1">
-              <Badge v-if="task.transcoding" class="bg-amber-500/20 text-amber-400 text-[0.65rem]">{{ t('downloads.transcoding') }}</Badge>
-              <Button variant="ghost" size="icon" :aria-label="t('common.cancel')" @click="cancelDownload(task.itemId)" class="text-red-400 hover:text-red-300 hover:bg-red-500/10">
-                <X class="size-4" />
-              </Button>
-            </div>
-          </div>
-          <div class="h-2 bg-white/10 rounded-full overflow-hidden">
-            <!-- Indeterminate animation when total size is unknown -->
-            <div v-if="!task.total && task.status === 'downloading'"
-              class="h-full rounded-full animate-indeterminate"
-              :class="task.transcoding ? 'bg-amber-500' : 'bg-accent-purple'" />
-            <div v-else class="h-full transition-all duration-300"
-              :class="task.status === 'queued' ? 'bg-white/20' : 'bg-accent-purple'"
-              :style="{ width: task.status === 'queued' ? '100%' : `${task.progress}%` }" />
-          </div>
-          <div class="text-right text-xs mt-1" :class="!task.total ? (task.transcoding ? 'text-amber-400' : 'text-accent-purple-light') : task.status === 'queued' ? 'text-text-muted' : 'text-accent-purple-light'">
-            <template v-if="task.status === 'queued'">{{ t('downloads.waiting') }}</template>
-            <template v-else-if="!task.total">{{ t('downloads.downloadedSize', { size: formatSize(task.loaded) }) }}</template>
-            <template v-else>{{ task.progress }}%</template>
-          </div>
-        </Card>
-      </div>
-    </section>
-
-    <!-- Empty state -->
-    <EmptyState v-if="offlineStore.downloadCount === 0 && activeDownloads.length === 0"
+    <EmptyState v-if="!offlineStore.downloadCount && !activeGroups.length && !failedTasks.length"
       :icon="DownloadIcon" :title="t('downloads.emptyTitle')" :text="t('downloads.emptyText')">
       <template #action>
         <Button as-child><router-link :to="{ name: 'libraryList' }">{{ t('downloads.browse') }}</router-link></Button>
       </template>
     </EmptyState>
 
-    <template v-else>
+    <div v-else class="flex flex-col gap-6">
+      <!-- Storage summary -->
+      <div class="flex items-center gap-3 rounded-2xl border border-border-default bg-surface px-4 py-3">
+        <div class="min-w-0 flex-1">
+          <div class="text-body font-semibold text-text-heading">{{ t('downloads.onDevice', { size: formatSize(storage.total) }) }}</div>
+          <div class="text-caption text-text-muted">{{ storageDetail }}</div>
+        </div>
+        <router-link :to="{ name: 'libraryList' }"
+          class="inline-flex min-h-11 items-center text-sm font-semibold text-accent-purple">
+          {{ t('downloads.browseShort') }}
+        </router-link>
+      </div>
 
-      <!-- ── ROOT VIEW ── -->
-      <template v-if="view === 'root'">
+      <!-- Running downloads: an album counts as one row -->
+      <section v-if="activeGroups.length" :aria-label="t('downloads.inProgress', { n: activeGroups.length })">
+        <div class="mb-2 flex items-center justify-between">
+          <h2 class="text-label font-semibold uppercase tracking-wide text-text-muted">
+            {{ t('downloads.inProgress', { n: activeGroups.length }) }}
+          </h2>
+          <Button variant="ghost" size="sm" class="text-red-400 hover:text-red-300" @click="cancelAll">
+            {{ t('downloads.cancelAll') }}
+          </Button>
+        </div>
+        <ul class="flex flex-col">
+          <li v-for="group in activeGroups" :key="group.key" class="flex items-center gap-3 py-2">
+            <LazyImg :src="imageOf(group.key)" :alt="group.name" item-type="Audio"
+              class="size-12 shrink-0 rounded-lg object-cover" />
+            <div class="flex min-w-0 flex-1 flex-col gap-1.5">
+              <div class="flex justify-between gap-2">
+                <span class="truncate text-body font-semibold text-text-heading">{{ group.name }}</span>
+                <span class="shrink-0 text-caption text-text-primary tabular-nums">{{ group.progress }}%</span>
+              </div>
+              <div class="h-1 overflow-hidden rounded-full bg-border-default">
+                <div class="h-full rounded-full bg-accent-purple transition-all" :style="{ width: group.progress + '%' }" />
+              </div>
+              <span v-if="group.total > 1" class="text-caption text-text-muted">
+                {{ t('downloads.tracksOf', { done: group.done, total: group.total }) }}
+              </span>
+            </div>
+            <Button variant="ghost" size="icon" class="shrink-0 rounded-full"
+              :aria-label="t('audio.cancelDownload')" @click="cancelGroup(group.itemIds)">
+              <X class="size-5" />
+            </Button>
+          </li>
+        </ul>
+      </section>
 
-        <!-- Stats -->
-        <div class="flex gap-4 mb-4 flex-wrap">
-          <Card class="bg-surface-raised border-border-input px-5 py-3 flex flex-col items-center gap-1">
-            <span class="text-2xl font-bold text-accent-purple-light">{{ offlineStore.downloadCount }}</span>
-            <span class="text-sm text-text-muted">{{ t('downloads.items', offlineStore.downloadCount) }}</span>
-          </Card>
-          <Card class="bg-surface-raised border-border-input px-5 py-3 flex flex-col items-center gap-1">
-            <span class="text-2xl font-bold text-accent-purple-light">{{ formatSize(offlineStore.totalStorageUsed) }}</span>
-            <span class="text-sm text-text-muted">{{ t('downloads.storage') }}</span>
-          </Card>
-          <Button variant="ghost" @click="deleteAll" class="ml-auto self-center text-red-400 hover:text-red-300">
+      <!-- Failures -->
+      <section v-if="failedTasks.length" :aria-label="t('downloads.failed', { n: failedTasks.length })">
+        <h2 class="mb-2 text-label font-semibold uppercase tracking-wide text-text-muted">
+          {{ t('downloads.failed', { n: failedTasks.length }) }}
+        </h2>
+        <ul class="flex flex-col">
+          <li v-for="task in failedTasks" :key="task.itemId" class="flex items-center gap-3 py-2">
+            <div class="min-w-0 flex-1">
+              <div class="truncate text-body font-semibold text-text-heading">{{ task.name }}</div>
+              <div class="text-caption text-error">{{ t('detail.downloadFailed') }}</div>
+            </div>
+            <Button variant="secondary" size="sm" class="shrink-0 rounded-full" @click="downloadStore.retry(task.itemId)">
+              <RotateCcw class="size-4" /> {{ t('downloads.retry') }}
+            </Button>
+            <Button variant="ghost" size="icon" class="shrink-0 rounded-full" :aria-label="t('downloads.dismiss')"
+              @click="downloadStore.removeTask(task.itemId)">
+              <X class="size-5" />
+            </Button>
+          </li>
+        </ul>
+      </section>
+
+      <!-- What is on the device -->
+      <section v-if="storedGroups.length" :aria-label="t('downloads.stored')">
+        <div class="mb-2 flex items-center justify-between">
+          <h2 class="text-label font-semibold uppercase tracking-wide text-text-muted">{{ t('downloads.stored') }}</h2>
+          <Button variant="ghost" size="sm" class="text-red-400 hover:text-red-300" @click="deleteAll">
             {{ t('downloads.deleteAll') }}
           </Button>
         </div>
-        <!-- Storage breakdown by type -->
-        <div v-if="offlineStore.downloadCount > 0" class="text-xs text-text-muted mb-8">
-          <span v-if="movieStorageBytes > 0">{{ t('downloads.storageOf', { type: t('downloads.movies'), size: formatSize(movieStorageBytes) }) }}</span>
-          <span v-if="movieStorageBytes > 0 && tvStorageBytes > 0"> · </span>
-          <span v-if="tvStorageBytes > 0">{{ t('downloads.storageOf', { type: t('downloads.shows'), size: formatSize(tvStorageBytes) }) }}</span>
-          <span v-if="(movieStorageBytes > 0 || tvStorageBytes > 0) && musicStorageBytes > 0"> · </span>
-          <span v-if="musicStorageBytes > 0">{{ t('downloads.storageOf', { type: t('downloads.music'), size: formatSize(musicStorageBytes) }) }}</span>
-        </div>
-
-        <!-- Movies -->
-        <section v-if="offlineStore.movieDownloads.length > 0" class="mb-10">
-          <h2 class="text-lg font-semibold mb-4 text-accent-purple-light">{{ t('downloads.movies') }} ({{ offlineStore.movieDownloads.length }})</h2>
-          <ul class="list-none p-0 m-0 grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-3 sm:grid-cols-[repeat(auto-fill,minmax(150px,1fr))] sm:gap-4">
-            <li v-for="movie in offlineStore.movieDownloads" :key="movie.itemId">
-              <MediaCard :item="movie" @delete="deleteDownload(movie.itemId, movie.name)">
-                <router-link :to="{ name: 'ItemDetails', params: { id: movie.itemId } }" class="block w-full aspect-[2/3] rounded-[10px] overflow-hidden bg-black/60 shadow-lg relative">
-                  <LazyImg :src="getImageUrl(movie.itemId, 'Movie')" :alt="movie.name" item-type="Movie" class="w-full h-full object-cover block" />
-                  <Badge class="absolute top-2 right-2 bg-accent-purple text-white size-6 rounded-full flex items-center justify-center p-0 text-xs font-bold shadow-lg">✓</Badge>
-                </router-link>
-                <template #title>{{ movie.name }}</template>
-                <template #meta>{{ formatSize(movie.fileSize) }}</template>
-              </MediaCard>
-            </li>
-          </ul>
-        </section>
-
-        <!-- TV Shows — series grid -->
-        <section v-if="offlineStore.tvShowsGrouped.length > 0" class="mb-10">
-          <h2 class="text-lg font-semibold mb-4 text-accent-purple-light">{{ t('downloads.shows') }} ({{ offlineStore.tvShowsGrouped.length }})</h2>
-          <ul class="list-none p-0 m-0 grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-3 sm:grid-cols-[repeat(auto-fill,minmax(150px,1fr))] sm:gap-4">
-            <li v-for="series in offlineStore.tvShowsGrouped" :key="series.seriesId">
-              <div class="cursor-pointer group active:scale-[0.97] active:opacity-75 transition-all duration-200" @click="openSeries(series)">
-                <div class="w-full aspect-[2/3] rounded-[10px] overflow-hidden bg-black/60 shadow-lg relative
-                            group-hover:-translate-y-1 group-hover:shadow-xl transition-all duration-200">
-                  <LazyImg :src="getImageUrl(series.seriesId, 'Series')" :alt="series.seriesName"
-                    item-type="Series" class="w-full h-full object-cover block" />
-                  <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
-                  <div class="absolute bottom-0 left-0 right-0 px-2 pb-2">
-                    <span class="text-[0.65rem] text-white/70">
-                      {{ t('downloads.seasons', series.seasons.length) }}
-                    </span>
-                  </div>
-                </div>
-                <div class="mt-2 text-center">
-                  <div class="text-[0.9rem] font-semibold text-text-heading truncate leading-tight" :title="series.seriesName">
-                    {{ series.seriesName }}
-                  </div>
-                  <div class="text-xs text-text-muted">
-                    {{ t('downloads.episodes', totalEpisodes(series)) }}
-                  </div>
-                </div>
-              </div>
-            </li>
-          </ul>
-        </section>
-
-        <!-- Music -->
-        <section v-if="offlineStore.musicDownloads.length > 0" class="mb-10">
-          <h2 class="text-lg font-semibold mb-4 text-accent-purple-light">{{ t('downloads.music') }} ({{ offlineStore.musicDownloads.length }})</h2>
-          <ul class="list-none p-0 m-0 grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-3 sm:grid-cols-[repeat(auto-fill,minmax(140px,1fr))] sm:gap-4">
-            <li v-for="music in offlineStore.musicDownloads" :key="music.itemId">
-              <MediaCard :item="music" @delete="deleteDownload(music.itemId, music.name)">
-                <router-link :to="{ name: 'ItemDetails', params: { id: music.itemId } }" class="block w-full aspect-square rounded-[10px] overflow-hidden bg-black/60 shadow-lg relative">
-                  <LazyImg :src="getImageUrl(music.itemId, 'Audio')" :alt="music.name" item-type="Audio" class="w-full h-full object-cover block" />
-                  <Badge class="absolute top-2 right-2 bg-accent-purple text-white size-6 rounded-full flex items-center justify-center p-0 text-xs font-bold shadow-lg">✓</Badge>
-                </router-link>
-                <template #title>{{ music.name }}</template>
-                <template #meta>{{ formatSize(music.fileSize) }}</template>
-              </MediaCard>
-            </li>
-          </ul>
-        </section>
-      </template>
-
-      <!-- ── SEASONS VIEW ── -->
-      <template v-else-if="view === 'seasons' && selectedSeries">
-        <div class="flex justify-end mb-4">
-          <Button variant="destructive" size="sm" @click="deleteAllSeries(selectedSeries)">
-            <Trash2 class="size-3.5 mr-1" /> {{ t('downloads.deleteSeries') }}
-          </Button>
-        </div>
-        <ul class="list-none p-0 m-0 grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-3 sm:grid-cols-[repeat(auto-fill,minmax(150px,1fr))] sm:gap-4">
-          <li v-for="season in selectedSeries.seasons" :key="season.seasonId">
-            <div class="cursor-pointer group active:scale-[0.97] active:opacity-75 transition-all duration-200" @click="openSeason(season)">
-              <div class="w-full aspect-[2/3] rounded-[10px] overflow-hidden bg-black/60 shadow-lg relative
-                          group-hover:-translate-y-1 group-hover:shadow-xl transition-all duration-200">
-                <LazyImg :src="getImageUrl(season.seasonId, 'Season')" :alt="t('downloads.season', { n: season.seasonNumber })"
-                  item-type="Season" class="w-full h-full object-cover block" />
-                <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
-                <div class="absolute bottom-0 left-0 right-0 px-2 pb-2">
-                  <span class="text-[0.65rem] text-white/70">{{ t('downloads.episodes', season.episodes.length) }}</span>
-                </div>
-              </div>
-              <div class="mt-2 text-center">
-                <div class="text-[0.9rem] font-semibold text-text-heading">{{ t('downloads.season', { n: season.seasonNumber }) }}</div>
-                <div class="text-xs text-text-muted">{{ t('downloads.downloadedCount', season.episodes.length) }}</div>
-              </div>
-            </div>
-          </li>
-        </ul>
-      </template>
-
-      <!-- ── EPISODES VIEW ── -->
-      <template v-else-if="view === 'episodes' && selectedSeason">
-        <div class="flex justify-end mb-4">
-          <Button variant="destructive" size="sm" @click="deleteAllSeason(selectedSeason)">
-            <Trash2 class="size-3.5 mr-1" /> {{ t('downloads.deleteSeason') }}
-          </Button>
-        </div>
-        <div class="flex flex-col gap-2">
-          <div v-for="ep in selectedSeason.episodes" :key="ep.itemId"
-            class="flex gap-3 p-3 rounded-xl border border-border-default bg-surface-raised hover:border-border-hover hover:bg-surface-hover transition-all duration-200">
-            <!-- Thumbnail -->
-            <router-link :to="{ name: 'ItemDetails', params: { id: ep.itemId } }"
-              class="relative w-[120px] h-[68px] sm:w-[160px] sm:h-[90px] rounded-lg overflow-hidden bg-black/40 shrink-0">
-              <LazyImg :src="getImageUrl(ep.itemId, 'Episode')" :alt="ep.name"
-                item-type="Episode" class="w-full h-full object-cover block" />
-              <div class="absolute bottom-1 left-1.5">
-                <span class="text-[0.6rem] text-white/80 font-semibold bg-black/60 rounded px-1">E{{ ep.episodeNumber }}</span>
+        <ul class="flex flex-col">
+          <li v-for="group in storedGroups" :key="group.key" class="flex items-center gap-3 py-1.5">
+            <router-link :to="{ name: 'ItemDetails', params: { id: group.imageId } }" class="flex min-h-11 min-w-0 flex-1 items-center gap-3">
+              <LazyImg :src="artworkUrl(group.imageId, jellyfinStore.getImageUrl(group.imageId, 'Primary', 150, 150) || '')"
+                :alt="group.name" :item-type="group.kind === 'album' ? 'MusicAlbum' : 'Movie'"
+                class="size-12 shrink-0 rounded-lg object-cover" />
+              <div class="min-w-0">
+                <div class="truncate text-body font-semibold text-text-heading">{{ group.name }}</div>
+                <div class="text-caption text-text-muted">{{ groupMeta(group) }}</div>
               </div>
             </router-link>
-            <!-- Info -->
-            <div class="flex-1 min-w-0 flex flex-col justify-between py-0.5">
-              <div>
-                <router-link :to="{ name: 'ItemDetails', params: { id: ep.itemId } }"
-                  class="font-semibold text-sm text-text-heading line-clamp-2 hover:text-accent-purple-light transition-colors">
-                  {{ ep.name }}
-                </router-link>
-                <div class="text-xs text-text-muted mt-0.5">{{ formatSize(ep.fileSize) }}</div>
-              </div>
-              <Button variant="destructive" size="sm" class="self-start mt-2" @click="deleteDownload(ep.itemId, ep.name)">
-                <Trash2 class="size-3.5 mr-1" /> {{ t('common.delete') }}
-              </Button>
-            </div>
-          </div>
-        </div>
-      </template>
-
-    </template>
+            <Button variant="ghost" size="icon" class="shrink-0 rounded-full text-text-muted"
+              :aria-label="t('detail.confirmDelete', { name: group.name })" @click="deleteGroup(group)">
+              <Trash2 class="size-5" />
+            </Button>
+          </li>
+        </ul>
+      </section>
+    </div>
   </AppPage>
 </template>
 
 <script setup lang="ts">
-import { onMounted, computed, ref, watch } from 'vue';
+import { computed, onMounted, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { onBeforeRouteLeave } from 'vue-router';
-import { AppPage, EmptyState, PageHeader } from '@/components/layout';
-import { i18n } from '@/i18n';
-import { useOfflineStore } from '@/store/offline-store';
-import { useJellyfinStore } from '@/store/jellyfin-store';
-import { useDownloadStore } from '@/store/download-store';
-import { downloadService } from '@/services/downloadService';
-import LazyImg from '@/components/LazyImg.vue';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Download as DownloadIcon, Trash2, X, Loader2 } from 'lucide-vue-next';
-import { defineComponent, h } from 'vue';
+import { Download as DownloadIcon, RotateCcw, Trash2, X } from 'lucide-vue-next';
 
-// Inline media card helper component
-const MediaCard = defineComponent({
-  props: { item: Object },
-  emits: ['delete'],
-  setup(_, { slots, emit }) {
-    return () => h('div', { class: 'flex flex-col' }, [
-      slots.default?.(),
-      h('div', { class: 'mt-2 text-center' }, [
-        h('div', { class: 'text-[0.9rem] font-semibold text-text-heading truncate leading-tight' }, slots.title?.()),
-        h('div', { class: 'text-xs text-text-muted mb-2' }, slots.meta?.()),
-        h(Button, { variant: 'destructive', size: 'sm', class: 'w-full', onClick: () => emit('delete') }, () => [
-          h(Trash2, { class: 'size-3.5 mr-1' }), i18n.global.t('common.delete'),
-        ]),
-      ]),
-    ]);
-  },
-});
+import LazyImg from '@/components/LazyImg.vue';
+import { AppPage, EmptyState, PageHeader } from '@/components/layout';
+import { Button } from '@/components/ui/button';
+import { useOfflineArtwork } from '@/composables/useOfflineArtwork';
+import { downloadService } from '@/services/downloadService';
+import { useDownloadStore } from '@/store/download-store';
+import { useJellyfinStore } from '@/store/jellyfin-store';
+import { useOfflineStore } from '@/store/offline-store';
+import { groupActiveTasks, groupStored, storageByKind, type StoredGroup } from '@/utils/downloadGroups';
 
 const { t } = useI18n();
 const offlineStore = useOfflineStore();
 const jellyfinStore = useJellyfinStore();
 const downloadStore = useDownloadStore();
+const { artworkUrl, preload } = useOfflineArtwork();
 
-type View = 'root' | 'seasons' | 'episodes';
-const view = ref<View>('root');
-const selectedSeries = ref<any>(null);
-const selectedSeason = ref<any>(null);
+const tasks = computed(() => [...downloadStore.tasks.values()]);
+const activeGroups = computed(() => groupActiveTasks(tasks.value));
+const failedTasks = computed(() => tasks.value.filter((task) => task.status === 'failed'));
+const storedGroups = computed(() => groupStored(offlineStore.downloads));
+const storage = computed(() => storageByKind(offlineStore.downloads));
 
-const activeDownloads = computed(() => downloadStore.activeDownloads);
+const storageDetail = computed(() => [
+  storage.value.movies && t('downloads.storageOf', { type: t('downloads.movies'), size: formatSize(storage.value.movies) }),
+  storage.value.series && t('downloads.storageOf', { type: t('downloads.shows'), size: formatSize(storage.value.series) }),
+  storage.value.music && t('downloads.storageOf', { type: t('downloads.music'), size: formatSize(storage.value.music) }),
+].filter(Boolean).join(' · '));
 
-const pageTitle = computed(() => {
-  if (view.value === 'seasons' && selectedSeries.value) return selectedSeries.value.seriesName;
-  if (view.value === 'episodes' && selectedSeason.value) return t('downloads.season', { n: selectedSeason.value.seasonNumber });
-  return t('downloads.title');
-});
-
-// Back button only appears in sub-views; the root "return to library" is now
-// handled by the bottom nav's Accueil tab.
-const showBackButton = computed(() => view.value !== 'root');
-
-function navigateBack() {
-  if (view.value === 'episodes') { view.value = 'seasons'; selectedSeason.value = null; return; }
-  if (view.value === 'seasons') { view.value = 'root'; selectedSeries.value = null; return; }
+/** The album (or item) image of a running download row. */
+function imageOf(key: string): string {
+  return artworkUrl(key, jellyfinStore.getImageUrl(key, 'Primary', 150, 150) || '');
 }
 
-// Intercept device back button when in a sub-view — navigate within the component instead of leaving.
-// Do NOT intercept intentional navigation to content pages (ItemDetails, Player, etc.).
-onBeforeRouteLeave((to, _from, next) => {
-  if (to.name === 'ItemDetails' || to.name === 'Player') {
-    next();
-    return;
-  }
-  if (view.value === 'episodes') {
-    view.value = 'seasons';
-    selectedSeason.value = null;
-    next(false);
-    return;
-  }
-  if (view.value === 'seasons') {
-    view.value = 'root';
-    selectedSeries.value = null;
-    next(false);
-    return;
-  }
-  next();
-});
-
-function openSeries(series: any) {
-  selectedSeries.value = series;
-  view.value = 'seasons';
-}
-
-function openSeason(season: any) {
-  selectedSeason.value = season;
-  view.value = 'episodes';
-}
-
-function totalEpisodes(series: any): number {
-  return series.seasons.reduce((n: number, s: any) => n + s.episodes.length, 0);
-}
-
-function cancelDownload(itemId: string) {
-  downloadStore.cancelDownload(itemId);
-}
-
-function cancelAll() {
-  if (!confirm(t('downloads.confirmCancelAll'))) return;
-  downloadStore.cancelAll();
-}
-
-// Cached local image URLs for offline display
-const cachedImageUrls = ref<Map<string, string>>(new Map());
-
-function getImageUrl(id: string, itemType?: string) {
-  // Prefer locally cached artwork (works offline)
-  const cached = cachedImageUrls.value.get(id);
-  if (cached) return cached;
-  // Fall back to server URL (works online)
-  const isAudio = itemType === 'Audio' || itemType === 'MusicAlbum';
-  return jellyfinStore.getImageUrl(id, 'Primary', isAudio ? 150 : 130, isAudio ? 150 : 195) || '';
-}
-
-const movieStorageBytes = computed(() =>
-  offlineStore.movieDownloads.reduce((sum: number, d: any) => sum + (d.fileSize || 0), 0)
-);
-const tvStorageBytes = computed(() =>
-  offlineStore.downloads.filter((d: any) => d.type === 'Episode').reduce((sum: number, d: any) => sum + (d.fileSize || 0), 0)
-);
-const musicStorageBytes = computed(() =>
-  offlineStore.downloads.filter((d: any) => d.type === 'Audio').reduce((sum: number, d: any) => sum + (d.fileSize || 0), 0)
-);
-
-async function deleteAll() {
-  if (!confirm(t('downloads.confirmDeleteAll', { n: offlineStore.downloadCount }))) return;
-  try {
-    for (const dl of [...offlineStore.downloads]) {
-      await downloadService.deleteOfflineFile(dl.itemId);
-      await offlineStore.removeDownload(dl.itemId);
-    }
-  } catch {
-    alert(t('downloads.deleteSomeFailed'));
-  }
+function groupMeta(group: StoredGroup): string {
+  const size = formatSize(group.size);
+  if (group.kind === 'series') return `${t('downloads.episodesCount', group.count)} · ${size}`;
+  if (group.kind === 'album') return `${t('downloads.tracksCount', group.count)} · ${size}`;
+  return size;
 }
 
 function formatSize(bytes: number): string {
@@ -369,104 +161,48 @@ function formatSize(bytes: number): string {
   return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
 }
 
-async function deleteAllSeries(series: any) {
-  const count = totalEpisodes(series);
-  if (!confirm(t('downloads.confirmDeleteSeries', { n: count, name: series.seriesName }, count))) return;
-  try {
-    for (const season of series.seasons) {
-      for (const ep of season.episodes) {
-        await downloadService.deleteOfflineFile(ep.itemId);
-        await offlineStore.removeDownload(ep.itemId);
-      }
-    }
-    view.value = 'root';
-    selectedSeries.value = null;
-  } catch {
-    alert(t('downloads.deleteEpisodesFailed'));
+function cancelGroup(itemIds: string[]) {
+  for (const id of itemIds) {
+    if (downloadStore.isDownloading(id)) downloadStore.cancelDownload(id);
   }
 }
 
-async function deleteAllSeason(season: any) {
-  const count = season.episodes.length;
-  if (!confirm(t('downloads.confirmDeleteSeason', { n: count, season: season.seasonNumber }, count))) return;
-  try {
-    for (const ep of season.episodes) {
-      await downloadService.deleteOfflineFile(ep.itemId);
-      await offlineStore.removeDownload(ep.itemId);
-    }
-    // Go back to seasons view; if no seasons left, go to root
-    const updated = offlineStore.tvShowsGrouped.find(s => s.seriesId === selectedSeries.value?.seriesId);
-    if (!updated || updated.seasons.length === 0) {
-      view.value = 'root';
-      selectedSeries.value = null;
-    } else {
-      selectedSeries.value = updated;
-      view.value = 'seasons';
-      selectedSeason.value = null;
-    }
-  } catch {
-    alert(t('downloads.deleteEpisodesFailed'));
+function cancelAll() {
+  if (!confirm(t('downloads.confirmCancelAll'))) return;
+  downloadStore.cancelAll();
+}
+
+async function deleteItems(itemIds: string[]) {
+  for (const id of itemIds) {
+    await downloadService.deleteOfflineFile(id);
+    await offlineStore.removeDownload(id);
   }
 }
 
-async function deleteDownload(itemId: string, name: string) {
-  if (!confirm(t('detail.confirmDelete', { name }))) return;
+async function deleteGroup(group: StoredGroup) {
+  if (!confirm(t('detail.confirmDelete', { name: group.name }))) return;
   try {
-    await downloadService.deleteOfflineFile(itemId);
-    await offlineStore.removeDownload(itemId);
-    // If now empty, pop back a level
-    if (view.value === 'episodes' && selectedSeason.value) {
-      const updated = offlineStore.tvShowsGrouped
-        .find(s => s.seriesId === selectedSeries.value?.seriesId)
-        ?.seasons.find((s: any) => s.seasonId === selectedSeason.value.seasonId);
-      if (!updated || updated.episodes.length === 0) navigateBack();
-      else selectedSeason.value = updated;
-    }
+    await deleteItems(group.itemIds);
   } catch {
     alert(t('detail.deleteFailed'));
   }
 }
 
-async function preloadCachedArtworkUrls() {
-  const imageIds = new Set<string>();
-  for (const download of offlineStore.downloads) {
-    imageIds.add(download.itemId);
-    if (download.seriesId) imageIds.add(download.seriesId);
-    if (download.seasonId) imageIds.add(download.seasonId);
+async function deleteAll() {
+  if (!confirm(t('downloads.confirmDeleteAll', { n: offlineStore.downloadCount }))) return;
+  try {
+    await deleteItems(offlineStore.downloads.map((download) => download.itemId));
+  } catch {
+    alert(t('downloads.deleteSomeFailed'));
   }
-
-  const entries = await Promise.all(
-    [...imageIds].map(async (id) => {
-      const url = await downloadService.getCachedImageUrl(id);
-      return url ? [id, url] as const : null;
-    }),
-  );
-  cachedImageUrls.value = new Map(
-    entries.filter((entry): entry is readonly [string, string] => entry !== null),
-  );
 }
 
-watch(
-  () => offlineStore.downloads.map(download => download.itemId).join('|'),
-  () => { void preloadCachedArtworkUrls(); },
-);
+watch([storedGroups, activeGroups], () => {
+  void preload([...storedGroups.value.map((group) => group.imageId), ...activeGroups.value.map((group) => group.key)]);
+}, { immediate: true });
 
 onMounted(async () => {
   await offlineStore.loadDownloads();
-  if (offlineStore.isFullyOnline) {
-    await offlineStore.refreshOfflineAssets();
-  }
-  await preloadCachedArtworkUrls();
+  if (offlineStore.isFullyOnline) await offlineStore.refreshOfflineAssets();
 });
 </script>
-
-<style scoped>
-@keyframes indeterminate {
-  0% { width: 15%; margin-left: -15%; }
-  50% { width: 40%; }
-  100% { width: 15%; margin-left: 100%; }
-}
-.animate-indeterminate {
-  animation: indeterminate 1.5s ease-in-out infinite;
-}
-</style>

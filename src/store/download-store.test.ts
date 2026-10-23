@@ -71,3 +71,24 @@ describe('download queue', () => {
     expect(store.activeDownloads.map((task) => task.status)).toEqual(['downloading', 'downloading', 'downloading', 'queued', 'queued']);
   });
 });
+
+describe('download retry', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.mocked(downloadService.downloadForOffline).mockClear();
+  });
+
+  it('retries a failed download from its metadata', async () => {
+    vi.mocked(downloadService.downloadForOffline).mockRejectedValueOnce(new Error('HTTP 500'));
+    const store = useDownloadStore();
+    store.startDownload('t1', { Name: 'Adagio', Type: 'Audio', AlbumId: 'al1', Album: 'Plague' });
+    await new Promise((resolve) => setTimeout(resolve));
+    expect(store.getTask('t1')).toMatchObject({ status: 'failed', groupId: 'al1', groupName: 'Plague' });
+
+    await store.retry('t1');
+    await new Promise((resolve) => setTimeout(resolve));
+
+    expect(vi.mocked(downloadService.downloadForOffline).mock.calls.map((call) => call[1])).toEqual(['t1', 't1']);
+    expect(store.getTask('t1')?.status).toBe('downloading');
+  });
+});

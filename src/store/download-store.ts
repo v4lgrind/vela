@@ -128,6 +128,11 @@ export interface DownloadTask {
   error?: string;
   startedAt: number;
   transcoding?: boolean;
+  /** Album of a track: the Téléchargés tab shows an album's tracks as one row. */
+  groupId?: string;
+  groupName?: string;
+  /** Kept after a failure, so the download can be retried. */
+  metadata?: any;
 }
 
 export interface TranscodeOptions {
@@ -242,6 +247,8 @@ export const useDownloadStore = defineStore('downloads', {
         status: 'queued',
         startedAt: Date.now(),
         transcoding: false,
+        groupId: metadata.Type === 'Audio' ? metadata.AlbumId : undefined,
+        groupName: metadata.Type === 'Audio' ? metadata.Album : undefined,
       };
 
       this.tasks.set(itemId, task);
@@ -369,7 +376,10 @@ export const useDownloadStore = defineStore('downloads', {
         const t = this.tasks.get(itemId);
         if (t) {
           t.status = error?.name === 'AbortError' ? 'cancelled' : 'failed';
-          if (t.status === 'failed') t.error = error.message || 'Download failed';
+          if (t.status === 'failed') {
+            t.error = error.message || 'Download failed';
+            t.metadata = metadata;
+          }
         }
         // The download runs after startDownload() resolved, so no caller sees this failure.
         if (error?.name !== 'AbortError') {
@@ -592,6 +602,13 @@ export const useDownloadStore = defineStore('downloads', {
         logger.warn('[DownloadStore] Codec check failed, downloading raw:', e);
         return undefined;
       }
+    },
+
+    /** Starts a failed download again, from the metadata it kept. */
+    async retry(itemId: string) {
+      const task = this.tasks.get(itemId);
+      if (task?.status !== 'failed' || !task.metadata) return;
+      await this.startDownload(itemId, task.metadata);
     },
 
     cancelDownload(itemId: string) {

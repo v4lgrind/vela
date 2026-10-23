@@ -62,21 +62,6 @@ export const useOfflineStore = defineStore('offline', {
     },
 
     /**
-     * Get downloads by type
-     */
-    movieDownloads: (state) => {
-      return state.downloads.filter((d) => d.type === 'Movie');
-    },
-
-    episodeDownloads: (state) => {
-      return state.downloads.filter((d) => d.type === 'Episode');
-    },
-
-    musicDownloads: (state) => {
-      return state.downloads.filter((d) => d.type === 'MusicAlbum' || d.type === 'Audio');
-    },
-
-    /**
      * Get TV shows organized by series
      */
     tvShowsGrouped: (state) => {

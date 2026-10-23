@@ -352,6 +352,7 @@
     }
   },
   "offline": {
-    "banner": "Hors ligne · seuls vos téléchargements sont affichés"
+    "banner": "Hors ligne · seuls vos téléchargements sont affichés",
+    "noDownloads": "Aucun téléchargement"
   }
 }

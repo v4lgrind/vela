@@ -352,6 +352,7 @@
     }
   },
   "offline": {
-    "banner": "Offline · only your downloads are shown"
+    "banner": "Offline · only your downloads are shown",
+    "noDownloads": "No downloads"
   }
 }

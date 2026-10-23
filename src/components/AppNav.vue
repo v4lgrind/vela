@@ -1,9 +1,10 @@
 <template>
-  <!-- Wide screens (tablet landscape, desktop): vertical rail on the left. -->
+  <!-- Wide screens (tablet landscape, desktop): vertical rail on the left,
+       starting below the status bar so its background never runs under it. -->
   <nav
     v-if="wide"
-    class="fixed inset-y-0 left-0 z-40 flex w-[72px] flex-col items-center gap-3 border-r border-border-default
-           bg-nav-bg pt-[calc(var(--sat,env(safe-area-inset-top,0px))+16px)] backdrop-blur-xl">
+    class="fixed bottom-0 left-0 top-[var(--sat,env(safe-area-inset-top,0px))] z-40 flex w-[72px] flex-col items-center gap-3
+           border-r border-border-default bg-nav-bg pt-4 backdrop-blur-xl">
     <RouterLink
       v-for="tab in tabs" :key="tab.section"
       :to="{ name: tab.route }"

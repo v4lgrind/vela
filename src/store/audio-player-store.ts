@@ -62,6 +62,8 @@ interface AudioPlayerState {
   shuffle: boolean;
   /** Queue order to return to when shuffle is turned off */
   unshuffledQueue: AudioTrack[];
+  /** Music library whose random picks are playing, topped up as they run out */
+  libraryShuffle: string | null;
   /** Last known position, persisted so the queue resumes after a restart */
   resumePosition: number;
   /** A Google Cast device is reachable */
@@ -87,6 +89,7 @@ export const useAudioPlayerStore = defineStore('audio-player', {
     repeatMode: 'off',
     shuffle: false,
     unshuffledQueue: [],
+    libraryShuffle: null,
     resumePosition: 0,
     castAvailable: false,
     castDevice: null,
@@ -94,7 +97,7 @@ export const useAudioPlayerStore = defineStore('audio-player', {
     airplayDevice: null,
   }),
   persist: {
-    pick: ['queue', 'currentIndex', 'volume', 'repeatMode', 'shuffle', 'unshuffledQueue', 'resumePosition'],
+    pick: ['queue', 'currentIndex', 'volume', 'repeatMode', 'shuffle', 'unshuffledQueue', 'libraryShuffle', 'resumePosition'],
   },
   getters: {
     currentTrack: (state): AudioTrack | null => {
@@ -114,6 +117,7 @@ export const useAudioPlayerStore = defineStore('audio-player', {
     },
     playAlbum(tracks: AudioTrack[], startIndex = 0) {
       this.unshuffledQueue = tracks;
+      this.libraryShuffle = null;
       this.queue = this.shuffle ? shuffleAround(tracks, startIndex) : tracks;
       this.currentIndex = this.shuffle ? 0 : startIndex;
       this.currentTime = 0;
@@ -125,6 +129,11 @@ export const useAudioPlayerStore = defineStore('audio-player', {
     playShuffled(tracks: AudioTrack[]) {
       this.shuffle = true;
       this.playAlbum(tracks, Math.floor(Math.random() * tracks.length));
+    },
+    /** `tracks` are already random picks from the library (see audioPlayerService refill). */
+    playLibraryShuffle(libraryId: string, tracks: AudioTrack[]) {
+      this.playAlbum(tracks, 0);
+      this.libraryShuffle = libraryId;
     },
     toggleShuffle() {
       const current = this.currentTrack;
@@ -228,6 +237,7 @@ export const useAudioPlayerStore = defineStore('audio-player', {
       this.isExpanded = false;
       this.queue = [];
       this.unshuffledQueue = [];
+      this.libraryShuffle = null;
       this.currentIndex = -1;
       this.resumePosition = 0;
       controller?.stop();

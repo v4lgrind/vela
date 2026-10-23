@@ -33,6 +33,7 @@
     <string name="download_cancel">Cancel</string>
     <string name="download_channel_name">Downloads</string>
     <string name="download_channel_desc">File download progress</string>
+    <string name="auto_shuffle_library">Shuffle: %1$s</string>
     <string name="auto_latest">Recently added</string>
     <string name="auto_albums">Albums</string>
     <string name="auto_artists">Artists</string>

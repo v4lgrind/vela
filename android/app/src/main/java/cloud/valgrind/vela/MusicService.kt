@@ -9,6 +9,7 @@ import androidx.core.content.ContextCompat
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.audio.AudioSink
@@ -39,12 +40,18 @@ class MusicService : MediaLibraryService() {
         /** Sent to controllers when a queue was started from outside the app (e.g. the car). */
         const val COMMAND_EXTERNAL_QUEUE = "externalQueue"
         private const val TAG = "MusicService"
+        /** Library shuffle tops the queue up once this many tracks are left after the playing one. */
+        private const val LIBRARY_SHUFFLE_REFILL_AT = 5
     }
 
     private var session: MediaLibrarySession? = null
     private lateinit var library: JellyfinLibrary
     // Library calls hit the network: keep them off the main thread.
     private val io = MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(2))
+    // Music library the car is shuffling; a queue from the app clears it
+    // (the app tops up its own library shuffle).
+    private var libraryShuffle: String? = null
+    private var refilling = false
 
     override fun onCreate() {
         super.onCreate()
@@ -74,6 +81,9 @@ class MusicService : MediaLibraryService() {
             .build()
         AirPlayManager.attach(player)
         library = JellyfinLibrary(this)
+        player.addListener(object : Player.Listener {
+            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) = refillLibraryShuffle(player)
+        })
 
         val openApp = PendingIntent.getActivity(
             this,
@@ -86,6 +96,27 @@ class MusicService : MediaLibraryService() {
             .setId("music")
             .setSessionActivity(openApp)
             .build()
+    }
+
+    /** More random picks before a car-started library shuffle runs out. */
+    private fun refillLibraryShuffle(player: Player) {
+        val libraryId = libraryShuffle ?: return
+        if (refilling) return
+        if (player.mediaItemCount - 1 - player.currentMediaItemIndex > LIBRARY_SHUFFLE_REFILL_AT) return
+        refilling = true
+        val queued = (0 until player.mediaItemCount).map { player.getMediaItemAt(it).mediaId }.toSet()
+        val future = io.submit<List<MediaItem>> { library.randomTracks(libraryId) }
+        future.addListener({
+            refilling = false
+            val picks = runCatching { future.get() }
+                .onFailure { Log.w(TAG, "Library shuffle refill failed: ${it.message}") }
+                .getOrNull()
+            if (libraryShuffle != libraryId || picks.isNullOrEmpty()) return@addListener
+            // A small library has been fully played: start a new round.
+            player.addMediaItems(picks.filter { it.mediaId !in queued }.ifEmpty { picks })
+            // Let the app adopt the longer queue if it's running.
+            session?.broadcastCustomCommand(SessionCommand(COMMAND_EXTERNAL_QUEUE, Bundle.EMPTY), Bundle.EMPTY)
+        }, ContextCompat.getMainExecutor(this))
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? = session
@@ -143,6 +174,9 @@ class MusicService : MediaLibraryService() {
             startIndex: Int,
             startPositionMs: Long,
         ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> {
+            libraryShuffle = mediaItems.firstOrNull()?.mediaId
+                ?.takeIf { it.startsWith(JellyfinLibrary.SHUFFLE_PREFIX) }
+                ?.removePrefix(JellyfinLibrary.SHUFFLE_PREFIX)
             if (isResolved(mediaItems)) {
                 return super.onSetMediaItems(mediaSession, controller, mediaItems, startIndex, startPositionMs)
             }

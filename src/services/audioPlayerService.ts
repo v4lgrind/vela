@@ -23,6 +23,8 @@ import { WebAudioEngine } from './audio/webAudioEngine';
 import type { AudioEngine, EngineState, QueueItem } from './audio/types';
 import { logger } from '@/utils/logger';
 import { jellyfinAuthorization } from '@/utils/jellyfinAuthorization';
+import { toAudioTrack } from '@/utils/audioTrack';
+import { freshTracks, LIBRARY_SHUFFLE_REFILL_AT } from '@/utils/audioQueue';
 
 const isNative = Capacitor.isNativePlatform();
 const REPORT_INTERVAL_MS = 10_000;
@@ -48,6 +50,7 @@ class AudioPlayerService implements AudioController {
   private lastDuration = 0;
   private reportInterval: ReturnType<typeof setInterval> | null = null;
   private ops: Promise<unknown> = Promise.resolve();
+  private refilling = false;
 
   init() {
     if (this.initialized) return;
@@ -68,6 +71,34 @@ class AudioPlayerService implements AudioController {
     }
     registerAudioController(this);
     this.restoreFromEngine();
+    this.setupLibraryShuffleRefill();
+  }
+
+  // --- Library shuffle: more random picks before the queue runs out ---
+
+  private setupLibraryShuffleRefill() {
+    watch(
+      () => [this.audioStore.libraryShuffle, this.audioStore.currentIndex, this.audioStore.queue.length] as const,
+      ([libraryShuffle, index, length]) => {
+        if (libraryShuffle && index >= 0 && length - 1 - index <= LIBRARY_SHUFFLE_REFILL_AT) {
+          this.refillLibraryShuffle(libraryShuffle);
+        }
+      },
+    );
+  }
+
+  private async refillLibraryShuffle(libraryId: string) {
+    if (this.refilling) return;
+    this.refilling = true;
+    try {
+      const picks = (await this.jellyfinStore.fetchRandomTracks(libraryId)).map((item) => toAudioTrack(item));
+      // The user may have started something else meanwhile.
+      if (this.audioStore.libraryShuffle === libraryId) this.audioStore.addToQueue(freshTracks(this.audioStore.queue, picks));
+    } catch (e) {
+      logger.error('[AudioPlayer] Library shuffle refill failed', e);
+    } finally {
+      this.refilling = false;
+    }
   }
 
   /** Only the active engine's events reach the store. */
@@ -130,6 +161,8 @@ class AudioPlayerService implements AudioController {
     NativeAudio.addListener('externalQueue', () => {
       if (this.engine !== this.localEngine) return;
       this.audioStore.shuffle = false;
+      // The car's library shuffle is topped up by MusicService itself.
+      this.audioStore.libraryShuffle = null;
       this.restoreFromEngine().then(() => {
         this.audioStore.unshuffledQueue = this.audioStore.queue;
       });

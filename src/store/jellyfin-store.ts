@@ -671,6 +671,19 @@ export const useJellyfinStore = defineStore("jellyfin", {
       });
       return resp.data.Items ?? [];
     },
+    /** Random songs from a music library. */
+    async fetchRandomTracks(libraryId: string, limit = 300) {
+      this.initializeApi();
+      const resp = await getLibraryApi(this.api).getItems({
+        userId: this.userId,
+        parentId: libraryId,
+        recursive: true,
+        includeItemTypes: ["Audio"] as any,
+        sortBy: ["Random"] as any,
+        limit,
+      });
+      return resp.data.Items ?? [];
+    },
     /** Playlist entries in playlist order (no sortBy). */
     async fetchPlaylistTracks(playlistId: string) {
       this.initializeApi();

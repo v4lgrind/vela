@@ -83,7 +83,9 @@
       "albums": "Albums",
       "artists": "Artistes",
       "songs": "Titres",
-      "playlists": "Playlists"
+      "playlists": "Playlists",
+      "shuffleAll": "Lecture aléatoire",
+      "shuffleFailed": "Impossible de lancer la lecture aléatoire"
     }
   },
   "audio": {

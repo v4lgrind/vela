@@ -24,3 +24,16 @@ export function indexAfterMove(current: number, from: number, to: number): numbe
   if (from > current && to <= current) return current + 1;
   return current;
 }
+
+/** Library shuffle tops the queue up once this many tracks are left after the playing one. */
+export const LIBRARY_SHUFFLE_REFILL_AT = 5;
+
+/**
+ * Random picks not queued yet; all of them when every one was (a small
+ * library has been fully played, so a new round starts).
+ */
+export function freshTracks<T extends { id: string }>(queue: T[], candidates: T[]): T[] {
+  const queued = new Set(queue.map((t) => t.id));
+  const fresh = candidates.filter((t) => !queued.has(t.id));
+  return fresh.length ? fresh : candidates;
+}

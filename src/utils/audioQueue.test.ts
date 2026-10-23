@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { indexAfterMove, moveItem, shuffleAround } from './audioQueue';
+import { freshTracks, indexAfterMove, moveItem, shuffleAround } from './audioQueue';
 
 describe('shuffleAround', () => {
   it('keeps the chosen item first and every item once', () => {
@@ -50,5 +50,17 @@ describe('indexAfterMove', () => {
         expect(moved[indexAfterMove(2, from, to)]).toBe('c');
       }
     }
+  });
+});
+
+describe('freshTracks', () => {
+  const track = (id: string) => ({ id });
+
+  it('drops tracks already in the queue', () => {
+    expect(freshTracks([track('a'), track('b')], [track('b'), track('c')])).toEqual([track('c')]);
+  });
+
+  it('starts a new round once every candidate was queued', () => {
+    expect(freshTracks([track('a'), track('b')], [track('b'), track('a')])).toEqual([track('b'), track('a')]);
   });
 });

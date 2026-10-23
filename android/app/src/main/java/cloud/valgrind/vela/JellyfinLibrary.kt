@@ -16,7 +16,7 @@ import java.net.URLEncoder
  * app (and its WebView) isn't running. The WebView pushes the server and
  * credentials through [NativeAudioPlugin.setLibraryConfig].
  *
- * Media ids: `root`, `latest`, `albums`, `artists`, `playlists`,
+ * Media ids: `root`, `shuffle:<libraryId>`, `latest`, `albums`, `artists`, `playlists`,
  * `album:<id>`, `artist:<id>`, `playlist:<id>`, and for browse tracks
  * `track:<trackId>:<parent>` so a pick can queue the rest of its parent.
  * Queued items use the plain track id, like the queues the app builds.
@@ -25,6 +25,8 @@ class JellyfinLibrary(private val context: Context) {
 
     companion object {
         const val ROOT = "root"
+        /** `shuffle:<libraryId>`: random picks from a music library; MusicService tops the queue up. */
+        const val SHUFFLE_PREFIX = "shuffle:"
         private const val PREFS = "music_library"
         private const val PAGE = 300
 
@@ -51,7 +53,8 @@ class JellyfinLibrary(private val context: Context) {
 
     /** Blocking (network). Children of a browsable [parentId]. */
     fun children(parentId: String): List<MediaItem> = when {
-        parentId == ROOT -> listOf(
+        // Audiobooks often live in a "music" library too: one shuffle entry per library.
+        parentId == ROOT -> musicLibraries().map(::shuffleItem) + listOf(
             folder("latest", context.getString(R.string.auto_latest)),
             folder("albums", context.getString(R.string.auto_albums)),
             folder("artists", context.getString(R.string.auto_artists)),
@@ -106,6 +109,7 @@ class JellyfinLibrary(private val context: Context) {
                 queue to queue.indexOfFirst { it.mediaId == trackId }.coerceAtLeast(0)
             }
             id.startsWith("album:") || id.startsWith("playlist:") -> tracksOf(id).map(::queueItem) to 0
+            id.startsWith(SHUFFLE_PREFIX) -> randomTracks(id.removePrefix(SHUFFLE_PREFIX)) to 0
             else -> {
                 // Plain track ids (search results, or a queue restored by the system).
                 val byId = items("Ids" to items.joinToString(",") { it.mediaId }).associateBy { it.getString("Id") }
@@ -114,9 +118,17 @@ class JellyfinLibrary(private val context: Context) {
         }.takeIf { it.first.isNotEmpty() }
     }
 
+    /** Blocking (network). Random songs from a music library. */
+    fun randomTracks(libraryId: String): List<MediaItem> =
+        items("ParentId" to libraryId, "IncludeItemTypes" to "Audio", "SortBy" to "Random").map(::queueItem)
+
     // --- Jellyfin queries ---
 
     // Items/Latest returns nothing without a library id; sort by date added instead.
+    private fun musicLibraries(): List<JSONObject> =
+        page(JSONObject(get("/Users/$userId/Views", emptyMap())))
+            .filter { it.optString("CollectionType") == "music" }
+
     private fun latestAlbums(): List<JSONObject> =
         items("IncludeItemTypes" to "MusicAlbum", "SortBy" to "DateCreated", "SortOrder" to "Descending", "Limit" to "50")
 
@@ -176,6 +188,15 @@ class JellyfinLibrary(private val context: Context) {
         .setMediaMetadata(
             MediaMetadata.Builder().setTitle(title).setIsBrowsable(true).setIsPlayable(false)
                 .setMediaType(MediaMetadata.MEDIA_TYPE_FOLDER_MIXED).build()
+        )
+        .build()
+
+    private fun shuffleItem(library: JSONObject) = MediaItem.Builder()
+        .setMediaId(SHUFFLE_PREFIX + library.getString("Id"))
+        .setMediaMetadata(
+            MediaMetadata.Builder().setTitle(context.getString(R.string.auto_shuffle_library, library.optString("Name")))
+                .setIsBrowsable(false).setIsPlayable(true)
+                .setMediaType(MediaMetadata.MEDIA_TYPE_PLAYLIST).build()
         )
         .build()
 

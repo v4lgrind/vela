@@ -29,6 +29,7 @@
     <string name="download_cancel">Annuler</string>
     <string name="download_channel_name">Téléchargements</string>
     <string name="download_channel_desc">Progression des téléchargements</string>
+    <string name="auto_shuffle_library">Aléatoire : %1$s</string>
     <string name="auto_latest">Ajouts récents</string>
     <string name="auto_albums">Albums</string>
     <string name="auto_artists">Artistes</string>

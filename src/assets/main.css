@@ -207,6 +207,17 @@ html.light {
   );
 }
 
+/* Expanded audio player backdrop */
+:root {
+  --audio-player-bg: radial-gradient(circle at top, #1a1a2e 0%, #0a0a0a 70%);
+}
+html.light {
+  --audio-player-bg: radial-gradient(circle at top, #dce4f1 0%, var(--color-background) 70%);
+}
+@utility audio-player-bg {
+  background: var(--audio-player-bg);
+}
+
 /* Player gradient utility */
 @utility player-gradient {
   background: linear-gradient(

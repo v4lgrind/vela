@@ -15,8 +15,8 @@
         :class="[
           'flex items-center gap-2 px-3 py-2 rounded-lg text-sm',
           needsConversion
-            ? 'bg-amber-500/10 border border-amber-500/30 text-amber-300'
-            : 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-300',
+            ? 'bg-amber-500/10 border border-amber-500/30 text-amber-300 in-[.light]:text-amber-700'
+            : 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 in-[.light]:text-emerald-700',
         ]"
       >
         <AlertTriangle v-if="needsConversion" class="size-4 flex-shrink-0" />
@@ -39,8 +39,8 @@
             :class="[
               'px-3 py-1.5 rounded-lg text-sm transition-all cursor-pointer border',
               selectedBitrate === preset.bitrate
-                ? 'bg-accent-blue/20 border-accent-blue/50 text-white'
-                : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10',
+                ? 'bg-accent-blue/20 border-accent-blue/50 text-text-heading'
+                : 'bg-surface-hover border-border-input text-text-primary hover:bg-border-input',
             ]"
           >
             {{ preset.label === 'Auto' ? t('settings.original') : preset.label }}
@@ -59,14 +59,14 @@
             :class="[
               'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-left transition-all cursor-pointer',
               selectedAudio === track.Index
-                ? 'bg-accent-blue/20 border border-accent-blue/50 text-white'
-                : 'bg-white/5 border border-white/10 text-white/70 hover:bg-white/10',
+                ? 'bg-accent-blue/20 border border-accent-blue/50 text-text-heading'
+                : 'bg-surface-hover border border-border-input text-text-primary hover:bg-border-input',
             ]"
           >
             <div
               :class="[
                 'size-4 rounded-full border-2 flex items-center justify-center flex-shrink-0',
-                selectedAudio === track.Index ? 'border-accent-blue' : 'border-white/30',
+                selectedAudio === track.Index ? 'border-accent-blue' : 'border-text-subtle',
               ]"
             >
               <div v-if="selectedAudio === track.Index" class="size-2 rounded-full bg-accent-blue" />
@@ -85,14 +85,14 @@
             :class="[
               'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-left transition-all cursor-pointer',
               selectedSubtitle === -1
-                ? 'bg-accent-blue/20 border border-accent-blue/50 text-white'
-                : 'bg-white/5 border border-white/10 text-white/70 hover:bg-white/10',
+                ? 'bg-accent-blue/20 border border-accent-blue/50 text-text-heading'
+                : 'bg-surface-hover border border-border-input text-text-primary hover:bg-border-input',
             ]"
           >
             <div
               :class="[
                 'size-4 rounded-full border-2 flex items-center justify-center flex-shrink-0',
-                selectedSubtitle === -1 ? 'border-accent-blue' : 'border-white/30',
+                selectedSubtitle === -1 ? 'border-accent-blue' : 'border-text-subtle',
               ]"
             >
               <div v-if="selectedSubtitle === -1" class="size-2 rounded-full bg-accent-blue" />
@@ -106,14 +106,14 @@
             :class="[
               'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-left transition-all cursor-pointer',
               selectedSubtitle === track.Index
-                ? 'bg-accent-blue/20 border border-accent-blue/50 text-white'
-                : 'bg-white/5 border border-white/10 text-white/70 hover:bg-white/10',
+                ? 'bg-accent-blue/20 border border-accent-blue/50 text-text-heading'
+                : 'bg-surface-hover border border-border-input text-text-primary hover:bg-border-input',
             ]"
           >
             <div
               :class="[
                 'size-4 rounded-full border-2 flex items-center justify-center flex-shrink-0',
-                selectedSubtitle === track.Index ? 'border-accent-blue' : 'border-white/30',
+                selectedSubtitle === track.Index ? 'border-accent-blue' : 'border-text-subtle',
               ]"
             >
               <div v-if="selectedSubtitle === track.Index" class="size-2 rounded-full bg-accent-blue" />
@@ -124,11 +124,11 @@
       </div>
 
       <!-- Estimated size -->
-      <div class="flex items-center justify-between px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm">
+      <div class="flex items-center justify-between px-3 py-2 rounded-lg bg-surface-hover border border-border-input text-sm">
         <span class="text-text-muted">
           {{ itemCount > 1 ? t('transcode.estimatedTotal', { n: itemCount }) : t('transcode.estimatedSize') }}
         </span>
-        <span class="font-medium text-white">{{ sizeLabel }}</span>
+        <span class="font-medium text-text-heading">{{ sizeLabel }}</span>
       </div>
 
       <!-- Actions -->

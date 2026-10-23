@@ -1,6 +1,19 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { createPinia, setActivePinia } from 'pinia';
 
-import { withForcedVideoParams } from './download-store';
+import { downloadService } from '@/services/downloadService';
+
+import { useDownloadStore, withForcedVideoParams } from './download-store';
+
+vi.mock('@/services/downloadService', () => ({
+  downloadService: {
+    downloadForOffline: vi.fn(() => new Promise(() => {})),
+    isDownloading: vi.fn(() => false),
+  },
+}));
+vi.mock('./jellyfin-store', () => ({
+  useJellyfinStore: () => ({ serverUrl: 'https://jf.example', accessToken: 'token', fetchItemDetails: async (id: string) => ({ Id: id }) }),
+}));
 
 describe('withForcedVideoParams', () => {
   it('adds video bitrate and resolution box params', () => {
@@ -42,5 +55,19 @@ describe('withForcedVideoParams', () => {
 
   it('returns the original string when the URL cannot be parsed', () => {
     expect(withForcedVideoParams('not a url', 8_000_000, 720)).toBe('not a url');
+  });
+});
+
+describe('download queue', () => {
+  beforeEach(() => setActivePinia(createPinia()));
+
+  it('starts each queued download once, at most 3 at a time', async () => {
+    const store = useDownloadStore();
+    for (const id of ['a', 'b', 'c', 'd', 'e']) store.startDownload(id, { Name: id, Type: 'Audio' });
+    await new Promise((resolve) => setTimeout(resolve));
+
+    const started = vi.mocked(downloadService.downloadForOffline).mock.calls.map((call) => call[1]);
+    expect(started).toEqual(['a', 'b', 'c']);
+    expect(store.activeDownloads.map((task) => task.status)).toEqual(['downloading', 'downloading', 'downloading', 'queued', 'queued']);
   });
 });

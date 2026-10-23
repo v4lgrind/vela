@@ -276,6 +276,8 @@ export const useDownloadStore = defineStore('downloads', {
       let metadata = this._metadataQueue.get(itemId);
       if (!task || !metadata) return;
 
+      // Take the slot now: the next _processQueue() call can run before the await below.
+      task.status = 'downloading';
       const jellyfinStore = useJellyfinStore();
       const transcodeOptions = this._transcodeOptionsQueue.get(itemId);
 
@@ -288,8 +290,10 @@ export const useDownloadStore = defineStore('downloads', {
       } catch (error) {
         logger.warn('[DownloadStore] Could not enrich offline metadata:', itemId, error);
       }
-
-      task.status = 'downloading';
+      if (this.tasks.get(itemId)?.status === 'cancelled') {
+        this._processQueue();
+        return;
+      }
 
       try {
         // Check if video codec needs transcoding before downloading

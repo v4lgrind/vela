@@ -50,7 +50,8 @@
     "recentlyAdded": "Recently added · {library}",
     "myLibraries": "My libraries",
     "markPlayed": "Mark as played",
-    "loadError": "Could not load your libraries"
+    "loadError": "Could not load your libraries",
+    "seeAllDownloads": "See all in the library"
   },
   "library": {
     "title": "Libraries",

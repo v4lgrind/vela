@@ -50,7 +50,8 @@
     "recentlyAdded": "Ajouts récents · {library}",
     "myLibraries": "Mes bibliothèques",
     "markPlayed": "Marquer comme vu",
-    "loadError": "Impossible de charger vos bibliothèques"
+    "loadError": "Impossible de charger vos bibliothèques",
+    "seeAllDownloads": "Tout voir dans la bibliothèque"
   },
   "library": {
     "title": "Bibliothèques",

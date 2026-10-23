@@ -33,6 +33,10 @@
     </PageHeader>
     <AirPlayDialog v-model:open="showAirPlay" />
 
+    <!-- Offline: what is on the device -->
+    <OfflineHome v-if="isOffline" />
+
+    <template v-else>
     <!-- Continue Watching -->
     <Section v-if="resumeItems.length" :title="t('home.continueWatching')">
       <MediaRail>
@@ -236,11 +240,12 @@
         </router-link>
       </MediaRail>
     </Section>
+    </template>
   </AppPage>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 import type { BaseItemDto } from '@jellyfin/sdk/lib/generated-client/models/base-item-dto';
@@ -258,6 +263,7 @@ import { audioPlayerService } from '@/services/audioPlayerService';
 import { useOfflineStore } from '@/store/offline-store';
 import { useDownloadStore } from '@/store/download-store';
 import { useRetryWhileFailed } from '@/composables/useRetryWhileFailed';
+import OfflineHome from '@/components/offline/OfflineHome.vue';
 
 const { t } = useI18n();
 const store = useJellyfinStore();
@@ -304,7 +310,10 @@ function cacheCurrentHome() {
   store.homeCache = snapshot;
 }
 
+const isOffline = computed(() => !offlineStore.isFullyOnline);
+
 async function loadMedia(force = false) {
+  if (isOffline.value) return;
   // A stale snapshot stays rendered while fresh data loads without a spinner.
   if (!force && restoreCachedHome() && !store.homeCache?.stale) return;
 
@@ -411,6 +420,8 @@ function goToItem(item: HomeItem) {
 }
 
 useRetryWhileFailed(computed(() => error.value !== null), () => loadMedia());
+
+watch(isOffline, (offline) => { if (!offline) loadMedia(); });
 
 onMounted(() => {
   loadMedia();

@@ -174,8 +174,9 @@ class OfflineDatabase {
       const transaction = db.transaction(["downloads"], "readwrite");
       const store = transaction.objectStore("downloads");
 
-      media.jellyfinItem = JSON.parse(JSON.stringify(media.jellyfinItem));
-      const request = store.put(media);
+      // Plain copy: records taken from the Pinia store carry reactive proxies
+      // (jellyfinItem, introSegments) that IndexedDB cannot clone.
+      const request = store.put(JSON.parse(JSON.stringify(media)));
 
       request.onsuccess = () => {
         logger.log("[OfflineDB] Added download:", media.itemId);

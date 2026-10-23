@@ -173,6 +173,7 @@ export const useOfflineStore = defineStore('offline', {
         // Records saved before sizes and library ids were stored: fix them in the background.
         this.backfillSizes()
           .then(() => this.backfillLibraryIds())
+          .then(() => this.refreshDownloadedUserData())
           .catch((error) => logger.error('[OfflineStore] Backfill failed:', error));
       } catch (error) {
         logger.error('[OfflineStore] Failed to initialize:', error);
@@ -376,6 +377,27 @@ export const useOfflineStore = defineStore('offline', {
       await this.loadDownloads();
     },
 
+    /**
+     * Fresh user data (position, played, last played date) for every download,
+     * so progress made on another device shows offline too (online only).
+     */
+    async refreshDownloadedUserData() {
+      if (!this.isFullyOnline || !this.downloads.length) return;
+      const jellyfinStore = useJellyfinStore();
+      if (!jellyfinStore.serverUrl || !jellyfinStore.accessToken) return;
+      try {
+        const items = await jellyfinStore.fetchItemsByIds(this.downloads.map((download) => download.itemId));
+        const userData = new Map(items.map((item) => [item.Id, item.UserData]));
+        for (const download of this.downloads) {
+          const fresh = userData.get(download.itemId);
+          if (fresh) await offlineDatabase.addDownload({ ...download, jellyfinItem: { ...download.jellyfinItem, UserData: fresh } });
+        }
+        await this.loadDownloads();
+      } catch (error) {
+        logger.warn('[OfflineStore] Could not refresh the user data of downloads:', error);
+      }
+    },
+
     /** Real size of Android downloads recorded as 0 B (content:// files can't be stat'ed). */
     async backfillSizes() {
       if (!Capacitor.isNativePlatform()) return;
@@ -434,11 +456,13 @@ export const useOfflineStore = defineStore('offline', {
       try {
         const result = await syncService.syncWatchProgress(
           jellyfinStore.serverUrl,
-          jellyfinStore.accessToken
+          jellyfinStore.accessToken,
+          jellyfinStore.userId ?? '',
         );
 
         this.lastSyncTime = Date.now();
-        logger.log(`[OfflineStore] Sync complete: ${result.synced} synced, ${result.failed} failed`);
+        logger.log(`[OfflineStore] Sync complete: ${result.synced} synced, ${result.kept} kept, ${result.failed} failed`);
+        await this.refreshDownloadedUserData();
       } catch (error) {
         logger.error('[OfflineStore] Sync failed:', error);
       } finally {

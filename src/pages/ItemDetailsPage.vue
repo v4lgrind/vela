@@ -1074,17 +1074,20 @@ function canDownload(it: any): boolean {
     return it && ['Movie', 'Episode', 'Video', 'Audio', 'MusicAlbum'].includes(it.Type);
 }
 
-const isItemDownloaded = computed(() => {
-    return offlineStore.isItemDownloaded(itemId.value);
-});
+// Jellyfin can't serve an album as one file: an album download is its tracks.
+const downloadIds = computed<string[]>(() =>
+    item.value?.Type === 'MusicAlbum' ? audioTracks.value.map((track) => track.Id) : [itemId.value]);
 
-const isDownloading = computed(() => {
-    return downloadStore.isDownloading(itemId.value);
-});
+const isItemDownloaded = computed(() =>
+    downloadIds.value.length > 0 && downloadIds.value.every((id) => offlineStore.isItemDownloaded(id)));
+
+const isDownloading = computed(() => downloadIds.value.some((id) => downloadStore.isDownloading(id)));
 
 const downloadProgress = computed(() => {
-    const task = downloadStore.getTask(itemId.value);
-    return task?.progress ?? 0;
+    const ids = downloadIds.value;
+    const total = ids.reduce((sum, id) =>
+        sum + (offlineStore.isItemDownloaded(id) ? 100 : downloadStore.getTask(id)?.progress ?? 0), 0);
+    return ids.length ? Math.round(total / ids.length) : 0;
 });
 
 /** True when the item carries a video stream (i.e. resolution/transcode options apply). */
@@ -1113,6 +1116,13 @@ async function requestDownload(id: string, metadata: any, failMessage: string) {
 
 async function handleDownload() {
     if (!item.value) return;
+    if (item.value.Type === 'MusicAlbum') {
+        for (const track of audioTracks.value) {
+            if (offlineStore.isItemDownloaded(track.Id)) continue;
+            await requestDownload(track.Id, track, t('detail.downloadEpisodeFailed', { name: track.Name }));
+        }
+        return;
+    }
     await requestDownload(itemId.value, item.value, t('detail.downloadFailed'));
 }
 
@@ -1154,8 +1164,10 @@ async function deleteDownload() {
     if (!item.value) return;
     if (!confirm(t('detail.confirmDelete', { name: item.value.Name }))) return;
     try {
-        await downloadService.deleteOfflineFile(itemId.value);
-        await offlineStore.removeDownload(itemId.value);
+        for (const id of downloadIds.value) {
+            await downloadService.deleteOfflineFile(id);
+            await offlineStore.removeDownload(id);
+        }
     } catch {
         showError(t('detail.deleteFailed'));
     }
@@ -1163,7 +1175,9 @@ async function deleteDownload() {
 
 function cancelDownload() {
     if (!item.value) return;
-    downloadStore.cancelDownload(itemId.value);
+    for (const id of downloadIds.value) {
+        if (downloadStore.isDownloading(id)) downloadStore.cancelDownload(id);
+    }
 }
 
 function openBulkDialog(target: 'season' | 'series') {

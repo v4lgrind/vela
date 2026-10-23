@@ -65,7 +65,8 @@ class SyncService {
             headers,
             body: JSON.stringify({
               PlaybackPositionTicks: progress.completed ? 0 : Math.round(progress.position * 10_000_000),
-              Played: progress.completed,
+              // Only ever mark played: a partial rewatch must not un-mark a watched item.
+              ...(progress.completed ? { Played: true } : {}),
               LastPlayedDate: new Date(progress.lastWatched).toISOString(),
             }),
           });

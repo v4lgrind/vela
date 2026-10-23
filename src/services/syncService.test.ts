@@ -38,7 +38,7 @@ describe('syncService.syncWatchProgress', () => {
       'GET https://jf/UserItems/e1/UserData?userId=user1',
       'POST https://jf/UserItems/e1/UserData?userId=user1',
     ]);
-    expect(calls[1].body).toEqual({ PlaybackPositionTicks: 1_205_000_000, Played: false, LastPlayedDate: '2026-01-02T10:00:00.000Z' });
+    expect(calls[1].body).toEqual({ PlaybackPositionTicks: 1_205_000_000, LastPlayedDate: '2026-01-02T10:00:00.000Z' });
     expect(offlineDatabase.markProgressSynced).toHaveBeenCalledWith('e1');
     expect(result).toEqual({ synced: 1, failed: 0, kept: 0 });
   });
@@ -61,6 +61,15 @@ describe('syncService.syncWatchProgress', () => {
     await syncService.syncWatchProgress('https://jf', 'token', 'user1');
 
     expect(calls[1].body).toMatchObject({ Played: true, PlaybackPositionTicks: 0 });
+  });
+
+  it('keeps a played item played after a partial rewatch', async () => {
+    vi.mocked(offlineDatabase.getUnsyncedProgress).mockResolvedValue([progress()]);
+    const calls = stubServer({ Played: true, LastPlayedDate: '2026-01-01T10:00:00Z' });
+
+    await syncService.syncWatchProgress('https://jf', 'token', 'user1');
+
+    expect(calls[1].body).not.toHaveProperty('Played');
   });
 
   it('counts a failed request', async () => {

@@ -34,7 +34,8 @@ export interface AudioEngine {
   setVolume(volume: number): void;
   stop(): void;
   onState(handler: (s: EngineState) => void): void;
-  onError(handler: (message: string) => void): void;
+  /** `network`: the server could not be reached (offline), as opposed to a bad file. */
+  onError(handler: (message: string, network?: boolean) => void): void;
   /** Queue already playing in the engine, if it outlived the WebView. */
   restore(): Promise<{ tracks: AudioTrack[]; state: EngineState } | null>;
 }

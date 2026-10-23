@@ -104,7 +104,7 @@ class AudioPlayerService implements AudioController {
   /** Only the active engine's events reach the store. */
   private bindEngine(engine: AudioEngine) {
     engine.onState((s) => { if (this.engine === engine) this.onEngineState(s); });
-    engine.onError((message) => { if (this.engine === engine) this.onEngineError(message); });
+    engine.onError((message, network) => { if (this.engine === engine) this.onEngineError(message, network); });
   }
 
   // --- Casting: while a Cast session is up, the queue plays on the device ---
@@ -262,9 +262,21 @@ class AudioPlayerService implements AudioController {
     this.lastDuration = s.duration;
   }
 
-  private onEngineError(message: string) {
+  private onEngineError(message: string, network = false) {
     logger.error('[AudioPlayer] Playback error:', message);
-    if (this.audioStore.hasNext) this.audioStore.next();
+    if (!network) {
+      if (this.audioStore.hasNext) this.audioStore.next();
+      return;
+    }
+    // Offline, every streamed track would fail in turn: only a downloaded one can play.
+    const { queue, currentIndex } = this.audioStore;
+    const nextLocal = queue.findIndex((track, i) => i > currentIndex && this.offlineStore.isItemDownloaded(track.id));
+    if (nextLocal >= 0) {
+      this.audioStore.jumpTo(nextLocal);
+      return;
+    }
+    if (this.audioStore.isPlaying) this.audioStore.togglePlayPause();
+    useToast().showError(i18n.global.t('audio.offlineNoNext'));
   }
 
   /**

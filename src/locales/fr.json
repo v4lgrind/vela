@@ -106,7 +106,8 @@
     "playNext": "Lire ensuite",
     "addToQueue": "Ajouter à la file",
     "removeDownload": "Supprimer le téléchargement",
-    "cancelDownload": "Annuler le téléchargement"
+    "cancelDownload": "Annuler le téléchargement",
+    "offlineNoNext": "Pas de connexion, et aucun titre téléchargé à lire ensuite"
   },
   "detail": {
     "episodes": "{n} épisode | {n} épisodes",

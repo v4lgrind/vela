@@ -106,7 +106,8 @@
     "playNext": "Play next",
     "addToQueue": "Add to queue",
     "removeDownload": "Remove download",
-    "cancelDownload": "Cancel download"
+    "cancelDownload": "Cancel download",
+    "offlineNoNext": "No connection, and no downloaded track to play next"
   },
   "detail": {
     "episodes": "{n} episode | {n} episodes",

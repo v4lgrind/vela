@@ -60,7 +60,9 @@ class NativeAudioPlugin : Plugin() {
 
         override fun onPlayerError(error: PlaybackException) {
             Log.e(TAG, "Playback error", error)
-            notifyListeners("error", JSObject().put("message", error.message ?: error.errorCodeName))
+            notifyListeners("error", JSObject()
+                .put("message", error.message ?: error.errorCodeName)
+                .put("code", error.errorCodeName))
         }
     }
 

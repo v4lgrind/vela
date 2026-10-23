@@ -70,8 +70,8 @@ export class NativeAudioEngine implements AudioEngine {
     NativeAudio.addListener('stateChange', (s) => handler(toEngineState(s)));
   }
 
-  onError(handler: (message: string) => void) {
-    NativeAudio.addListener('error', (e) => handler(e.message));
+  onError(handler: (message: string, network?: boolean) => void) {
+    NativeAudio.addListener('error', (e) => handler(e.message, e.code?.startsWith('ERROR_CODE_IO_NETWORK')));
   }
 
   async restore() {

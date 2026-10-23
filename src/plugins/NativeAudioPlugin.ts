@@ -46,7 +46,7 @@ export interface NativeAudioPluginInterface {
   /** Server and credentials for browsing the library from Android Auto. */
   setLibraryConfig(opts: { serverUrl: string; accessToken: string; userId: string; maxBitrate: number }): Promise<void>;
   addListener(event: 'stateChange', handler: (e: NativeAudioState) => void): Promise<PluginListenerHandle>;
-  addListener(event: 'error', handler: (e: { message: string }) => void): Promise<PluginListenerHandle>;
+  addListener(event: 'error', handler: (e: { message: string; code?: string }) => void): Promise<PluginListenerHandle>;
   /** A queue was started from outside the app (Android Auto); read it with getState(). */
   addListener(event: 'externalQueue', handler: () => void): Promise<PluginListenerHandle>;
 }

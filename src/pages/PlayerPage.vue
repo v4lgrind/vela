@@ -280,6 +280,7 @@ import { useAudioPlayerStore } from '@/store/audio-player-store';
 import { usePreferencesStore } from '@/store/preferences-store';
 import { useOfflineStore } from '@/store/offline-store';
 import { offlineDatabase } from '@/services/offlineDatabase';
+import { offlineResumeSeconds } from '@/utils/watchProgress';
 import { NativeVideo } from '@/plugins/NativeVideoPlugin';
 import { usePlatform } from '@/composables/usePlatform';
 import { usePlayerSession } from '@/composables/player/usePlayerSession';
@@ -471,20 +472,11 @@ onMounted(async () => {
     const cachedDownload = offlineStore.getDownload(itemId);
     const isOffline = !offlineStore.isFullyOnline || preferencesStore.forceOfflineMode;
     if (isOffline && cachedDownload) {
-        const routeStartTicks = route.query.startTicks ? Number(route.query.startTicks) : null;
-
-        // For offline playback, always check offline database first (most recent progress),
-        // then fall back to route startTicks or cached Jellyfin position.
-        let resumeSeconds: number | undefined;
+        // The most recent playback wins: this device offline, or another one
+        // (user data refreshed while online). Starting from an older local
+        // position would later overwrite the newer one on Jellyfin.
         const offlineProgress = await offlineDatabase.getWatchProgress(itemId);
-        if (offlineProgress && offlineProgress.position > 0 && !offlineProgress.completed) {
-            resumeSeconds = offlineProgress.position;
-        } else if (routeStartTicks) {
-            resumeSeconds = routeStartTicks / 10_000_000;
-        } else {
-            const cachedTicks = cachedDownload.jellyfinItem?.UserData?.PlaybackPositionTicks;
-            resumeSeconds = cachedTicks ? cachedTicks / 10_000_000 : undefined;
-        }
+        const resumeSeconds = offlineResumeSeconds(cachedDownload.jellyfinItem, offlineProgress ?? undefined);
 
         mediaTitle.value = buildMediaTitle(cachedDownload.jellyfinItem);
         await offlinePlayer.initOfflinePlayer(cachedDownload, resumeSeconds, mediaTitle.value);

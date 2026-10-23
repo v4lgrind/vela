@@ -512,7 +512,7 @@ import {
 } from '@/services/downloadService';
 import { offlineDatabase } from '@/services/offlineDatabase';
 import { localLibraryPage, type LocalQuery } from '@/utils/offlineLibrary';
-import { effectiveProgress } from '@/utils/watchProgress';
+import { offlineResumeSeconds } from '@/utils/watchProgress';
 import LazyImg from '@/components/LazyImg.vue';
 import { formatTicksDuration, formatTicksHuman, formatBytes } from '@/utils/helpers';
 import { Button } from '@/components/ui/button';
@@ -641,10 +641,7 @@ async function load() {
             item.value = cached.jellyfinItem;
             const progress = await offlineDatabase.getWatchProgress(itemId.value);
             // The most recent playback wins: this device offline, or another one before.
-            const resume = effectiveProgress(cached.jellyfinItem, progress ?? undefined);
-            if (resume.position > 0 && !resume.played && resume.percentage < 90) {
-                offlineProgressSeconds.value = resume.position;
-            }
+            offlineProgressSeconds.value = offlineResumeSeconds(cached.jellyfinItem, progress ?? undefined) ?? null;
             return;
         }
 

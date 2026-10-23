@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 
 import type { DownloadedMedia, WatchProgress } from '@/services/offlineDatabase';
 
-import { effectiveProgress, resumeCandidates, shouldPushLocal } from './watchProgress';
+import { effectiveProgress, offlineResumeSeconds, resumeCandidates, shouldPushLocal } from './watchProgress';
 
 const JAN_1 = Date.parse('2026-01-01T10:00:00Z');
 const JAN_2 = Date.parse('2026-01-02T10:00:00Z');
@@ -71,5 +71,22 @@ describe('resumeCandidates', () => {
   it('skips videos marked played', () => {
     const downloads = [dl('seen', 'Movie', { PlaybackPositionTicks: 100 * 1e7, PlayedPercentage: 10, Played: true })];
     expect(resumeCandidates(downloads, new Map())).toEqual([]);
+  });
+});
+
+describe('offlineResumeSeconds', () => {
+  it('resumes at the newer server position over an older local one', () => {
+    const item = serverItem({ PlaybackPositionTicks: 2400 * 1e7, PlayedPercentage: 50, LastPlayedDate: '2026-01-05T10:00:00Z' });
+    expect(offlineResumeSeconds(item, local({ position: 300, lastWatched: JAN_1 }))).toBe(2400);
+  });
+
+  it('resumes at the newer local position', () => {
+    const item = serverItem({ PlaybackPositionTicks: 600 * 1e7, PlayedPercentage: 20, LastPlayedDate: '2026-01-01T10:00:00Z' });
+    expect(offlineResumeSeconds(item, local())).toBe(1200);
+  });
+
+  it('starts over a video finished on another device', () => {
+    const item = serverItem({ PlaybackPositionTicks: 0, PlayedPercentage: 100, Played: true, LastPlayedDate: '2026-01-05T10:00:00Z' });
+    expect(offlineResumeSeconds(item, local({ lastWatched: JAN_1 }))).toBeUndefined();
   });
 });

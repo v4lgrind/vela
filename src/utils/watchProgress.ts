@@ -33,6 +33,17 @@ export function effectiveProgress(item: any, local?: WatchProgress): EffectivePr
   };
 }
 
+/**
+ * Where offline playback starts, by the same rule: undefined to start over
+ * (nothing played, finished, or past the resume threshold).
+ */
+export function offlineResumeSeconds(item: any, local?: WatchProgress): number | undefined {
+  const progress = effectiveProgress(item, local);
+  return progress.position > 0 && !progress.played && progress.percentage < RESUME_MAX_PERCENTAGE
+    ? progress.position
+    : undefined;
+}
+
 /** Push offline progress unless Jellyfin recorded a strictly newer playback. */
 export function shouldPushLocal(local: WatchProgress, server: { LastPlayedDate?: string | null } | undefined): boolean {
   return local.lastWatched >= lastPlayedOf(server);

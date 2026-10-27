@@ -31,7 +31,7 @@
 
   --color-rating: #fbbf24;
 
-  --color-nav-bg: rgba(18, 20, 23, 0.82); /* blurred bottom-nav surface */
+  --color-nav-bg: rgba(18, 20, 23, 0.65); /* blurred bottom-nav surface */
 
   --radius-card: 12px;
   --radius-button: 8px;
@@ -131,7 +131,7 @@ html.light {
   --color-accent-purple: #1f6fe0;
   --color-accent-purple-light: #4a8be8;
   --color-accent-ink: #ffffff;
-  --color-nav-bg: rgba(255, 255, 255, 0.85);
+  --color-nav-bg: rgba(255, 255, 255, 0.7);
 
   --color-background: #eef1f5;
   --color-foreground: #0b1220;

@@ -58,7 +58,7 @@ const { t } = useI18n();
 const audioStore = useAudioPlayerStore();
 const jellyfinStore = useJellyfinStore();
 
-// When the bottom nav is on screen, sit just above it (nav: 66px tall, 16px
+// When the bottom nav is on screen, sit just above it (nav: 66px tall, 4px
 // offset, +8px gap) instead of flush to the bottom edge.
 // On wide screens the nav is a left rail: stay at the bottom, right of the rail.
 const navVisible = useBottomNavVisible();

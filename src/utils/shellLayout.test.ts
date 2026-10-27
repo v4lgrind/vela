@@ -13,8 +13,8 @@ describe('contentStyle', () => {
   });
 
   it('reserves the floating bar (and the mini player above it) on narrow screens', () => {
-    expect(contentStyle({ navVisible: true, wide: false, miniVisible: false })).toEqual({ paddingBottom: `calc(98px + ${SAB})` });
-    expect(contentStyle({ navVisible: true, wide: false, miniVisible: true })).toEqual({ paddingBottom: `calc(98px + 64px + ${SAB})` });
+    expect(contentStyle({ navVisible: true, wide: false, miniVisible: false })).toEqual({ paddingBottom: `calc(86px + ${SAB})` });
+    expect(contentStyle({ navVisible: true, wide: false, miniVisible: true })).toEqual({ paddingBottom: `calc(86px + 64px + ${SAB})` });
   });
 });
 
@@ -24,7 +24,7 @@ describe('miniPlayerStyle', () => {
   });
 
   it('sits above the floating bar on narrow screens', () => {
-    expect(miniPlayerStyle({ navVisible: true, wide: false })).toEqual({ bottom: `calc(90px + ${SAB})` });
+    expect(miniPlayerStyle({ navVisible: true, wide: false })).toEqual({ bottom: `calc(78px + ${SAB})` });
   });
 
   it('lets the template pin it to the bottom edge when there is no nav', () => {

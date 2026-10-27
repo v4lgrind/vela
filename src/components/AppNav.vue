@@ -58,5 +58,5 @@ const tabs: { section: NavSection; label: string; route: string; icon: typeof Ho
 ];
 
 // Float above the gesture bar; --sab is the measured inset, env() is the web fallback.
-const barStyle = { bottom: "calc(16px + var(--sab, env(safe-area-inset-bottom, 0px)))" };
+const barStyle = { bottom: "calc(4px + var(--sab, env(safe-area-inset-bottom, 0px)))" };
 </script>

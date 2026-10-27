@@ -11,6 +11,7 @@ import {
   getUserViewApi,
   getSystemApi,
   getArtistApi,
+  getLyricApi,
 } from "@jellyfin/sdk/lib/utils/api";
 import { Preferences } from "@capacitor/preferences";
 
@@ -732,6 +733,12 @@ export const useJellyfinStore = defineStore("jellyfin", {
         sortOrder: ["Ascending"],
       });
       return resp.data.Items ?? [];
+    },
+    /** A track's lyrics; the server answers 404 when it has none. */
+    async fetchLyrics(itemId: string) {
+      this.initializeApi();
+      const resp = await getLyricApi(this.api).getLyrics({ itemId });
+      return resp.data;
     },
     getPlaceholderImage(itemType?: string): string {
       return generatePlaceholderImage(PLACEHOLDER_KEYS[itemType ?? ""] ?? itemType ?? "default");

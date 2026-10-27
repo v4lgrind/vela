@@ -29,6 +29,12 @@
           @click="audioPlayerService.openCastDialog()">
           <Cast class="size-6" />
         </Button>
+        <Button v-if="lyrics" variant="ghost" size="icon" :aria-label="t('audio.lyrics')"
+          class="size-11 rounded-full hover:bg-white/10"
+          :class="showLyrics && !showQueue ? 'text-accent-purple' : 'text-text-primary'"
+          @click="toggleLyrics">
+          <MicVocal class="size-6" />
+        </Button>
         <Button variant="ghost" size="icon" class="size-11 rounded-full text-text-primary hover:bg-white/10" :aria-label="t('audio.queue')" @click="showQueue = !showQueue">
           <ListMusic class="size-7" />
         </Button>
@@ -36,8 +42,9 @@
     </div>
 
     <!-- Main Player -->
-    <div v-if="!showQueue" class="flex-1 flex flex-col items-center justify-center gap-6 py-4">
-      <img v-if="albumArtUrl && !artFailed" :key="artAttempt" @error="artFailed = true" :src="albumArtUrl" class="size-70 rounded-xl object-cover shadow-[0_20px_60px_rgba(0,0,0,0.5)]" :alt="t('audio.cover')" />
+    <div v-if="!showQueue" class="flex-1 flex flex-col items-center justify-center gap-6 py-4" :class="showLyrics && lyrics && 'min-h-0'">
+      <AudioLyrics v-if="showLyrics && lyrics" :key="currentTrack?.id" :lyrics="lyrics" class="flex-1 min-h-0 w-full max-w-[600px]" />
+      <img v-else-if="albumArtUrl && !artFailed" :key="artAttempt" @error="artFailed = true" :src="albumArtUrl" class="size-70 rounded-xl object-cover shadow-[0_20px_60px_rgba(0,0,0,0.5)]" :alt="t('audio.cover')" />
       <div v-else class="size-70 rounded-xl bg-border-input"></div>
 
       <div class="text-center max-w-full">
@@ -140,7 +147,9 @@ import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { audioPlayerService } from '@/services/audioPlayerService';
 import AirPlayDialog from '@/components/AirPlayDialog.vue';
-import { Airplay, Cast, ChevronDown, GripVertical, ListMusic, SkipBack, SkipForward, Play, Pause, Repeat, Repeat1, Shuffle, Volume2, Volume1, VolumeX, X } from 'lucide-vue-next';
+import AudioLyrics from '@/components/AudioLyrics.vue';
+import { toLyricLines, type Lyrics } from '@/utils/lyrics';
+import { Airplay, Cast, ChevronDown, GripVertical, ListMusic, MicVocal, SkipBack, SkipForward, Play, Pause, Repeat, Repeat1, Shuffle, Volume2, Volume1, VolumeX, X } from 'lucide-vue-next';
 
 const { t } = useI18n();
 const audioStore = useAudioPlayerStore();
@@ -166,6 +175,26 @@ useRetryWhileFailed(artFailed, () => {
   artAttempt.value++;
 });
 
+// Lyrics replace the cover; the button only shows when the track has some.
+const lyrics = ref<Lyrics | null>(null);
+const showLyrics = ref(false);
+
+watch(() => currentTrack.value?.id, async (id) => {
+  lyrics.value = null;
+  if (!id) return;
+  try {
+    const dto = await jellyfinStore.fetchLyrics(id);
+    if (currentTrack.value?.id === id) lyrics.value = toLyricLines(dto);
+  } catch {
+    // 404: no lyrics for this track (or offline).
+  }
+}, { immediate: true });
+
+function toggleLyrics() {
+  showLyrics.value = showQueue.value || !showLyrics.value;
+  showQueue.value = false;
+}
+
 // While the thumb is dragged, show its position; seek once on release.
 const seekPreview = ref<number | null>(null);
 
@@ -183,7 +212,7 @@ const swipeStartY = ref<number | null>(null);
 function onSwipeStart(e: TouchEvent) {
   const target = e.target as HTMLElement;
   if (target.closest('[data-no-swipe]')) return;
-  const queueScroll = target.closest('[data-queue-scroll]');
+  const queueScroll = target.closest('[data-queue-scroll], [data-lyrics-scroll]');
   if ((queueScroll && queueScroll.scrollTop > 0) || (sheet.value?.scrollTop ?? 0) > 0) return;
   swipeStartY.value = e.touches[0].clientY;
 }

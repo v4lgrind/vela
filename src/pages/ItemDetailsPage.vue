@@ -7,7 +7,7 @@
 
         <!-- Error -->
         <section v-else-if="error"
-            class="flex items-center justify-center min-h-dvh text-red-400 text-lg">{{ error }}</section>
+            class="flex items-center justify-center min-h-dvh text-error text-lg">{{ error }}</section>
 
         <template v-else>
 
@@ -64,29 +64,31 @@
                           <div class="mx-auto max-w-[1200px] px-gutter md:px-gutter-wide">
                             <!-- Breadcrumb -->
                             <div v-if="item.SeriesId || item.SeasonId"
-                                class="flex items-center gap-1.5 text-sm text-text-muted mb-1.5">
+                                class="flex items-center gap-1.5 text-caption text-text-muted mb-1.5">
                                 <button v-if="item.SeriesId" @click="goToItem(item.SeriesId)"
                                     class="hover:text-text-heading transition-colors cursor-pointer">{{ item.SeriesName }}</button>
                                 <span v-if="item.SeriesId && item.SeasonId" class="text-text-subtle">/</span>
                                 <button v-if="item.SeasonId" @click="goToItem(item.SeasonId)"
                                     class="hover:text-text-heading transition-colors cursor-pointer">{{ item.SeasonName }}</button>
                             </div>
-                            <h1 class="line-clamp-2 text-page sm:text-4xl font-bold text-text-heading leading-tight tracking-tight mb-2">{{ item.Name }}</h1>
-                            <div v-if="item.Type === 'MusicAlbum' && item.AlbumArtists?.length" class="flex flex-wrap gap-x-2 mb-1.5 text-[15px] font-semibold text-text-primary">
+                            <h1 class="line-clamp-2 text-page lg:text-page-wide font-bold text-text-heading leading-tight tracking-tight mb-2">{{ item.Name }}</h1>
+                            <div v-if="item.Type === 'MusicAlbum' && item.AlbumArtists?.length" class="flex flex-wrap gap-x-2 mb-1.5 text-body font-semibold text-text-primary">
                                 <button v-for="artist in item.AlbumArtists" :key="artist.Id" @click="goToItem(artist.Id)"
                                     class="hover:text-text-heading underline-offset-4 hover:underline cursor-pointer">{{ artist.Name }}</button>
                             </div>
-                            <div class="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[12.5px] text-text-primary">
+                            <div class="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-caption text-text-primary">
                                 <template v-for="(part, i) in heroMeta" :key="part">
                                     <span v-if="i" class="text-text-subtle">·</span>
                                     <span>{{ part }}</span>
                                 </template>
                                 <template v-if="item.CommunityRating">
                                     <span class="text-text-subtle">·</span>
-                                    <span class="text-amber-500 font-semibold">★ {{ item.CommunityRating.toFixed(1) }}</span>
+                                    <span class="inline-flex items-center gap-1 font-semibold text-text-heading">
+                                        <Star class="size-3 fill-current stroke-none" aria-hidden="true" />{{ item.CommunityRating.toFixed(1) }}
+                                    </span>
                                 </template>
-                                <span v-if="videoResolution" class="ml-1 px-2 py-0.5 rounded-md bg-text-heading/15 text-[10.5px] font-semibold">{{ videoResolution }}</span>
-                                <span v-if="videoCodec" class="px-2 py-0.5 rounded-md bg-text-heading/15 text-[10.5px] font-semibold uppercase">{{ videoCodec }}</span>
+                                <span v-for="badge in videoBadges" :key="badge"
+                                    class="rounded-full bg-text-heading/15 px-2 text-label font-semibold leading-5 text-text-heading first-of-type:ml-1">{{ badge }}</span>
                             </div>
                           </div>
                         </div>
@@ -98,13 +100,19 @@
                         <!-- Actions -->
                         <div class="flex flex-wrap items-center gap-2.5 mb-4">
                             <button v-if="isPlayable(item)" @click="playMedia"
-                                class="flex-1 min-w-[180px] flex items-center justify-center gap-2 h-[50px] rounded-2xl bg-accent-purple text-accent-ink font-bold text-[15px] active:scale-[0.98] transition shadow-lg cursor-pointer">
+                                class="flex-1 min-w-[180px] md:flex-none md:min-w-[280px] md:px-8 flex items-center justify-center gap-2 h-[50px] rounded-2xl bg-accent-purple text-accent-ink font-semibold text-body active:scale-[0.98] transition cursor-pointer">
                                 <Play class="size-4 fill-current stroke-none" />
                                 {{ resumePositionLabel ? t('detail.resume', { time: resumePositionLabel }) : t('common.play') }}
                             </button>
 
+                            <button v-if="nextEpisode" @click="playNextEpisode"
+                                class="flex-1 min-w-[180px] md:flex-none md:min-w-[280px] md:px-8 flex items-center justify-center gap-2 h-[50px] rounded-2xl bg-accent-purple text-accent-ink font-semibold text-body active:scale-[0.98] transition cursor-pointer">
+                                <Play class="size-4 fill-current stroke-none" />
+                                {{ nextEpisodeLabel }}
+                            </button>
+
                             <button v-if="isMusicCollection" @click="playAlbum"
-                                class="flex-1 min-w-[180px] flex items-center justify-center gap-2 h-[50px] rounded-2xl bg-accent-purple text-accent-ink font-bold text-[15px] active:scale-[0.98] transition cursor-pointer">
+                                class="flex-1 min-w-[180px] md:flex-none md:min-w-[280px] md:px-8 flex items-center justify-center gap-2 h-[50px] rounded-2xl bg-accent-purple text-accent-ink font-semibold text-body active:scale-[0.98] transition cursor-pointer">
                                 <Play class="size-4 fill-current stroke-none" /> {{ item.Type === 'MusicAlbum' ? t('detail.playAlbum') : t('detail.playAll') }}
                             </button>
                             <button v-if="isMusicCollection" @click="shuffleAlbum" :aria-label="t('detail.shuffle')"
@@ -128,31 +136,32 @@
                             </button>
                             <button v-if="isDownloading" @click="cancelDownload"
                                 :aria-label="t('detail.downloadingCancel', { percent: downloadProgress })"
-                                class="flex items-center justify-center size-[50px] rounded-2xl bg-red-500/10 border border-red-500/30 text-red-400 active:scale-95 transition cursor-pointer">
+                                class="flex items-center justify-center size-[50px] rounded-2xl bg-surface border border-border-default text-accent-purple active:scale-95 transition cursor-pointer">
                                 <Loader2 class="size-5 animate-spin" />
                             </button>
 
                             <!-- Bulk download Season / Series -->
                             <button v-if="item.Type === 'Season'" @click="openBulkDialog('season')"
-                                class="flex items-center gap-2 px-4 h-[50px] rounded-2xl bg-surface border border-border-default text-text-heading text-sm font-medium active:scale-95 transition cursor-pointer">
-                                <DownloadIcon class="size-4" /> {{ t('types.Season') }}
+                                :aria-label="t('detail.bulkTitle', { name: item.Name })"
+                                class="flex items-center justify-center size-[50px] rounded-2xl bg-surface border border-border-default text-text-heading active:scale-95 transition cursor-pointer">
+                                <DownloadIcon class="size-5" />
                             </button>
                             <button v-if="item.Type === 'Series'" @click="openBulkDialog('series')"
-                                class="flex items-center gap-2 px-4 h-[50px] rounded-2xl bg-surface border border-border-default text-text-heading text-sm font-medium active:scale-95 transition cursor-pointer">
-                                <DownloadIcon class="size-4" /> {{ t('types.Series') }}
+                                :aria-label="t('detail.bulkTitle', { name: item.Name })"
+                                class="flex items-center justify-center size-[50px] rounded-2xl bg-surface border border-border-default text-text-heading active:scale-95 transition cursor-pointer">
+                                <DownloadIcon class="size-5" />
                             </button>
 
                             <!-- Mark all watched (Series / Season) -->
                             <button v-if="item.Type === 'Series' || item.Type === 'Season'"
                                 :disabled="togglingWatched" @click="toggleWatched"
                                 :aria-label="item.UserData?.Played ? t('detail.markAllUnwatched') : t('detail.markAllWatched')"
-                                class="flex items-center gap-2 px-4 h-[50px] rounded-2xl border text-sm font-medium active:scale-95 transition cursor-pointer"
+                                class="flex items-center justify-center size-[50px] rounded-2xl border active:scale-95 transition cursor-pointer"
                                 :class="item.UserData?.Played
                                     ? 'bg-accent-purple/15 border-accent-purple/40 text-accent-purple'
                                     : 'bg-surface border-border-default text-text-heading'">
-                                <Loader2 v-if="togglingWatched" class="size-4 animate-spin" />
-                                <Check v-else class="size-4" />
-                                {{ item.UserData?.Played ? t('library.watched') : t('detail.markWatchedShort') }}
+                                <Loader2 v-if="togglingWatched" class="size-5 animate-spin" />
+                                <Check v-else class="size-5" />
                             </button>
 
                             <!-- Watched toggle (single playable) -->
@@ -171,7 +180,7 @@
 
                         <!-- Resume progress bar -->
                         <div v-if="resumePercent > 0 && resumePercent < 100"
-                            class="h-1 rounded-full bg-surface-hover overflow-hidden mb-4">
+                            class="h-1 rounded-full bg-surface-hover overflow-hidden mb-4 md:max-w-[280px]">
                             <div class="h-full bg-accent-purple rounded-full" :style="{ width: resumePercent + '%' }" />
                         </div>
 
@@ -198,11 +207,11 @@
                         <!-- Director / Studio inline -->
                         <div class="flex flex-wrap gap-x-5 gap-y-1 text-xs">
                             <span v-if="directorNames.length">
-                                <span class="text-text-subtle uppercase tracking-wider text-[10px] mr-1.5">{{ t('detail.director') }}</span>
+                                <span class="text-text-subtle uppercase tracking-wider text-label mr-1.5">{{ t('detail.director') }}</span>
                                 <span class="text-text-primary">{{ directorNames.join(', ') }}</span>
                             </span>
                             <span v-if="studioNames.length">
-                                <span class="text-text-subtle uppercase tracking-wider text-[10px] mr-1.5">{{ t('detail.studio') }}</span>
+                                <span class="text-text-subtle uppercase tracking-wider text-label mr-1.5">{{ t('detail.studio') }}</span>
                                 <span class="text-text-primary">{{ studioNames.join(', ') }}</span>
                             </span>
                         </div>
@@ -235,7 +244,7 @@
                                     <div class="grid grid-cols-2 gap-2">
                                         <template v-for="row in sourceDetails" :key="`s-${row.label}`">
                                             <div class="bg-surface-hover/50 rounded-lg px-3 py-2"
-                                                :class="row.label === 'Path' ? 'col-span-2' : ''">
+                                                :class="row.wide ? 'col-span-2' : ''">
                                                 <div class="text-[11px] text-text-muted uppercase tracking-wider">{{ row.label }}</div>
                                                 <div class="text-sm font-medium text-text-heading mt-0.5 break-all">{{ row.value }}</div>
                                             </div>
@@ -270,7 +279,7 @@
                                     item-type="Season" class="w-full h-full object-cover" />
                                 <button @click.stop="toggleWatchedSeason(season)" :disabled="watchingSeasonId === season.Id"
                                     class="absolute top-1 right-1 flex size-10 items-center justify-center rounded-full transition-all duration-200 cursor-pointer pointer-events-auto disabled:opacity-50"
-                                    :class="season.UserData?.Played ? 'bg-accent-purple text-white shadow' : 'bg-black/50 text-white/80'"
+                                    :class="season.UserData?.Played ? 'bg-accent-purple text-accent-ink' : 'bg-black/50 text-white/80'"
                                     :aria-label="season.UserData?.Played ? t('common.markUnwatched') : t('common.markWatched')">
                                     <Loader2 v-if="watchingSeasonId === season.Id" class="size-4 animate-spin" />
                                     <Check v-else class="size-4" />
@@ -291,25 +300,13 @@
 
                 <!-- Episodes -->
                 <Section v-if="item.Type === 'Season' && episodes.length" :title="t('detail.episodesTitle')">
-                    <template #actions>
-                        <button :disabled="togglingWatched" @click="toggleWatched"
-                            :aria-label="item.UserData?.Played ? t('detail.markAllUnwatched') : t('detail.markAllWatched')"
-                            class="flex min-h-10 items-center gap-1.5 px-3 rounded-lg border text-caption font-medium transition-all cursor-pointer"
-                            :class="item.UserData?.Played
-                                ? 'bg-accent-purple/15 border-accent-purple/40 text-accent-purple hover:bg-accent-purple/25'
-                                : 'bg-surface-hover border-border-input text-text-muted hover:text-text-heading hover:border-border-hover'">
-                            <Loader2 v-if="togglingWatched" class="size-3 animate-spin" />
-                            <Check v-else class="size-3" />
-                            {{ item.UserData?.Played ? t('detail.allWatched') : t('detail.markAllWatchedShort') }}
-                        </button>
-                    </template>
                     <div class="flex flex-col gap-2">
                         <div v-for="ep in episodes" :key="ep.Id"
                             class="flex gap-3 sm:gap-4 p-2.5 rounded-xl cursor-pointer transition-all duration-200 border border-transparent hover:bg-surface-raised hover:border-border-default active:opacity-75"
-                            :class="ep.UserData?.Played ? 'opacity-50 hover:opacity-80' : ''"
                             @click="goToItem(ep.Id)">
                             <!-- Thumbnail -->
-                            <div class="relative group w-[100px] h-[56px] sm:w-[180px] sm:h-[101px] rounded-lg overflow-hidden shrink-0 bg-black/40">
+                            <div class="relative group w-[100px] h-[56px] sm:w-[180px] sm:h-[101px] rounded-lg overflow-hidden shrink-0 bg-black/40"
+                                :class="ep.UserData?.Played && 'opacity-60'">
                                 <LazyImg :src="getImageUrl(ep.Id, 'Primary', 240, 135)" :alt="ep.Name"
                                     item-type="Episode" class="w-full h-full object-cover" />
                                 <div class="absolute inset-0 bg-black/50 flex items-center justify-center sm:opacity-0 sm:group-hover:opacity-100 transition-opacity pointer-events-none">
@@ -328,7 +325,7 @@
                             <!-- Info -->
                             <div class="flex-1 min-w-0 py-0.5">
                                 <div class="flex items-start justify-between gap-2 mb-1">
-                                    <p class="font-semibold text-sm text-text-heading m-0 leading-snug">
+                                    <p class="font-semibold text-sm m-0 leading-snug" :class="ep.UserData?.Played ? 'text-text-muted' : 'text-text-heading'">
                                         <span class="text-text-subtle mr-1">{{ ep.IndexNumber }}.</span>{{ ep.Name }}
                                     </p>
                                     <div class="flex items-center gap-1.5 shrink-0">
@@ -352,7 +349,7 @@
                                         </button>
                                         <button @click.stop="toggleWatchedEpisode(ep)" :disabled="watchingEpId === ep.Id"
                                             class="flex size-10 items-center justify-center rounded-full transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
-                                            :class="ep.UserData?.Played ? 'bg-accent-purple text-white' : 'bg-surface-hover text-text-muted hover:bg-surface-raised hover:text-text-heading'"
+                                            :class="ep.UserData?.Played ? 'bg-accent-purple text-accent-ink' : 'bg-surface-hover text-text-muted hover:bg-surface-raised hover:text-text-heading'"
                                             :aria-label="ep.UserData?.Played ? t('common.markUnwatched') : t('common.markWatched')">
                                             <Check class="size-3.5" />
                                         </button>
@@ -364,7 +361,9 @@
                                 </p>
                                 <p v-else class="text-text-subtle text-xs italic mb-0">{{ t('detail.noSynopsis') }}</p>
                                 <div v-if="ep.CommunityRating || ep.PremiereDate" class="flex gap-2 mt-1">
-                                    <span v-if="ep.CommunityRating" class="text-xs text-yellow-400/70">★ {{ ep.CommunityRating.toFixed(1) }}</span>
+                                    <span v-if="ep.CommunityRating" class="inline-flex items-center gap-1 text-xs text-text-muted">
+                                        <Star class="size-2.5 fill-current stroke-none" aria-hidden="true" />{{ ep.CommunityRating.toFixed(1) }}
+                                    </span>
                                     <span v-if="ep.PremiereDate" class="text-xs text-text-subtle">{{ new Date(ep.PremiereDate).getFullYear() }}</span>
                                 </div>
                             </div>
@@ -518,7 +517,7 @@ import { formatTicksDuration, formatTicksHuman, formatBytes } from '@/utils/help
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose, DialogTrigger } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
-import { Play, Check, Download as DownloadIcon, ChevronLeft, Loader2, Info, Shuffle, Tv2 } from 'lucide-vue-next';
+import { Play, Check, Download as DownloadIcon, ChevronLeft, Loader2, Info, Shuffle, Star, Tv2 } from 'lucide-vue-next';
 import { MediaRail, Section } from '@/components/layout';
 import CastPlugin, { type CastState } from '@/plugins/CastPlugin';
 import { usePlatform } from '@/composables/usePlatform';
@@ -527,7 +526,7 @@ import { logger } from '@/utils/logger';
 import TranscodeDownloadDialog from '@/components/TranscodeDownloadDialog.vue';
 import TrackActionsMenu from '@/components/TrackActionsMenu.vue';
 import { toAudioTrack } from '@/utils/audioTrack';
-import { heroImage, metaParts } from '@/utils/detailMeta';
+import { hdrLabel, heroImage, metaParts, nextEpisodeOf, resolutionLabel } from '@/utils/detailMeta';
 import type { TranscodeOptions } from '@/store/download-store';
 
 const store = useJellyfinStore();
@@ -537,7 +536,7 @@ const downloadStore = useDownloadStore();
 const metadataCache = useMetadataCacheStore();
 const route = useRoute();
 const router = useRouter();
-const { t } = useI18n();
+const { t, locale } = useI18n();
 
 // Deep links (Android Auto, notifications) open a detail page with nothing behind it: land on Home.
 function goBack() {
@@ -626,6 +625,7 @@ async function load() {
     error.value = null;
     seasons.value = [];
     episodes.value = [];
+    seriesNextUp.value = null;
     audioTracks.value = [];
     artistAlbums.value = [];
     similarItems.value = [];
@@ -712,7 +712,10 @@ async function load() {
         item.value = data;
 
         if (data?.Type === 'Series') {
-            seasons.value = await store.fetchSeasons(itemId.value);
+            [seasons.value, seriesNextUp.value] = await Promise.all([
+                store.fetchSeasons(itemId.value),
+                store.fetchNextUp(itemId.value).catch(() => null),
+            ]);
         }
         if (data?.Type === 'Season') {
             episodes.value = await store.fetchEpisodes(itemId.value);
@@ -859,6 +862,38 @@ const resumePositionLabel = computed(() => {
     if (!ticks || ticks <= 0) return null;
     return formatTicksHuman(ticks);
 });
+
+// Series: the server's next-up episode. Season: picked from the loaded episodes.
+const seriesNextUp = ref<any | null>(null);
+const nextEpisode = computed<any | null>(() => {
+    if (item.value?.Type === 'Series') return seriesNextUp.value;
+    if (item.value?.Type === 'Season') return nextEpisodeOf(episodes.value);
+    return null;
+});
+const nextEpisodeLabel = computed(() => {
+    const ep = nextEpisode.value;
+    if (!ep) return '';
+    const code = `S${ep.ParentIndexNumber ?? item.value?.IndexNumber ?? 1}E${ep.IndexNumber ?? 1}`;
+    return (ep.UserData?.PlaybackPositionTicks ?? 0) > 0
+        ? t('detail.resumeEpisode', { code })
+        : t('detail.playEpisode', { code });
+});
+
+function playNextEpisode() {
+    const ep = nextEpisode.value;
+    if (!ep) return;
+    const ticks = ep.UserData?.PlaybackPositionTicks;
+    const sorted = [...episodes.value].sort((a, b) => (a.IndexNumber ?? 0) - (b.IndexNumber ?? 0));
+    const following = sorted[sorted.findIndex((e) => e.Id === ep.Id) + 1];
+    router.push({
+        name: 'Player',
+        params: { id: ep.Id },
+        query: {
+            ...(ticks ? { startTicks: String(ticks) } : {}),
+            ...(following ? { nextEpisodeId: following.Id } : {}),
+        },
+    });
+}
 
 const heroMeta = computed(() => (item.value ? metaParts(item.value, t, episodes.value.length || undefined) : []));
 const genres = computed<string[]>(() => item.value?.Genres || []);
@@ -1026,70 +1061,74 @@ const mediaStreams = computed<any[]>(() => item.value?.MediaStreams ?? []);
 const videoStreams = computed(() => mediaStreams.value.filter(s => s.Type === 'Video'));
 const primaryVideo = computed(() => videoStreams.value[0] || null);
 
-const videoCodec = computed(() => {
-    const c = primaryVideo.value?.Codec;
-    return c ? String(c).toUpperCase() : null;
-});
-const videoResolution = computed(() => {
-    const w = primaryVideo.value?.Width;
-    const h = primaryVideo.value?.Height;
-    return w && h ? `${w}x${h}` : null;
+/** Badges after the hero meta line: resolution class, HDR format, codec. */
+const videoBadges = computed(() => {
+    const v = primaryVideo.value;
+    const codec = v?.Codec ? String(v.Codec).toUpperCase() : null;
+    return [resolutionLabel(v), hdrLabel(v), codec].filter((b): b is string => !!b);
 });
 
-const videoDetails = computed(() => {
+type InfoRow = { label: string; value: string; wide?: boolean };
+
+/** Readable value for the media info dialog: yes/no for flags, Mbit/s for bitrates. */
+function infoValue(key: string, val: unknown): string {
+    if (typeof val === 'boolean') return val ? t('common.yes') : t('common.no');
+    if (key.endsWith('Bitrate') && typeof val === 'number') {
+        return t('detail.info.mbps', { n: (val / 1_000_000).toLocaleString(locale.value, { maximumFractionDigits: 1 }) });
+    }
+    return String(val);
+}
+
+function infoRows(pairs: Array<[string, unknown]>): InfoRow[] {
+    return pairs
+        .filter(([, val]) => val !== null && val !== undefined && val !== '')
+        .map(([key, val]) => ({ label: t(`detail.info.${key}`), value: infoValue(key, val), wide: key === 'path' }));
+}
+
+const videoDetails = computed<InfoRow[]>(() => {
     const v = primaryVideo.value;
     if (!v) return [];
-    const entries: Array<{ label: string; value: string }> = [];
-    const push = (label: string, val: any) => {
-        if (val === null || val === undefined || val === '') return;
-        entries.push({ label, value: String(val) });
-    };
-    push('Codec', v.Codec?.toUpperCase());
-    push('Profile', v.Profile);
-    push('Level', v.Level);
-    if (v.Width && v.Height) push('Resolution', `${v.Width}x${v.Height}`);
-    push('Aspect Ratio', v.AspectRatio);
-    push('Avg Frame Rate', v.AverageFrameRate);
-    push('Real Frame Rate', v.RealFrameRate);
-    push('Bitrate (video)', v.BitRate);
-    push('Bit Depth', v.BitDepth);
-    push('Ref Frames', v.RefFrames);
-    push('Interlaced', v.IsInterlaced);
-    push('IsAVC', v.IsAVC);
-    push('Pixel Format', v.PixelFormat);
-    push('Color Space', v.ColorSpace);
-    push('Color Transfer', v.ColorTransfer);
-    push('Color Primaries', v.ColorPrimaries);
-    push('Video Range', v.VideoRange);
-    push('HDR Type', v.VideoRangeType);
-    if (v.DvProfile != null) push('DoVi Profile', v.DvProfile);
-    if (v.DvLevel != null) push('DoVi Level', v.DvLevel);
-    if (v.DvVersionMajor != null) {
-        push('DoVi Version', `${v.DvVersionMajor}.${v.DvVersionMinor ?? 0}`);
-    }
-    push('Time Base', v.TimeBase);
-    push('Index', v.Index);
-    return entries;
+    return infoRows([
+        ['codec', v.Codec?.toUpperCase()],
+        ['profile', v.Profile],
+        ['level', v.Level],
+        ['resolution', v.Width && v.Height ? `${v.Width} × ${v.Height}` : null],
+        ['aspectRatio', v.AspectRatio],
+        ['avgFrameRate', v.AverageFrameRate],
+        ['realFrameRate', v.RealFrameRate],
+        ['videoBitrate', v.BitRate],
+        ['bitDepth', v.BitDepth],
+        ['refFrames', v.RefFrames],
+        ['interlaced', v.IsInterlaced],
+        ['avc', v.IsAVC],
+        ['pixelFormat', v.PixelFormat],
+        ['colorSpace', v.ColorSpace],
+        ['colorTransfer', v.ColorTransfer],
+        ['colorPrimaries', v.ColorPrimaries],
+        ['videoRange', v.VideoRange],
+        ['hdrType', v.VideoRangeType],
+        ['doviProfile', v.DvProfile],
+        ['doviLevel', v.DvLevel],
+        ['doviVersion', v.DvVersionMajor != null ? `${v.DvVersionMajor}.${v.DvVersionMinor ?? 0}` : null],
+        ['timeBase', v.TimeBase],
+        ['index', v.Index],
+    ]);
 });
 
 const mediaSources = computed<any[]>(() => item.value?.MediaSources ?? []);
 const firstSource = computed(() => mediaSources.value[0] || null);
 
-const sourceDetails = computed(() => {
-    const s = firstSource.value;
-    if (!s) return [];
-    const entries: Array<{ label: string; value: string }> = [];
-    const push = (label: string, val: any) => {
-        if (val === null || val === undefined || val === '') return;
-        entries.push({ label, value: String(val) });
-    };
-    push('Container', s.Container);
-    push('Total Bitrate', s.Bitrate);
-    push('Path', s.Path);
-    push('Direct Play', s.SupportsDirectPlay);
-    push('Remux', s.SupportsDirectStream);
-    push('Transcode', s.SupportsTranscoding);
-    return entries;
+const sourceDetails = computed<InfoRow[]>(() => {
+    const src = firstSource.value;
+    if (!src) return [];
+    return infoRows([
+        ['container', src.Container],
+        ['totalBitrate', src.Bitrate],
+        ['path', src.Path],
+        ['directPlay', src.SupportsDirectPlay],
+        ['remux', src.SupportsDirectStream],
+        ['transcode', src.SupportsTranscoding],
+    ]);
 });
 
 const fileSizeHuman = computed(() => {

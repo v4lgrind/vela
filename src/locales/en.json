@@ -9,7 +9,9 @@
     "loading": "Loading…",
     "close": "Close",
     "cancel": "Cancel",
-    "delete": "Delete"
+    "delete": "Delete",
+    "yes": "Yes",
+    "no": "No"
   },
   "duration": {
     "hoursMinutes": "{h}h {m}m",
@@ -154,7 +156,41 @@
     "confirmDelete": "Delete \"{name}\" from offline storage?",
     "downloadFailed": "Download failed. Please try again.",
     "deleteFailed": "Could not delete",
-    "downloadEpisodeFailed": "Could not download \"{name}\""
+    "downloadEpisodeFailed": "Could not download \"{name}\"",
+    "playEpisode": "Play {code}",
+    "resumeEpisode": "Resume {code}",
+    "info": {
+      "codec": "Codec",
+      "profile": "Profile",
+      "level": "Level",
+      "resolution": "Resolution",
+      "aspectRatio": "Aspect ratio",
+      "avgFrameRate": "Average frame rate",
+      "realFrameRate": "Real frame rate",
+      "videoBitrate": "Video bitrate",
+      "bitDepth": "Bit depth",
+      "refFrames": "Reference frames",
+      "interlaced": "Interlaced",
+      "avc": "AVC",
+      "pixelFormat": "Pixel format",
+      "colorSpace": "Color space",
+      "colorTransfer": "Color transfer",
+      "colorPrimaries": "Color primaries",
+      "videoRange": "Video range",
+      "hdrType": "HDR type",
+      "doviProfile": "Dolby Vision profile",
+      "doviLevel": "Dolby Vision level",
+      "doviVersion": "Dolby Vision version",
+      "timeBase": "Time base",
+      "index": "Stream index",
+      "container": "Container",
+      "totalBitrate": "Total bitrate",
+      "path": "Path",
+      "directPlay": "Direct play",
+      "remux": "Remux",
+      "transcode": "Transcode",
+      "mbps": "{n} Mbit/s"
+    }
   },
   "person": {
     "titles": "{n} title | {n} titles",

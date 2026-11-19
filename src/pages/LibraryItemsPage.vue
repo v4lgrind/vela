@@ -134,7 +134,7 @@
       <ul v-else-if="viewMode === 'grid'" class="list-none p-0 m-0 grid grid-cols-3 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(150px,1fr))] sm:gap-4">
         <li v-for="item in items" :key="item.Id" class="group">
           <!-- Poster with overlay -->
-          <div class="relative w-full rounded-xl overflow-hidden bg-surface shadow-lg"
+          <div class="relative w-full rounded-xl overflow-hidden bg-surface-raised"
             :class="isSquare(item) ? 'aspect-square' : 'aspect-[2/3]'">
             <router-link
               :to="item.Type === 'BoxSet'
@@ -145,18 +145,19 @@
                 class="w-full h-full object-cover block" />
             </router-link>
 
-            <!-- Watched badge -->
+            <!-- Watched badge: phones already show it in the action overlay -->
             <div v-if="item.UserData?.Played"
-              class="absolute top-1.5 right-1.5 size-[18px] rounded-full bg-accent-purple flex items-center justify-center shadow pointer-events-none">
+              class="absolute top-1.5 right-1.5 size-[18px] rounded-full bg-accent-purple items-center justify-center pointer-events-none"
+              :class="isSquare(item) || item.Type === 'BoxSet' ? 'flex' : 'hidden sm:flex'">
               <Check class="size-[11px] text-accent-ink" :stroke-width="3" />
             </div>
             <!-- Download badge -->
             <div v-if="offlineStore.isItemDownloaded(item.Id)"
-              class="absolute top-1.5 left-1.5 size-5 rounded-full bg-accent-purple/85 flex items-center justify-center shadow pointer-events-none">
+              class="absolute top-1.5 left-1.5 size-5 rounded-full bg-accent-purple flex items-center justify-center pointer-events-none">
               <DownloadIcon class="size-[11px] text-accent-ink" />
             </div>
             <div v-else-if="downloadStore.isDownloading(item.Id)"
-              class="absolute top-1.5 left-1.5 size-5 rounded-full bg-accent-purple/85 flex items-center justify-center shadow pointer-events-none animate-pulse">
+              class="absolute top-1.5 left-1.5 size-5 rounded-full bg-accent-purple flex items-center justify-center pointer-events-none">
               <Loader2 class="size-[11px] text-accent-ink animate-spin" />
             </div>
 
@@ -183,8 +184,8 @@
           </div>
 
           <div class="mt-1.5 px-0.5">
-            <div class="text-xs font-medium text-text-heading truncate leading-tight" :title="item.Name">{{ item.Name }}</div>
-            <div v-if="item.ProductionYear" class="text-[10.5px] text-text-muted mt-0.5">{{ item.ProductionYear }}</div>
+            <div class="text-caption font-medium text-text-heading truncate" :title="item.Name">{{ item.Name }}</div>
+            <div v-if="item.ProductionYear" class="text-label font-normal text-text-muted">{{ item.ProductionYear }}</div>
           </div>
         </li>
       </ul>
@@ -209,7 +210,9 @@
               <div class="text-xs text-text-muted mt-0.5 flex items-center gap-2">
                 <span v-if="item.ProductionYear">{{ item.ProductionYear }}</span>
                 <span v-if="item.RunTimeTicks">{{ formatRuntime(item.RunTimeTicks) }}</span>
-                <span v-if="item.CommunityRating" class="text-yellow-400">★ {{ item.CommunityRating.toFixed(1) }}</span>
+                <span v-if="item.CommunityRating" class="inline-flex items-center gap-1">
+                  <Star class="size-2.5 fill-current stroke-none" aria-hidden="true" />{{ item.CommunityRating.toFixed(1) }}
+                </span>
               </div>
               <!-- Progress bar for partially watched -->
               <div v-if="item.UserData?.PlayedPercentage && !item.UserData?.Played" class="mt-1.5 h-1 bg-white/10 rounded-full overflow-hidden">
@@ -227,7 +230,7 @@
                 <Loader2 class="size-3 animate-spin" />
               </div>
               <div v-if="item.UserData?.Played" class="bg-accent-purple rounded-full p-0.5">
-                <Check class="size-3 text-white" />
+                <Check class="size-3 text-accent-ink" />
               </div>
               <button v-if="!isSquare(item) && item.Type !== 'BoxSet'"
                 @click.prevent.stop="playItem(item)"
@@ -278,7 +281,7 @@ import { Drawer, DrawerClose, DrawerContent, DrawerDescription, DrawerTitle } fr
 import { AppPage, PageHeader } from '@/components/layout';
 import AlphaIndex from '@/components/AlphaIndex.vue';
 import { formatDuration } from '@/i18n/format';
-import { Play, Check, Download as DownloadIcon, Loader2, SlidersHorizontal, LayoutGrid, List, Shuffle, EyeOff, Heart, WifiOff } from 'lucide-vue-next';
+import { Play, Check, Download as DownloadIcon, Loader2, SlidersHorizontal, LayoutGrid, List, Shuffle, EyeOff, Heart, Star, WifiOff } from 'lucide-vue-next';
 import { useOfflineStore } from '@/store/offline-store';
 import { useDownloadStore } from '@/store/download-store';
 import { useMetadataCacheStore } from '@/store/metadata-cache-store';

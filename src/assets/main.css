@@ -133,6 +133,10 @@ html.light {
   --color-accent-ink: #ffffff;
   --color-nav-bg: rgba(255, 255, 255, 0.7);
 
+  /* #ff6b6b is 2.8:1 on white; this keeps error text readable in the day theme. */
+  --color-error: #d43c3c;
+  --color-error-dark: #b92f2f;
+
   --color-background: #eef1f5;
   --color-foreground: #0b1220;
   --color-card: #ffffff;

@@ -1,0 +1,163 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-19T12:00:00Z",
+  "title": "Design System: Vela",
+  "extensions": {
+    "colorMeta": {
+      "star-blue": { "role": "primary", "displayName": "Star Blue", "canonical": "#2f9bff", "tonalRamp": ["#04213f", "#073a6e", "#0b569f", "#1373d0", "#2f9bff", "#5bb0ff", "#93caff", "#d3e9ff"] },
+      "star-blue-soft": { "role": "primary", "displayName": "Star Blue Soft", "canonical": "#5bb0ff" },
+      "star-blue-day": { "role": "primary", "displayName": "Star Blue Day", "canonical": "#1f6fe0" },
+      "harbor-ink": { "role": "primary", "displayName": "Harbor Ink", "canonical": "#04121f" },
+      "void-black": { "role": "neutral", "displayName": "Void Black", "canonical": "#000000", "tonalRamp": ["#000000", "#121417", "#16191e", "#1a1e23", "#20242b", "#2a2f37", "#6b7280", "#9aa3ad"] },
+      "night-surface": { "role": "neutral", "displayName": "Night Surface", "canonical": "#121417" },
+      "night-raised": { "role": "neutral", "displayName": "Night Raised", "canonical": "#1a1e23" },
+      "night-hover": { "role": "neutral", "displayName": "Night Hover", "canonical": "#16191e" },
+      "night-line": { "role": "neutral", "displayName": "Night Line", "canonical": "#20242b" },
+      "night-line-strong": { "role": "neutral", "displayName": "Night Line Strong", "canonical": "#2a2f37" },
+      "night-input-line": { "role": "neutral", "displayName": "Night Input Line", "canonical": "#232830" },
+      "starlight": { "role": "neutral", "displayName": "Starlight", "canonical": "#ffffff" },
+      "moon-text": { "role": "neutral", "displayName": "Moon Text", "canonical": "#c7ced6" },
+      "haze-text": { "role": "neutral", "displayName": "Haze Text", "canonical": "#9aa3ad" },
+      "dust-text": { "role": "neutral", "displayName": "Dust Text", "canonical": "#6b7280" },
+      "foreground-dark": { "role": "neutral", "displayName": "Foreground", "canonical": "#e6eaee" },
+      "alert-coral": { "role": "error", "displayName": "Alert Coral", "canonical": "#ff6b6b" },
+      "destructive-dark": { "role": "error", "displayName": "Destructive", "canonical": "#7f1d1d" },
+      "day-background": { "role": "neutral", "displayName": "Day Background", "canonical": "#eef1f5", "tonalRamp": ["#0b1220", "#46505e", "#5a6573", "#9aa1ab", "#d4d8e0", "#e3e6ea", "#eef1f5", "#ffffff"] },
+      "day-surface": { "role": "neutral", "displayName": "Day Surface", "canonical": "#ffffff" },
+      "day-hover": { "role": "neutral", "displayName": "Day Hover", "canonical": "#e7ebf1" },
+      "day-muted": { "role": "neutral", "displayName": "Day Muted", "canonical": "#f4f6f9" },
+      "day-line": { "role": "neutral", "displayName": "Day Line", "canonical": "#e3e6ea" },
+      "day-heading": { "role": "neutral", "displayName": "Day Heading", "canonical": "#0b1220" },
+      "day-text": { "role": "neutral", "displayName": "Day Text", "canonical": "#46505e" },
+      "day-muted-text": { "role": "neutral", "displayName": "Day Muted Text", "canonical": "#5a6573" }
+    },
+    "typographyMeta": {
+      "headline": { "displayName": "Page Title", "purpose": "Page titles (text-page), clamped to two lines." },
+      "headline-wide": { "displayName": "Page Title (wide)", "purpose": "Page titles at >= 1024px (text-page-wide)." },
+      "title": { "displayName": "Section Title", "purpose": "Section headings above rails and lists (text-section)." },
+      "body": { "displayName": "Body", "purpose": "List rows, descriptions, settings labels (text-body)." },
+      "control": { "displayName": "Control", "purpose": "Button and input text." },
+      "caption": { "displayName": "Caption", "purpose": "Metadata, subtitles, chips, See all links (text-caption)." },
+      "label": { "displayName": "Label", "purpose": "Nav labels and small badges (text-label)." }
+    },
+    "shadows": [
+      { "name": "floating-bar", "value": "0 8px 30px -12px rgba(0,0,0,0.5)", "purpose": "Floating bottom nav bar, paired with backdrop-blur-xl over rgba(18,20,23,0.65)." },
+      { "name": "sheet", "value": "0 -8px 32px rgba(0,0,0,0.5)", "purpose": "Bottom sheets and the mini audio player." },
+      { "name": "dialog", "value": "0 20px 60px rgba(0,0,0,0.5)", "purpose": "Modal dialogs." }
+    ],
+    "motion": [
+      { "name": "press", "value": "transform scale(0.97) + opacity 0.75, 80-200ms ease-out", "purpose": "Press feedback on cards and buttons." },
+      { "name": "state", "value": "200ms ease-out", "purpose": "Default color and transform transitions (duration-200)." },
+      { "name": "emphasis", "value": "300ms ease-out", "purpose": "Larger panel and sheet transitions." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "rail", "value": "1024px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Main action: Star Blue fill with Harbor Ink text, 44px tall.",
+      "html": "<button class=\"ds-btn-primary\">Play</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 44px; padding: 8px 16px; border-radius: 6px; border: 1px solid rgba(47,155,255,0.8); background: var(--color-primary, #2f9bff); color: var(--color-primary-foreground, #04121f); font: 500 14px/1.43 'Outfit Variable', 'Outfit', sans-serif; cursor: pointer; transition: all 200ms ease-out; } .ds-btn-primary:hover { filter: brightness(1.1); } .ds-btn-primary:active { transform: scale(0.95); opacity: 0.9; } .ds-btn-primary:focus-visible { outline: 2px solid #2f9bff; outline-offset: 2px; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Secondary action on Night Raised with a faint white border.",
+      "html": "<button class=\"ds-btn-secondary\">Download</button>",
+      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; justify-content: center; height: 44px; padding: 8px 16px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.15); background: var(--color-secondary, #1a1e23); color: var(--color-secondary-foreground, #f5f8fa); font: 500 14px/1.43 'Outfit Variable', 'Outfit', sans-serif; cursor: pointer; transition: all 200ms ease-out; } .ds-btn-secondary:hover { border-color: rgba(255,255,255,0.25); } .ds-btn-secondary:active { transform: scale(0.95); opacity: 0.9; } .ds-btn-secondary:focus-visible { outline: 2px solid #2f9bff; outline-offset: 2px; }"
+    },
+    {
+      "name": "Round Back Button",
+      "kind": "button",
+      "refersTo": "button-icon-round",
+      "description": "Ghost round icon button used in page headers.",
+      "html": "<button class=\"ds-btn-round\" aria-label=\"Back\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"m15 18-6-6 6-6\"/></svg></button>",
+      "css": ".ds-btn-round { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 9999px; border: 1px solid var(--color-border-input, #232830); background: rgba(0,0,0,0.05); color: var(--color-foreground, #e6eaee); cursor: pointer; transition: all 200ms ease-out; } .ds-btn-round:hover { border-color: var(--color-border-hover, #2a2f37); background: var(--color-accent, #1a1e23); } .ds-btn-round:active { transform: scale(0.95); } .ds-btn-round:focus-visible { outline: 2px solid #2f9bff; outline-offset: 2px; }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "44px field with hairline stroke and Star Blue focus ring.",
+      "html": "<input class=\"ds-input\" placeholder=\"Server address\" />",
+      "css": ".ds-input { height: 44px; width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--color-input, #232830); background: var(--color-background, #000000); color: var(--color-foreground, #e6eaee); font: 400 14px/1.43 'Outfit Variable', 'Outfit', sans-serif; } .ds-input::placeholder { color: var(--color-muted-foreground, #9aa3ad); } .ds-input:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--color-background, #000), 0 0 0 4px var(--color-ring, #2f9bff); }"
+    },
+    {
+      "name": "Filter Chip",
+      "kind": "chip",
+      "refersTo": "chip",
+      "description": "Pill filter toggle; selected state fills Star Blue.",
+      "html": "<div class=\"ds-chips\"><button class=\"ds-chip\" aria-pressed=\"true\">Movies</button><button class=\"ds-chip\" aria-pressed=\"false\">Unwatched</button></div>",
+      "css": ".ds-chips { display: flex; gap: 8px; } .ds-chip { height: 36px; padding: 0 14px; border-radius: 9999px; border: 1px solid var(--color-border-default, #20242b); background: var(--color-surface-hover, #16191e); color: var(--color-text-primary, #c7ced6); font: 500 13px/1.35 'Outfit Variable', 'Outfit', sans-serif; cursor: pointer; transition: background-color 200ms, color 200ms; } .ds-chip[aria-pressed=\"true\"] { background: var(--color-accent-purple, #2f9bff); border-color: var(--color-accent-purple, #2f9bff); color: var(--color-accent-ink, #04121f); } .ds-chip:focus-visible { outline: 2px solid #2f9bff; outline-offset: 2px; }"
+    },
+    {
+      "name": "Poster Card",
+      "kind": "card",
+      "refersTo": "poster-card",
+      "description": "2:3 poster with 12px corners, flat, downloaded badge in the corner.",
+      "html": "<div class=\"ds-poster\"><div class=\"ds-poster-art\"><span class=\"ds-poster-badge\"><svg width=\"12\" height=\"12\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#fff\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 15V3\"/><path d=\"m7 10 5 5 5-5\"/><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"/></svg></span></div><p class=\"ds-poster-title\">Dune: Part Two</p></div>",
+      "css": ".ds-poster { width: 128px; font-family: 'Outfit Variable', 'Outfit', sans-serif; transition: transform 200ms, opacity 200ms; cursor: pointer; } .ds-poster:active { transform: scale(0.97); opacity: 0.75; } .ds-poster-art { position: relative; aspect-ratio: 2 / 3; border-radius: 12px; overflow: hidden; background: linear-gradient(160deg, #24364d, var(--color-surface-raised, #1a1e23) 70%); margin-bottom: 6px; } .ds-poster-badge { position: absolute; top: 6px; left: 6px; display: flex; padding: 4px; border-radius: 9999px; background: rgba(47,155,255,0.8); } .ds-poster-title { margin: 0; font-size: 13px; line-height: 1.35; color: var(--color-text-primary, #c7ced6); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }"
+    },
+    {
+      "name": "Floating Bottom Bar",
+      "kind": "nav",
+      "refersTo": "nav-bar",
+      "description": "Frosted floating pill bar with five tabs; active tab in Star Blue.",
+      "html": "<nav class=\"ds-navbar\"><a class=\"ds-tab ds-tab-active\"><svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8\"/><path d=\"M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z\"/></svg><span>Home</span></a><a class=\"ds-tab\"><svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"11\" cy=\"11\" r=\"8\"/><path d=\"m21 21-4.3-4.3\"/></svg><span>Search</span></a><a class=\"ds-tab\"><svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 15V3\"/><path d=\"m7 10 5 5 5-5\"/><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"/></svg><span>Downloads</span></a></nav>",
+      "css": ".ds-navbar { display: flex; align-items: center; height: 66px; padding: 0 8px; border-radius: 25px; border: 1px solid var(--color-border-default, #20242b); background: var(--color-nav-bg, rgba(18,20,23,0.65)); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); box-shadow: 0 8px 30px -12px rgba(0,0,0,0.5); font-family: 'Outfit Variable', 'Outfit', sans-serif; } .ds-tab { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 4px 2px; font-size: 11px; line-height: 1.3; font-weight: 500; color: var(--color-text-subtle, #6b7280); text-decoration: none; cursor: pointer; transition: color 200ms; } .ds-tab-active { color: var(--color-accent-purple, #2f9bff); } .ds-tab:focus-visible { outline: 2px solid #2f9bff; outline-offset: 2px; border-radius: 8px; }"
+    },
+    {
+      "name": "List Row",
+      "kind": "custom",
+      "refersTo": "list-row",
+      "description": "Settings-style row: icon, label, value, chevron.",
+      "html": "<button class=\"ds-row\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M2 12h20\"/><path d=\"M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20\"/></svg><span class=\"ds-row-label\">Language</span><span class=\"ds-row-value\">English</span><svg class=\"ds-row-chev\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"m9 18 6-6-6-6\"/></svg></button>",
+      "css": ".ds-row { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 48px; padding: 8px 16px; border: 0; background: transparent; text-align: left; color: var(--color-text-heading, #ffffff); font: 400 15px/1.45 'Outfit Variable', 'Outfit', sans-serif; cursor: pointer; } .ds-row:active { background: var(--color-surface-hover, #16191e); } .ds-row-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .ds-row-value { font-size: 13px; color: var(--color-text-muted, #9aa3ad); } .ds-row-chev { color: var(--color-text-subtle, #6b7280); } .ds-row:focus-visible { outline: 2px solid #2f9bff; outline-offset: -2px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Night Sky",
+    "overview": "Vela's logo is a sail traced in stars on a deep night background, and the interface follows the same idea. The background is true black (#000000) so OLED screens switch off around the content. Surfaces are only a few steps lighter, like the darker parts of the sky. The bright things on screen are the user's own posters, backdrops and album covers. One blue, Star Blue, is the only colored light in the chrome. It marks where you are, what is selected and what is playing next.\n\nThe mood is premium and cinematic, but calm. Big blurred backdrops and full-bleed hero art give the detail and player screens a screening-room depth. Everything else stays quiet: two type weights doing most of the work, no ornament, no second accent. Density is comfortable rather than compact. Rails of posters swipe edge to edge, sections breathe 32px apart, and every control is at least 44px.\n\nA day theme (html.light) mirrors the system on a cool grey-white field with a deeper Star Blue. It is fully supported, but the night theme is the reference: design there first, then confirm the day theme stays readable.",
+    "keyCharacteristics": [
+      "True-black canvas, tonal surfaces, media artwork as the only rich color.",
+      "A single blue accent for state and action; text and icons on blue use Harbor Ink.",
+      "One typeface (Outfit Variable): bold page titles, semibold section titles, regular body.",
+      "Soft, rounded, touchable forms: pills for actions and chips, 12px corners for media.",
+      "Content is flat; only the floating chrome (bottom bar, rail, mini player, sheets, dialogs) blurs and casts a shadow."
+    ],
+    "rules": [
+      { "name": "The One Star Rule", "body": "Star Blue is the only chromatic color in the interface chrome. Don't add a second accent. Color beyond the blue comes from the artwork only.", "section": "colors" },
+      { "name": "The Ink-on-Blue Rule", "body": "Anything placed on a Star Blue fill uses Harbor Ink (#04121f) in the night theme and white in the day theme, never mid-grey.", "section": "colors" },
+      { "name": "The Legacy Tokens Note", "body": "main.css still defines accent-orange, accent-teal, accent-green, rating, and --radius-card/button/input. They are unused leftovers, not part of the system. Don't adopt them; remove them when convenient. accent-purple is a historical name that now holds Star Blue.", "section": "colors" },
+      { "name": "The Scale-Token Rule", "body": "Use the named type tokens (text-page, text-section, text-body, text-caption, text-label), not ad-hoc Tailwind sizes. cn() / tailwind-merge has been taught these names; raw text-xl/text-sm on headings is drift.", "section": "typography" },
+      { "name": "The Three-Weight Rule", "body": "Weights are 700 for page titles, 600 for section titles and emphasis, 500 for controls and labels, and 400 for reading text. Nothing lighter than 400 and nothing heavier than 700.", "section": "typography" },
+      { "name": "The Floating Chrome Rule", "body": "Only overlay chrome may cast a shadow or blur what's behind it: the nav bar, rail, mini player, sheets, dialogs, menus and controls over images. Cards, rows and sections stay flat and separate by tone.", "section": "elevation" },
+      { "name": "The Dark Screening Rule", "body": "Backdrops are blurred and faded into the background; they never compete with the foreground title or controls.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do keep the night background pure black (#000000) and separate surfaces by tone (#121417 → #1a1e23).",
+      "Do use Star Blue only for state, selection, progress and the primary action, with Harbor Ink on top of it.",
+      "Do use the named type tokens (text-page, text-section, text-body, text-caption, text-label) and the spacing tokens (gutter, gutter-wide, section).",
+      "Do give every tap target at least 44px, expanding the hit area with after: insets when the visual is smaller.",
+      "Do use 12px corners for media and pills for buttons, chips and badges.",
+      "Do check every change in both themes; use theme tokens rather than literal white or black for text.",
+      "Do use Lucide icons at a stroke width of 1.8 (1.5 for large empty-state icons).",
+      "Do route insets through safe-* utilities or --sat/--sab/--sal/--sar."
+    ],
+    "donts": [
+      "Don't introduce a second accent color, or use the legacy orange/teal/green/rating tokens.",
+      "Don't put shadows or blur on content cards, rows or sections; only floating chrome gets them.",
+      "Don't add a second typeface or weights outside 400–700.",
+      "Don't hard-code white text on hero art; the day theme fades to a light background.",
+      "Don't add arrow buttons to media rails; they swipe and snap.",
+      "Don't write user-visible text in components; all copy goes through i18n."
+    ]
+  }
+}

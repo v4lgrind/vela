@@ -1,4 +1,6 @@
-<shape xmlns:android="http://schemas.android.com/apk/res/android">
-    <solid android:color="#80000000" />
-    <corners android:radius="8dp" />
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Over-image control: round, 40% black (DESIGN.md "Over image"). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <solid android:color="#66000000" />
 </shape>

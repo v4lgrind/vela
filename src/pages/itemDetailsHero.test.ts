@@ -14,7 +14,7 @@ describe('ItemDetailsPage hero', () => {
   // The title block sits on the fade into the page background, which is light in the light theme.
   it('colors the title block with theme tokens, not fixed white', () => {
     const src = readFileSync(resolve(__dirname, 'ItemDetailsPage.vue'), 'utf8');
-    const block = src.slice(src.indexOf('<!-- Title + meta overlaid'), src.indexOf('{{ videoCodec }}'));
+    const block = src.slice(src.indexOf('<!-- Title + meta overlaid'), src.indexOf('<!-- Body below backdrop -->'));
     expect(block).not.toMatch(/text-white|bg-white\/|text-yellow-300/);
   });
 });

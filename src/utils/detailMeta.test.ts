@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 
 import { i18n, setLocale } from '@/i18n';
 
-import { heroImage, metaParts } from './detailMeta';
+import { hdrLabel, heroImage, metaParts, nextEpisodeOf, resolutionLabel } from './detailMeta';
 
 const t = i18n.global.t;
 
@@ -39,5 +39,38 @@ describe('heroImage', () => {
   it('uses the item backdrop when it has one, else its primary image', () => {
     expect(heroImage({ Type: 'Movie', Id: 'm', BackdropImageTags: ['t'] } as BaseItemDto)).toEqual({ itemId: 'm', type: 'Backdrop' });
     expect(heroImage({ Type: 'Movie', Id: 'm', BackdropImageTags: [] } as BaseItemDto)).toEqual({ itemId: 'm', type: 'Primary' });
+  });
+});
+
+describe('resolutionLabel', () => {
+  it('names the usual classes', () => {
+    expect(resolutionLabel({ Width: 3840, Height: 2160 })).toBe('4K');
+    expect(resolutionLabel({ Width: 1920, Height: 800 })).toBe('1080p');
+    expect(resolutionLabel({ Width: 1280, Height: 720 })).toBe('720p');
+    expect(resolutionLabel({ Width: 720, Height: 576 })).toBe('SD');
+    expect(resolutionLabel(null)).toBeNull();
+  });
+});
+
+describe('hdrLabel', () => {
+  it('shows HDR formats and hides SDR', () => {
+    expect(hdrLabel({ VideoRangeType: 'HDR10' })).toBe('HDR10');
+    expect(hdrLabel({ VideoRangeType: 'DOVIWithHDR10' })).toBe('Dolby Vision');
+    expect(hdrLabel({ VideoRangeType: 'SDR' })).toBeNull();
+    expect(hdrLabel({})).toBeNull();
+  });
+});
+
+describe('nextEpisodeOf', () => {
+  const ep = (n: number, played = false, pct = 0) => ({ IndexNumber: n, UserData: { Played: played, PlayedPercentage: pct } });
+
+  it('prefers the episode in progress', () => {
+    expect(nextEpisodeOf([ep(1, true), ep(3), ep(2, false, 40)])?.IndexNumber).toBe(2);
+  });
+
+  it('falls back to the first unwatched, then the first', () => {
+    expect(nextEpisodeOf([ep(2), ep(1, true)])?.IndexNumber).toBe(2);
+    expect(nextEpisodeOf([ep(2, true), ep(1, true)])?.IndexNumber).toBe(1);
+    expect(nextEpisodeOf([])).toBeNull();
   });
 });

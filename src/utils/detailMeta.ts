@@ -33,3 +33,40 @@ export function heroImage(item: BaseItemDto): { itemId: string; type: 'Backdrop'
   if (item.BackdropImageTags?.length) return { itemId: item.Id!, type: 'Backdrop' };
   return { itemId: item.Id!, type: 'Primary' };
 }
+
+type VideoStream = { Width?: number | null; Height?: number | null; VideoRangeType?: string | null };
+
+/** Short resolution class for a video stream ("4K", "1080p"…), judged on width first so cropped scope films keep their class. */
+export function resolutionLabel(video: VideoStream | null | undefined): string | null {
+  const w = video?.Width ?? 0;
+  const h = video?.Height ?? 0;
+  if (!w && !h) return null;
+  if (w >= 3200 || h >= 2000) return '4K';
+  if (w >= 1800 || h >= 1000) return '1080p';
+  if (w >= 1200 || h >= 700) return '720p';
+  return 'SD';
+}
+
+const HDR_LABELS: Record<string, string> = {
+  HDR10: 'HDR10',
+  HDR10Plus: 'HDR10+',
+  HLG: 'HLG',
+  DOVI: 'Dolby Vision',
+};
+
+/** HDR format worth showing next to the resolution, or null for SDR. */
+export function hdrLabel(video: VideoStream | null | undefined): string | null {
+  const type = video?.VideoRangeType;
+  if (!type || type === 'SDR' || type === 'Unknown') return null;
+  if (type.startsWith('DOVI')) return HDR_LABELS.DOVI;
+  return HDR_LABELS[type] ?? 'HDR';
+}
+
+type EpisodeLike = { IndexNumber?: number | null; UserData?: { Played?: boolean; PlayedPercentage?: number | null } | null };
+
+/** The episode a season's main button plays: one in progress, else the first unwatched, else the first. */
+export function nextEpisodeOf<T extends EpisodeLike>(episodes: T[]): T | null {
+  const sorted = [...episodes].sort((a, b) => (a.IndexNumber ?? 0) - (b.IndexNumber ?? 0));
+  const inProgress = sorted.find((ep) => !ep.UserData?.Played && (ep.UserData?.PlayedPercentage ?? 0) > 0);
+  return inProgress ?? sorted.find((ep) => !ep.UserData?.Played) ?? sorted[0] ?? null;
+}

@@ -28,7 +28,7 @@
           <h2 class="text-label font-semibold uppercase tracking-wide text-text-muted">
             {{ t('downloads.inProgress', { n: activeGroups.length }) }}
           </h2>
-          <Button variant="ghost" size="sm" class="text-red-400 hover:text-red-300" @click="cancelAll">
+          <Button variant="ghost" size="sm" class="text-error hover:text-error-dark" @click="cancelAll">
             {{ t('downloads.cancelAll') }}
           </Button>
         </div>
@@ -82,7 +82,7 @@
       <section v-if="storedGroups.length" :aria-label="t('downloads.stored')">
         <div class="mb-2 flex items-center justify-between">
           <h2 class="text-label font-semibold uppercase tracking-wide text-text-muted">{{ t('downloads.stored') }}</h2>
-          <Button variant="ghost" size="sm" class="text-red-400 hover:text-red-300" @click="deleteAll">
+          <Button variant="ghost" size="sm" class="text-error hover:text-error-dark" @click="deleteAll">
             {{ t('downloads.deleteAll') }}
           </Button>
         </div>

@@ -9,7 +9,9 @@
     "loading": "Chargement…",
     "close": "Fermer",
     "cancel": "Annuler",
-    "delete": "Supprimer"
+    "delete": "Supprimer",
+    "yes": "Oui",
+    "no": "Non"
   },
   "duration": {
     "hoursMinutes": "{h} h {m} min",
@@ -154,7 +156,41 @@
     "confirmDelete": "Supprimer « {name} » du stockage hors ligne ?",
     "downloadFailed": "Échec du téléchargement. Réessayez.",
     "deleteFailed": "Suppression impossible",
-    "downloadEpisodeFailed": "Impossible de télécharger « {name} »"
+    "downloadEpisodeFailed": "Impossible de télécharger « {name} »",
+    "playEpisode": "Lire {code}",
+    "resumeEpisode": "Reprendre {code}",
+    "info": {
+      "codec": "Codec",
+      "profile": "Profil",
+      "level": "Niveau",
+      "resolution": "Résolution",
+      "aspectRatio": "Format d'image",
+      "avgFrameRate": "Fréquence moyenne",
+      "realFrameRate": "Fréquence réelle",
+      "videoBitrate": "Débit vidéo",
+      "bitDepth": "Profondeur de couleur",
+      "refFrames": "Images de référence",
+      "interlaced": "Entrelacé",
+      "avc": "AVC",
+      "pixelFormat": "Format de pixel",
+      "colorSpace": "Espace colorimétrique",
+      "colorTransfer": "Transfert colorimétrique",
+      "colorPrimaries": "Primaires",
+      "videoRange": "Plage dynamique",
+      "hdrType": "Type HDR",
+      "doviProfile": "Profil Dolby Vision",
+      "doviLevel": "Niveau Dolby Vision",
+      "doviVersion": "Version Dolby Vision",
+      "timeBase": "Base de temps",
+      "index": "Index du flux",
+      "container": "Conteneur",
+      "totalBitrate": "Débit total",
+      "path": "Chemin",
+      "directPlay": "Lecture directe",
+      "remux": "Remux",
+      "transcode": "Transcodage",
+      "mbps": "{n} Mbit/s"
+    }
   },
   "person": {
     "titles": "{n} titre | {n} titres",

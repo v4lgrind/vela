@@ -48,7 +48,7 @@
         <Button type="submit" class="w-full" :disabled="pin.length < 4">{{ t('airplay.pair') }}</Button>
       </form>
 
-      <p v-if="error" class="text-sm text-red-400">{{ error }}</p>
+      <p v-if="error" class="text-sm text-error">{{ error }}</p>
     </DialogContent>
   </Dialog>
 </template>

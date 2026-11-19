@@ -7,7 +7,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.ActivityInfo
 import android.graphics.Color
-import android.graphics.Typeface
+import androidx.core.content.res.ResourcesCompat
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
@@ -1583,7 +1583,7 @@ class NativePlayerActivity : AppCompatActivity() {
             this.text = text
             setTextColor(color)
             textSize = 12f
-            typeface = Typeface.DEFAULT_BOLD
+            typeface = ResourcesCompat.getFont(context, R.font.outfit_semibold)
             setPadding((10 * d).toInt(), (4 * d).toInt(), (10 * d).toInt(), (4 * d).toInt())
             background = GradientDrawable().apply {
                 cornerRadius = 999f
@@ -1599,7 +1599,7 @@ class NativePlayerActivity : AppCompatActivity() {
             setTextColor(0x66FFFFFF.toInt())
             textSize = 11f
             letterSpacing = 0.08f
-            typeface = Typeface.DEFAULT_BOLD
+            typeface = ResourcesCompat.getFont(context, R.font.outfit_semibold)
             layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
             ).apply { topMargin = (14 * d).toInt(); bottomMargin = (6 * d).toInt() }

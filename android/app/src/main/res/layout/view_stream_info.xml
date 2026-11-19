@@ -31,7 +31,7 @@
             android:layout_weight="1"
             android:textColor="#FFFFFF"
             android:textSize="16sp"
-            android:fontFamily="sans-serif-medium"
+            android:fontFamily="@font/outfit_semibold"
             android:text="@string/player_stream_info" />
 
         <ImageButton

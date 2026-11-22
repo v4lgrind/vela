@@ -1,0 +1,597 @@
+{
+    "Items": [
+        {
+            "Id": "mov00003500000000000000000000000",
+            "Name": "Amber Coast",
+            "SortName": "Amber Coast",
+            "Type": "Movie",
+            "ParentId": "lib00000100000000000000000000000",
+            "ProductionYear": 2021,
+            "Genres": [
+                "Romance",
+                "Aventure"
+            ],
+            "OfficialRating": "tous publics",
+            "CommunityRating": 6.1,
+            "CriticRating": 81,
+            "RunTimeTicks": 69000000000,
+            "Overview": "Quand une cartographe découvre une île absente de toutes les cartes, elle entraîne son frère et une ancienne pilote dans une traversée qui va bouleverser ce qu’ils croyaient savoir de leur famille. Un récit lumineux sur la mémoire et les lieux qui nous gardent.",
+            "Taglines": [
+                "Certaines cartes mènent chez soi."
+            ],
+            "Studios": [
+                {
+                    "Name": "Studio Halcyon"
+                }
+            ],
+            "People": [
+                {
+                    "Id": "per00000400000000000000000000000",
+                    "Name": "Maren Holt",
+                    "Role": "Ines",
+                    "Type": "Director",
+                    "PrimaryImageTag": "t"
+                },
+                {
+                    "Id": "per00000500000000000000000000000",
+                    "Name": "Idris Kovač",
+                    "Role": "Capitaine Rook",
+                    "Type": "Actor",
+                    "PrimaryImageTag": "t"
+                },
+                {
+                    "Id": "per00000600000000000000000000000",
+                    "Name": "Léa Fontaine",
+                    "Role": "Maud",
+                    "Type": "Actor",
+                    "PrimaryImageTag": "t"
+                },
+                {
+                    "Id": "per00000700000000000000000000000",
+                    "Name": "Tomás Ribeiro",
+                    "Role": "Le passeur",
+                    "Type": "Actor",
+                    "PrimaryImageTag": "t"
+                },
+                {
+                    "Id": "per00000800000000000000000000000",
+                    "Name": "Ana Sörensen",
+                    "Role": "Hana",
+                    "Type": "Actor",
+                    "PrimaryImageTag": "t"
+                },
+                {
+                    "Id": "per00000900000000000000000000000",
+                    "Name": "Kenji Arata",
+                    "Role": "Oskar",
+                    "Type": "Actor",
+                    "PrimaryImageTag": "t"
+                },
+                {
+                    "Id": "per00001000000000000000000000000",
+                    "Name": "Yasmin Okafor",
+                    "Role": "La pilote",
+                    "Type": "Actor",
+                    "PrimaryImageTag": "t"
+                }
+            ],
+            "PremiereDate": "2021-03-13T00:00:00Z",
+            "ImageTags": {
+                "Primary": "t",
+                "Logo": "t"
+            },
+            "BackdropImageTags": [
+                "b"
+            ],
+            "MediaSources": [
+                {
+                    "Id": "mov00003500000000000000000000000",
+                    "Name": "Version 4K",
+                    "Container": "mkv",
+                    "Size": 18400000000,
+                    "Bitrate": 24500000,
+                    "MediaStreams": [
+                        {
+                            "Type": "Video",
+                            "Codec": "hevc",
+                            "Width": 3840,
+                            "Height": 2160,
+                            "Profile": "Main 10",
+                            "VideoRange": "HDR",
+                            "VideoRangeType": "HDR10",
+                            "BitRate": 24000000,
+                            "Index": 0,
+                            "IsDefault": true,
+                            "DisplayTitle": "4K HEVC HDR10"
+                        },
+                        {
+                            "Type": "Audio",
+                            "Codec": "eac3",
+                            "Channels": 6,
+                            "ChannelLayout": "5.1",
+                            "Language": "fre",
+                            "DisplayTitle": "Français - Dolby Digital+ - 5.1 - Par défaut",
+                            "Index": 1,
+                            "IsDefault": true
+                        },
+                        {
+                            "Type": "Audio",
+                            "Codec": "aac",
+                            "Channels": 2,
+                            "Language": "eng",
+                            "DisplayTitle": "English - AAC - Stéréo",
+                            "Index": 2
+                        },
+                        {
+                            "Type": "Subtitle",
+                            "Codec": "subrip",
+                            "Language": "fre",
+                            "DisplayTitle": "Français - SUBRIP",
+                            "Index": 3,
+                            "IsExternal": false
+                        },
+                        {
+                            "Type": "Subtitle",
+                            "Codec": "pgssub",
+                            "Language": "eng",
+                            "DisplayTitle": "English - PGS",
+                            "Index": 4
+                        }
+                    ],
+                    "Path": "/media/x.mkv",
+                    "SupportsDirectPlay": true
+                }
+            ],
+            "MediaStreams": [
+                {
+                    "Type": "Video",
+                    "Codec": "hevc",
+                    "Width": 3840,
+                    "Height": 2160,
+                    "Profile": "Main 10",
+                    "VideoRange": "HDR",
+                    "VideoRangeType": "HDR10",
+                    "BitRate": 24000000,
+                    "Index": 0,
+                    "IsDefault": true,
+                    "DisplayTitle": "4K HEVC HDR10"
+                },
+                {
+                    "Type": "Audio",
+                    "Codec": "eac3",
+                    "Channels": 6,
+                    "ChannelLayout": "5.1",
+                    "Language": "fre",
+                    "DisplayTitle": "Français - Dolby Digital+ - 5.1 - Par défaut",
+                    "Index": 1,
+                    "IsDefault": true
+                },
+                {
+                    "Type": "Audio",
+                    "Codec": "aac",
+                    "Channels": 2,
+                    "Language": "eng",
+                    "DisplayTitle": "English - AAC - Stéréo",
+                    "Index": 2
+                },
+                {
+                    "Type": "Subtitle",
+                    "Codec": "subrip",
+                    "Language": "fre",
+                    "DisplayTitle": "Français - SUBRIP",
+                    "Index": 3,
+                    "IsExternal": false
+                },
+                {
+                    "Type": "Subtitle",
+                    "Codec": "pgssub",
+                    "Language": "eng",
+                    "DisplayTitle": "English - PGS",
+                    "Index": 4
+                }
+            ],
+            "UserData": {
+                "Played": false,
+                "PlaybackPositionTicks": 0,
+                "IsFavorite": false
+            },
+            "DateCreated": "2026-09-20T20:44:47.850Z"
+        },
+        {
+            "Id": "mov00002100000000000000000000000",
+            "Name": "Atlas of Small Things",
+            "SortName": "Atlas of Small Things",
+            "Type": "Movie",
+            "ParentId": "lib00000100000000000000000000000",
+            "ProductionYear": 2017,
+            "Genres": [
+                "Comédie",
+                "Drame"
+            ],
+            "OfficialRating": "tous publics",
+            "CommunityRating": 6.1,
+            "CriticRating": 67,
+            "RunTimeTicks": 82200000000,
+            "Overview": "Quand une cartographe découvre une île absente de toutes les cartes, elle entraîne son frère et une ancienne pilote dans une traversée qui va bouleverser ce qu’ils croyaient savoir de leur famille. Un récit lumineux sur la mémoire et les lieux qui nous gardent.",
+            "Taglines": [
+                "Certaines cartes mènent chez soi."
+            ],
+            "Studios": [
+                {
+                    "Name": "Studio Halcyon"
+                }
+            ],
+            "People": [
+                {
+                    "Id": "per00000400000000000000000000000",
+                    "Name": "Maren Holt",
+                    "Role": "Ines",
+                    "Type": "Director",
+                    "PrimaryImageTag": "t"
+                },
+                {
+                    "Id": "per00000500000000000000000000000",
+                    "Name": "Idris Kovač",
+                    "Role": "Capitaine Rook",
+                    "Type": "Actor",
+                    "PrimaryImageTag": "t"
+                },
+                {
+                    "Id": "per00000600000000000000000000000",
+                    "Name": "Léa Fontaine",
+                    "Role": "Maud",
+                    "Type": "Actor",
+                    "PrimaryImageTag": "t"
+                },
+                {
+                    "Id": "per00000700000000000000000000000",
+                    "Name": "Tomás Ribeiro",
+                    "Role": "Le passeur",
+                    "Type": "Actor",
+                    "PrimaryImageTag": "t"
+                },
+                {
+                    "Id": "per00000800000000000000000000000",
+                    "Name": "Ana Sörensen",
+                    "Role": "Hana",
+                    "Type": "Actor",
+                    "PrimaryImageTag": "t"
+                },
+                {
+                    "Id": "per00000900000000000000000000000",
+                    "Name": "Kenji Arata",
+                    "Role": "Oskar",
+                    "Type": "Actor",
+                    "PrimaryImageTag": "t"
+                },
+                {
+                    "Id": "per00001000000000000000000000000",
+                    "Name": "Yasmin Okafor",
+                    "Role": "La pilote",
+                    "Type": "Actor",
+                    "PrimaryImageTag": "t"
+                }
+            ],
+            "PremiereDate": "2017-03-17T00:00:00Z",
+            "ImageTags": {
+                "Primary": "t",
+                "Logo": "t"
+            },
+            "BackdropImageTags": [
+                "b"
+            ],
+            "MediaSources": [
+                {
+                    "Id": "mov00002100000000000000000000000",
+                    "Name": "Version 4K",
+                    "Container": "mkv",
+                    "Size": 18400000000,
+                    "Bitrate": 24500000,
+                    "MediaStreams": [
+                        {
+                            "Type": "Video",
+                            "Codec": "hevc",
+                            "Width": 3840,
+                            "Height": 2160,
+                            "Profile": "Main 10",
+                            "VideoRange": "HDR",
+                            "VideoRangeType": "HDR10",
+                            "BitRate": 24000000,
+                            "Index": 0,
+                            "IsDefault": true,
+                            "DisplayTitle": "4K HEVC HDR10"
+                        },
+                        {
+                            "Type": "Audio",
+                            "Codec": "eac3",
+                            "Channels": 6,
+                            "ChannelLayout": "5.1",
+                            "Language": "fre",
+                            "DisplayTitle": "Français - Dolby Digital+ - 5.1 - Par défaut",
+                            "Index": 1,
+                            "IsDefault": true
+                        },
+                        {
+                            "Type": "Audio",
+                            "Codec": "aac",
+                            "Channels": 2,
+                            "Language": "eng",
+                            "DisplayTitle": "English - AAC - Stéréo",
+                            "Index": 2
+                        },
+                        {
+                            "Type": "Subtitle",
+                            "Codec": "subrip",
+                            "Language": "fre",
+                            "DisplayTitle": "Français - SUBRIP",
+                            "Index": 3,
+                            "IsExternal": false
+                        },
+                        {
+                            "Type": "Subtitle",
+                            "Codec": "pgssub",
+                            "Language": "eng",
+                            "DisplayTitle": "English - PGS",
+                            "Index": 4
+                        }
+                    ],
+                    "Path": "/media/x.mkv",
+                    "SupportsDirectPlay": true
+                }
+            ],
+            "MediaStreams": [
+                {
+                    "Type": "Video",
+                    "Codec": "hevc",
+                    "Width": 3840,
+                    "Height": 2160,
+                    "Profile": "Main 10",
+                    "VideoRange": "HDR",
+                    "VideoRangeType": "HDR10",
+                    "BitRate": 24000000,
+                    "Index": 0,
+                    "IsDefault": true,
+                    "DisplayTitle": "4K HEVC HDR10"
+                },
+                {
+                    "Type": "Audio",
+                    "Codec": "eac3",
+                    "Channels": 6,
+                    "ChannelLayout": "5.1",
+                    "Language": "fre",
+                    "DisplayTitle": "Français - Dolby Digital+ - 5.1 - Par défaut",
+                    "Index": 1,
+                    "IsDefault": true
+                },
+                {
+                    "Type": "Audio",
+                    "Codec": "aac",
+                    "Channels": 2,
+                    "Language": "eng",
+                    "DisplayTitle": "English - AAC - Stéréo",
+                    "Index": 2
+                },
+                {
+                    "Type": "Subtitle",
+                    "Codec": "subrip",
+                    "Language": "fre",
+                    "DisplayTitle": "Français - SUBRIP",
+                    "Index": 3,
+                    "IsExternal": false
+                },
+                {
+                    "Type": "Subtitle",
+                    "Codec": "pgssub",
+                    "Language": "eng",
+                    "DisplayTitle": "English - PGS",
+                    "Index": 4
+                }
+            ],
+            "UserData": {
+                "Played": false,
+                "PlaybackPositionTicks": 0,
+                "IsFavorite": false
+            },
+            "DateCreated": "2026-11-01T20:44:47.849Z"
+        },
+        {
+            "Id": "mov00002000000000000000000000000",
+            "Name": "Brume",
+            "SortName": "Brume",
+            "Type": "Movie",
+            "ParentId": "lib00000100000000000000000000000",
+            "ProductionYear": 2020,
+            "Genres": [
+                "Horreur",
+                "Aventure"
+            ],
+            "OfficialRating": "16",
+            "CommunityRating": 8.5,
+            "CriticRating": 66,
+            "RunTimeTicks": 78000000000,
+            "Overview": "Quand une cartographe découvre une île absente de toutes les cartes, elle entraîne son frère et une ancienne pilote dans une traversée qui va bouleverser ce qu’ils croyaient savoir de leur famille. Un récit lumineux sur la mémoire et les lieux qui nous gardent.",
+            "Taglines": [
+                "Certaines cartes mènent chez soi."
+            ],
+            "Studios": [
+                {
+                    "Name": "Studio Halcyon"
+                }
+            ],
+            "People": [
+                {
+                    "Id": "per00000400000000000000000000000",
+                    "Name": "Maren Holt",
+                    "Role": "Ines",
+                    "Type": "Director",
+                    "PrimaryImageTag": "t"
+                },
+                {
+                    "Id": "per00000500000000000000000000000",
+                    "Name": "Idris Kovač",
+                    "Role": "Capitaine Rook",
+                    "Type": "Actor",
+                    "PrimaryImageTag": "t"
+                },
+                {
+                    "Id": "per00000600000000000000000000000",
+                    "Name": "Léa Fontaine",
+                    "Role": "Maud",
+                    "Type": "Actor",
+                    "PrimaryImageTag": "t"
+                },
+                {
+                    "Id": "per00000700000000000000000000000",
+                    "Name": "Tomás Ribeiro",
+                    "Role": "Le passeur",
+                    "Type": "Actor",
+                    "PrimaryImageTag": "t"
+                },
+                {
+                    "Id": "per00000800000000000000000000000",
+                    "Name": "Ana Sörensen",
+                    "Role": "Hana",
+                    "Type": "Actor",
+                    "PrimaryImageTag": "t"
+                },
+                {
+                    "Id": "per00000900000000000000000000000",
+                    "Name": "Kenji Arata",
+                    "Role": "Oskar",
+                    "Type": "Actor",
+                    "PrimaryImageTag": "t"
+                },
+                {
+                    "Id": "per00001000000000000000000000000",
+                    "Name": "Yasmin Okafor",
+                    "Role": "La pilote",
+                    "Type": "Actor",
+                    "PrimaryImageTag": "t"
+                }
+            ],
+            "PremiereDate": "2020-03-16T00:00:00Z",
+            "ImageTags": {
+                "Primary": "t",
+                "Logo": "t"
+            },
+            "BackdropImageTags": [
+                "b"
+            ],
+            "MediaSources": [
+                {
+                    "Id": "mov00002000000000000000000000000",
+                    "Name": "Version 4K",
+                    "Container": "mkv",
+                    "Size": 18400000000,
+                    "Bitrate": 24500000,
+                    "MediaStreams": [
+                        {
+                            "Type": "Video",
+                            "Codec": "hevc",
+                            "Width": 3840,
+                            "Height": 2160,
+                            "Profile": "Main 10",
+                            "VideoRange": "HDR",
+                            "VideoRangeType": "HDR10",
+                            "BitRate": 24000000,
+                            "Index": 0,
+                            "IsDefault": true,
+                            "DisplayTitle": "4K HEVC HDR10"
+                        },
+                        {
+                            "Type": "Audio",
+                            "Codec": "eac3",
+                            "Channels": 6,
+                            "ChannelLayout": "5.1",
+                            "Language": "fre",
+                            "DisplayTitle": "Français - Dolby Digital+ - 5.1 - Par défaut",
+                            "Index": 1,
+                            "IsDefault": true
+                        },
+                        {
+                            "Type": "Audio",
+                            "Codec": "aac",
+                            "Channels": 2,
+                            "Language": "eng",
+                            "DisplayTitle": "English - AAC - Stéréo",
+                            "Index": 2
+                        },
+                        {
+                            "Type": "Subtitle",
+                            "Codec": "subrip",
+                            "Language": "fre",
+                            "DisplayTitle": "Français - SUBRIP",
+                            "Index": 3,
+                            "IsExternal": false
+                        },
+                        {
+                            "Type": "Subtitle",
+                            "Codec": "pgssub",
+                            "Language": "eng",
+                            "DisplayTitle": "English - PGS",
+                            "Index": 4
+                        }
+                    ],
+                    "Path": "/media/x.mkv",
+                    "SupportsDirectPlay": true
+                }
+            ],
+            "MediaStreams": [
+                {
+                    "Type": "Video",
+                    "Codec": "hevc",
+                    "Width": 3840,
+                    "Height": 2160,
+                    "Profile": "Main 10",
+                    "VideoRange": "HDR",
+                    "VideoRangeType": "HDR10",
+                    "BitRate": 24000000,
+                    "Index": 0,
+                    "IsDefault": true,
+                    "DisplayTitle": "4K HEVC HDR10"
+                },
+                {
+                    "Type": "Audio",
+                    "Codec": "eac3",
+                    "Channels": 6,
+                    "ChannelLayout": "5.1",
+                    "Language": "fre",
+                    "DisplayTitle": "Français - Dolby Digital+ - 5.1 - Par défaut",
+                    "Index": 1,
+                    "IsDefault": true
+                },
+                {
+                    "Type": "Audio",
+                    "Codec": "aac",
+                    "Channels": 2,
+                    "Language": "eng",
+                    "DisplayTitle": "English - AAC - Stéréo",
+                    "Index": 2
+                },
+                {
+                    "Type": "Subtitle",
+                    "Codec": "subrip",
+                    "Language": "fre",
+                    "DisplayTitle": "Français - SUBRIP",
+                    "Index": 3,
+                    "IsExternal": false
+                },
+                {
+                    "Type": "Subtitle",
+                    "Codec": "pgssub",
+                    "Language": "eng",
+                    "DisplayTitle": "English - PGS",
+                    "Index": 4
+                }
+            ],
+            "UserData": {
+                "Played": false,
+                "PlaybackPositionTicks": 0,
+                "IsFavorite": false
+            },
+            "DateCreated": "2026-11-04T20:44:47.849Z"
+        }
+    ],
+    "TotalRecordCount": 24,
+    "StartIndex": 0
+}

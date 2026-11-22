@@ -1,0 +1,394 @@
+{
+  "MediaContainer": {
+    "size": 3,
+    "totalSize": 1012,
+    "offset": 0,
+    "allowSync": true,
+    "art": "/:/resources/movie-fanart.jpg",
+    "identifier": "com.plexapp.plugins.library",
+    "librarySectionID": 1,
+    "librarySectionTitle": "librarySectionTitle 1",
+    "librarySectionUUID": "7adb1ea63bd5427fb625687e",
+    "mediaTagPrefix": "/system/bundle/media/flags/",
+    "mediaTagVersion": 1792751798,
+    "thumb": "/:/resources/movie.png",
+    "title1": "title1 1",
+    "title2": "title2 3",
+    "viewGroup": "movie",
+    "viewMode": 65592,
+    "Metadata": [
+      {
+        "ratingKey": "68928",
+        "key": "/library/metadata/68928",
+        "guid": "plex://item/6c934257901c",
+        "slug": "slug 14",
+        "studio": "studio 15",
+        "type": "movie",
+        "title": "title 146",
+        "originalTitle": "originalTitle 16",
+        "contentRating": "fr/16",
+        "contentRatingAge": 16,
+        "summary": "summary 23",
+        "rating": 8.8,
+        "audienceRating": 6.3,
+        "skipCount": 1,
+        "year": 2025,
+        "tagline": "tagline 14",
+        "thumb": "/library/metadata/68928/thumb/1795320830",
+        "art": "/library/metadata/68928/art/1795320830",
+        "duration": 6906048,
+        "originallyAvailableAt": "2025-06-18",
+        "addedAt": 1753776688,
+        "updatedAt": 1795320830,
+        "audienceRatingImage": "rottentomatoes://image.rating.upright",
+        "chapterSource": "media",
+        "primaryExtraKey": "/library/metadata/68929",
+        "ratingImage": "rottentomatoes://image.rating.ripe",
+        "Media": [
+          {
+            "id": 104281,
+            "duration": 6906048,
+            "bitrate": 8326,
+            "width": 1920,
+            "height": 694,
+            "aspectRatio": 2.35,
+            "audioChannels": 6,
+            "audioCodec": "ac3",
+            "videoCodec": "h264",
+            "videoResolution": "1080",
+            "container": "mkv",
+            "videoFrameRate": "24p",
+            "videoProfile": "high",
+            "hasVoiceActivity": false,
+            "Part": [
+              {
+                "id": 109440,
+                "key": "/library/parts/109440/1753776596/file.mkv",
+                "duration": 6906048,
+                "file": "/media/item-24.mkv",
+                "size": 7187103828,
+                "container": "mkv",
+                "videoProfile": "high"
+              }
+            ]
+          }
+        ],
+        "Image": [
+          {
+            "alt": "alt 23",
+            "type": "coverPoster",
+            "url": "/library/metadata/68928/thumb/1795320830"
+          },
+          {
+            "alt": "alt 23",
+            "type": "background",
+            "url": "/library/metadata/68928/art/1795320830"
+          },
+          {
+            "alt": "alt 23",
+            "type": "clearLogo",
+            "url": "/library/metadata/68928/clearLogo/1795320830"
+          },
+          {
+            "alt": "alt 23",
+            "type": "backgroundSquare",
+            "url": "/library/metadata/68928/squareArt/1795320830"
+          }
+        ],
+        "UltraBlurColors": {
+          "topLeft": "272f35",
+          "topRight": "a22f20",
+          "bottomRight": "2c061c",
+          "bottomLeft": "3c1320"
+        },
+        "Genre": [
+          {
+            "tag": "Horreur"
+          },
+          {
+            "tag": "Thriller"
+          }
+        ],
+        "Country": [
+          {
+            "tag": "United Kingdom"
+          },
+          {
+            "tag": "United States of America"
+          }
+        ],
+        "Collection": [
+          {
+            "tag": "tag 530"
+          }
+        ],
+        "Director": [
+          {
+            "tag": "tag 531"
+          }
+        ],
+        "Writer": [
+          {
+            "tag": "tag 532"
+          }
+        ],
+        "Role": [
+          {
+            "tag": "tag 533"
+          },
+          {
+            "tag": "tag 534"
+          },
+          {
+            "tag": "tag 535"
+          }
+        ]
+      },
+      {
+        "ratingKey": "74320",
+        "key": "/library/metadata/74320",
+        "guid": "plex://item/c37393034ad2",
+        "slug": "slug 15",
+        "studio": "studio 15",
+        "type": "movie",
+        "title": "title 147",
+        "originalTitle": "originalTitle 17",
+        "contentRating": "fr/16",
+        "contentRatingAge": 16,
+        "summary": "summary 24",
+        "rating": 9.1,
+        "audienceRating": 8.8,
+        "year": 2026,
+        "tagline": "tagline 15",
+        "thumb": "/library/metadata/74320/thumb/1792730994",
+        "art": "/library/metadata/74320/art/1792730994",
+        "duration": 6560448,
+        "originallyAvailableAt": "2026-01-14",
+        "addedAt": 1771312874,
+        "updatedAt": 1792730994,
+        "audienceRatingImage": "rottentomatoes://image.rating.upright",
+        "primaryExtraKey": "/library/metadata/74321",
+        "ratingImage": "rottentomatoes://image.rating.ripe",
+        "Media": [
+          {
+            "id": 110544,
+            "duration": 6560448,
+            "bitrate": 7697,
+            "width": 1920,
+            "height": 800,
+            "aspectRatio": 2.35,
+            "audioChannels": 6,
+            "audioCodec": "ac3",
+            "videoCodec": "h264",
+            "videoResolution": "1080",
+            "container": "mkv",
+            "videoFrameRate": "24p",
+            "videoProfile": "high",
+            "hasVoiceActivity": false,
+            "Part": [
+              {
+                "id": 115703,
+                "key": "/library/parts/115703/1771312831/file.mkv",
+                "duration": 6560448,
+                "file": "/media/item-25.mkv",
+                "size": 6311669390,
+                "container": "mkv",
+                "videoProfile": "high"
+              }
+            ]
+          }
+        ],
+        "Image": [
+          {
+            "alt": "alt 24",
+            "type": "coverPoster",
+            "url": "/library/metadata/74320/thumb/1792730994"
+          },
+          {
+            "alt": "alt 24",
+            "type": "background",
+            "url": "/library/metadata/74320/art/1792730994"
+          },
+          {
+            "alt": "alt 24",
+            "type": "clearLogo",
+            "url": "/library/metadata/74320/clearLogo/1792730994"
+          },
+          {
+            "alt": "alt 24",
+            "type": "backgroundSquare",
+            "url": "/library/metadata/74320/squareArt/1792730994"
+          }
+        ],
+        "UltraBlurColors": {
+          "topLeft": "431c0c",
+          "topRight": "914224",
+          "bottomRight": "6d331c",
+          "bottomLeft": "300e04"
+        },
+        "Genre": [
+          {
+            "tag": "Horreur"
+          },
+          {
+            "tag": "Science-Fiction"
+          }
+        ],
+        "Country": [
+          {
+            "tag": "United Kingdom"
+          },
+          {
+            "tag": "United States of America"
+          }
+        ],
+        "Director": [
+          {
+            "tag": "tag 536"
+          }
+        ],
+        "Writer": [
+          {
+            "tag": "tag 532"
+          }
+        ],
+        "Role": [
+          {
+            "tag": "tag 535"
+          },
+          {
+            "tag": "tag 534"
+          },
+          {
+            "tag": "tag 537"
+          }
+        ]
+      },
+      {
+        "ratingKey": "65265",
+        "key": "/library/metadata/65265",
+        "guid": "plex://item/25c3a6c8f84c",
+        "slug": "slug 16",
+        "studio": "studio 16",
+        "type": "movie",
+        "title": "title 148",
+        "originalTitle": "originalTitle 18",
+        "contentRating": "fr/16",
+        "contentRatingAge": 16,
+        "summary": "summary 25",
+        "rating": 8.7,
+        "audienceRating": 8.5,
+        "year": 2002,
+        "tagline": "tagline 16",
+        "thumb": "/library/metadata/65265/thumb/1795257909",
+        "art": "/library/metadata/65265/art/1795257909",
+        "duration": 7054080,
+        "originallyAvailableAt": "2002-11-01",
+        "addedAt": 1727806039,
+        "updatedAt": 1795257909,
+        "audienceRatingImage": "rottentomatoes://image.rating.upright",
+        "chapterSource": "media",
+        "primaryExtraKey": "/library/metadata/65266",
+        "ratingImage": "rottentomatoes://image.rating.ripe",
+        "Media": [
+          {
+            "id": 98413,
+            "duration": 7054080,
+            "bitrate": 17022,
+            "width": 1920,
+            "height": 1040,
+            "aspectRatio": 1.85,
+            "audioChannels": 6,
+            "audioCodec": "dca",
+            "videoCodec": "h264",
+            "videoResolution": "1080",
+            "container": "mkv",
+            "videoFrameRate": "24p",
+            "audioProfile": "dts",
+            "videoProfile": "high",
+            "hasVoiceActivity": false,
+            "Part": [
+              {
+                "id": 103570,
+                "key": "/library/parts/103570/1727805895/file.MKV",
+                "duration": 7054080,
+                "file": "/media/item-26.MKV",
+                "size": 15009618240,
+                "audioProfile": "dts",
+                "container": "mkv",
+                "videoProfile": "high"
+              }
+            ]
+          }
+        ],
+        "Image": [
+          {
+            "alt": "alt 25",
+            "type": "coverPoster",
+            "url": "/library/metadata/65265/thumb/1795257909"
+          },
+          {
+            "alt": "alt 25",
+            "type": "background",
+            "url": "/library/metadata/65265/art/1795257909"
+          },
+          {
+            "alt": "alt 25",
+            "type": "clearLogo",
+            "url": "/library/metadata/65265/clearLogo/1795257909"
+          },
+          {
+            "alt": "alt 25",
+            "type": "backgroundSquare",
+            "url": "/library/metadata/65265/squareArt/1795257909"
+          }
+        ],
+        "UltraBlurColors": {
+          "topLeft": "571002",
+          "topRight": "6e190f",
+          "bottomRight": "9f1a03",
+          "bottomLeft": "430b04"
+        },
+        "Genre": [
+          {
+            "tag": "Horreur"
+          },
+          {
+            "tag": "Science-Fiction"
+          }
+        ],
+        "Country": [
+          {
+            "tag": "United Kingdom"
+          }
+        ],
+        "Collection": [
+          {
+            "tag": "tag 530"
+          }
+        ],
+        "Director": [
+          {
+            "tag": "tag 531"
+          }
+        ],
+        "Writer": [
+          {
+            "tag": "tag 532"
+          }
+        ],
+        "Role": [
+          {
+            "tag": "tag 538"
+          },
+          {
+            "tag": "tag 539"
+          },
+          {
+            "tag": "tag 540"
+          }
+        ]
+      }
+    ]
+  }
+}

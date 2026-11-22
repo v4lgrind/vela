@@ -1,0 +1,248 @@
+{
+  "MediaContainer": {
+    "size": 3,
+    "totalSize": 46,
+    "offset": 0,
+    "allowSync": true,
+    "art": "/:/resources/show-fanart.jpg",
+    "identifier": "com.plexapp.plugins.library",
+    "librarySectionID": 3,
+    "librarySectionTitle": "librarySectionTitle 2",
+    "librarySectionUUID": "7d505cfbb185a593354310a4",
+    "mediaTagPrefix": "/system/bundle/media/flags/",
+    "mediaTagVersion": 1792751798,
+    "nocache": true,
+    "thumb": "/:/resources/show.png",
+    "title1": "title1 4",
+    "title2": "title2 7",
+    "viewGroup": "show",
+    "viewMode": 65592,
+    "Metadata": [
+      {
+        "ratingKey": "20069",
+        "key": "/library/metadata/20069/children",
+        "guid": "plex://item/2f57938f2c0a",
+        "slug": "slug 27",
+        "studio": "studio 17",
+        "type": "show",
+        "title": "title 199",
+        "originalTitle": "originalTitle 31",
+        "contentRating": "fr/10",
+        "contentRatingAge": 16,
+        "summary": "summary 53",
+        "index": 1,
+        "audienceRating": 8.4,
+        "year": 2004,
+        "tagline": "tagline 27",
+        "thumb": "/library/metadata/20069/thumb/1793620663",
+        "art": "/library/metadata/20069/art/1793620663",
+        "theme": "/library/metadata/20069/theme/1793620663",
+        "duration": 1440000,
+        "originallyAvailableAt": "2004-10-05",
+        "leafCount": 76,
+        "viewedLeafCount": 0,
+        "childCount": 3,
+        "addedAt": 1666518305,
+        "updatedAt": 1793620663,
+        "audienceRatingImage": "themoviedb://image.rating",
+        "Image": [
+          {
+            "alt": "alt 53",
+            "type": "coverPoster",
+            "url": "/library/metadata/20069/thumb/1793620663"
+          },
+          {
+            "alt": "alt 53",
+            "type": "background",
+            "url": "/library/metadata/20069/art/1793620663"
+          },
+          {
+            "alt": "alt 53",
+            "type": "backgroundSquare",
+            "url": "/library/metadata/20069/squareArt/1793620663"
+          }
+        ],
+        "UltraBlurColors": {
+          "topLeft": "130e2a",
+          "topRight": "203f68",
+          "bottomRight": "0b0921",
+          "bottomLeft": "152043"
+        },
+        "Genre": [
+          {
+            "tag": "Animation"
+          },
+          {
+            "tag": "Action"
+          }
+        ],
+        "Country": [
+          {
+            "tag": "Japan"
+          }
+        ],
+        "Role": [
+          {
+            "tag": "tag 39"
+          },
+          {
+            "tag": "tag 40"
+          },
+          {
+            "tag": "tag 41"
+          }
+        ]
+      },
+      {
+        "ratingKey": "73811",
+        "key": "/library/metadata/73811/children",
+        "guid": "plex://item/bf1187dfcd60",
+        "slug": "slug 28",
+        "studio": "studio 28",
+        "type": "show",
+        "title": "title 204",
+        "originalTitle": "originalTitle 32",
+        "contentRating": "fr/16",
+        "contentRatingAge": 14,
+        "summary": "summary 56",
+        "index": 1,
+        "audienceRating": 7.2,
+        "year": 2019,
+        "tagline": "tagline 28",
+        "thumb": "/library/metadata/73811/thumb/1793424962",
+        "art": "/library/metadata/73811/art/1793424962",
+        "theme": "/library/metadata/73811/theme/1793424962",
+        "duration": 1380000,
+        "originallyAvailableAt": "2019-04-10",
+        "leafCount": 12,
+        "viewedLeafCount": 0,
+        "childCount": 1,
+        "addedAt": 1766512928,
+        "updatedAt": 1793424962,
+        "audienceRatingImage": "themoviedb://image.rating",
+        "Image": [
+          {
+            "alt": "alt 57",
+            "type": "coverPoster",
+            "url": "/library/metadata/73811/thumb/1793424962"
+          },
+          {
+            "alt": "alt 57",
+            "type": "background",
+            "url": "/library/metadata/73811/art/1793424962"
+          },
+          {
+            "alt": "alt 57",
+            "type": "backgroundSquare",
+            "url": "/library/metadata/73811/squareArt/1793424962"
+          }
+        ],
+        "UltraBlurColors": {
+          "topLeft": "280c0a",
+          "topRight": "391218",
+          "bottomRight": "351024",
+          "bottomLeft": "973946"
+        },
+        "Genre": [
+          {
+            "tag": "Drame"
+          },
+          {
+            "tag": "Musique"
+          }
+        ],
+        "Country": [
+          {
+            "tag": "Japan"
+          }
+        ],
+        "Role": [
+          {
+            "tag": "tag 596"
+          },
+          {
+            "tag": "tag 597"
+          },
+          {
+            "tag": "tag 598"
+          }
+        ]
+      },
+      {
+        "ratingKey": "31590",
+        "key": "/library/metadata/31590/children",
+        "guid": "plex://item/3d5dad9b0d63",
+        "slug": "slug 29",
+        "studio": "studio 29",
+        "type": "show",
+        "title": "title 205",
+        "originalTitle": "originalTitle 33",
+        "contentRating": "fr/Accord parental",
+        "contentRatingAge": 16,
+        "summary": "summary 57",
+        "index": 1,
+        "audienceRating": 8.5,
+        "year": 2022,
+        "tagline": "tagline 29",
+        "thumb": "/library/metadata/31590/thumb/1794480790",
+        "art": "/library/metadata/31590/art/1794480790",
+        "theme": "/library/metadata/31590/theme/1794480790",
+        "duration": 1440000,
+        "originallyAvailableAt": "2022-10-11",
+        "leafCount": 12,
+        "viewedLeafCount": 0,
+        "childCount": 1,
+        "addedAt": 1679946799,
+        "updatedAt": 1794480790,
+        "audienceRatingImage": "themoviedb://image.rating",
+        "Image": [
+          {
+            "alt": "alt 58",
+            "type": "coverPoster",
+            "url": "/library/metadata/31590/thumb/1794480790"
+          },
+          {
+            "alt": "alt 58",
+            "type": "background",
+            "url": "/library/metadata/31590/art/1794480790"
+          },
+          {
+            "alt": "alt 58",
+            "type": "backgroundSquare",
+            "url": "/library/metadata/31590/squareArt/1794480790"
+          }
+        ],
+        "UltraBlurColors": {
+          "topLeft": "4e1825",
+          "topRight": "200803",
+          "bottomRight": "4f182f",
+          "bottomLeft": "622547"
+        },
+        "Genre": [
+          {
+            "tag": "Animation"
+          },
+          {
+            "tag": "Comédie"
+          }
+        ],
+        "Country": [
+          {
+            "tag": "Japan"
+          }
+        ],
+        "Role": [
+          {
+            "tag": "tag 752"
+          },
+          {
+            "tag": "tag 753"
+          },
+          {
+            "tag": "tag 754"
+          }
+        ]
+      }
+    ]
+  }
+}

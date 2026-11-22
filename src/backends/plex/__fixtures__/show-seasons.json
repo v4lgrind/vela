@@ -1,0 +1,182 @@
+{
+  "MediaContainer": {
+    "size": 4,
+    "allowSync": true,
+    "art": "/library/metadata/20069/art/1793620663",
+    "identifier": "com.plexapp.plugins.library",
+    "key": "20069",
+    "librarySectionID": 3,
+    "librarySectionTitle": "librarySectionTitle 2",
+    "librarySectionUUID": "7d505cfbb185a593354310a4",
+    "mediaTagPrefix": "/system/bundle/media/flags/",
+    "mediaTagVersion": 1792751798,
+    "nocache": true,
+    "parentIndex": 1,
+    "parentTitle": "parentTitle 12",
+    "parentYear": 2004,
+    "summary": "summary 53",
+    "theme": "/library/metadata/20069/theme/1793620663",
+    "thumb": "/library/metadata/20069/thumb/1793620663",
+    "title1": "title1 4",
+    "title2": "title2 6",
+    "viewGroup": "season",
+    "viewMode": 65593,
+    "Directory": [
+      {
+        "leafCount": 76,
+        "thumb": "/library/metadata/20069/thumb/1793620663",
+        "viewedLeafCount": 0,
+        "key": "/library/metadata/20069/allLeaves",
+        "title": "title 200"
+      }
+    ],
+    "Metadata": [
+      {
+        "ratingKey": "75920",
+        "key": "/library/metadata/75920/children",
+        "parentRatingKey": "20069",
+        "guid": "plex://item/9079ae281acb",
+        "parentGuid": "plex://item/2f57938f2c0a",
+        "parentSlug": "parentSlug 1",
+        "parentStudio": "parentStudio 1",
+        "type": "season",
+        "title": "title 201",
+        "titleSort": "titleSort 15",
+        "parentKey": "/library/metadata/20069",
+        "parentTitle": "parentTitle 12",
+        "summary": "summary 48",
+        "index": 1,
+        "parentIndex": 1,
+        "parentYear": 2004,
+        "thumb": "/library/metadata/75920/thumb/1779587226",
+        "art": "/library/metadata/20069/art/1793620663",
+        "parentThumb": "/library/metadata/20069/thumb/1793620663",
+        "parentTheme": "/library/metadata/20069/theme/1793620663",
+        "leafCount": 5,
+        "viewedLeafCount": 0,
+        "addedAt": 1779587226,
+        "updatedAt": 1779587226,
+        "Image": [
+          {
+            "alt": "alt 54",
+            "type": "coverPoster",
+            "url": "/library/metadata/75920/thumb/1779587226"
+          },
+          {
+            "alt": "alt 54",
+            "type": "background",
+            "url": "/library/metadata/20069/art/1793620663"
+          },
+          {
+            "alt": "alt 54",
+            "type": "backgroundSquare",
+            "url": "/library/metadata/20069/squareArt/1793620663"
+          }
+        ],
+        "UltraBlurColors": {
+          "topLeft": "4c1a28",
+          "topRight": "872e2c",
+          "bottomRight": "ab1e23",
+          "bottomLeft": "a9212a"
+        }
+      },
+      {
+        "ratingKey": "75927",
+        "key": "/library/metadata/75927/children",
+        "parentRatingKey": "20069",
+        "guid": "plex://item/e4ddd5772547",
+        "parentGuid": "plex://item/2f57938f2c0a",
+        "parentSlug": "parentSlug 1",
+        "parentStudio": "parentStudio 1",
+        "type": "season",
+        "title": "title 202",
+        "titleSort": "titleSort 16",
+        "parentKey": "/library/metadata/20069",
+        "parentTitle": "parentTitle 12",
+        "summary": "summary 54",
+        "index": 2,
+        "parentIndex": 1,
+        "parentYear": 2004,
+        "thumb": "/library/metadata/75927/thumb/1779831517",
+        "art": "/library/metadata/20069/art/1793620663",
+        "parentThumb": "/library/metadata/20069/thumb/1793620663",
+        "parentTheme": "/library/metadata/20069/theme/1793620663",
+        "leafCount": 21,
+        "viewedLeafCount": 0,
+        "addedAt": 1779831515,
+        "updatedAt": 1779831517,
+        "Image": [
+          {
+            "alt": "alt 55",
+            "type": "coverPoster",
+            "url": "/library/metadata/75927/thumb/1779831517"
+          },
+          {
+            "alt": "alt 55",
+            "type": "background",
+            "url": "/library/metadata/20069/art/1793620663"
+          },
+          {
+            "alt": "alt 55",
+            "type": "backgroundSquare",
+            "url": "/library/metadata/20069/squareArt/1793620663"
+          }
+        ],
+        "UltraBlurColors": {
+          "topLeft": "162e4f",
+          "topRight": "a72436",
+          "bottomRight": "a7252b",
+          "bottomLeft": "963d31"
+        }
+      },
+      {
+        "ratingKey": "20070",
+        "key": "/library/metadata/20070/children",
+        "parentRatingKey": "20069",
+        "guid": "plex://item/39fea9f034a8",
+        "parentGuid": "plex://item/2f57938f2c0a",
+        "parentSlug": "parentSlug 1",
+        "parentStudio": "parentStudio 1",
+        "type": "season",
+        "title": "title 203",
+        "parentKey": "/library/metadata/20069",
+        "parentTitle": "parentTitle 12",
+        "summary": "summary 55",
+        "index": 17,
+        "parentIndex": 1,
+        "year": 2022,
+        "thumb": "/library/metadata/20070/thumb/1792425005",
+        "art": "/library/metadata/20069/art/1793620663",
+        "parentThumb": "/library/metadata/20069/thumb/1793620663",
+        "parentTheme": "/library/metadata/20069/theme/1793620663",
+        "leafCount": 50,
+        "viewedLeafCount": 0,
+        "addedAt": 1666250376,
+        "updatedAt": 1792425005,
+        "Image": [
+          {
+            "alt": "alt 56",
+            "type": "coverPoster",
+            "url": "/library/metadata/20070/thumb/1792425005"
+          },
+          {
+            "alt": "alt 56",
+            "type": "background",
+            "url": "/library/metadata/20069/art/1793620663"
+          },
+          {
+            "alt": "alt 56",
+            "type": "backgroundSquare",
+            "url": "/library/metadata/20069/squareArt/1793620663"
+          }
+        ],
+        "UltraBlurColors": {
+          "topLeft": "1b1a1c",
+          "topRight": "7f5217",
+          "bottomRight": "471b18",
+          "bottomLeft": "76342e"
+        }
+      }
+    ]
+  }
+}

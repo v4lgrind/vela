@@ -1,0 +1,33 @@
+{
+    "Items": [
+        {
+            "Id": "lib00000100000000000000000000000",
+            "Name": "Films",
+            "CollectionType": "movies",
+            "Type": "CollectionFolder",
+            "ImageTags": {
+                "Primary": "t"
+            }
+        },
+        {
+            "Id": "lib00000200000000000000000000000",
+            "Name": "Séries",
+            "CollectionType": "tvshows",
+            "Type": "CollectionFolder",
+            "ImageTags": {
+                "Primary": "t"
+            }
+        },
+        {
+            "Id": "lib00000300000000000000000000000",
+            "Name": "Musique",
+            "CollectionType": "music",
+            "Type": "CollectionFolder",
+            "ImageTags": {
+                "Primary": "t"
+            }
+        }
+    ],
+    "TotalRecordCount": 3,
+    "StartIndex": 0
+}

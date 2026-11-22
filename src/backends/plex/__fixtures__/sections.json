@@ -1,0 +1,188 @@
+{
+  "MediaContainer": {
+    "size": 7,
+    "allowSync": false,
+    "title1": "title1 3",
+    "Directory": [
+      {
+        "allowSync": true,
+        "filters": true,
+        "refreshing": false,
+        "key": "1",
+        "type": "movie",
+        "title": "title 193",
+        "agent": "tv.plex.agents.movie",
+        "scanner": "Plex Movie",
+        "language": "fr-FR",
+        "uuid": "7adb1ea63bd5427fb625687e",
+        "updatedAt": 1700576015,
+        "createdAt": 1640882869,
+        "scannedAt": 1787952501,
+        "content": true,
+        "directory": true,
+        "contentChangedAt": 10896572,
+        "hidden": 0,
+        "Location": [
+          {
+            "id": 9,
+            "path": "/media/item-6"
+          }
+        ]
+      },
+      {
+        "allowSync": true,
+        "filters": true,
+        "refreshing": false,
+        "key": "8",
+        "type": "movie",
+        "title": "title 194",
+        "agent": "tv.plex.agents.movie",
+        "scanner": "Plex Movie",
+        "language": "fr-FR",
+        "metadataAgentProviderGroupId": 1,
+        "uuid": "35ea92b7275e25349fc4e433",
+        "updatedAt": 1767046201,
+        "createdAt": 1699354817,
+        "scannedAt": 1767046203,
+        "content": true,
+        "directory": true,
+        "contentChangedAt": 10732058,
+        "hidden": 0,
+        "Location": [
+          {
+            "id": 13,
+            "path": "/media/item-7"
+          }
+        ]
+      },
+      {
+        "allowSync": true,
+        "filters": true,
+        "refreshing": false,
+        "key": "3",
+        "type": "show",
+        "title": "title 195",
+        "agent": "tv.plex.agents.series",
+        "scanner": "Plex TV Series",
+        "language": "fr-FR",
+        "metadataAgentProviderGroupId": 2,
+        "uuid": "7d505cfbb185a593354310a4",
+        "updatedAt": 1765375435,
+        "createdAt": 1640882911,
+        "scannedAt": 1774630174,
+        "content": true,
+        "directory": true,
+        "contentChangedAt": 10878554,
+        "hidden": 0,
+        "Location": [
+          {
+            "id": 10,
+            "path": "/media/item-8"
+          }
+        ]
+      },
+      {
+        "allowSync": true,
+        "filters": true,
+        "refreshing": false,
+        "key": "12",
+        "type": "show",
+        "title": "title 196",
+        "agent": "tv.plex.agents.custom.fankai",
+        "scanner": "Plex TV Series",
+        "language": "fr-FR",
+        "metadataAgentProviderGroupId": 7,
+        "uuid": "ffac9baafd029e8ae1061a2c",
+        "updatedAt": 1785916741,
+        "createdAt": 1785916741,
+        "scannedAt": 1787678102,
+        "content": true,
+        "directory": true,
+        "contentChangedAt": 9999741,
+        "hidden": 0,
+        "Location": [
+          {
+            "id": 19,
+            "path": "/media/item-9"
+          }
+        ]
+      },
+      {
+        "allowSync": true,
+        "filters": true,
+        "refreshing": false,
+        "key": "2",
+        "type": "show",
+        "title": "title 197",
+        "agent": "tv.plex.agents.series",
+        "scanner": "Plex TV Series",
+        "language": "fr-FR",
+        "uuid": "70c8e2f5ea46a9971bdaa686",
+        "updatedAt": 1682336099,
+        "createdAt": 1640882888,
+        "scannedAt": 1788260963,
+        "content": true,
+        "directory": true,
+        "contentChangedAt": 10884498,
+        "hidden": 0,
+        "Location": [
+          {
+            "id": 11,
+            "path": "/media/item-10"
+          }
+        ]
+      },
+      {
+        "allowSync": true,
+        "filters": true,
+        "refreshing": false,
+        "key": "10",
+        "type": "artist",
+        "title": "title 198",
+        "agent": "tv.plex.agents.music",
+        "scanner": "Plex Music",
+        "language": "fr-FR",
+        "metadataAgentProviderGroupId": 3,
+        "uuid": "6ee08e1fc8365ff986b7a734",
+        "updatedAt": 1764801680,
+        "createdAt": 1755710532,
+        "scannedAt": 1769948408,
+        "content": true,
+        "directory": true,
+        "contentChangedAt": 8647101,
+        "hidden": 0,
+        "Location": [
+          {
+            "id": 16,
+            "path": "/media/item-11"
+          }
+        ]
+      },
+      {
+        "allowSync": true,
+        "filters": true,
+        "refreshing": false,
+        "key": "9",
+        "type": "artist",
+        "title": "title 102",
+        "agent": "tv.plex.agents.music",
+        "scanner": "Plex Music",
+        "language": "fr-FR",
+        "uuid": "e889ffd52a075f20570f0f51",
+        "updatedAt": 1722526308,
+        "createdAt": 1722526308,
+        "scannedAt": 1791986559,
+        "content": true,
+        "directory": true,
+        "contentChangedAt": 10666061,
+        "hidden": 0,
+        "Location": [
+          {
+            "id": 15,
+            "path": "/media/item-12"
+          }
+        ]
+      }
+    ]
+  }
+}

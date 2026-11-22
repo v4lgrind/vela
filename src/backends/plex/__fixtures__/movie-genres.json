@@ -1,0 +1,216 @@
+{
+  "MediaContainer": {
+    "size": 33,
+    "allowSync": false,
+    "art": "/:/resources/movie-fanart.jpg",
+    "content": "secondary",
+    "identifier": "com.plexapp.plugins.library",
+    "mediaTagPrefix": "/system/bundle/media/flags/",
+    "mediaTagVersion": 1792751798,
+    "thumb": "/:/resources/movie.png",
+    "title1": "title1 1",
+    "title2": "title2 2",
+    "viewGroup": "secondary",
+    "viewMode": 65592,
+    "Directory": [
+      {
+        "fastKey": "/library/sections/1/all?genre=51",
+        "key": "51",
+        "title": "title 81",
+        "type": "genre"
+      },
+      {
+        "fastKey": "/library/sections/1/all?genre=7",
+        "key": "7",
+        "title": "title 82",
+        "type": "genre"
+      },
+      {
+        "fastKey": "/library/sections/1/all?genre=837",
+        "key": "837",
+        "title": "title 83",
+        "type": "genre"
+      },
+      {
+        "fastKey": "/library/sections/1/all?genre=7769",
+        "key": "7769",
+        "title": "title 84",
+        "type": "genre"
+      },
+      {
+        "fastKey": "/library/sections/1/all?genre=240535",
+        "key": "240535",
+        "title": "title 85",
+        "type": "genre"
+      },
+      {
+        "fastKey": "/library/sections/1/all?genre=142",
+        "key": "142",
+        "title": "title 86",
+        "type": "genre"
+      },
+      {
+        "fastKey": "/library/sections/1/all?genre=6420",
+        "key": "6420",
+        "title": "title 87",
+        "type": "genre"
+      },
+      {
+        "fastKey": "/library/sections/1/all?genre=4",
+        "key": "4",
+        "title": "title 88",
+        "type": "genre"
+      },
+      {
+        "fastKey": "/library/sections/1/all?genre=6",
+        "key": "6",
+        "title": "title 89",
+        "type": "genre"
+      },
+      {
+        "fastKey": "/library/sections/1/all?genre=1290",
+        "key": "1290",
+        "title": "title 90",
+        "type": "genre"
+      },
+      {
+        "fastKey": "/library/sections/1/all?genre=48",
+        "key": "48",
+        "title": "title 91",
+        "type": "genre"
+      },
+      {
+        "fastKey": "/library/sections/1/all?genre=5",
+        "key": "5",
+        "title": "title 92",
+        "type": "genre"
+      },
+      {
+        "fastKey": "/library/sections/1/all?genre=714",
+        "key": "714",
+        "title": "title 93",
+        "type": "genre"
+      },
+      {
+        "fastKey": "/library/sections/1/all?genre=140423",
+        "key": "140423",
+        "title": "title 94",
+        "type": "genre"
+      },
+      {
+        "fastKey": "/library/sections/1/all?genre=50",
+        "key": "50",
+        "title": "title 95",
+        "type": "genre"
+      },
+      {
+        "fastKey": "/library/sections/1/all?genre=49",
+        "key": "49",
+        "title": "title 96",
+        "type": "genre"
+      },
+      {
+        "fastKey": "/library/sections/1/all?genre=1156",
+        "key": "1156",
+        "title": "title 97",
+        "type": "genre"
+      },
+      {
+        "fastKey": "/library/sections/1/all?genre=23917",
+        "key": "23917",
+        "title": "title 98",
+        "type": "genre"
+      },
+      {
+        "fastKey": "/library/sections/1/all?genre=250440",
+        "key": "250440",
+        "title": "title 99",
+        "type": "genre"
+      },
+      {
+        "fastKey": "/library/sections/1/all?genre=715",
+        "key": "715",
+        "title": "title 100",
+        "type": "genre"
+      },
+      {
+        "fastKey": "/library/sections/1/all?genre=1291",
+        "key": "1291",
+        "title": "title 101",
+        "type": "genre"
+      },
+      {
+        "fastKey": "/library/sections/1/all?genre=789",
+        "key": "789",
+        "title": "title 102",
+        "type": "genre"
+      },
+      {
+        "fastKey": "/library/sections/1/all?genre=366",
+        "key": "366",
+        "title": "title 103",
+        "type": "genre"
+      },
+      {
+        "fastKey": "/library/sections/1/all?genre=36741",
+        "key": "36741",
+        "title": "title 104",
+        "type": "genre"
+      },
+      {
+        "fastKey": "/library/sections/1/all?genre=969",
+        "key": "969",
+        "title": "title 105",
+        "type": "genre"
+      },
+      {
+        "fastKey": "/library/sections/1/all?genre=365",
+        "key": "365",
+        "title": "title 106",
+        "type": "genre"
+      },
+      {
+        "fastKey": "/library/sections/1/all?genre=1190",
+        "key": "1190",
+        "title": "title 107",
+        "type": "genre"
+      },
+      {
+        "fastKey": "/library/sections/1/all?genre=6071",
+        "key": "6071",
+        "title": "title 108",
+        "type": "genre"
+      },
+      {
+        "fastKey": "/library/sections/1/all?genre=10314",
+        "key": "10314",
+        "title": "title 109",
+        "type": "genre"
+      },
+      {
+        "fastKey": "/library/sections/1/all?genre=8374",
+        "key": "8374",
+        "title": "title 110",
+        "type": "genre"
+      },
+      {
+        "fastKey": "/library/sections/1/all?genre=281",
+        "key": "281",
+        "title": "title 111",
+        "type": "genre"
+      },
+      {
+        "fastKey": "/library/sections/1/all?genre=96454",
+        "key": "96454",
+        "title": "title 112",
+        "type": "genre"
+      },
+      {
+        "fastKey": "/library/sections/1/all?genre=3925",
+        "key": "3925",
+        "title": "title 113",
+        "type": "genre"
+      }
+    ]
+  }
+}

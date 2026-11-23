@@ -109,7 +109,12 @@
 - Done in ec7ebda: one shared request per Plex item (3 s), native player
   reports playing/paused (timeline said "paused" for Plex and Jellyfin), a
   request silent for 3 s checks its address and moves only if it is dead
-  (5.3 s instead of 10.4 s live). Built as versionCode 38, not installed yet.
+  (5.3 s instead of 10.4 s live). Installed as versionCode 38; user confirmed.
+- Done in 1455108 (versionCode 39, user confirmed on the phone): remove a
+  saved server from the login list; A–Z index ends above the mini player
+  (`--shell-bottom` from App.vue); removing or signing out of the account
+  while music played froze the app (the player skipped through the whole
+  queue): the queue now stops on account change and after 3 failed tracks.
 - User test on a phone: sign in to Plex with the real plex.tv/link code
   (owner account approves), pick a profile, play, check resume / watched state.
 - Release (Jellyfin refactor + Plex v1), user's decision.

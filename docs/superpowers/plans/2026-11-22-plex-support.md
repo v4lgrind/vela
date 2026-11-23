@@ -506,6 +506,26 @@ must reproduce them byte for byte.
   URL building in `download-store` and `downloadService`.
 - `syncService` → `userData.pushOfflineProgress`.
 
+#### Phase 6 results (2026-11-23) — done
+
+- 6a (bb329d8): `backend.downloads.plan` (original file or forced-params
+  transcode, sidecar subtitle, markers) and `userData.pushOfflineProgress`.
+- 6b: download records hold `serverId`, a domain `item` and `markers`.
+  Records saved before the update (`jellyfinItem`, `introSegments`) are
+  converted on load through the active backend's decoder and written back once
+  (`utils/offlineRecords.ts`); the legacy fields are kept, so no IndexedDB
+  version bump was needed.
+- `download-store` builds a `DownloadRequest` (quality preset, display-sized
+  transcode when the device cannot play the file, desktop sidecar subtitle) and
+  hands the plan to `downloadService.downloadForOffline`. Artwork caching takes
+  domain image refs; cache paths are unchanged, so cached images survive.
+- `metadata-cache-store` stores domain items; old entries are decoded lazily.
+- `offline-store`, `syncService`, `offlineLibrary`, `watchProgress` and the
+  offline screens (OfflineHome, library grid, details, player) read domain
+  items only.
+- Verified: 299 tests, type check, build. Not yet checked on a device with
+  downloads made by the previous version: do it before the Phase 7 release.
+
 ### Phase 7 — Seal (S)
 - Delete `types/jellyfin.ts`, `jellyfin-store.ts`, `utils/jellyfinAuthorization.ts`,
   `playbackUrl.ts` (moved), `constants.ts` device profiles (moved).

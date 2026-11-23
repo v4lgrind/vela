@@ -287,7 +287,7 @@ import { useDownloadStore } from '@/store/download-store';
 import { useMetadataCacheStore } from '@/store/metadata-cache-store';
 import { useOfflineArtwork } from '@/composables/useOfflineArtwork';
 import { shuffleAround } from '@/utils/audioQueue';
-import { downloadedTracks, downloadsInLibrary, localGenres, localLibraryPage, type LocalView } from '@/utils/offlineLibrary';
+import { downloadedTracks, downloadsInLibrary, localGenres, localLibraryPage } from '@/utils/offlineLibrary';
 
 const { t } = useI18n();
 const backend = useBackend();
@@ -339,11 +339,6 @@ const SORT_ORDERS = [
   { value: 'asc' as const, label: 'library.ascending', arrow: '↑' },
   { value: 'desc' as const, label: 'library.descending', arrow: '↓' },
 ];
-/** Offline pages are built by the legacy local helpers, which use Jellyfin sort names. */
-const LOCAL_SORT: Record<SortField, string> = {
-  title: 'SortName', releaseDate: 'PremiereDate', dateAdded: 'DateCreated',
-  rating: 'CommunityRating', playCount: 'PlayCount', random: 'Random',
-};
 const POSTER: ImageSize = { width: 130, height: 195 };
 const SQUARE: ImageSize = { width: 150, height: 150 };
 const RANDOM_TRACKS = 300;
@@ -408,9 +403,8 @@ function playSongs(index: number) {
   audioStore.playAlbum(songs.value.map((song) => trackToAudioTrack(song)), index);
 }
 
-/** Downloads stored before Phase 6 are Jellyfin items. */
 function localTracks(): Track[] {
-  return downloadedTracks(libraryDownloads()).map(session.decodeStoredItem).filter((item): item is Track => item.kind === 'track');
+  return downloadedTracks(libraryDownloads());
 }
 
 const shuffleLoading = ref(false);
@@ -625,25 +619,10 @@ useIntersectionObserver(sentinel, ([entry]) => {
   if (sentinelVisible) loadMore();
 }, { rootMargin: '800px' });
 
-const LOCAL_COLLECTION: Record<string, string> = { movies: 'movies', shows: 'tvshows', music: 'music' };
-
+/** Downloaded items, paged and filtered like the server's browse. */
 function localPage(query: LibraryQuery) {
-  const view: LocalView = !isMusicLibrary.value ? 'items'
-    : musicTab.value === 'artists' ? 'artists'
-    : musicTab.value === 'songs' ? 'songs'
-    : 'albums';
-  const page = localLibraryPage(libraryDownloads(), view, LOCAL_COLLECTION[currentLibrary.value.kind], {
-    startIndex: query.offset,
-    limit: query.limit,
-    sortBy: LOCAL_SORT[sortBy.value],
-    sortOrder: sortOrder.value === 'desc' ? 'Descending' : 'Ascending',
-    unplayedOnly: unplayedOnly.value && !isMusicLibrary.value,
-    favoritesOnly: favoritesOnly.value,
-    genres: selectedGenres.value,
-    nameStartsWith: nameStartsWith.value,
-    seed: localSeed,
-  }, (seriesId) => metadataCache.get(seriesId, true) ?? undefined);
-  return { items: page.items.map(session.decodeStoredItem), total: page.total };
+  return localLibraryPage(libraryDownloads(), currentLibrary.value.kind, query, localSeed,
+    (seriesId) => metadataCache.get(seriesId, true) ?? undefined);
 }
 
 async function fetchPage(id: string, query: LibraryQuery) {
@@ -652,7 +631,7 @@ async function fetchPage(id: string, query: LibraryQuery) {
 
 async function loadGenres() {
   if (localMode.value) {
-    availableGenres.value = localGenres(libraryDownloads().map((download) => download.jellyfinItem));
+    availableGenres.value = localGenres(libraryDownloads().map((download) => download.item));
     return;
   }
   const id = libraryId.value;

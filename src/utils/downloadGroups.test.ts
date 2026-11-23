@@ -10,7 +10,9 @@ const task = (itemId: string, status: DownloadTask['status'], over: Partial<Down
 });
 
 const dl = (itemId: string, type: DownloadedMedia['type'], fileSize: number, over: Partial<DownloadedMedia> = {}): DownloadedMedia => ({
-  itemId, type, name: itemId, filePath: itemId, fileSize, downloadDate: 0, jellyfinItem: {}, ...over,
+  itemId, type, name: itemId, filePath: itemId, fileSize, downloadDate: 0, serverId: 's', markers: [],
+  item: { id: itemId, kind: 'movie', title: itemId, genres: [], studios: [], images: {}, user: { played: false, playCount: 0, favorite: false }, versions: [], credits: [] },
+  ...over,
 });
 
 describe('groupActiveTasks', () => {

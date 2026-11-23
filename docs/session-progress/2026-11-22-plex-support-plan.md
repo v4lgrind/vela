@@ -71,5 +71,11 @@
 
 - Phase 5 done (2026-11-23): music through `backend.music`; see the plan.
 
+- Phase 6 done (2026-11-23): downloads and offline on the domain; old
+  download records are converted on load. See the plan's "Phase 6 results".
+
 ## Next steps
-- Phase 6 (offline/downloads), Phase 7 (seal), Phase 8 (Plex backend).
+- Phase 7 (seal): remove `jellyfin-store.ts`, `types/jellyfin.ts`,
+  `utils/jellyfinAuthorization.ts`; tighten `architecture.test.ts`;
+  backend-neutral i18n; check old downloads on a device; release.
+- Phase 8 (Plex backend, video v1).

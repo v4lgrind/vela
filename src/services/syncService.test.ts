@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+import type { MediaBackend } from '@/domain';
+
 import { offlineDatabase, type WatchProgress } from './offlineDatabase';
 import { syncService } from './syncService';
 
@@ -13,72 +15,38 @@ const progress = (over: Partial<WatchProgress> = {}): WatchProgress => ({
   itemId: 'e1', position: 120.5, duration: 3000, percentage: 4, completed: false, lastWatched: LOCAL_TIME, synced: false, ...over,
 });
 
-/** Server user data answered to the GET, and the requests the service made. */
-function stubServer(serverUserData: Record<string, any>, postStatus = 200) {
-  const calls: { method: string; url: string; body?: any }[] = [];
-  vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
-    const method = init?.method ?? 'GET';
-    calls.push({ method, url, body: init?.body ? JSON.parse(String(init.body)) : undefined });
-    if (method === 'GET') return new Response(JSON.stringify(serverUserData), { status: 200 });
-    return new Response('{}', { status: postStatus });
-  }));
-  return calls;
-}
+const push = vi.fn();
+const backend = { userData: { pushOfflineProgress: push } } as unknown as MediaBackend;
+const mine = () => true;
 
 beforeEach(() => vi.clearAllMocks());
 
 describe('syncService.syncWatchProgress', () => {
-  it('pushes newer local progress', async () => {
-    vi.mocked(offlineDatabase.getUnsyncedProgress).mockResolvedValue([progress()]);
-    const calls = stubServer({ LastPlayedDate: '2026-01-01T10:00:00Z' });
-
-    const result = await syncService.syncWatchProgress('https://jf', 'token', 'user1');
-
-    expect(calls.map((c) => `${c.method} ${c.url}`)).toEqual([
-      'GET https://jf/UserItems/e1/UserData?userId=user1',
-      'POST https://jf/UserItems/e1/UserData?userId=user1',
-    ]);
-    expect(calls[1].body).toEqual({ PlaybackPositionTicks: 1_205_000_000, LastPlayedDate: '2026-01-02T10:00:00.000Z' });
+  it('pushes local progress in domain units and marks it synced', async () => {
+    vi.mocked(offlineDatabase.getUnsyncedProgress).mockResolvedValue([progress({ completed: true })]);
+    push.mockResolvedValue('pushed');
+    expect(await syncService.syncWatchProgress(backend, mine)).toEqual({ synced: 1, failed: 0, kept: 0 });
+    expect(push).toHaveBeenCalledWith({ itemId: 'e1', positionMs: 120_500, played: true, lastPlayedAtMs: LOCAL_TIME });
     expect(offlineDatabase.markProgressSynced).toHaveBeenCalledWith('e1');
-    expect(result).toEqual({ synced: 1, failed: 0, kept: 0 });
   });
 
-  it('keeps newer server progress', async () => {
+  it('counts progress the server kept, and marks it synced', async () => {
     vi.mocked(offlineDatabase.getUnsyncedProgress).mockResolvedValue([progress()]);
-    const calls = stubServer({ LastPlayedDate: '2026-01-03T10:00:00Z' });
-
-    const result = await syncService.syncWatchProgress('https://jf', 'token', 'user1');
-
-    expect(calls.filter((c) => c.method === 'POST')).toEqual([]);
+    push.mockResolvedValue('kept');
+    expect(await syncService.syncWatchProgress(backend, mine)).toEqual({ synced: 0, failed: 0, kept: 1 });
     expect(offlineDatabase.markProgressSynced).toHaveBeenCalledWith('e1');
-    expect(result).toEqual({ synced: 0, failed: 0, kept: 1 });
   });
 
-  it('marks played when completed', async () => {
-    vi.mocked(offlineDatabase.getUnsyncedProgress).mockResolvedValue([progress({ completed: true, percentage: 95 })]);
-    const calls = stubServer({});
-
-    await syncService.syncWatchProgress('https://jf', 'token', 'user1');
-
-    expect(calls[1].body).toMatchObject({ Played: true, PlaybackPositionTicks: 0 });
-  });
-
-  it('keeps a played item played after a partial rewatch', async () => {
+  it('leaves failed pushes for the next sync', async () => {
     vi.mocked(offlineDatabase.getUnsyncedProgress).mockResolvedValue([progress()]);
-    const calls = stubServer({ Played: true, LastPlayedDate: '2026-01-01T10:00:00Z' });
-
-    await syncService.syncWatchProgress('https://jf', 'token', 'user1');
-
-    expect(calls[1].body).not.toHaveProperty('Played');
-  });
-
-  it('counts a failed request', async () => {
-    vi.mocked(offlineDatabase.getUnsyncedProgress).mockResolvedValue([progress()]);
-    stubServer({}, 500);
-
-    const result = await syncService.syncWatchProgress('https://jf', 'token', 'user1');
-
+    push.mockRejectedValue(new Error('HTTP 500'));
+    expect(await syncService.syncWatchProgress(backend, mine)).toEqual({ synced: 0, failed: 1, kept: 0 });
     expect(offlineDatabase.markProgressSynced).not.toHaveBeenCalled();
-    expect(result).toEqual({ synced: 0, failed: 1, kept: 0 });
+  });
+
+  it('keeps progress of another server for that server', async () => {
+    vi.mocked(offlineDatabase.getUnsyncedProgress).mockResolvedValue([progress()]);
+    expect(await syncService.syncWatchProgress(backend, () => false)).toEqual({ synced: 0, failed: 0, kept: 0 });
+    expect(push).not.toHaveBeenCalled();
   });
 });

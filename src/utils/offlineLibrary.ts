@@ -1,45 +1,27 @@
-import type { Library, LibraryKind } from '@/domain';
+import type { Album, Artist, Library, LibraryKind, LibraryQuery, MediaItem, Page, Series, SortField, Track, UserState } from '@/domain';
 import type { DownloadedMedia } from '@/services/offlineDatabase';
 
 /**
- * Library pages built from downloaded media, in the `{ items, total }` shape
- * of the server fetchers, so a library page can list downloads the same way
- * online and offline.
+ * Library pages built from downloaded media, in the shape of the server's
+ * `catalog.browse`, so a library page lists downloads the same way online and
+ * offline (same `LibraryQuery`, same `Page<MediaItem>`).
  */
-
-/** `items`: the grid of a video library (movies, or series for tvshows). */
-export type LocalView = 'albums' | 'artists' | 'songs' | 'items';
-
-export interface LocalQuery {
-  startIndex: number;
-  limit: number;
-  sortBy: string;
-  sortOrder: 'Ascending' | 'Descending';
-  unplayedOnly: boolean;
-  favoritesOnly: boolean;
-  genres: string[];
-  nameStartsWith: string;
-  /** Seeds the Random sort, so every page of one listing shares its order. */
-  seed: number;
-}
 
 export type LocalLibrary = Pick<Library, 'id' | 'kind'>;
 
+const NO_USER_STATE: UserState = { played: false, playCount: 0, favorite: false };
+
 function libraryKindOf(download: DownloadedMedia): LibraryKind {
-  if (download.type === 'Movie') return 'movies';
-  if (download.type === 'Episode') return 'shows';
+  if (download.item.kind === 'movie') return 'movies';
+  if (download.item.kind === 'episode') return 'shows';
   return 'music';
 }
 
 /**
  * Downloads of `library`. A record without its library id (not backfilled
- * yet) goes to the first library of its collection type.
+ * yet) goes to the first library of its kind.
  */
-export function downloadsInLibrary(
-  downloads: DownloadedMedia[],
-  library: LocalLibrary,
-  libraries: LocalLibrary[],
-): DownloadedMedia[] {
+export function downloadsInLibrary(downloads: DownloadedMedia[], library: LocalLibrary, libraries: LocalLibrary[]): DownloadedMedia[] {
   return downloads.filter((download) => {
     if (download.libraryId) return download.libraryId === library.id;
     const kind = libraryKindOf(download);
@@ -51,95 +33,88 @@ export function librariesWithDownloads<T extends LocalLibrary>(libraries: T[], d
   return libraries.filter((library) => downloadsInLibrary(downloads, library, libraries).length > 0);
 }
 
-export function downloadedTracks(downloads: DownloadedMedia[]): any[] {
-  return downloads.filter((download) => download.type === 'Audio').map((download) => download.jellyfinItem);
+export function downloadedTracks(downloads: DownloadedMedia[]): Track[] {
+  return downloads.map((download) => download.item).filter((item): item is Track => item.kind === 'track');
 }
 
-export function localGenres(items: any[]): string[] {
-  return [...new Set(items.flatMap((item) => item.Genres ?? []))].sort((a, b) => a.localeCompare(b));
+export function localGenres(items: MediaItem[]): string[] {
+  return [...new Set(items.flatMap((item) => item.genres))].sort((a, b) => a.localeCompare(b));
 }
 
-function albumsOf(tracks: any[]): any[] {
-  const albums = new Map<string, any>();
+function albumsOf(tracks: Track[]): Album[] {
+  const albums = new Map<string, Album>();
   for (const track of tracks) {
-    if (!track.AlbumId) continue;
-    const album = albums.get(track.AlbumId);
+    if (!track.albumId) continue;
+    const album = albums.get(track.albumId);
     if (album) {
-      album.ChildCount++;
+      album.trackCount = (album.trackCount ?? 0) + 1;
       continue;
     }
-    albums.set(track.AlbumId, {
-      Id: track.AlbumId,
-      Name: track.Album || track.Name,
-      Type: 'MusicAlbum',
-      AlbumArtist: track.AlbumArtist,
-      AlbumArtists: track.AlbumArtists ?? [],
-      ProductionYear: track.ProductionYear,
-      PremiereDate: track.PremiereDate,
-      DateCreated: track.DateCreated,
-      Genres: track.Genres,
-      UserData: track.UserData,
-      ChildCount: 1,
+    albums.set(track.albumId, {
+      id: track.albumId,
+      kind: 'album',
+      title: track.albumTitle || track.title,
+      artists: track.albumArtists,
+      year: track.year,
+      premiereDate: track.premiereDate,
+      addedAt: track.addedAt,
+      genres: track.genres,
+      studios: [],
+      images: { poster: track.images.poster },
+      user: track.user,
+      trackCount: 1,
     });
   }
   return [...albums.values()];
 }
 
-function artistsOf(tracks: any[]): any[] {
-  const artists = new Map<string, any>();
+function artistsOf(tracks: Track[]): Artist[] {
+  const artists = new Map<string, Artist>();
   for (const track of tracks) {
-    for (const artist of track.AlbumArtists ?? []) {
-      if (!artist.Id || artists.has(artist.Id)) continue;
-      artists.set(artist.Id, { Id: artist.Id, Name: artist.Name, Type: 'MusicArtist', Genres: track.Genres });
+    for (const artist of track.albumArtists) {
+      if (!artist.id || artists.has(artist.id)) continue;
+      artists.set(artist.id, {
+        id: artist.id, kind: 'artist', title: artist.name, genres: track.genres, studios: [], images: {}, user: NO_USER_STATE,
+      });
     }
   }
   return [...artists.values()];
 }
 
-function seriesOf(episodes: DownloadedMedia[], seriesMeta?: (id: string) => any | undefined): any[] {
-  const series = new Map<string, any>();
-  for (const episode of episodes) {
-    if (!episode.seriesId || series.has(episode.seriesId)) continue;
-    series.set(episode.seriesId, seriesMeta?.(episode.seriesId) ?? {
-      Id: episode.seriesId,
-      Name: episode.seriesName || episode.jellyfinItem?.SeriesName || '',
-      Type: 'Series',
-      Genres: episode.jellyfinItem?.Genres,
-      UserData: episode.jellyfinItem?.UserData,
-    });
+function seriesOf(downloads: DownloadedMedia[], seriesMeta?: (id: string) => MediaItem | undefined): MediaItem[] {
+  const series = new Map<string, MediaItem>();
+  for (const { item } of downloads) {
+    if (item.kind !== 'episode' || !item.seriesId || series.has(item.seriesId)) continue;
+    const fallback: Series = {
+      id: item.seriesId, kind: 'series', title: item.seriesTitle, genres: item.genres, studios: [], credits: [],
+      images: { poster: item.images.poster, backdrop: item.images.backdrop }, user: item.user,
+    };
+    series.set(item.seriesId, seriesMeta?.(item.seriesId) ?? fallback);
   }
   return [...series.values()];
 }
 
-function itemsOf(
-  downloads: DownloadedMedia[],
-  view: LocalView,
-  collectionType: string | null | undefined,
-  seriesMeta?: (id: string) => any | undefined,
-): any[] {
+function itemsOf(downloads: DownloadedMedia[], query: LibraryQuery, kind: LibraryKind, seriesMeta?: (id: string) => MediaItem | undefined): MediaItem[] {
   const tracks = downloadedTracks(downloads);
-  switch (view) {
+  switch (query.view) {
     case 'albums': return albumsOf(tracks);
     case 'artists': return artistsOf(tracks);
-    case 'songs': return tracks;
+    case 'tracks': return tracks;
+    case 'playlists': return [];
     default:
-      return collectionType === 'tvshows'
-        ? seriesOf(downloads.filter((d) => d.type === 'Episode'), seriesMeta)
-        : downloads.filter((d) => d.type === 'Movie').map((d) => d.jellyfinItem);
+      return kind === 'shows' ? seriesOf(downloads, seriesMeta) : downloads.map((d) => d.item).filter((item) => item.kind === 'movie');
   }
 }
 
-const sortName = (item: any): string => String(item.SortName ?? item.Name ?? '').toLowerCase();
+const sortName = (item: MediaItem): string => (item.sortTitle ?? item.title).toLowerCase();
 
-function sortKey(item: any, sortBy: string): string | number {
-  switch (sortBy) {
-    case 'PremiereDate': return item.PremiereDate ?? '';
-    case 'DateCreated': return item.DateCreated ?? '';
-    case 'CommunityRating': return item.CommunityRating ?? 0;
-    case 'PlayCount': return item.UserData?.PlayCount ?? 0;
-    default: return sortName(item);
-  }
-}
+const SORT_KEY: Record<Exclude<SortField, 'random'>, (item: MediaItem) => string | number> = {
+  title: sortName,
+  releaseDate: (item) => item.premiereDate ?? '',
+  dateAdded: (item) => item.addedAt ?? '',
+  rating: (item) => item.rating ?? 0,
+  playCount: (item) => item.user.playCount,
+};
 
 /** mulberry32: a small seeded PRNG. */
 function seededRandom(seed: number): () => number {
@@ -153,43 +128,50 @@ function seededRandom(seed: number): () => number {
   };
 }
 
-function sorted(items: any[], query: LocalQuery): any[] {
-  if (query.sortBy === 'Random') {
-    const random = seededRandom(query.seed);
-    const out = [...items].sort((a, b) => String(a.Id).localeCompare(String(b.Id)));
-    for (let i = out.length - 1; i > 0; i--) {
-      const j = Math.floor(random() * (i + 1));
-      [out[i], out[j]] = [out[j], out[i]];
-    }
-    return out;
+function shuffled(items: MediaItem[], seed: number): MediaItem[] {
+  const random = seededRandom(seed);
+  const out = [...items].sort((a, b) => a.id.localeCompare(b.id));
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
   }
-  const direction = query.sortOrder === 'Descending' ? -1 : 1;
+  return out;
+}
+
+function sorted(items: MediaItem[], query: LibraryQuery, seed: number): MediaItem[] {
+  if (query.sort.by === 'random') return shuffled(items, seed);
+  const keyOf = SORT_KEY[query.sort.by];
+  const direction = query.sort.order === 'desc' ? -1 : 1;
   return [...items].sort((a, b) => {
-    const ka = sortKey(a, query.sortBy);
-    const kb = sortKey(b, query.sortBy);
+    const ka = keyOf(a);
+    const kb = keyOf(b);
     const byKey = typeof ka === 'number' && typeof kb === 'number' ? ka - kb : String(ka).localeCompare(String(kb));
     return (byKey || sortName(a).localeCompare(sortName(b))) * direction;
   });
 }
 
-function matches(item: any, query: LocalQuery): boolean {
-  if (query.favoritesOnly && !item.UserData?.IsFavorite) return false;
-  if (query.unplayedOnly && item.UserData?.Played) return false;
-  if (query.genres.length && !query.genres.some((genre) => item.Genres?.includes(genre))) return false;
-  if (query.nameStartsWith) {
+function matches(item: MediaItem, filter: LibraryQuery['filter']): boolean {
+  if (filter.favorites && !item.user.favorite) return false;
+  if (filter.unplayed && item.user.played) return false;
+  if (filter.genres?.length && !filter.genres.some((genre) => item.genres.includes(genre))) return false;
+  if (filter.letter) {
     const first = sortName(item).charAt(0).toUpperCase();
-    if (query.nameStartsWith === '#' ? /[A-Z]/.test(first) : first !== query.nameStartsWith) return false;
+    if (filter.letter === '#' ? /[A-Z]/.test(first) : first !== filter.letter) return false;
   }
   return true;
 }
 
+/**
+ * One page of downloaded items for a library view. `seed` keeps a random order
+ * stable across the pages of one listing.
+ */
 export function localLibraryPage(
   downloads: DownloadedMedia[],
-  view: LocalView,
-  collectionType: string | null | undefined,
-  query: LocalQuery,
-  seriesMeta?: (id: string) => any | undefined,
-): { items: any[]; total: number } {
-  const all = sorted(itemsOf(downloads, view, collectionType, seriesMeta).filter((item) => matches(item, query)), query);
-  return { items: all.slice(query.startIndex, query.startIndex + query.limit), total: all.length };
+  kind: LibraryKind,
+  query: LibraryQuery,
+  seed: number,
+  seriesMeta?: (id: string) => MediaItem | undefined,
+): Page<MediaItem> {
+  const all = sorted(itemsOf(downloads, query, kind, seriesMeta).filter((item) => matches(item, query.filter)), query, seed);
+  return { items: all.slice(query.offset, query.offset + query.limit), total: all.length };
 }

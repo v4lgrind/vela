@@ -28,7 +28,12 @@ vi.mock('@/services/offlineDetection', () => ({ offlineDetection: { isFullyOnlin
 vi.mock('@/services/syncService', () => ({ syncService: { syncWatchProgress: vi.fn(async () => ({ synced: 0, failed: 0, kept: 0 })) } }));
 vi.mock('@/services/downloadService', () => ({ downloadService: { cacheArtworkById: vi.fn(), cacheArtworkForMetadata: vi.fn() } }));
 const libraryOf = vi.fn();
-vi.mock('./session-store', () => ({ useSessionStore: () => ({ backend: { catalog: { libraryOf } } }) }));
+const session = {
+  backend: { catalog: { libraryOf, items: vi.fn(async () => []) } },
+  active: { serverId: 'srv' },
+  decodeStoredItem: (raw: { Id: string }) => ({ id: raw.Id, kind: 'track', title: raw.Id, genres: [], studios: [], images: {}, user: {} }),
+};
+vi.mock('./session-store', () => ({ useSessionStore: () => session }));
 vi.mock('./libraries-store', () => ({ useLibrariesStore: () => ({ libraries: [] }) }));
 vi.mock('./jellyfin-store', () => {
   const store = { serverUrl: 'https://jf', accessToken: 'token', userId: 'u', libraries: [], fetchLibraryIdOf: vi.fn(), fetchItemsByIds: vi.fn(async () => []) };

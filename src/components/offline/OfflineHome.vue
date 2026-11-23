@@ -9,7 +9,7 @@
         <button v-for="{ media, progress } in resume" :key="media.itemId" type="button"
           class="w-44 shrink-0 text-left sm:w-52" @click="play(media.itemId, progress.position)">
           <div class="relative mb-1.5 aspect-video overflow-hidden rounded-xl bg-surface-raised active:scale-[0.97]">
-            <LazyImg :src="artworkUrl(media.itemId, '')" :alt="media.name" :item-type="media.type"
+            <LazyImg :src="artworkUrl(media.itemId, '')" :alt="media.name" :kind="media.item.kind"
               class="block h-full w-full object-cover" />
             <div class="absolute bottom-0 left-0 right-0 h-1 bg-white/20">
               <div class="h-full bg-accent-purple" :style="{ width: progress.percentage + '%' }" />
@@ -34,13 +34,13 @@
         </Button>
       </template>
       <MediaRail>
-        <router-link v-for="album in row.albums" :key="album.Id" :to="{ name: 'ItemDetails', params: { id: album.Id } }"
+        <router-link v-for="album in row.albums" :key="album.id" :to="{ name: 'ItemDetails', params: { id: album.id } }"
           class="w-28 shrink-0">
           <div class="mb-1.5 aspect-square overflow-hidden rounded-xl bg-surface-raised">
-            <LazyImg :src="artworkUrl(album.Id, '')" :alt="album.Name" item-type="MusicAlbum"
+            <LazyImg :src="artworkUrl(album.id, '')" :alt="album.title" kind="album"
               class="block h-full w-full object-cover" />
           </div>
-          <div class="truncate px-0.5 text-xs font-semibold text-text-heading">{{ album.Name }}</div>
+          <div class="truncate px-0.5 text-xs font-semibold text-text-heading">{{ album.title }}</div>
         </router-link>
       </MediaRail>
     </Section>
@@ -70,8 +70,7 @@ import { useLibrariesStore } from '@/store/libraries-store';
 import { useOfflineStore } from '@/store/offline-store';
 import { shuffleAround } from '@/utils/audioQueue';
 import { trackToAudioTrack } from '@/utils/audioTrack';
-import { useSessionStore } from '@/store/session-store';
-import type { Track } from '@/domain';
+import type { LibraryQuery, Track } from '@/domain';
 import { downloadedTracks, downloadsInLibrary, localLibraryPage } from '@/utils/offlineLibrary';
 import { resumeCandidates } from '@/utils/watchProgress';
 
@@ -86,20 +85,17 @@ const { artworkUrl, preload } = useOfflineArtwork();
 const localProgress = ref(new Map<string, WatchProgress>());
 const resume = computed(() => resumeCandidates(offlineStore.downloads, localProgress.value));
 
-const ALBUMS = {
-  startIndex: 0, limit: 30, sortBy: 'SortName', sortOrder: 'Ascending' as const,
-  unplayedOnly: false, favoritesOnly: false, genres: [], nameStartsWith: '', seed: 1,
-};
+const ALBUMS: LibraryQuery = { view: 'albums', sort: { by: 'title', order: 'asc' }, filter: {}, offset: 0, limit: 30 };
 const musicRows = computed(() => librariesStore.libraries
   .filter((library) => library.kind === 'music')
   .map((library) => {
     const downloads = downloadsInLibrary(offlineStore.downloads, library, librariesStore.libraries);
-    return { library, tracks: downloadedTracks(downloads), albums: localLibraryPage(downloads, 'albums', 'music', ALBUMS).items };
+    return { library, tracks: downloadedTracks(downloads), albums: localLibraryPage(downloads, 'music', ALBUMS, 1).items };
   })
   .filter((row) => row.tracks.length));
 
 function timeLeft(media: DownloadedMedia, position: number): string {
-  const total = (media.jellyfinItem?.RunTimeTicks ?? 0) / 10_000_000;
+  const total = (media.item.durationMs ?? 0) / 1000;
   const left = Math.floor(total - position);
   return left >= 60 ? formatRemaining(left) : '';
 }
@@ -108,12 +104,8 @@ function play(itemId: string, position: number) {
   router.push({ name: 'Player', params: { id: itemId }, query: { startMs: String(Math.floor(position * 1000)) } });
 }
 
-/** Downloads are stored as Jellyfin items until Phase 6. */
-function shuffle(tracks: unknown[]) {
-  const session = useSessionStore();
-  const queue = tracks.map(session.decodeStoredItem)
-    .filter((item): item is Track => item.kind === 'track')
-    .map((track) => trackToAudioTrack(track));
+function shuffle(tracks: Track[]) {
+  const queue = tracks.map((track) => trackToAudioTrack(track));
   audioStore.playAlbum(shuffleAround(queue, Math.floor(Math.random() * queue.length)), 0);
 }
 

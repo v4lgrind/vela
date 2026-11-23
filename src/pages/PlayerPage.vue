@@ -275,7 +275,6 @@ import { useI18n } from 'vue-i18n';
 //   useOfflinePlayer  — downloaded-file playback path
 import { computed, ref, onMounted, onBeforeUnmount } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { useSessionStore } from '@/store/session-store';
 import type { SubtitleStream } from '@/domain';
 import { languageMatches } from '@/utils/language';
 import { useHomeStore } from '@/store/home-store';
@@ -306,7 +305,6 @@ import PlayerBottomSheet from '@/components/PlayerBottomSheet.vue';
 const route = useRoute();
 const { t } = useI18n();
 const router = useRouter();
-const sessionStore = useSessionStore();
 const audioPlayerStore = useAudioPlayerStore();
 const preferencesStore = usePreferencesStore();
 const offlineStore = useOfflineStore();
@@ -477,11 +475,11 @@ onMounted(async () => {
     if (isOffline && cachedDownload) {
         // The most recent playback wins: this device offline, or another one
         // (user data refreshed while online). Starting from an older local
-        // position would later overwrite the newer one on Jellyfin.
+        // position would later overwrite the newer one on the server.
         const offlineProgress = await offlineDatabase.getWatchProgress(itemId);
-        const resumeSeconds = offlineResumeSeconds(cachedDownload.jellyfinItem, offlineProgress ?? undefined);
+        const resumeSeconds = offlineResumeSeconds(cachedDownload.item, offlineProgress ?? undefined);
 
-        mediaTitle.value = buildMediaTitle(sessionStore.decodeStoredItem(cachedDownload.jellyfinItem));
+        mediaTitle.value = buildMediaTitle(cachedDownload.item);
         await offlinePlayer.initOfflinePlayer(cachedDownload, resumeSeconds, mediaTitle.value);
         if (!isNative) {
             document.addEventListener('fullscreenchange', onFullscreenChange);

@@ -500,7 +500,7 @@ import { onMounted, onUnmounted, ref, computed, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
 import { playedPercent } from '@/domain';
-import type { Album, Credit, Episode, ImageRef, ImageSize, MediaItem, Season, Track } from '@/domain';
+import type { Album, Credit, Episode, ImageRef, ImageSize, LibraryQuery, MediaItem, Season, Track } from '@/domain';
 import { useBackend, useImageUrl } from '@/composables/useBackend';
 import { useOfflineStore } from '@/store/offline-store';
 import { useAudioPlayerStore, type AudioTrack } from '@/store/audio-player-store';
@@ -513,8 +513,8 @@ import {
     downloadService,
     type OfflineArtworkType,
 } from '@/services/downloadService';
-import { offlineDatabase } from '@/services/offlineDatabase';
-import { localLibraryPage, type LocalQuery } from '@/utils/offlineLibrary';
+import { offlineDatabase, type DownloadedMedia } from '@/services/offlineDatabase';
+import { downloadedTracks, localLibraryPage } from '@/utils/offlineLibrary';
 import { offlineResumeSeconds } from '@/utils/watchProgress';
 import LazyImg from '@/components/LazyImg.vue';
 import { formatMsDuration, formatMsHuman, formatBytes } from '@/utils/helpers';
@@ -595,30 +595,14 @@ const watchingEpId = ref<string | null>(null);
 const togglingWatched = ref(false);
 const offlineProgressSeconds = ref<number | null>(null);
 const cachedArtworkUrls = ref<Record<string, string>>({});
-/** Every downloaded album of an artist or the one album of a page, by year then name. */
-const ALL_LOCAL: LocalQuery = {
-    startIndex: 0, limit: 1000, sortBy: 'PremiereDate', sortOrder: 'Ascending',
-    unplayedOnly: false, favoritesOnly: false, genres: [], nameStartsWith: '', seed: 1,
-};
+/** Every downloaded album of an artist or the one album of a page, by release date. */
+const ALL_LOCAL: LibraryQuery = { view: 'albums', sort: { by: 'releaseDate', order: 'asc' }, filter: {}, offset: 0, limit: 1000 };
 
 // ── Offline artwork ──────────────────────────────────────────────────────────
 
-/** Artwork cached with downloads is keyed by item id and image role (Jellyfin-era layout). */
-function artworkTargetsOf(media: MediaItem) {
-    const episode = media.kind === 'episode' ? media : null;
-    const credits = 'credits' in media ? media.credits : [];
-    return buildOfflineArtworkTargets({
-        Id: media.id,
-        Type: episode ? 'Episode' : undefined,
-        SeriesId: episode?.seriesId,
-        SeasonId: episode?.seasonId,
-        People: credits.map((credit) => ({ Id: credit.personId, PrimaryImageTag: credit.image ? 'cached' : undefined })),
-    });
-}
-
 async function loadCachedArtwork(media: MediaItem) {
     const targets = new Map<string, { itemId: string; imageType: OfflineArtworkType }>();
-    for (const target of artworkTargetsOf(media)) targets.set(`${target.itemId}:${target.imageType}`, target);
+    for (const target of buildOfflineArtworkTargets(media)) targets.set(`${target.itemId}:${target.imageType}`, target);
     for (const child of [...seasons.value, ...episodes.value, ...artistAlbums.value]) {
         targets.set(`${child.id}:Primary`, { itemId: child.id, imageType: 'Primary' });
     }
@@ -644,10 +628,12 @@ function artUrl(id: string, ref: ImageRef | undefined, size: ImageSize, imageTyp
 
 // ── Loading ──────────────────────────────────────────────────────────────────
 
-/** Downloads and cached metadata are still stored as Jellyfin items (until Phase 6). */
-const decode = (raw: unknown): MediaItem => session.decodeStoredItem(raw);
 const isKind = <K extends MediaItem['kind']>(kind: K) =>
     (media: MediaItem): media is Extract<MediaItem, { kind: K }> => media.kind === kind;
+
+const NO_USER_STATE = { played: false, playCount: 0, favorite: false };
+/** Minimal item for a parent known only from downloads (no cached metadata). */
+const localItem = (id: string, title: string) => ({ id, title, genres: [], studios: [], images: {}, user: NO_USER_STATE });
 
 function resetChildren() {
     seasons.value = [];
@@ -662,42 +648,40 @@ function resetChildren() {
 
 /** Offline: an album or artist known from downloaded tracks. */
 function loadLocalMusic(id: string): boolean {
-    const tracks = offlineStore.downloads.filter((d) => d.type === 'Audio');
+    const tracks = offlineStore.downloads.filter((d) => d.item.kind === 'track');
     const albumTracks = tracks.filter((d) => d.albumId === id);
     if (albumTracks.length) {
-        const album = localLibraryPage(albumTracks, 'albums', 'music', ALL_LOCAL).items[0];
-        item.value = decode(metadataCache.get(id, true) ?? album);
-        audioTracks.value = albumTracks.map((d) => decode(d.jellyfinItem)).filter(isKind('track'))
+        item.value = metadataCache.get(id, true) ?? localLibraryPage(albumTracks, 'music', ALL_LOCAL, 1).items[0];
+        audioTracks.value = downloadedTracks(albumTracks)
             .sort((a, b) => (a.discNumber ?? 0) - (b.discNumber ?? 0) || (a.trackNumber ?? 0) - (b.trackNumber ?? 0));
         return true;
     }
-    const artistTracks = tracks.filter((d) => (d.jellyfinItem?.AlbumArtists ?? []).some((artist: { Id?: string }) => artist.Id === id));
+    const artistTracks = tracks.filter((d) => d.item.kind === 'track' && d.item.albumArtists.some((artist) => artist.id === id));
     if (!artistTracks.length) return false;
-    const artist = artistTracks[0].jellyfinItem.AlbumArtists.find((a: { Id?: string }) => a.Id === id);
-    item.value = decode(metadataCache.get(id, true) ?? { Id: id, Name: artist?.Name ?? '', Type: 'MusicArtist' });
-    artistAlbums.value = localLibraryPage(artistTracks, 'albums', 'music', ALL_LOCAL).items.map(decode).filter(isKind('album'));
+    const first = artistTracks[0].item;
+    const name = first.kind === 'track' ? first.albumArtists.find((a) => a.id === id)?.name ?? '' : '';
+    item.value = metadataCache.get(id, true) ?? { ...localItem(id, name), kind: 'artist' };
+    artistAlbums.value = localLibraryPage(artistTracks, 'music', ALL_LOCAL, 1).items.filter(isKind('album'));
     return true;
+}
+
+function localSeason(seasonId: string, seasonNumber: number | undefined, seriesId: string, seriesTitle: string): Season {
+    return { ...localItem(seasonId, `Season ${seasonNumber ?? ''}`.trim()), kind: 'season', seasonNumber, seriesId, seriesTitle };
 }
 
 /** Offline: a series or season known from downloaded episodes. */
 function loadLocalShow(id: string): boolean {
     const series = offlineStore.tvShowsGrouped.find((group) => group.seriesId === id);
     if (series) {
-        item.value = decode(metadataCache.get(id, true) ?? { Id: series.seriesId, Name: series.seriesName, Type: 'Series' });
-        seasons.value = series.seasons.map((season) => decode({
-            Id: season.seasonId, Name: `Season ${season.seasonNumber}`, Type: 'Season',
-            IndexNumber: season.seasonNumber, SeriesId: series.seriesId, SeriesName: series.seriesName,
-        })).filter(isKind('season'));
+        item.value = metadataCache.get(id, true) ?? { ...localItem(series.seriesId, series.seriesName), kind: 'series', credits: [] };
+        seasons.value = series.seasons.map((season) => localSeason(season.seasonId, season.seasonNumber, series.seriesId, series.seriesName));
         return true;
     }
     for (const group of offlineStore.tvShowsGrouped) {
         const season = group.seasons.find((candidate) => candidate.seasonId === id);
         if (!season) continue;
-        item.value = decode(metadataCache.get(id, true) ?? {
-            Id: season.seasonId, Name: `Season ${season.seasonNumber}`, Type: 'Season',
-            IndexNumber: season.seasonNumber, SeriesId: group.seriesId, SeriesName: group.seriesName,
-        });
-        episodes.value = season.episodes.map((ep: { itemId: string; jellyfinItem: object }) => decode({ ...ep.jellyfinItem, Id: ep.itemId })).filter(isKind('episode'));
+        item.value = metadataCache.get(id, true) ?? localSeason(season.seasonId, season.seasonNumber, group.seriesId, group.seriesName);
+        episodes.value = season.episodes.map((ep: DownloadedMedia) => ep.item).filter(isKind('episode'));
         return true;
     }
     return false;
@@ -706,10 +690,10 @@ function loadLocalShow(id: string): boolean {
 async function loadOffline(id: string): Promise<boolean> {
     const cached = offlineStore.getDownload(id);
     if (cached) {
-        item.value = decode(cached.jellyfinItem);
+        item.value = cached.item;
         const progress = await offlineDatabase.getWatchProgress(id);
         // The most recent playback wins: this device offline, or another one before.
-        offlineProgressSeconds.value = offlineResumeSeconds(cached.jellyfinItem, progress ?? undefined) ?? null;
+        offlineProgressSeconds.value = offlineResumeSeconds(cached.item, progress ?? undefined) ?? null;
         return true;
     }
     return loadLocalMusic(id) || loadLocalShow(id);
@@ -742,7 +726,7 @@ async function load() {
     } catch {
         // Network failed — fall back to cached download data if available.
         const cached = offlineStore.getDownload(itemId.value);
-        if (cached) item.value = decode(cached.jellyfinItem);
+        if (cached) item.value = cached.item;
         else error.value = t('detail.loadError');
     } finally {
         if (item.value) await loadCachedArtwork(item.value);

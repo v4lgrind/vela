@@ -86,7 +86,31 @@
   "claude"; its watch state stayed empty (checked). See the plan's
   "Phase 8 results".
 
+- Phone testing (2026-11-23, user's Pixel 10, versionCode 35 → 37 installed
+  with `adb install -r`; local builds need `ANDROID_VERSION_CODE` above the
+  installed CI build):
+  - Buffering: Vela had picked the server's public address; from home the
+    router looped the stream back (NAT loopback, Plex showed the router
+    192.168.1.254 at ~10 Mb/s). Fix 8326acb: LAN addresses win the race
+    (public after 1 s, relay after 2 s); saved plex.direct names with a
+    private IP count as LAN on reconnect.
+  - Slowness: the phone was on 2.4 GHz Wi-Fi with 6–13 % packet loss to every
+    LAN host (0 % on 5 GHz). Environment, not Vela; the server answered the
+    same requests in 10–36 ms.
+  - Endless library loading after turning Wi-Fi off: no request time limit,
+    a shared pending sections request, and the address picked once per run.
+    Fixes 855fef7 (15 s limit, no stuck caches) and 54b0cfc (re-race on
+    online / connection type change / app foreground, client fails over to a
+    saved address that answers and reports it through
+    `BackendEvents.onConnectionChange`). User confirmed: Wi-Fi → mobile →
+    Wi-Fi works.
+
 ## Next steps
+- Player page fetches the same Plex item 6 times (item, negotiate, markers,
+  chapters…): share one request.
+- Timeline reports `paused` while the video plays.
+- First request after a silent network change can still wait for the 15 s
+  limit before failing over.
 - User test on a phone: sign in to Plex with the real plex.tv/link code
   (owner account approves), pick a profile, play, check resume / watched state.
 - Release (Jellyfin refactor + Plex v1), user's decision.

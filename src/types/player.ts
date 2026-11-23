@@ -6,6 +6,10 @@ export interface SubtitleTrack {
   label: string;
   playbackMode: 'external' | 'burn-in';
   deliveryUrl?: string;
+  deliveryFormat?: 'vtt' | 'srt' | 'ass';
+  /** A subtitle file beside the video (not inside the container). */
+  isExternalFile?: boolean;
+  format?: 'text' | 'image';
 }
 
 export interface AudioTrack {

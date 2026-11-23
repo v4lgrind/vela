@@ -14,7 +14,9 @@
             </div>
             <span class="text-xs font-semibold text-accent-purple">{{ t('settings.active') }}</span>
           </div>
-          <ListRow :icon="Server" :label="t('settings.switchServer')" :to="{ name: 'login' }" />
+          <ListRow v-if="session.active?.accountKey" :icon="Users" :label="t('settings.switchProfile')"
+            :to="{ name: 'login', query: { switch: 'profile' } }" />
+          <ListRow :icon="Server" :label="t('settings.switchServer')" :to="{ name: 'login', query: { switch: 'server' } }" />
           <ListRow :icon="LogOut" :label="t('settings.signOut')" destructive @click="signOut" />
         </div>
       </section>
@@ -139,7 +141,7 @@ import { useRouter } from 'vue-router';
 import { AppPage, ListRow, PageHeader } from '@/components/layout';
 import { Switch } from '@/components/ui/switch';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { ChevronRight, LogOut, Server, Palette, MonitorPlay, Music } from 'lucide-vue-next';
+import { ChevronRight, LogOut, Server, Palette, MonitorPlay, Music, Users } from 'lucide-vue-next';
 import { usePreferencesStore } from '@/store/preferences-store';
 import { useSessionStore } from '@/store/session-store';
 

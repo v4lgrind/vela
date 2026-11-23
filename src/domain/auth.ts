@@ -92,4 +92,6 @@ export interface Authenticator {
   startDeviceCode(deviceId: string, serverUrl?: string): Promise<DeviceCodeSession>;
   /** Plex: back to the profile choice with a stored account token (switch profile). */
   resumeAccount?(accountToken: string, deviceId: string): Promise<AuthStep>;
+  /** Plex: the server address that answers now, among the saved ones. */
+  reconnect?(connection: ServerConnection, token: string): Promise<string>;
 }

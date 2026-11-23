@@ -18,15 +18,18 @@ function subtitleLabel(stream: SubtitleStream): string {
 
 /** Player subtitle choices: sidecars the server serves, burn-in for the rest. */
 export function createSubtitleTracks(version: MediaVersion, external: ExternalSubtitle[]): SubtitleTrack[] {
-  const urlById = new Map(external.map((sidecar) => [sidecar.streamId, sidecar.url]));
+  const sidecarById = new Map(external.map((sidecar) => [sidecar.streamId, sidecar]));
   return version.subtitles.map((stream) => {
-    const deliveryUrl = urlById.get(stream.id);
+    const sidecar = sidecarById.get(stream.id);
     return {
       index: Number(stream.id),
       language: stream.language || 'und',
       label: subtitleLabel(stream),
-      playbackMode: deliveryUrl ? 'external' : 'burn-in',
-      deliveryUrl,
+      playbackMode: sidecar ? 'external' : 'burn-in',
+      deliveryUrl: sidecar?.url,
+      deliveryFormat: sidecar?.format,
+      isExternalFile: stream.isExternal,
+      format: stream.format,
     };
   });
 }

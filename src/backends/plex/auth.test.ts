@@ -162,6 +162,23 @@ describe('Plex sign-in', () => {
   });
 });
 
+describe('reconnect', () => {
+  const saved = {
+    kind: 'plex' as const, serverId: MACHINE, serverName: 'S', user: { id: 'u', name: 'U' }, tokenKey: 'k', deviceId: 'client-1',
+    baseUrl: 'https://lan.example', candidateUrls: ['https://lan.example', 'https://wan.example'],
+  };
+
+  it('keeps the saved address while it answers', async () => {
+    serve(homeRoutes({ 'GET https://wan.example/identity': () => ({ MediaContainer: { machineIdentifier: MACHINE } }) }));
+    expect(await createPlexAuthenticator(identity).reconnect!(saved, 'server-token')).toBe('https://lan.example');
+  });
+
+  it('moves to another saved address away from home', async () => {
+    serve({ 'GET https://wan.example/identity': () => ({ MediaContainer: { machineIdentifier: MACHINE } }) });
+    expect(await createPlexAuthenticator(identity).reconnect!(saved, 'server-token')).toBe('https://wan.example');
+  });
+});
+
 describe('connection race', () => {
   it('orders local, remote, then relay addresses', () => {
     const ordered = orderConnections([

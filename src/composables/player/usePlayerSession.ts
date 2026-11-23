@@ -66,8 +66,8 @@ export function usePlayerSession(videoEl: Ref<HTMLVideoElement | null>) {
     const playSessionId = computed(() => plan.value?.sessionId ?? '');
     const hlsUrl = ref('');
     const playMethod = ref<PlayMethodName>('Transcode');
-    /** Authorization the native player sends with every request of the stream. */
-    const authHeader = computed(() => plan.value?.headers.Authorization ?? backend?.authHeaders().Authorization ?? '');
+    /** Headers the players send with every request of the stream. */
+    const requestHeaders = computed<Record<string, string>>(() => plan.value?.headers ?? backend?.authHeaders() ?? {});
 
     const audioList = ref<AudioTrack[]>([]);
     const selectedAudioIndex = ref<number | null>(null);
@@ -254,7 +254,7 @@ export function usePlayerSession(videoEl: Ref<HTMLVideoElement | null>) {
         backend,
         itemId,
         nextEpisodeId,
-        authHeader,
+        requestHeaders,
         isLoading,
         isPlaying,
         currentTime,

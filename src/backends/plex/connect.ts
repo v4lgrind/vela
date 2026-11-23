@@ -5,6 +5,8 @@ export interface PlexConnection {
   uri: string;
   local: boolean;
   relay: boolean;
+  /** Start this probe later (saved addresses are tried in their saved order). */
+  delayMs?: number;
 }
 
 const PROBE_TIMEOUT_MS = 8000;
@@ -55,7 +57,8 @@ export async function raceConnections(
   const timeout = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
 
   async function probe(connection: PlexConnection): Promise<string> {
-    if (connection.relay) await delay(RELAY_DELAY_MS, controller.signal);
+    const wait = connection.relay ? RELAY_DELAY_MS : connection.delayMs ?? 0;
+    if (wait) await delay(wait, controller.signal);
     const identity = await plexJson<{ MediaContainer?: { machineIdentifier?: string } }>({
       baseUrl: connection.uri, path: '/identity', headers, signal: controller.signal,
     });
@@ -72,4 +75,10 @@ export async function raceConnections(
     clearTimeout(timeout);
     controller.abort();
   }
+}
+
+/** Saved addresses, last working one first, each started a little after the previous. */
+export function savedConnections(baseUrl: string, candidateUrls: string[]): PlexConnection[] {
+  const uris = [baseUrl, ...candidateUrls.filter((uri) => uri !== baseUrl)];
+  return uris.map((uri, index) => ({ uri, local: false, relay: false, delayMs: Math.min(index * 250, RELAY_DELAY_MS) }));
 }

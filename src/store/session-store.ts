@@ -13,6 +13,9 @@ import type { LegacyJellyfinState } from './sessionMigration';
 
 const CLIENT_VERSION = '1.0.0';
 const LEGACY_STORE_KEY = 'jellyfin';
+const RECONNECT_WAIT_MS = 3000;
+/** Account whose address was checked in this app run (the router restores on every navigation). */
+let reconnectedKey: string | null = null;
 const deviceInfo = getClientDeviceInfo();
 
 export const CLIENT_IDENTITY: ClientIdentity = {
@@ -85,6 +88,22 @@ export const useSessionStore = defineStore('session', {
     async restore(): Promise<void> {
       if (!this.legacyMigrated) await this.migrateLegacy();
       if (this.active && !this.token) this.token = await readToken(this.active.tokenKey);
+      await this.reconnect();
+    },
+
+    /**
+     * Plex servers have several addresses (LAN, public, relay): switch to the one
+     * that answers now. Waits at most RECONNECT_WAIT_MS, then finishes in the background.
+     */
+    async reconnect(): Promise<void> {
+      const active = this.active;
+      const authenticator = active ? this.authenticator(active.kind) : null;
+      if (!active || !this.token || !authenticator?.reconnect || reconnectedKey === active.tokenKey) return;
+      reconnectedKey = active.tokenKey;
+      const attempt = authenticator.reconnect(active, this.token).then((baseUrl) => {
+        if (baseUrl !== active.baseUrl) this.upsert({ ...active, baseUrl });
+      }).catch(() => undefined);
+      await Promise.race([attempt, new Promise((resolve) => setTimeout(resolve, RECONNECT_WAIT_MS))]);
     },
 
     async migrateLegacy(): Promise<void> {
@@ -152,6 +171,7 @@ export const useSessionStore = defineStore('session', {
       if (!token) return false;
       this.activeKey = tokenKey;
       this.token = token;
+      await this.reconnect();
       return true;
     },
 

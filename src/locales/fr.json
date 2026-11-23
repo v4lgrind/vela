@@ -288,7 +288,8 @@
       "large": "Grande",
       "xl": "Très grande",
       "huge": "Énorme"
-    }
+    },
+    "switchProfile": "Changer de profil Plex"
   },
   "login": {
     "selectAccount": "Choisissez un compte pour continuer",
@@ -306,12 +307,27 @@
     "quickConnectCode": "Saisissez ce code dans le client web Jellyfin",
     "waitingApproval": "En attente de validation…",
     "failed": "Connexion échouée. Vérifiez vos identifiants.",
-    "qcTimeout": "Quick Connect a expiré. Réessayez.",
+    "qcTimeout": "Le code a expiré. Réessayez.",
     "qcDisabled": "Quick Connect est désactivé. Activez-le dans Jellyfin : Tableau de bord → Avancé → Quick Connect.",
     "qcUnsupported": "Quick Connect n'est pas pris en charge par cette version du serveur.",
     "urlProtocol": "L'adresse du serveur doit commencer par http:// ou https://",
     "urlInvalid": "Saisissez une adresse de serveur valide (ex. http://192.168.1.10:8096)",
-    "unreachable": "Serveur injoignable. Vérifiez l’adresse et votre connexion."
+    "unreachable": "Serveur injoignable. Vérifiez l’adresse et votre connexion.",
+    "serverType": "Type de serveur",
+    "kind": {
+      "jellyfin": "Jellyfin",
+      "plex": "Plex"
+    },
+    "plexIntro": "Connectez-vous avec votre compte Plex, puis choisissez votre profil.",
+    "plexSignIn": "Obtenir un code",
+    "plexLinkHint": "Ouvrez cette page sur n’importe quel appareil et saisissez le code",
+    "chooseProfile": "Qui regarde ?",
+    "pinProtected": "Protégé par un code PIN",
+    "pinFor": "Code PIN de {name}",
+    "wrongPin": "Code PIN incorrect. Réessayez.",
+    "profileRefused": "Ce profil ne peut pas ouvrir le serveur.",
+    "chooseServer": "Choisissez un serveur",
+    "serverOffline": "Hors ligne"
   },
   "logs": {
     "entries": "{n} entrée | {n} entrées",

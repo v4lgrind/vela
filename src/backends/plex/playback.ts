@@ -132,10 +132,12 @@ function maxVideoBitrateKbps(request: PlaybackRequest, mustTranscode: boolean): 
   return undefined;
 }
 
-function externalSubtitles(client: PlexClient, media: PlexMedia): ExternalSubtitle[] {
+/** Subtitle files beside the video; the web player reads SRT and WebVTT only (ASS is burned in there). */
+function externalSubtitles(client: PlexClient, media: PlexMedia, target: PlaybackRequest['target']): ExternalSubtitle[] {
   return (media.Part?.[0]?.Stream ?? []).flatMap((stream) => {
     const format = SIDECAR_FORMAT[stream.codec?.toLowerCase() ?? ''];
-    return stream.streamType === 3 && stream.key && format ? [{ streamId: String(stream.id), url: client.url(stream.key), format }] : [];
+    const isPlayable = format && (target === 'native' || format !== 'ass');
+    return stream.streamType === 3 && stream.key && isPlayable ? [{ streamId: String(stream.id), url: client.url(stream.key), format }] : [];
   });
 }
 
@@ -150,7 +152,7 @@ export function createPlexPlayback(client: PlexClient): PlaybackPort {
     return item;
   };
 
-  function directPlan(media: PlexMedia): PlaybackPlan {
+  function directPlan(media: PlexMedia, request: PlaybackRequest): PlaybackPlan {
     const url = `${client.baseUrl}${media.Part![0].key}`;
     return {
       method: 'direct-play',
@@ -159,7 +161,7 @@ export function createPlexPlayback(client: PlexClient): PlaybackPort {
       mediaElementUrl: withParams(url, { 'X-Plex-Token': client.token }),
       version: toMediaVersion(media),
       startOffsetMs: 0,
-      externalSubtitles: externalSubtitles(client, media),
+      externalSubtitles: externalSubtitles(client, media, request.target),
       sessionId: '',
       transcodeReasons: [],
     };
@@ -205,7 +207,7 @@ export function createPlexPlayback(client: PlexClient): PlaybackPort {
       version: toMediaVersion(media),
       // The HLS stream starts at the (whole-second) offset.
       startOffsetMs: Math.floor((request.startMs ?? 0) / 1000) * 1000,
-      externalSubtitles: externalSubtitles(client, media),
+      externalSubtitles: externalSubtitles(client, media, request.target),
       sessionId,
       transcodeReasons: decision.transcodeDecisionText ? [decision.transcodeDecisionText] : [],
     };
@@ -216,7 +218,7 @@ export function createPlexPlayback(client: PlexClient): PlaybackPort {
     const { media, index } = pickMedia(item, request.versionId);
     const mayDirectPlay = request.constraints.allowDirectPlay && request.subtitle?.mode !== 'burn-in'
       && !request.maxBitrate && !request.maxSize && !request.preferStream;
-    return mayDirectPlay && playsDirectly(media, request) ? directPlan(media) : streamPlan(request, media, index);
+    return mayDirectPlay && playsDirectly(media, request) ? directPlan(media, request) : streamPlan(request, media, index);
   }
 
   function reporter(plan: PlaybackPlan, itemId: ItemId): PlaybackReporter {

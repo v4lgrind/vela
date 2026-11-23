@@ -19,7 +19,7 @@ import java.util.concurrent.Executors
  * [Info.intervalMs]. Sheets are downloaded on demand and the requested tile
  * is cut out with a region decoder, so a full sheet is never decoded.
  */
-class TrickplayThumbnails(private val info: Info, private val authHeader: String) {
+class TrickplayThumbnails(private val info: Info, private val headers: Map<String, String>) {
 
     data class Info(
         /** Sheet URL with `{index}` in place of the sheet number. */
@@ -110,7 +110,7 @@ class TrickplayThumbnails(private val info: Info, private val authHeader: String
     @Suppress("DEPRECATION")
     private fun fetchSheet(sheet: Int): BitmapRegionDecoder? = try {
         val conn = URL(info.urlTemplate.replace("{index}", sheet.toString())).openConnection() as HttpURLConnection
-        conn.setRequestProperty("Authorization", authHeader)
+        headers.forEach { (name, value) -> conn.setRequestProperty(name, value) }
         conn.connectTimeout = 5000
         conn.readTimeout = 10000
         try {

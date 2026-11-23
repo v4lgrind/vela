@@ -13,6 +13,13 @@ import type { PlayerSession } from './usePlayerSession';
 import type { StreamInfo } from './useStreamInfo';
 import type { SkipIntro } from './useSkipIntro';
 
+/** Media3 MIME types of the sidecar formats servers deliver. */
+const SUBTITLE_MIME: Record<'vtt' | 'srt' | 'ass', string> = {
+    vtt: 'text/vtt',
+    srt: 'application/x-subrip',
+    ass: 'text/x-ssa',
+};
+
 /**
  * Native (Android ExoPlayer) playback path: negotiates the stream for this
  * device's decoders, wires all NativeVideo plugin listeners, and handles
@@ -24,7 +31,7 @@ export function useNativePlayer(
     skipIntro: SkipIntro,
 ) {
     const {
-        backend, itemId, nextEpisodeId, authHeader,
+        backend, itemId, nextEpisodeId, requestHeaders,
         isLoading, currentTime, duration, progressPct, error,
         version, hlsUrl, playMethod,
         audioList, selectedAudioIndex, subtitleList, selectedSubtitleIndex,
@@ -206,22 +213,23 @@ export function useNativePlayer(
 
             // Build subtitle tracks for ExoPlayer.
             // For raw DirectPlay, ExoPlayer extracts embedded text tracks from the MKV
-            // container directly — passing sidecar VTTs would create duplicates.
+            // container directly — passing their sidecars would create duplicates;
+            // subtitle files beside the video (Plex) are still passed.
             // For HLS (transcode / direct-stream), embedded subs are not in the HLS
             // manifest, so we pass them as external sidecar tracks.
-            const subtitleTracks = isDirectPlayRaw
-                ? []
-                : subtitleList.value
-                    .filter(s => s.playbackMode === 'external' && s.deliveryUrl)
-                    .map(s => ({
-                        url: s.deliveryUrl!,
-                        lang: s.language,
-                        label: s.label,
-                    }));
+            const subtitleTracks = subtitleList.value
+                .filter(s => s.playbackMode === 'external' && s.deliveryUrl && (!isDirectPlayRaw || s.isExternalFile))
+                .map(s => ({
+                    url: s.deliveryUrl!,
+                    lang: s.language,
+                    label: s.label,
+                    mimeType: SUBTITLE_MIME[s.deliveryFormat ?? 'vtt'],
+                }));
             // Image subtitles (PGS) can't be rendered by ExoPlayer — offer them as
             // burn-in choices the native picker restarts playback to apply.
+            // In raw DirectPlay ExoPlayer already shows the embedded text tracks.
             const burnInSubtitleTracks = subtitleList.value
-                .filter(s => s.playbackMode === 'burn-in')
+                .filter(s => s.playbackMode === 'burn-in' && !(isDirectPlayRaw && s.format === 'text'))
                 .map(s => ({
                     index: s.index,
                     lang: s.language,
@@ -455,7 +463,7 @@ export function useNativePlayer(
             debugLog(`[NativePlayer] calling NativeVideo.start: startPositionMs=${finalStartPositionMs} playMethod=${playMethod.value} subtitleTracks=${subtitleTracks.length} nextEpisodeId=${resolvedNextEpisodeId}`);
             await NativeVideo.start({
                 url: hlsUrl.value,
-                authHeader: authHeader.value,
+                headers: requestHeaders.value,
                 startPositionMs: finalStartPositionMs,
                 title: title || version.value?.name || '',
                 playMethod: playMethod.value,

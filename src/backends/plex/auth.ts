@@ -11,7 +11,7 @@ import type {
   ServerUser,
 } from '@/domain';
 
-import { raceConnections, orderConnections, type PlexConnection } from './connect';
+import { orderConnections, raceConnections, savedConnections, type PlexConnection } from './connect';
 import { PLEX_TV, PlexHttpError, plexHeaders, plexJson } from './http';
 
 const LINK_URL = 'https://plex.tv/link';
@@ -204,11 +204,18 @@ export function createPlexAuthenticator(identity: ClientIdentity): Authenticator
     };
   }
 
+  /** The address that answers now (LAN at home, public or relay outside). */
+  async function reconnect(connection: ServerConnection, token: string): Promise<string> {
+    const headers = plexHeaders(identity, connection.deviceId, token);
+    return raceConnections(savedConnections(connection.baseUrl, connection.candidateUrls), connection.serverId, headers);
+  }
+
   return {
     kind: 'plex',
     supportsPassword: false,
     supportsDeviceCode: true,
     startDeviceCode,
     resumeAccount: profileStep,
+    reconnect,
   };
 }

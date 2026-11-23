@@ -275,7 +275,7 @@ export function useOfflinePlayer(
 
                 await NativeVideo.start({
                     url: playUrl,
-                    authHeader: '',
+                    headers: {},
                     startPositionMs,
                     title: itemTitle || '',
                     playMethod: 'DirectPlay',

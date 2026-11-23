@@ -105,8 +105,8 @@ router.beforeEach(async (to, _from, next) => {
   if (requiresAuth && !isAuthenticated) {
     next({ name: "login" });
   }
-  // Si on est connecté et qu'on accède à la page login
-  else if (to.name === "login" && isAuthenticated) {
+  // Si on est connecté et qu'on accède à la page login (sauf pour changer de compte ou de profil)
+  else if (to.name === "login" && isAuthenticated && !to.query.switch) {
     next({ name: "libraries" });
   }
   // Redirect audio items away from the video player route (skip when offline to avoid server calls)

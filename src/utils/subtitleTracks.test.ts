@@ -15,12 +15,13 @@ describe('createSubtitleTracks', () => {
     const pgs = subtitle('3', { codec: 'PGSSUB', language: 'fra', title: 'PGS French Complets - PGSSUB', format: 'image' });
     expect(createSubtitleTracks(version([pgs]), [])).toEqual([{
       index: 3, language: 'fra', label: 'PGS French Complets - PGSSUB', playbackMode: 'burn-in', deliveryUrl: undefined,
+      deliveryFormat: undefined, isExternalFile: false, format: 'image',
     }]);
   });
 
   it('uses the server sidecar URL for text streams it serves', () => {
     const tracks = createSubtitleTracks(version([subtitle('5', { language: 'eng' })]), [{ streamId: '5', url: VTT, format: 'vtt' }]);
-    expect(tracks[0]).toMatchObject({ index: 5, playbackMode: 'external', deliveryUrl: VTT, label: 'ENG' });
+    expect(tracks[0]).toMatchObject({ index: 5, playbackMode: 'external', deliveryUrl: VTT, deliveryFormat: 'vtt', label: 'ENG' });
   });
 
   it('falls back to burn-in for a text stream the server does not serve as a sidecar', () => {

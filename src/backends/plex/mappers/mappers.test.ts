@@ -123,6 +123,10 @@ describe('Plex → domain: music, libraries, misc', () => {
     expect(url.searchParams.get('X-Plex-Token')).toBe('tok');
   });
 
+  it('uses agent image URLs as they are', () => {
+    expect(plexImageUrl('https://pms.example:32400', 'tok', 'https://metadata-static.plex.tv/p/x.jpg')).toBe('https://metadata-static.plex.tv/p/x.jpg');
+  });
+
   it('normalises video ranges', () => {
     expect(videoRange({ colorTrc: 'smpte2084' })).toBe('hdr10');
     expect(videoRange({ colorTrc: 'arib-std-b67' })).toBe('hlg');

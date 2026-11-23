@@ -5,6 +5,7 @@ import Hls from 'hls.js';
 import { usePreferencesStore } from '@/store/preferences-store';
 import { NativeVideo } from '@/plugins/NativeVideoPlugin';
 import { logger } from '@/utils/logger';
+import { srtToVtt } from '@/utils/srtToVtt';
 import type { PlayerSession } from './usePlayerSession';
 import type { PlayerControls } from './usePlayerControls';
 
@@ -46,7 +47,7 @@ export function useWebPlayer(
     isNative: boolean,
 ) {
     const {
-        itemId, authHeader, plan,
+        itemId, requestHeaders, plan,
         isLoading, isPlaying, currentTime, duration, progressPct, error,
         hlsUrl, playMethod,
         audioList, selectedAudioIndex, subtitleList, selectedSubtitleIndex,
@@ -211,10 +212,13 @@ export function useWebPlayer(
                 // Local media:// sidecars need no token — and the custom header
                 // would trigger a CORS preflight the protocol handler rejects.
                 const init = sub.deliveryUrl.startsWith('http')
-                    ? { headers: { Authorization: authHeader.value } }
+                    ? { headers: requestHeaders.value }
                     : undefined;
                 const resp = await fetch(sub.deliveryUrl, init);
-                blobUrl = URL.createObjectURL(await resp.blob());
+                // <track> reads WebVTT only: SRT sidecars (Plex) are converted.
+                blobUrl = sub.deliveryFormat === 'srt'
+                    ? URL.createObjectURL(new Blob([srtToVtt(await resp.text())], { type: 'text/vtt' }))
+                    : URL.createObjectURL(await resp.blob());
                 subtitleBlobCache.set(index, blobUrl);
             } catch (e) {
                 logger.error('[subtitle] fetch failed:', e);
@@ -255,7 +259,7 @@ export function useWebPlayer(
                 maxMaxBufferLength: 60,
                 fLoader: makeJellyfinFragmentLoader() as any,
                 xhrSetup: (xhr) => {
-                    xhr.setRequestHeader('Authorization', authHeader.value);
+                    for (const [name, value] of Object.entries(requestHeaders.value)) xhr.setRequestHeader(name, value);
                 },
             });
             hls.loadSource(url);

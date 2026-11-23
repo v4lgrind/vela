@@ -63,7 +63,7 @@ class NativePlayerActivity : AppCompatActivity() {
 
     companion object {
         const val EXTRA_URL = "url"
-        const val EXTRA_AUTH_HEADER = "authHeader"
+        const val EXTRA_HEADERS = "headers"
         const val EXTRA_START_MS = "startPositionMs"
         const val EXTRA_TITLE = "title"
         const val EXTRA_PLAY_METHOD = "playMethod"
@@ -357,7 +357,7 @@ class NativePlayerActivity : AppCompatActivity() {
 
     // Store build parameters so we can rebuild the player for DV fallback.
     private var buildUrl = ""
-    private var buildAuthHeader = ""
+    private var buildHeaders: Map<String, String> = emptyMap()
     private var buildPlayMethod = ""
     private var buildSubtitleTracksJson = "[]"
 
@@ -470,7 +470,7 @@ class NativePlayerActivity : AppCompatActivity() {
             finish()
             return
         }
-        val authHeader = intent.getStringExtra(EXTRA_AUTH_HEADER) ?: ""
+        val headers = parseHeaders(intent.getStringExtra(EXTRA_HEADERS))
         val startMs = intent.getLongExtra(EXTRA_START_MS, 0L)
         android.util.Log.d("NativePlayer", "NativePlayerActivity.onCreate: url=$url startMs=$startMs")
         val title = intent.getStringExtra(EXTRA_TITLE) ?: ""
@@ -515,7 +515,7 @@ class NativePlayerActivity : AppCompatActivity() {
         tvTitle.text = title
 
         trickplay = TrickplayThumbnails.parse(intent.getStringExtra(EXTRA_TRICKPLAY_JSON))?.let {
-            TrickplayThumbnails(it, authHeader)
+            TrickplayThumbnails(it, headers)
         }
 
         // SRT subtitle overlay — parsed from file, rendered outside ExoPlayer pipeline
@@ -538,7 +538,7 @@ class NativePlayerActivity : AppCompatActivity() {
         }
 
         setupControls()
-        buildPlayer(url, authHeader, startMs, playMethod, subtitleTracksJson)
+        buildPlayer(url, headers, startMs, playMethod, subtitleTracksJson)
 
         ContextCompat.registerReceiver(
             this,
@@ -703,19 +703,19 @@ class NativePlayerActivity : AppCompatActivity() {
 
     private fun buildPlayer(
         url: String,
-        authHeader: String,
+        headers: Map<String, String>,
         startMs: Long,
         playMethod: String,
         subtitleTracksJson: String
     ) {
         // Store params for potential DV fallback rebuild
         buildUrl = url
-        buildAuthHeader = authHeader
+        buildHeaders = headers
         buildPlayMethod = playMethod
         buildSubtitleTracksJson = subtitleTracksJson
 
         val httpFactory = DefaultHttpDataSource.Factory()
-            .setDefaultRequestProperties(mapOf("Authorization" to authHeader))
+            .setDefaultRequestProperties(headers)
         val dataFactory = DefaultDataSource.Factory(this, httpFactory)
 
         val audioAttr = AudioAttributes.Builder()
@@ -913,7 +913,7 @@ class NativePlayerActivity : AppCompatActivity() {
                         tracksReported = false
                         player?.release()
                         player = null
-                        buildPlayer(buildUrl, buildAuthHeader, resumeMs, buildPlayMethod, buildSubtitleTracksJson)
+                        buildPlayer(buildUrl, buildHeaders, resumeMs, buildPlayMethod, buildSubtitleTracksJson)
                         return
                     }
 
@@ -1029,6 +1029,14 @@ class NativePlayerActivity : AppCompatActivity() {
         tvSrtSubtitle?.textSize = 22f * scale
     }
 
+    /** `{"Header": "value"}` from the plugin; malformed input sends no extra header. */
+    private fun parseHeaders(json: String?): Map<String, String> = try {
+        val obj = JSONObject(json ?: "{}")
+        obj.keys().asSequence().associateWith { obj.optString(it) }
+    } catch (e: Exception) {
+        emptyMap()
+    }
+
     private fun parseSubtitleConfigs(json: String): List<MediaItem.SubtitleConfiguration> {
         return try {
             val arr = JSONArray(json)
@@ -1038,7 +1046,7 @@ class NativePlayerActivity : AppCompatActivity() {
                 val lang = obj.optString("lang", "und")
                 val label = obj.optString("label", lang)
                 MediaItem.SubtitleConfiguration.Builder(android.net.Uri.parse(url))
-                    .setMimeType(MimeTypes.TEXT_VTT)
+                    .setMimeType(obj.optString("mimeType").takeIf { it.isNotEmpty() } ?: MimeTypes.TEXT_VTT)
                     .setLanguage(lang)
                     .setLabel(label)
                     .build()

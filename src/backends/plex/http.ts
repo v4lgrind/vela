@@ -45,20 +45,37 @@ export function withParams(path: string, params: PlexRequest['params']): string 
   return `${path}${path.includes('?') ? '&' : '?'}${text}`;
 }
 
-async function send(request: PlexRequest): Promise<Response> {
+/**
+ * Longest wait for one answer. After a network change a request can sit on a
+ * dead connection without ever failing; without a limit the screens that wait
+ * for it load forever.
+ */
+export const REQUEST_TIMEOUT_MS = 15_000;
+
+/** Sends the request and reads the body within REQUEST_TIMEOUT_MS (or until the caller aborts). */
+async function send(request: PlexRequest): Promise<string> {
   const path = withParams(request.path, request.params);
-  const response = await fetch(`${request.baseUrl}${path}`, {
-    method: request.method ?? 'GET',
-    headers: request.headers,
-    signal: request.signal,
-  });
-  if (!response.ok) throw new PlexHttpError(response.status, request.path);
-  return response;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const abort = () => controller.abort();
+  if (request.signal?.aborted) abort();
+  request.signal?.addEventListener('abort', abort, { once: true });
+  try {
+    const response = await fetch(`${request.baseUrl}${path}`, {
+      method: request.method ?? 'GET',
+      headers: request.headers,
+      signal: controller.signal,
+    });
+    if (!response.ok) throw new PlexHttpError(response.status, request.path);
+    return await response.text();
+  } finally {
+    clearTimeout(timer);
+    request.signal?.removeEventListener('abort', abort);
+  }
 }
 
 export async function plexJson<T>(request: PlexRequest): Promise<T> {
-  const response = await send(request);
-  const text = await response.text();
+  const text = await send(request);
   return (text ? JSON.parse(text) : {}) as T;
 }
 

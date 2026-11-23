@@ -75,7 +75,11 @@ export function createPlexCatalog(client: PlexClient): CatalogPort {
     let ids = genreIds.get(libraryId);
     if (!ids) {
       ids = client.get(`/library/sections/${libraryId}/genre`)
-        .then((c) => new Map((c.MediaContainer.Directory ?? []).map((genre) => [genre.title, genre.key])));
+        .then((c) => new Map((c.MediaContainer.Directory ?? []).map((genre) => [genre.title, genre.key])))
+        .catch((error) => {
+          genreIds.delete(libraryId);
+          throw error;
+        });
       genreIds.set(libraryId, ids);
     }
     return ids;

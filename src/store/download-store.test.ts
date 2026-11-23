@@ -30,7 +30,7 @@ vi.mock('@/services/offlineDatabase', async (importActual) => ({
 const user = { played: false, playCount: 0, favorite: false };
 const base = (id: string, title: string) => ({ id, title, genres: [], studios: [], images: {}, user });
 const track = (id: string, title: string, extra: Partial<Track> = {}): Track =>
-  ({ ...base(id, title), kind: 'track', artists: [], versions: [], ...extra });
+  ({ ...base(id, title), kind: 'track', artists: [], albumArtists: [], versions: [], ...extra });
 const movie = (id: string, title: string): Movie => ({ ...base(id, title), kind: 'movie', versions: [], credits: [] });
 
 describe('withForcedVideoParams', () => {

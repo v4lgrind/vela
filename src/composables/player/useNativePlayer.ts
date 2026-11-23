@@ -136,11 +136,12 @@ export function useNativePlayer(
         }
     }
 
-    /** Seek-bar thumbnail sheets, in the native player's JSON shape (tile sheets only for now). */
+    /** Seek-bar thumbnails in the native player's JSON shape: tile sheets (Jellyfin) or one BIF file (Plex). */
     async function buildTrickplayJson(): Promise<string | undefined> {
         if (!backend?.capabilities.trickplay || !version.value) return undefined;
         try {
             const sheets = await backend.playback.trickplay(itemId, version.value.id);
+            if (sheets?.format === 'bif') return JSON.stringify({ format: 'bif', url: sheets.url });
             if (sheets?.format !== 'tiles') return undefined;
             return JSON.stringify({
                 urlTemplate: sheets.urlTemplate,

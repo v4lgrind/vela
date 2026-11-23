@@ -252,6 +252,12 @@ export function createPlexPlayback(client: PlexClient): PlaybackPort {
     reporter,
     markers: async (id) => toMarkers((await metadata(id)).Marker),
     chapters: async (id) => toChapters((await metadata(id)).Chapter),
-    trickplay: async () => null,
+    // BIF previews exist only when PMS generated them ("video preview thumbnails").
+    trickplay: async (id, versionId) => {
+      const { media } = pickMedia(await metadata(id), versionId);
+      const part = media.Part?.[0];
+      if (!part?.indexes) return null;
+      return { format: 'bif', url: `${client.baseUrl}/library/parts/${part.id}/indexes/${part.indexes}`, headers: { ...client.headers } };
+    },
   };
 }

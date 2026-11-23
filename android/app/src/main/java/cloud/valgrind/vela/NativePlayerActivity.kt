@@ -339,7 +339,7 @@ class NativePlayerActivity : AppCompatActivity() {
     private lateinit var tvScrubOverlay: TextView
 
     // Trickplay thumbnails shown while seeking (null when the server has none)
-    private var trickplay: TrickplayThumbnails? = null
+    private var trickplay: SeekPreviews? = null
     private lateinit var trickplayPreview: View
     private lateinit var trickplayImage: android.widget.ImageView
     private lateinit var trickplayTime: TextView
@@ -514,9 +514,7 @@ class NativePlayerActivity : AppCompatActivity() {
 
         tvTitle.text = title
 
-        trickplay = TrickplayThumbnails.parse(intent.getStringExtra(EXTRA_TRICKPLAY_JSON))?.let {
-            TrickplayThumbnails(it, headers)
-        }
+        trickplay = SeekPreviews.from(intent.getStringExtra(EXTRA_TRICKPLAY_JSON), headers)
 
         // SRT subtitle overlay — parsed from file, rendered outside ExoPlayer pipeline
         val srtPath = intent.getStringExtra(EXTRA_SRT_FILE_PATH) ?: ""

@@ -132,6 +132,26 @@ describe('Plex playback negotiation', () => {
   });
 });
 
+describe('seek-bar previews', () => {
+  const withIndex = (indexes?: string) => {
+    const copy = structuredClone(movie);
+    copy.MediaContainer.Metadata[0].Media[0].Part[0].indexes = indexes;
+    vi.mocked(fetch).mockImplementation(async () => new Response(JSON.stringify(copy)));
+  };
+
+  it('previews from the part index', async () => {
+    withIndex('sd');
+    expect(await playback().trickplay(movieId, String(movie.MediaContainer.Metadata[0].Media[0].id))).toEqual({
+      format: 'bif', url: `https://pms.test/library/parts/${part.id}/indexes/sd`, headers: expect.objectContaining({ 'X-Plex-Token': 'server-token' }),
+    });
+  });
+
+  it('no previews when the part has no index', async () => {
+    withIndex(undefined);
+    expect(await playback().trickplay(movieId, String(movie.MediaContainer.Metadata[0].Media[0].id))).toBeNull();
+  });
+});
+
 describe('client profile', () => {
   it('declares the device codecs for direct play and HLS targets', () => {
     const extra = clientProfileExtra(request());

@@ -15,7 +15,7 @@ const CAPABILITIES: Capabilities = {
   transcodedDownloads: true,
   markers: true,
   chapters: true,
-  trickplay: false,
+  trickplay: true,
   lyrics: true,
   favorites: false,
   similar: true,

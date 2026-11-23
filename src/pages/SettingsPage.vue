@@ -10,7 +10,7 @@
             <span class="size-10 shrink-0 rounded-full bg-gradient-to-br from-accent-purple to-[#0a4f8a]" />
             <div class="flex-1 min-w-0">
               <div class="text-[14.5px] font-semibold text-text-heading truncate">{{ currentServerName }}</div>
-              <p class="text-xs text-text-muted mt-0.5 truncate">{{ jellyfinStore.serverUrl }}</p>
+              <p class="text-xs text-text-muted mt-0.5 truncate">{{ session.active?.baseUrl }}</p>
             </div>
             <span class="text-xs font-semibold text-accent-purple">{{ t('settings.active') }}</span>
           </div>
@@ -141,11 +141,11 @@ import { Switch } from '@/components/ui/switch';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { ChevronRight, LogOut, Server, Palette, MonitorPlay, Music } from 'lucide-vue-next';
 import { usePreferencesStore } from '@/store/preferences-store';
-import { useJellyfinStore } from '@/store/jellyfin-store';
+import { useSessionStore } from '@/store/session-store';
 
 const { t } = useI18n();
 const router = useRouter();
-const jellyfinStore = useJellyfinStore();
+const session = useSessionStore();
 const preferencesStore = usePreferencesStore();
 
 const themeOptions = [
@@ -154,15 +154,10 @@ const themeOptions = [
   { value: 'dark' as const, label: 'settings.themeDark' },
 ];
 
-const currentServerName = computed(() => {
-  const saved = jellyfinStore.savedServers.find(
-    (s) => s.serverUrl === jellyfinStore.serverUrl && s.userId === jellyfinStore.userId
-  );
-  return saved?.serverName ?? new URL(jellyfinStore.serverUrl || 'http://unknown').hostname;
-});
+const currentServerName = computed(() => session.active?.serverName ?? '');
 
-async function signOut() {
-  await jellyfinStore.logout();
+function signOut() {
+  session.signOut();
   router.push({ name: 'login' });
 }
 

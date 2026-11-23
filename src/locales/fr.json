@@ -310,7 +310,8 @@
     "qcDisabled": "Quick Connect est désactivé. Activez-le dans Jellyfin : Tableau de bord → Avancé → Quick Connect.",
     "qcUnsupported": "Quick Connect n'est pas pris en charge par cette version du serveur.",
     "urlProtocol": "L'adresse du serveur doit commencer par http:// ou https://",
-    "urlInvalid": "Saisissez une adresse de serveur valide (ex. http://192.168.1.10:8096)"
+    "urlInvalid": "Saisissez une adresse de serveur valide (ex. http://192.168.1.10:8096)",
+    "unreachable": "Serveur injoignable. Vérifiez l’adresse et votre connexion."
   },
   "logs": {
     "entries": "{n} entrée | {n} entrées",

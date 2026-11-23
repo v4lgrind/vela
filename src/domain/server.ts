@@ -39,6 +39,16 @@ export interface ServerConnection {
   /** Other addresses to race when `baseUrl` stops answering (Plex). */
   candidateUrls: string[];
   tokenKey: string;
+  /** Device / client identifier the token was issued to; sent with every request. */
+  deviceId: string;
+}
+
+/** How Vela introduces itself to servers. */
+export interface ClientIdentity {
+  product: string;
+  version: string;
+  deviceName: string;
+  platform: string;
 }
 
 export function connectionKey(connection: Pick<ServerConnection, 'kind' | 'serverId' | 'user'>): string {

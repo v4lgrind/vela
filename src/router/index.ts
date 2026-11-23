@@ -1,5 +1,6 @@
 import { createRouter, createWebHashHistory } from "vue-router";
 import { useJellyfinStore } from "@/store/jellyfin-store";
+import { useSessionStore } from "@/store/session-store";
 import { useAudioPlayerStore } from "@/store/audio-player-store";
 import { useOfflineStore } from "@/store/offline-store";
 import { usePreferencesStore } from "@/store/preferences-store";
@@ -92,13 +93,10 @@ export const router = createRouter({
 
 router.beforeEach(async (to, _from, next) => {
   const store = useJellyfinStore();
+  const session = useSessionStore();
+  await session.restore();
 
-  // Initialiser l'API si on a un token persisté (charge depuis Preferences si nécessaire)
-  if (!store.api || !store.accessToken) {
-    await store.initializeApiAsync();
-  }
-
-  const isAuthenticated = store.isAuthenticated;
+  const isAuthenticated = session.isAuthenticated;
   const requiresAuth = to.meta.requiresAuth ?? true;
   const offlineStore = useOfflineStore();
   const preferencesStore = usePreferencesStore();

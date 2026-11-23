@@ -8,16 +8,25 @@ import { router } from "./router";
 import piniaPluginPersistedstate from "pinia-plugin-persistedstate";
 import { Capacitor } from "@capacitor/core";
 import { StatusBar } from "@capacitor/status-bar";
+import { useSessionStore } from "./store/session-store";
 
 const pinia = createPinia();
 pinia.use(piniaPluginPersistedstate);
 
 const app = createApp(App);
 
-app.use(router);
 app.use(pinia);
 app.use(i18n);
-app.mount("#app");
+
+// The session (and the one-time import of pre-session Jellyfin accounts, which
+// shares the old store's localStorage key) must be ready before any page runs.
+useSessionStore(pinia)
+  .restore()
+  .catch((error) => console.error("[Main] Failed to restore the session:", error))
+  .finally(() => {
+    app.use(router);
+    app.mount("#app");
+  });
 
 if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
   StatusBar.setBackgroundColor({ color: '#00000000' }); // Transparent for edge-to-edge

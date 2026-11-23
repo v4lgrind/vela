@@ -6,4 +6,5 @@ export type * from './music';
 export type * from './playback';
 export type * from './query';
 export type * from './server';
+export { AuthError } from './auth';
 export { connectionKey } from './server';

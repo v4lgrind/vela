@@ -3,7 +3,7 @@
     <div class="w-[min(92vw,420px)] flex flex-col gap-4">
 
       <!-- Saved servers -->
-      <template v-if="jellyfin.savedServers.length > 0 && !showNewServer">
+      <template v-if="session.connections.length > 0 && !showNewServer">
         <Card class="bg-surface-raised/85 border-border-default">
           <CardHeader>
             <CardTitle class="text-center text-2xl font-bold">Vela</CardTitle>
@@ -11,16 +11,16 @@
           <CardContent class="flex flex-col gap-3">
             <p class="text-xs text-text-muted text-center mb-1">{{ t('login.selectAccount') }}</p>
             <button
-              v-for="s in jellyfin.savedServers"
-              :key="s.serverUrl + s.userId"
+              v-for="s in session.connections"
+              :key="s.tokenKey"
               class="flex items-center gap-3 w-full rounded-xl border border-border-input bg-surface-raised hover:bg-surface-hover px-4 py-3 text-left transition-colors"
               @click="quickSwitch(s)"
             >
               <div class="size-10 rounded-full bg-accent-purple/20 flex items-center justify-center shrink-0">
-                <span class="text-accent-purple font-bold text-base uppercase">{{ s.userName.charAt(0) }}</span>
+                <span class="text-accent-purple font-bold text-base uppercase">{{ s.user.name.charAt(0) }}</span>
               </div>
               <div class="min-w-0">
-                <p class="text-sm font-medium text-text-heading truncate">{{ s.userName }}</p>
+                <p class="text-sm font-medium text-text-heading truncate">{{ s.user.name }}</p>
                 <p class="text-xs text-text-muted truncate">{{ s.serverName }}</p>
               </div>
             </button>
@@ -40,7 +40,7 @@
         <CardHeader>
           <div class="flex items-center gap-2">
             <button
-              v-if="jellyfin.savedServers.length > 0 && showNewServer"
+              v-if="session.connections.length > 0 && showNewServer"
               @click="showNewServer = false"
               :aria-label="t('common.back')"
               class="flex size-11 items-center justify-center rounded-lg hover:bg-surface-hover transition-colors"
@@ -133,7 +133,7 @@
 
 <script setup lang="ts">
 import { ref, onUnmounted } from 'vue'
-import { useJellyfinStore } from '@/store/jellyfin-store'
+import { useSessionStore } from '@/store/session-store'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
@@ -142,14 +142,15 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Eye, EyeOff, ArrowLeft, Loader2 } from 'lucide-vue-next'
-import type { SavedServer } from '@/store/jellyfin-store'
+import { AuthError } from '@/domain'
+import type { AuthStep, DeviceCodeSession, ServerConnection } from '@/domain'
 import { validateServerUrl } from '@/utils/validateServerUrl'
 
 const { t } = useI18n()
-const jellyfin = useJellyfinStore()
+const session = useSessionStore()
 const router = useRouter()
 
-const serverUrl = ref(jellyfin.serverUrl)
+const serverUrl = ref(session.active?.baseUrl ?? session.connections[session.connections.length - 1]?.baseUrl ?? '')
 const username = ref('')
 const password = ref('')
 const showPassword = ref(false)
@@ -161,11 +162,29 @@ const error = ref<string | null>(null)
 // Quick Connect state
 const quickConnectActive = ref(false)
 const quickConnectCode = ref('')
-const quickConnectSecret = ref('')
 const quickConnectError = ref<string | null>(null)
+const QC_POLL_INTERVAL_MS = 2000
+let qcSession: DeviceCodeSession | null = null
 let qcPollTimer: ReturnType<typeof setInterval> | null = null
-let qcTimeoutTimer: ReturnType<typeof setTimeout> | null = null
-let qcAuthenticating = false
+let qcPolling = false
+
+const AUTH_ERROR_KEYS: Record<AuthError['reason'], string> = {
+  'invalid-credentials': 'login.failed',
+  unreachable: 'login.unreachable',
+  'device-code-disabled': 'login.qcDisabled',
+  'device-code-unsupported': 'login.qcUnsupported',
+  expired: 'login.qcTimeout',
+  unknown: 'login.failed',
+}
+
+function authMessage(e: unknown): string {
+  return t(e instanceof AuthError ? AUTH_ERROR_KEYS[e.reason] : 'login.failed')
+}
+
+function enter(step: AuthStep) {
+  // Jellyfin sign-ins finish in one step; profile/server choices arrive with Plex.
+  if (step.step === 'connected') router.push({ name: 'libraries' })
+}
 
 async function onSubmit() {
   error.value = null
@@ -173,17 +192,35 @@ async function onSubmit() {
   if (urlError) { error.value = urlError; return; }
   loading.value = true
   try {
-    await jellyfin.login(serverUrl.value, username.value, password.value)
-    router.push({ name: 'libraries' })
+    enter(await session.signInWithPassword('jellyfin', serverUrl.value, username.value, password.value))
   } catch (e) {
-    error.value = e instanceof Error ? e.message : t('login.failed')
+    error.value = authMessage(e)
     loading.value = false
   }
 }
 
-async function quickSwitch(server: SavedServer) {
-  await jellyfin.switchServer(server)
-  router.push({ name: 'libraries' })
+async function quickSwitch(connection: ServerConnection) {
+  if (await session.switchTo(connection.tokenKey)) router.push({ name: 'libraries' })
+  else showNewServer.value = true
+}
+
+async function pollQuickConnect() {
+  if (!qcSession || qcPolling) return
+  qcPolling = true
+  try {
+    const state = await qcSession.poll()
+    if (state.status === 'expired') {
+      cancelQuickConnect()
+      quickConnectError.value = t('login.qcTimeout')
+    } else if (state.status === 'approved') {
+      cancelQuickConnect()
+      enter(await session.settle(state.next))
+    }
+  } catch {
+    // Poll errors are transient: keep polling until the code expires.
+  } finally {
+    qcPolling = false
+  }
 }
 
 async function startQuickConnect() {
@@ -191,57 +228,21 @@ async function startQuickConnect() {
   const urlError = validateServerUrl(serverUrl.value)
   if (urlError) { quickConnectError.value = urlError; return; }
   try {
-    const result = await jellyfin.quickConnectInitiate(serverUrl.value)
-    quickConnectCode.value = result.Code
-    quickConnectSecret.value = result.Secret
+    qcSession = await session.startDeviceCode('jellyfin', serverUrl.value)
+    quickConnectCode.value = qcSession.challenge.code
     quickConnectActive.value = true
-
-    qcPollTimer = setInterval(async () => {
-      if (qcAuthenticating) return
-      try {
-        const poll = await jellyfin.quickConnectPoll(serverUrl.value, quickConnectSecret.value)
-        if (poll.Authenticated) {
-          qcAuthenticating = true
-          const secret = quickConnectSecret.value
-          const server = serverUrl.value
-          cancelQuickConnect()
-          try {
-            await jellyfin.quickConnectAuthenticate(server, secret)
-            router.push({ name: 'libraries' })
-          } catch (e: any) {
-            qcAuthenticating = false
-            quickConnectError.value = `Sign-in failed: ${e?.message ?? e}`
-          }
-        }
-      } catch {
-        // poll errors are transient — keep polling
-      }
-    }, 2000)
-
-    // Auto-cancel after 5 minutes
-    qcTimeoutTimer = setTimeout(() => {
-      cancelQuickConnect()
-      quickConnectError.value = t('login.qcTimeout')
-    }, 5 * 60 * 1000)
-  } catch (e: any) {
-    const status = e?.response?.status
-    if (status === 400 || status === 401 || status === 403) {
-      quickConnectError.value = t('login.qcDisabled')
-    } else if (status === 404) {
-      quickConnectError.value = t('login.qcUnsupported')
-    } else {
-      quickConnectError.value = `Quick Connect failed (${status ?? 'network error'}): ${e?.message ?? e}`
-    }
+    qcPollTimer = setInterval(pollQuickConnect, QC_POLL_INTERVAL_MS)
+  } catch (e) {
+    quickConnectError.value = authMessage(e)
   }
 }
 
 function cancelQuickConnect() {
+  qcSession?.cancel()
+  qcSession = null
   quickConnectActive.value = false
   quickConnectCode.value = ''
-  quickConnectSecret.value = ''
-  qcAuthenticating = false
   if (qcPollTimer) { clearInterval(qcPollTimer); qcPollTimer = null }
-  if (qcTimeoutTimer) { clearTimeout(qcTimeoutTimer); qcTimeoutTimer = null }
 }
 
 onUnmounted(() => cancelQuickConnect())

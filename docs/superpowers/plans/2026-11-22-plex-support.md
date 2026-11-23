@@ -373,6 +373,31 @@ must reproduce them byte for byte.
   keys copied to new ones.
 - Login page renders `AuthFlow`s (Jellyfin only for now).
 
+#### Phase 2 results (2026-11-23) — done
+
+- `store/session-store.ts`: saved `ServerConnection`s, active key, token in
+  memory only (secure storage via `services/tokenStorage.ts`, keys
+  `vela_token:<kind>:<serverId>:<userId>`), sign-in through the domain
+  `Authenticator`s (only module allowed to import `backends/registry`).
+- `backends/jellyfin/auth.ts`: password and Quick Connect as `AuthStep`s, errors
+  as `AuthError` reasons; real `ServerId` from the server.
+- One-time import of pre-session accounts (`store/sessionMigration.ts`, pure):
+  old saved servers, per-user and active tokens, and the old device id are kept
+  (Jellyfin tokens are tied to it). Old installs have no server id:
+  `url:<address>` stands in, and a later sign-in to the same account replaces
+  the entry. Runs in `main.ts` before the router mounts, because the old store
+  shares the `jellyfin` localStorage key. Legacy Preferences keys are left in
+  place until Phase 7.
+- `jellyfin-store` lost all auth code; `serverUrl`, `accessToken`, `userId` are
+  now read-only getters over the active Jellyfin connection, so data screens
+  are unchanged. `App.vue` resets its caches when the active account changes.
+- Each new Jellyfin sign-in gets its own device id (as Quick Connect already did).
+- Login page, Settings, router guard and bottom nav use the session store.
+- Checks: 47 files / 282 tests, `vue-tsc`, build; Chromium smoke test against
+  the fake server: sign-in, reload, settings, sign-out, one-tap switch back,
+  legacy install migrated (no page errors). `e2e/login.spec.ts` was already
+  stale (expects the pre-rebrand title) and is not part of this change.
+
 ### Phase 3 — Catalog on the domain (L)
 - `JellyfinBackend.catalog` + `imageUrl`; then switch screens one by one:
   home (`MediaList`, home cache) → `LibrariesPage` → `LibraryItemsPage` →

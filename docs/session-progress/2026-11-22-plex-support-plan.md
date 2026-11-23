@@ -50,7 +50,10 @@
   tests, `src/architecture.test.ts`. 266 tests green, type check and build OK.
   Details in the plan's "Phase 1 results".
 
+- Phase 2 done (2026-11-23): session store, Jellyfin authenticator, legacy
+  account migration; see the plan's "Phase 2 results".
+
 ## Next steps
-- Phase 2: session store (`ServerConnection`, server kind, namespaced token
-  keys, migration of saved servers), login page rendering `AuthStep`s.
-- Nothing is committed yet (branch `v4lgrind/plex-support`).
+- Phase 3: `JellyfinBackend.catalog` + `imageUrl`, then switch screens one by
+  one to domain types (home → libraries → grid → details → search → person).
+- Commits: one per phase on `v4lgrind/plex-support`.

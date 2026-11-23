@@ -24,6 +24,7 @@ import ExpandedAudioPlayer from "@/components/ExpandedAudioPlayer.vue";
 import AppNav from "@/components/AppNav.vue";
 import AppToast from "@/components/ui/toast/AppToast.vue";
 import { useJellyfinStore } from "@/store/jellyfin-store";
+import { useSessionStore } from "@/store/session-store";
 import { useAudioPlayerStore } from "@/store/audio-player-store";
 import { useOfflineStore } from "@/store/offline-store";
 import { usePreferencesStore } from "@/store/preferences-store";
@@ -41,12 +42,18 @@ import { logger } from "@/utils/logger";
 const route = useRoute();
 const router = useRouter();
 const store = useJellyfinStore();
+const session = useSessionStore();
 const audioStore = useAudioPlayerStore();
 const offlineStore = useOfflineStore();
 const preferencesStore = usePreferencesStore();
 useDpadNavigation();
 const { isNative } = usePlatform();
-const isAuthenticated = computed(() => store.isAuthenticated);
+const isAuthenticated = computed(() => session.isAuthenticated);
+
+// Data cached by the Jellyfin store belongs to one account.
+watch(() => session.activeKey, (key, previous) => {
+  if (previous !== undefined && key !== previous) store.resetSessionData();
+});
 
 // Bottom nav: visible on the main authenticated screens. Hidden on the
 // fullscreen player, the login screen, and while the expanded audio player

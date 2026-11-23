@@ -28,8 +28,9 @@ const LEGACY_SDK_IMPORTERS = [
   'utils/lyrics.ts',
 ];
 
-/** Files allowed to import a backend (the registry and session store, once they exist). */
-const BACKEND_IMPORTERS: string[] = [];
+/** The only app module allowed into `backends`, and only through the registry. */
+const BACKEND_IMPORTERS = ['store/session-store.ts'];
+const REGISTRY = 'backends/registry.ts';
 
 function sourceFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
@@ -76,7 +77,7 @@ describe('architecture', () => {
       imports
         .filter((spec) => spec.startsWith('.'))
         .map((spec) => relative(SRC, resolve(SRC, path, '..', spec)))
-        .filter((target) => target.split('/')[1] !== path.split('/')[1])
+        .filter((target) => path !== REGISTRY && target.split('/')[1] !== path.split('/')[1])
         .map((target) => `${path} → ${target}`));
     expect(crossing).toEqual([]);
   });
@@ -84,6 +85,11 @@ describe('architecture', () => {
   it('the app does not import backends', () => {
     const app = files.filter((f) => !f.path.startsWith('backends/') && !BACKEND_IMPORTERS.includes(f.path));
     expect(violations(app, (spec) => !spec.startsWith('@/backends'))).toEqual([]);
+  });
+
+  it('the session store reaches backends only through the registry', () => {
+    const importers = files.filter((f) => BACKEND_IMPORTERS.includes(f.path));
+    expect(violations(importers, (spec) => !spec.startsWith('@/backends') || spec === '@/backends/registry')).toEqual([]);
   });
 
   it('no new Jellyfin SDK import outside the Jellyfin backend', () => {

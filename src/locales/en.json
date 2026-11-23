@@ -310,7 +310,8 @@
     "qcDisabled": "Quick Connect is disabled. Enable it in Jellyfin: Dashboard → Advanced → Quick Connect.",
     "qcUnsupported": "Quick Connect is not supported by this server version.",
     "urlProtocol": "Server URL must use http:// or https://",
-    "urlInvalid": "Please enter a valid server URL (e.g. http://192.168.1.10:8096)"
+    "urlInvalid": "Please enter a valid server URL (e.g. http://192.168.1.10:8096)",
+    "unreachable": "Server unreachable. Check the address and your connection."
   },
   "logs": {
     "entries": "{n} entry | {n} entries",

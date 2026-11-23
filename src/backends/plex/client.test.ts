@@ -31,6 +31,38 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
+describe('PlexClient item requests', () => {
+  it('shares one request for the same item asked from several places', async () => {
+    lanAnswers = true;
+    const client = new PlexClient(connection, 'tok', identity);
+    const item = (id: string) => client.get(`/library/metadata/${id}`, { includeMarkers: 1, includeChapters: 1 });
+    await Promise.all([item('7'), item('7'), item('7'), item('7')]);
+    await item('7');
+    await item('8');
+    expect(requests).toEqual(['LAN /library/metadata/7', 'LAN /library/metadata/8']);
+  });
+
+  it('asks again after a write or once the answer is old', async () => {
+    lanAnswers = true;
+    vi.useFakeTimers();
+    const client = new PlexClient(connection, 'tok', identity);
+    await client.get('/library/metadata/7');
+    await client.send('GET', '/:/scrobble', { key: '7' });
+    await client.get('/library/metadata/7');
+    vi.advanceTimersByTime(3001);
+    await client.get('/library/metadata/7');
+    vi.useRealTimers();
+    expect(requests).toEqual(['LAN /library/metadata/7', 'LAN /:/scrobble', 'LAN /library/metadata/7', 'LAN /library/metadata/7']);
+  });
+
+  it('does not keep a failed answer', async () => {
+    const client = new PlexClient({ ...connection, candidateUrls: [LAN] }, 'tok', identity);
+    await expect(client.get('/library/metadata/7')).rejects.toThrow();
+    lanAnswers = true;
+    await expect(client.get('/library/metadata/7')).resolves.toBeTruthy();
+  });
+});
+
 describe('PlexClient away from home', () => {
   it('moves to the address that answers, repeats the request and reports the move', async () => {
     const onConnectionChange = vi.fn();
@@ -56,6 +88,39 @@ describe('PlexClient away from home', () => {
     expect(client.baseUrl).toBe(LAN);
     expect(requests).toEqual(['LAN /missing']);
   });
+
+  it('moves without waiting for the time limit when the address went silent', async () => {
+    // Wi-Fi turned off without any event: the LAN request just hangs.
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      const url = new URL(String(input));
+      requests.push(`${url.origin === LAN ? 'LAN' : 'WAN'} ${url.pathname}`);
+      if (url.origin === LAN) {
+        return new Promise((_resolve, reject) => init?.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError'))));
+      }
+      if (url.pathname === '/identity') return new Response(JSON.stringify({ MediaContainer: { machineIdentifier: 'machine-1' } }));
+      return new Response(JSON.stringify({ MediaContainer: { size: 1 } }));
+    });
+    const client = new PlexClient(connection, 'tok', identity);
+    const started = Date.now();
+    await expect(client.get('/library/sections')).resolves.toEqual({ MediaContainer: { size: 1 } });
+    expect(client.baseUrl).toBe(WAN);
+    expect(Date.now() - started).toBeLessThan(8000);
+  }, 15_000);
+
+  it('keeps a slow address that is still alive', async () => {
+    lanAnswers = true;
+    vi.mocked(fetch).mockImplementation(async (input) => {
+      const url = new URL(String(input));
+      requests.push(`${url.origin === LAN ? 'LAN' : 'WAN'} ${url.pathname}`);
+      if (url.pathname === '/identity') return new Response(JSON.stringify({ MediaContainer: { machineIdentifier: 'machine-1' } }));
+      await new Promise((resolve) => setTimeout(resolve, 3500));
+      return new Response(JSON.stringify({ MediaContainer: { size: 2 } }));
+    });
+    const client = new PlexClient(connection, 'tok', identity);
+    await expect(client.get('/library/sections/1/all')).resolves.toEqual({ MediaContainer: { size: 2 } });
+    expect(client.baseUrl).toBe(LAN);
+    expect(requests).toEqual(['LAN /library/sections/1/all', 'LAN /identity']);
+  }, 15_000);
 
   it('gives up with the original error when no address answers', async () => {
     vi.mocked(fetch).mockImplementation(async () => { throw new TypeError('Failed to fetch'); });

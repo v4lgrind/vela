@@ -466,6 +466,7 @@ class NativeVideoPlugin : Plugin() {
                         val data = JSObject()
                         data.put("positionMs", posMs)
                         data.put("durationMs", durMs)
+                        data.put("isPaused", intent.getBooleanExtra("isPaused", false))
                         notifyListeners("progress", data)
                     }
                     NativePlayerActivity.ACTION_ENDED -> {

@@ -870,6 +870,12 @@ class NativePlayerActivity : AppCompatActivity() {
                 btnPlayPause.setImageResource(if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play)
             }
 
+            // Pause / play reaches the server at once instead of at the next 5 s tick.
+            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                val p = player ?: return
+                sendProgressBroadcast(p.currentPosition, effectiveDuration(), !playWhenReady)
+            }
+
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
                 debugLog("[AudioCrash] onPlayerError: code=${error.errorCode} msg=${error.message}")
                 debugLog("[AudioCrash]   pendingIdx=$audioSwitchPendingGroupIndex pendingLang=$audioSwitchPendingLanguage selectedAudioGroupIndex=$selectedAudioGroupIndex")
@@ -1927,11 +1933,13 @@ class NativePlayerActivity : AppCompatActivity() {
 
     // ── Broadcast helpers ──────────────────────────────────────────────────────
 
-    private fun sendProgressBroadcast(posMs: Long, durMs: Long) {
-        android.util.Log.d("NativePlayer", "progress: posMs=$posMs durMs=$durMs")
+    /** `isPaused`: the user paused (buffering while asked to play still counts as playing). */
+    private fun sendProgressBroadcast(posMs: Long, durMs: Long, isPaused: Boolean = player?.playWhenReady == false) {
+        android.util.Log.d("NativePlayer", "progress: posMs=$posMs durMs=$durMs paused=$isPaused")
         val intent = Intent(ACTION_PROGRESS)
         intent.putExtra("positionMs", posMs)
         intent.putExtra("durationMs", durMs)
+        intent.putExtra("isPaused", isPaused)
         intent.setPackage(packageName)
         sendBroadcast(intent)
     }

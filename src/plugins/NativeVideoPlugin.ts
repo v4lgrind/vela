@@ -43,6 +43,8 @@ export interface NativeVideoStartOptions {
 export interface NativeVideoProgressEvent {
     positionMs: number;
     durationMs: number;
+    /** The user paused (buffering while asked to play counts as playing). */
+    isPaused?: boolean;
 }
 
 export interface NativeVideoStoppedEvent {

@@ -32,7 +32,7 @@ export function useNativePlayer(
 ) {
     const {
         backend, itemId, nextEpisodeId, requestHeaders,
-        isLoading, currentTime, duration, progressPct, error,
+        isLoading, isPlaying, currentTime, duration, progressPct, error,
         version, hlsUrl, playMethod,
         audioList, selectedAudioIndex, subtitleList, selectedSubtitleIndex,
         activeBurnInSubtitleIndex,
@@ -247,6 +247,8 @@ export function useNativePlayer(
 
             // Register event listeners before starting
             await NativeVideo.addListener('progress', (data) => {
+                // Reported to the server as playing / paused (it stayed "paused" before).
+                isPlaying.value = data.isPaused !== true;
                 currentTime.value = (data.positionMs + finalResumeOffsetMs) / 1000;
                 lastGoodPositionSec = currentTime.value;
                 duration.value = data.durationMs / 1000;

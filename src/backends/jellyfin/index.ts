@@ -32,6 +32,7 @@ export function createJellyfinBackend(connection: ServerConnection, token: strin
     kind: 'jellyfin',
     connection,
     capabilities: CAPABILITIES,
+    castMode: 'jellyfin-receiver',
     imageUrl: (ref, size) => jellyfinImageUrl(connection.baseUrl, ref, size),
     authHeaders: () => ({ Authorization: client.authorization }),
     catalog,

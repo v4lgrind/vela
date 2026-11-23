@@ -9,6 +9,8 @@ import type { PlexMetadata } from '../types';
 export function plexImageUrl(serverUrl: string, token: string, ref: ImageRef, size: ImageSize = {}): string {
   // Agent images (people photos) are public URLs the server's transcoder may not fetch.
   if (/^https?:\/\//.test(ref)) return ref;
+  // The photo transcoder answers 400 without a size: the original image then.
+  if (!size.width && !size.height) return `${serverUrl}${ref}${ref.includes('?') ? '&' : '?'}X-Plex-Token=${encodeURIComponent(token)}`;
   const params = new URLSearchParams({ url: ref, minSize: '1', upscale: '1', 'X-Plex-Token': token });
   if (size.width) params.set('width', String(size.width));
   if (size.height) params.set('height', String(size.height));

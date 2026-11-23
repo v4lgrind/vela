@@ -97,6 +97,8 @@ export interface MediaBackend {
   readonly kind: ServerKind;
   readonly connection: ServerConnection;
   readonly capabilities: Capabilities;
+  /** How Cast reaches this server: its own receiver app, or a stream URL on the Default Media Receiver. */
+  readonly castMode: 'jellyfin-receiver' | 'media-url';
   imageUrl(ref: ImageRef, size?: ImageSize): string;
   /** Headers native players and downloads must send to this server. */
   authHeaders(): Record<string, string>;

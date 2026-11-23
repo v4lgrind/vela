@@ -523,6 +523,7 @@ import { Separator } from '@/components/ui/separator';
 import { Play, Check, Download as DownloadIcon, ChevronLeft, Loader2, Info, Shuffle, Star, Tv2 } from 'lucide-vue-next';
 import { MediaRail, Section } from '@/components/layout';
 import CastPlugin, { type CastState } from '@/plugins/CastPlugin';
+import { castRequestFor } from '@/utils/castRequest';
 import { usePlatform } from '@/composables/usePlatform';
 import { useToast } from '@/composables/useToast';
 import { logger } from '@/utils/logger';
@@ -550,7 +551,6 @@ const HERO_STILL: ImageSize = { width: 960, height: 540 };
 const COVER: ImageSize = { width: 800, height: 800 };
 const BACKDROP: ImageSize = { width: 1920, height: 1080 };
 const PERSON: ImageSize = { width: 220 };
-const TICKS_PER_MS = 10_000;
 
 // Deep links (Android Auto, notifications) open a detail page with nothing behind it: land on Home.
 function goBack() {
@@ -732,21 +732,23 @@ async function load() {
     }
 }
 
-// ── Cast (Jellyfin receiver; hidden on servers without the capability) ─────────
+// ── Cast (Jellyfin receiver, or a stream URL on the Default Media Receiver) ──────
 const castState = ref<CastState>('NO_DEVICES_AVAILABLE');
 const canCast = computed(() => session.backend?.capabilities.cast ?? false);
 let castStateListener: { remove: () => void } | null = null;
 let castSessionListener: { remove: () => void } | null = null;
 
-function castCurrentItem() {
-    if (!item.value) return Promise.resolve();
-    return CastPlugin.castMedia({
-        itemId: item.value.id,
-        serverUrl: session.active?.baseUrl ?? '',
-        accessToken: session.token ?? '',
-        startPositionTicks: (item.value.user.resumePositionMs ?? 0) * TICKS_PER_MS,
-        title: item.value.title,
-    });
+async function castCurrentItem() {
+    const backend = session.backend;
+    if (!item.value || !backend) return;
+    const request = await castRequestFor(backend, item.value, { serverUrl: session.active?.baseUrl ?? '', token: session.token ?? '' });
+    if (request.kind === 'receiver') {
+        const { kind: _kind, ...options } = request;
+        await CastPlugin.castMedia(options);
+    } else {
+        const { kind: _kind, ...options } = request;
+        await CastPlugin.castUrl(options);
+    }
 }
 
 async function initCast() {
@@ -768,7 +770,7 @@ async function initCast() {
 async function castItem() {
     // Already connected — cast directly
     if (castState.value === 'CONNECTED' && item.value) await castCurrentItem();
-    else await CastPlugin.showPicker();
+    else await CastPlugin.showPicker({ receiver: session.backend?.castMode === 'media-url' ? 'default' : 'jellyfin' });
 }
 
 onMounted(() => { load(); initCast(); });

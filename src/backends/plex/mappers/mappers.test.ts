@@ -123,6 +123,10 @@ describe('Plex → domain: music, libraries, misc', () => {
     expect(url.searchParams.get('X-Plex-Token')).toBe('tok');
   });
 
+  it('serves the original image when no size is asked (the transcoder needs one)', () => {
+    expect(plexImageUrl('https://pms.example:32400', 'tok', '/library/metadata/1/thumb/2')).toBe('https://pms.example:32400/library/metadata/1/thumb/2?X-Plex-Token=tok');
+  });
+
   it('uses agent image URLs as they are', () => {
     expect(plexImageUrl('https://pms.example:32400', 'tok', 'https://metadata-static.plex.tv/p/x.jpg')).toBe('https://metadata-static.plex.tv/p/x.jpg');
   });

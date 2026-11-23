@@ -21,7 +21,7 @@ const CAPABILITIES: Capabilities = {
   similar: true,
   personPages: true,
   serverStreamInfo: false,
-  cast: false,
+  cast: true,
   androidAuto: false,
 };
 
@@ -31,6 +31,7 @@ export function createPlexBackend(connection: ServerConnection, token: string, i
     kind: 'plex',
     connection,
     capabilities: CAPABILITIES,
+    castMode: 'media-url',
     imageUrl: (ref, size) => plexImageUrl(client.baseUrl, token, ref, size),
     authHeaders: () => ({ ...client.headers }),
     catalog: createPlexCatalog(client),

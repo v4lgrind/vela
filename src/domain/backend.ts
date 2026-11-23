@@ -85,6 +85,12 @@ export interface DownloadPort {
   plan(request: DownloadRequest): Promise<DownloadPlan>;
 }
 
+/** What a backend tells the app about its connection while it runs. */
+export interface BackendEvents {
+  /** The backend moved to another address of the server (e.g. LAN → public after leaving home). */
+  onConnectionChange?(connection: ServerConnection): void;
+}
+
 /** One signed-in server. Created by the backend registry from a `ServerConnection`. */
 export interface MediaBackend {
   readonly kind: ServerKind;

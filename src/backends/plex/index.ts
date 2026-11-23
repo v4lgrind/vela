@@ -1,4 +1,4 @@
-import type { Capabilities, ClientIdentity, MediaBackend, MusicPort, ServerConnection } from '@/domain';
+import type { BackendEvents, Capabilities, ClientIdentity, MediaBackend, MusicPort, ServerConnection } from '@/domain';
 
 import { createPlexCatalog } from './catalog';
 import { PlexClient } from './client';
@@ -39,13 +39,13 @@ const NO_MUSIC: MusicPort = {
   reporter: unsupported('music'),
 };
 
-export function createPlexBackend(connection: ServerConnection, token: string, identity: ClientIdentity): MediaBackend {
-  const client = new PlexClient(connection, token, identity);
+export function createPlexBackend(connection: ServerConnection, token: string, identity: ClientIdentity, events: BackendEvents = {}): MediaBackend {
+  const client = new PlexClient(connection, token, identity, events);
   return {
     kind: 'plex',
     connection,
     capabilities: CAPABILITIES,
-    imageUrl: (ref, size) => plexImageUrl(connection.baseUrl, token, ref, size),
+    imageUrl: (ref, size) => plexImageUrl(client.baseUrl, token, ref, size),
     authHeaders: () => ({ ...client.headers }),
     catalog: createPlexCatalog(client),
     music: NO_MUSIC,

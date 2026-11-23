@@ -105,6 +105,23 @@ describe('session store', () => {
     expect(session.deviceIdFor('jellyfin')).not.toBe('plex-dev');
   });
 
+  it('picks the Plex address again when the network comes back', async () => {
+    const LAN = 'https://192-168-1-10.abc.plex.direct:32400';
+    const WAN = 'https://203-0-113-7.abc.plex.direct:32400';
+    vi.stubGlobal('fetch', vi.fn(async (input: string) => {
+      if (new URL(input).origin === LAN) throw new TypeError('Failed to fetch');
+      return new Response(JSON.stringify({ MediaContainer: { machineIdentifier: 'm1' } }));
+    }));
+    const session = useSessionStore();
+    await session.settle({ step: 'connected', token: 'tok', connection: connection({
+      kind: 'plex', serverId: 'm1', tokenKey: 'plex:m1:u1', baseUrl: LAN, candidateUrls: [LAN, WAN],
+    }) });
+    session.watchNetwork();
+    window.dispatchEvent(new Event('online'));
+    await vi.waitFor(() => expect(session.active?.baseUrl).toBe(WAN));
+    vi.unstubAllGlobals();
+  });
+
   it('cannot switch profile on a Jellyfin account', async () => {
     const session = useSessionStore();
     await session.settle({ step: 'connected', connection: connection(), token: 'tok' });

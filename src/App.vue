@@ -118,6 +118,9 @@ onMounted(async () => {
   // Apply persisted theme immediately
   applyTheme(preferencesStore.colorScheme);
 
+  // Plex: pick the server address again when the network changes (home Wi-Fi ↔ mobile).
+  session.watchNetwork();
+
   // Track system preference changes for 'system' mode
   mediaQueryListener = () => {
     if (preferencesStore.colorScheme === 'system') applyTheme('system');

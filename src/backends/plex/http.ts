@@ -2,6 +2,14 @@ import type { ClientIdentity } from '@/domain';
 
 export const PLEX_TV = 'https://plex.tv';
 
+/** No answer at all (no route, dead connection, time limit): another address of the server may work. */
+export class PlexUnreachableError extends Error {
+  constructor(path: string) {
+    super(`Plex ${path.split('?')[0]} got no answer`);
+    this.name = 'PlexUnreachableError';
+  }
+}
+
 /** Error carrying the HTTP status, so callers can map it to a domain error. */
 export class PlexHttpError extends Error {
   constructor(readonly status: number, path: string) {
@@ -68,6 +76,10 @@ async function send(request: PlexRequest): Promise<string> {
     });
     if (!response.ok) throw new PlexHttpError(response.status, request.path);
     return await response.text();
+  } catch (error) {
+    // The caller's own cancel and HTTP errors are answers; anything else means nobody answered.
+    if (error instanceof PlexHttpError || request.signal?.aborted) throw error;
+    throw new PlexUnreachableError(request.path);
   } finally {
     clearTimeout(timer);
     request.signal?.removeEventListener('abort', abort);

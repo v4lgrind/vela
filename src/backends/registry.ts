@@ -1,4 +1,4 @@
-import type { Authenticator, ClientIdentity, MediaBackend, ServerConnection, ServerKind } from '@/domain';
+import type { Authenticator, BackendEvents, ClientIdentity, MediaBackend, ServerConnection, ServerKind } from '@/domain';
 
 import { createJellyfinAuthenticator } from './jellyfin/auth';
 import { createJellyfinBackend } from './jellyfin';
@@ -14,8 +14,8 @@ export function authenticatorFor(kind: ServerKind, identity: ClientIdentity): Au
   return kind === 'plex' ? createPlexAuthenticator(identity) : createJellyfinAuthenticator(identity);
 }
 
-export function createBackend(connection: ServerConnection, token: string, identity: ClientIdentity): MediaBackend {
+export function createBackend(connection: ServerConnection, token: string, identity: ClientIdentity, events: BackendEvents = {}): MediaBackend {
   return connection.kind === 'plex'
-    ? createPlexBackend(connection, token, identity)
+    ? createPlexBackend(connection, token, identity, events)
     : createJellyfinBackend(connection, token, identity);
 }

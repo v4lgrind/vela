@@ -49,7 +49,8 @@ export interface MusicPort {
   albumTracks(albumId: ItemId): Promise<Track[]>;
   playlistTracks(playlistId: ItemId): Promise<Track[]>;
   randomTracks(libraryId: string, limit: number): Promise<Track[]>;
-  streamUrl(trackId: ItemId, request: AudioStreamRequest): string;
+  /** `streamRef`: the track version's file locator, when known (direct file instead of a conversion). */
+  streamUrl(trackId: ItemId, request: AudioStreamRequest, streamRef?: string): string;
   lyrics(trackId: ItemId): Promise<Lyrics | null>;
   /** Reports the playback of one track (start / progress / stop). */
   reporter(trackId: ItemId): PlaybackReporter;

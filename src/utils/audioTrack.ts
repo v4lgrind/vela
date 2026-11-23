@@ -14,5 +14,6 @@ export function trackToAudioTrack(track: Track, albumNameFallback = ''): AudioTr
     duration: track.durationMs ? track.durationMs / MS_PER_SECOND : 0,
     indexNumber: track.trackNumber || 0,
     artwork: track.images.poster,
+    streamRef: track.versions[0]?.streamRef,
   };
 }

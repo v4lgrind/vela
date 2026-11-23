@@ -14,6 +14,8 @@ export interface AudioTrack {
   indexNumber: number;
   /** Album cover (domain image ref); absent on queues saved before it existed. */
   artwork?: string;
+  /** File locator for a direct stream (MediaVersion.streamRef); absent on older queues. */
+  streamRef?: string;
 }
 
 /** What the playback engine reports back; mirrored into the store. */

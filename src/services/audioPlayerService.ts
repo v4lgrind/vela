@@ -369,12 +369,12 @@ class AudioPlayerService implements AudioController {
   private async toQueueItem(track: AudioTrack): Promise<QueueItem> {
     return {
       track,
-      url: await this.resolveUrl(track.id),
+      url: await this.resolveUrl(track.id, track.streamRef),
       artworkUrl: track.artwork ? this.backend()?.imageUrl(track.artwork, ARTWORK_SIZE) ?? '' : '',
     };
   }
 
-  private async resolveUrl(itemId: string): Promise<string> {
+  private async resolveUrl(itemId: string, streamRef?: string): Promise<string> {
     // A Cast device fetches from the server itself; local files are out of reach.
     if (this.offlineStore.isItemDownloaded(itemId) && this.engine !== this.castEngine) {
       const local = isNative
@@ -383,14 +383,14 @@ class AudioPlayerService implements AudioController {
       if (local) return local;
       logger.error('[AudioPlayer] Fichier local introuvable', itemId);
     }
-    return this.buildStreamUrl(itemId);
+    return this.buildStreamUrl(itemId, streamRef);
   }
 
   private backend(): MediaBackend | null {
     return this.session.backend;
   }
 
-  private buildStreamUrl(itemId: string): string {
+  private buildStreamUrl(itemId: string, streamRef?: string): string {
     const backend = this.backend();
     if (!backend) return '';
     return backend.music.streamUrl(itemId, {
@@ -402,7 +402,7 @@ class AudioPlayerService implements AudioController {
       transcode: isNative
         ? { container: 'mp3', codec: 'mp3', protocol: 'http' }
         : { container: 'ts', codec: 'aac', protocol: 'hls' },
-    });
+    }, streamRef);
   }
 
   // --- Playback reporting ---

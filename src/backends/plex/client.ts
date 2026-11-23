@@ -1,7 +1,7 @@
 import type { BackendEvents, ClientIdentity, ServerConnection } from '@/domain';
 
 import { raceConnections, savedConnections } from './connect';
-import { PlexUnreachableError, plexHeaders, plexJson, plexSend, withParams } from './http';
+import { PlexUnreachableError, plexHeaders, plexJson, plexSend, plexText, withParams } from './http';
 import type { PlexContainer, PlexMetadata } from './types';
 
 export type Params = Record<string, string | number | boolean | undefined>;
@@ -74,6 +74,10 @@ export class PlexClient {
   send(method: 'GET' | 'POST' | 'PUT' | 'DELETE', path: string, params: Params = {}): Promise<void> {
     this.items.clear();
     return this.withFailover((baseUrl, signal) => plexSend({ baseUrl, path, method, params, headers: this.headers, signal }));
+  }
+
+  text(path: string): Promise<string> {
+    return this.withFailover((baseUrl, signal) => plexText({ baseUrl, path, headers: this.headers, signal }));
   }
 
   /** Absolute URL carrying the token, for players and `<img>` that cannot send headers. */

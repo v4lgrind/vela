@@ -33,7 +33,8 @@ const TYPE_BY_VIEW: Partial<Record<LibraryView, number>> = {
   tracks: PLEX_TYPE.track,
 };
 
-/** Libraries Vela lists for Plex (v1 is video only). */
+/** Libraries Vela lists for Plex. */
+const LISTED_SECTIONS = new Set(['movie', 'show', 'artist']);
 const VIDEO_SECTIONS = new Set(['movie', 'show']);
 const SEARCH_KINDS: ItemKind[] = ['movie', 'series', 'episode'];
 const BATCH_SIZE = 100;
@@ -162,7 +163,7 @@ export function createPlexCatalog(client: PlexClient): CatalogPort {
   }
 
   return {
-    libraries: async (): Promise<Library[]> => (await videoSections()).map(toLibrary),
+    libraries: async (): Promise<Library[]> => (await allSections()).filter((section) => LISTED_SECTIONS.has(section.type)).map(toLibrary),
     browse,
     genres: async (libraryId) => [...(await genresOf(libraryId)).keys()].sort((a, b) => a.localeCompare(b)),
     item,

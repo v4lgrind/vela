@@ -91,6 +91,11 @@ export async function plexJson<T>(request: PlexRequest): Promise<T> {
   return (text ? JSON.parse(text) : {}) as T;
 }
 
+/** Raw text answer (lyrics files). */
+export function plexText(request: PlexRequest): Promise<string> {
+  return send(request);
+}
+
 /** For calls whose answer Vela ignores (timeline, scrobble, stop). */
 export async function plexSend(request: PlexRequest): Promise<void> {
   await send(request);

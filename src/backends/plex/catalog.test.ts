@@ -52,9 +52,9 @@ const query = (over: Partial<LibraryQuery> = {}): LibraryQuery => ({
 const last = () => requests[requests.length - 1];
 
 describe('Plex catalog', () => {
-  it('lists only the movie and show libraries (v1 is video only)', async () => {
+  it('lists the movie, show and music libraries', async () => {
     const libraries = await catalog().libraries();
-    expect(new Set(libraries.map((l) => l.kind))).toEqual(new Set(['movies', 'shows']));
+    expect(new Set(libraries.map((l) => l.kind))).toEqual(new Set(['movies', 'shows', 'music']));
   });
 
   it('browses a library with type, sort, paging and the server token', async () => {

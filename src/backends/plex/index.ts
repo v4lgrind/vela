@@ -22,7 +22,7 @@ const CAPABILITIES: Capabilities = {
   personPages: true,
   serverStreamInfo: false,
   cast: true,
-  androidAuto: false,
+  androidAuto: true,
 };
 
 export function createPlexBackend(connection: ServerConnection, token: string, identity: ClientIdentity, events: BackendEvents = {}): MediaBackend {

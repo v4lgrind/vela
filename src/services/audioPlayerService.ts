@@ -21,6 +21,7 @@ import { AirPlay } from '@/plugins/AirPlayPlugin';
 import { useToast } from '@/composables/useToast';
 import { WebAudioEngine } from './audio/webAudioEngine';
 import type { AudioEngine, EngineState, QueueItem } from './audio/types';
+import { autoLibraryConfig } from '@/utils/autoLibraryConfig';
 import { logger } from '@/utils/logger';
 import type { MediaBackend, PlaybackReporter } from '@/domain';
 import { trackToAudioTrack } from '@/utils/audioTrack';
@@ -169,22 +170,17 @@ class AudioPlayerService implements AudioController {
   // --- Android Auto: the car browses the library natively and may start a queue ---
 
   private setupAndroidAuto() {
-    // The car can start the music service without the app: it needs its own credentials.
-    // The native Android Auto library speaks Jellyfin only (other servers: Phase 9),
-    // so it gets credentials only for a Jellyfin account and is disabled otherwise.
+    // The car can start the music service without the app: it needs its own credentials
+    // (Jellyfin or Plex), cleared when signed out.
     watch(
-      () => {
-        const active = this.session.backend?.capabilities.androidAuto && this.session.active?.kind === 'jellyfin'
-          ? this.session.active : null;
-        return [active?.baseUrl, active ? this.session.token : null, active?.user.id, this.preferencesStore.musicMaxBitrate] as const;
-      },
-      ([serverUrl, accessToken, userId, maxBitrate]) => {
-        NativeAudio.setLibraryConfig({
-          serverUrl: serverUrl || '',
-          accessToken: accessToken || '',
-          userId: userId || '',
-          maxBitrate: maxBitrate || 140_000_000,
-        }).catch((e) => logger.error('[AudioPlayer] setLibraryConfig failed', e));
+      () => JSON.stringify(autoLibraryConfig({
+        active: this.session.active,
+        token: this.session.token,
+        androidAuto: this.session.backend?.capabilities.androidAuto ?? false,
+        maxBitrate: this.preferencesStore.musicMaxBitrate,
+      })),
+      (config) => {
+        NativeAudio.setLibraryConfig(JSON.parse(config)).catch((e) => logger.error('[AudioPlayer] setLibraryConfig failed', e));
       },
       { immediate: true },
     );

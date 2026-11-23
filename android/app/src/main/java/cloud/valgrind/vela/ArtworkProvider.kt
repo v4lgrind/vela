@@ -22,7 +22,8 @@ class ArtworkProvider : ContentProvider() {
 
     companion object {
         private const val TAG = "ArtworkProvider"
-        private val ITEM_ID = Regex("^[0-9a-f]{32}$")
+        // Jellyfin ids are 32 hex chars, Plex rating keys are numbers.
+        private val ITEM_ID = Regex("^[0-9A-Za-z_-]{1,64}$")
 
         fun uri(context: Context, itemId: String): Uri =
             Uri.parse("content://${context.packageName}.artwork/$itemId")
@@ -41,9 +42,9 @@ class ArtworkProvider : ContentProvider() {
     }
 
     private fun download(ctx: Context, itemId: String, file: File) {
-        val (url, auth) = JellyfinLibrary(ctx).imageRequest(itemId) ?: throw FileNotFoundException(itemId)
+        val (url, headers) = MusicLibrary.current(ctx).imageRequest(itemId) ?: throw FileNotFoundException(itemId)
         val conn = URL(url).openConnection() as HttpURLConnection
-        conn.setRequestProperty("Authorization", auth)
+        headers.forEach { (name, value) -> conn.setRequestProperty(name, value) }
         conn.connectTimeout = 8000
         conn.readTimeout = 15000
         try {

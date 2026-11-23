@@ -32,7 +32,7 @@ import java.util.concurrent.Executors
  * which gives us the media notification, lock-screen controls, headset /
  * Bluetooth buttons and audio focus. The WebView drives it through
  * [NativeAudioPlugin] via a MediaController. As a library service it also
- * serves the Jellyfin music library to Android Auto ([JellyfinLibrary]).
+ * serves the server's music library to Android Auto ([MusicLibrary]).
  */
 class MusicService : MediaLibraryService() {
 
@@ -45,7 +45,8 @@ class MusicService : MediaLibraryService() {
     }
 
     private var session: MediaLibrarySession? = null
-    private lateinit var library: JellyfinLibrary
+    /** Read on every call: the app may switch account (and server kind) while the service runs. */
+    private val library: MusicLibrary get() = MusicLibrary.current(this)
     // Library calls hit the network: keep them off the main thread.
     private val io = MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(2))
     // Music library the car is shuffling; a queue from the app clears it
@@ -80,7 +81,6 @@ class MusicService : MediaLibraryService() {
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
         AirPlayManager.attach(player)
-        library = JellyfinLibrary(this)
         player.addListener(object : Player.Listener {
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) = refillLibraryShuffle(player)
         })
@@ -175,8 +175,8 @@ class MusicService : MediaLibraryService() {
             startPositionMs: Long,
         ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> {
             libraryShuffle = mediaItems.firstOrNull()?.mediaId
-                ?.takeIf { it.startsWith(JellyfinLibrary.SHUFFLE_PREFIX) }
-                ?.removePrefix(JellyfinLibrary.SHUFFLE_PREFIX)
+                ?.takeIf { it.startsWith(MusicLibrary.SHUFFLE_PREFIX) }
+                ?.removePrefix(MusicLibrary.SHUFFLE_PREFIX)
             if (isResolved(mediaItems)) {
                 return super.onSetMediaItems(mediaSession, controller, mediaItems, startIndex, startPositionMs)
             }

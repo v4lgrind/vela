@@ -21,7 +21,6 @@ const IMPORT = /(?:import|export)\s[^'"]*?from\s+['"]([^'"]+)['"]|import\(\s*['"
  */
 const LEGACY_SDK_IMPORTERS = [
   'store/jellyfin-store.ts',
-  'utils/lyrics.ts',
 ];
 
 /** The only app module allowed into `backends`, and only through the registry. */

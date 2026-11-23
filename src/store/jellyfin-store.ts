@@ -5,7 +5,6 @@ import type { BaseItemDto } from "@jellyfin/sdk/lib/generated-client/models/base
 import {
   getLibraryApi,
   getUserDataApi,
-  getLyricApi,
 } from "@jellyfin/sdk/lib/utils/api";
 
 import { CLIENT_IDENTITY, useSessionStore } from "./session-store";
@@ -125,25 +124,6 @@ export const useJellyfinStore = defineStore("jellyfin", {
 
 
 
-    /** Random songs from a music library. */
-    async fetchRandomTracks(libraryId: string, limit = 300) {
-      this.initializeApi();
-      const resp = await getLibraryApi(this.api).getItems({
-        userId: this.userId,
-        parentId: libraryId,
-        recursive: true,
-        includeItemTypes: ["Audio"] as any,
-        sortBy: ["Random"] as any,
-        limit,
-      });
-      return resp.data.Items ?? [];
-    },
-    /** A track's lyrics; the server answers 404 when it has none. */
-    async fetchLyrics(itemId: string) {
-      this.initializeApi();
-      const resp = await getLyricApi(this.api).getLyrics({ itemId });
-      return resp.data;
-    },
   },
   getters: {
     // Read-only views of the session, kept while pages still use this store.

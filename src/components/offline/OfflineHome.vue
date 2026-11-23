@@ -69,7 +69,9 @@ import { useAudioPlayerStore } from '@/store/audio-player-store';
 import { useLibrariesStore } from '@/store/libraries-store';
 import { useOfflineStore } from '@/store/offline-store';
 import { shuffleAround } from '@/utils/audioQueue';
-import { toAudioTrack } from '@/utils/audioTrack';
+import { trackToAudioTrack } from '@/utils/audioTrack';
+import { useSessionStore } from '@/store/session-store';
+import type { Track } from '@/domain';
 import { downloadedTracks, downloadsInLibrary, localLibraryPage } from '@/utils/offlineLibrary';
 import { resumeCandidates } from '@/utils/watchProgress';
 
@@ -103,11 +105,15 @@ function timeLeft(media: DownloadedMedia, position: number): string {
 }
 
 function play(itemId: string, position: number) {
-  router.push({ name: 'Player', params: { id: itemId }, query: { startTicks: String(Math.floor(position * 10_000_000)) } });
+  router.push({ name: 'Player', params: { id: itemId }, query: { startMs: String(Math.floor(position * 1000)) } });
 }
 
-function shuffle(tracks: any[]) {
-  const queue = tracks.map((track) => toAudioTrack(track));
+/** Downloads are stored as Jellyfin items until Phase 6. */
+function shuffle(tracks: unknown[]) {
+  const session = useSessionStore();
+  const queue = tracks.map(session.decodeStoredItem)
+    .filter((item): item is Track => item.kind === 'track')
+    .map((track) => trackToAudioTrack(track));
   audioStore.playAlbum(shuffleAround(queue, Math.floor(Math.random() * queue.length)), 0);
 }
 

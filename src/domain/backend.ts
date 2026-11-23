@@ -51,6 +51,8 @@ export interface MusicPort {
   randomTracks(libraryId: string, limit: number): Promise<Track[]>;
   streamUrl(trackId: ItemId, request: AudioStreamRequest): string;
   lyrics(trackId: ItemId): Promise<Lyrics | null>;
+  /** Reports the playback of one track (start / progress / stop). */
+  reporter(trackId: ItemId): PlaybackReporter;
 }
 
 export interface OfflineProgress {

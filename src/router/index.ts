@@ -1,6 +1,6 @@
 import { createRouter, createWebHashHistory } from "vue-router";
-import { useJellyfinStore } from "@/store/jellyfin-store";
 import { useSessionStore } from "@/store/session-store";
+import { trackToAudioTrack } from "@/utils/audioTrack";
 import { useAudioPlayerStore } from "@/store/audio-player-store";
 import { useOfflineStore } from "@/store/offline-store";
 import { usePreferencesStore } from "@/store/preferences-store";
@@ -92,7 +92,6 @@ export const router = createRouter({
 });
 
 router.beforeEach(async (to, _from, next) => {
-  const store = useJellyfinStore();
   const session = useSessionStore();
   await session.restore();
 
@@ -111,22 +110,11 @@ router.beforeEach(async (to, _from, next) => {
     next({ name: "libraries" });
   }
   // Redirect audio items away from the video player route (skip when offline to avoid server calls)
-  else if (!isOffline && to.name === "Player" && to.params.id) {
+  else if (!isOffline && to.name === "Player" && to.params.id && session.backend) {
     try {
-      const item = store.currentItem?.Id === to.params.id
-        ? store.currentItem
-        : await store.fetchItemDetails(to.params.id as string);
-      if (item && (item.Type === "Audio" || item.MediaType === "Audio")) {
-        const audioStore = useAudioPlayerStore();
-        audioStore.playTrack({
-          id: item.Id,
-          name: item.Name || "",
-          artist: item.AlbumArtist || item.Artists?.join(", ") || "",
-          albumId: item.AlbumId || item.ParentId || item.Id,
-          albumName: item.Album || "",
-          duration: item.RunTimeTicks ? item.RunTimeTicks / 10_000_000 : 0,
-          indexNumber: item.IndexNumber || 0,
-        });
+      const item = await session.backend.catalog.item(to.params.id as string);
+      if (item.kind === "track") {
+        useAudioPlayerStore().playTrack(trackToAudioTrack(item));
         // Stay on current page or go back
         next(false);
         return;

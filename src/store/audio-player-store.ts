@@ -12,6 +12,8 @@ export interface AudioTrack {
   albumName: string;
   duration: number;
   indexNumber: number;
+  /** Album cover (domain image ref); absent on queues saved before it existed. */
+  artwork?: string;
 }
 
 /** What the playback engine reports back; mirrored into the store. */

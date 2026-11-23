@@ -69,8 +69,7 @@
   → HEVC excluded → playback to the end), legacy account migrated on device.
   See the plan's "Phase 4 results".
 
+- Phase 5 done (2026-11-23): music through `backend.music`; see the plan.
+
 ## Next steps
-- Phase 5 (music): `audioPlayerService` stream URLs / reporting / lyrics /
-  shuffle through `backend.music` and a reporter; `OfflineHome` and router
-  audio redirect off `toAudioTrack(raw)`.
 - Phase 6 (offline/downloads), Phase 7 (seal), Phase 8 (Plex backend).

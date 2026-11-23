@@ -7,6 +7,12 @@ import { toQueryString } from './client';
 import type { JellyfinClient, Query } from './client';
 import { JellyfinHttpError } from './http';
 import { toLyrics, toMediaItem } from './mappers';
+import { createReporter } from './playback/session';
+
+/** Audio plays as a direct stream of the universal endpoint; Jellyfin only needs a session id to tie reports together. */
+function audioSessionId(): string {
+  return `session-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+}
 
 const NOT_FOUND = 404;
 
@@ -59,5 +65,9 @@ export function createJellyfinMusic(client: JellyfinClient): MusicPort {
     }),
     streamUrl,
     lyrics,
+    reporter: (trackId) => createReporter(client, {
+      method: 'direct-stream', url: '', headers: {}, mediaElementUrl: '', startOffsetMs: 0, externalSubtitles: [],
+      transcodeReasons: [], sessionId: audioSessionId(), version: { id: trackId, video: [], audio: [], subtitles: [] },
+    }, trackId),
   };
 }

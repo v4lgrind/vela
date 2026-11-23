@@ -6,7 +6,7 @@
       <p v-for="(line, i) in lyrics.lines" :key="i" ref="lineEls"
         class="py-2 text-2xl font-bold leading-snug cursor-pointer transition-colors duration-100"
         :class="i === active ? 'text-text-heading' : 'text-text-muted/40'"
-        @click="audioStore.seek(line.start ?? 0)">
+        @click="audioStore.seek((line.startMs ?? 0) / 1000)">
         {{ line.text || '♪' }}
       </p>
     </template>
@@ -19,7 +19,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useAudioPlayerStore } from '@/store/audio-player-store';
-import { activeLyricIndex, type Lyrics } from '@/utils/lyrics';
+import type { Lyrics } from '@/domain';
+import { activeLyricIndex } from '@/utils/lyrics';
 
 const props = defineProps<{ lyrics: Lyrics }>();
 const audioStore = useAudioPlayerStore();

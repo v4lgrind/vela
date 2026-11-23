@@ -484,6 +484,19 @@ must reproduce them byte for byte.
 - `NativeAudioPlugin.setLibraryConfig` receives `kind` (Android Auto stays
   Jellyfin-only until Phase 9).
 
+#### Phase 5 results (2026-11-23) — done
+
+- `audioPlayerService` streams, shuffles, reports and builds artwork through
+  `backend.music` (new `music.reporter(trackId)`); stream URLs identical to
+  before. The reported volume is now 0–100 (it was sent as 0–1).
+- Queue tracks carry their cover as a domain image ref (`AudioTrack.artwork`);
+  queues saved before the update get it from the server once.
+- Lyrics are domain `Lyrics` (ms) and gated by `capabilities.lyrics`.
+- Android Auto receives credentials only for Jellyfin accounts (its native
+  library is Jellyfin-only until Phase 9).
+- Router audio redirect, OfflineHome shuffle and the mini / expanded players
+  no longer touch Jellyfin types.
+
 ### Phase 6 — Offline on the domain (M)
 - `DownloadedMedia`: `serverId` + `item: MediaItem` snapshot instead of
   `jellyfinItem`; IndexedDB version bump with an upgrade that converts existing

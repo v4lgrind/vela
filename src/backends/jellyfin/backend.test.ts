@@ -118,6 +118,13 @@ describe('Jellyfin backend: user data, music, images', () => {
     });
   });
 
+  it('reports a track as a direct stream with its own session id', async () => {
+    const reporter = backend().music.reporter('t1');
+    await reporter.start({ positionMs: 0, isPaused: false, volume: 80 });
+    await reporter.stop({ positionMs: 90_500, isPaused: true });
+    expect(requests.map((r) => `${r.method} ${r.path}`)).toEqual(['POST /Sessions/Playing', 'POST /Sessions/Playing/Stopped']);
+  });
+
   it('returns null lyrics on 404', async () => {
     responses['/Audio/t1/Lyrics'] = { status: 404 };
     expect(await backend().music.lyrics('t1')).toBeNull();

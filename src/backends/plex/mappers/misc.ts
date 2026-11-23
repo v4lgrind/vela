@@ -1,6 +1,6 @@
-import type { Chapter, Library, LibraryKind, Marker, MarkerKind } from '@/domain';
+import type { Chapter, Library, LibraryKind, Marker, MarkerKind, Person } from '@/domain';
 
-import type { PlexChapter, PlexDirectory, PlexMarker } from '../types';
+import type { PlexChapter, PlexDirectory, PlexMarker, PlexTag } from '../types';
 
 const LIBRARY_KIND_BY_TYPE: Record<string, LibraryKind> = {
   movie: 'movies',
@@ -37,4 +37,17 @@ export function toChapters(chapters: PlexChapter[] | undefined): Chapter[] {
     startMs: chapter.startTimeOffset,
     endMs: chapter.endTimeOffset,
   }));
+}
+
+/** `GET /library/people/{id}`: a tag with a name and a photo, no biography. */
+export function toPerson(tag: PlexTag): Person {
+  return {
+    id: String(tag.id ?? ''),
+    kind: 'person',
+    title: tag.tag,
+    genres: [],
+    studios: [],
+    images: tag.thumb ? { poster: tag.thumb } : {},
+    user: { played: false, playCount: 0, favorite: false },
+  };
 }

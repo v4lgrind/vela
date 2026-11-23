@@ -144,6 +144,13 @@ export interface PlexDirectory {
   art?: string;
 }
 
+export interface PlexHub {
+  type: string;
+  hubIdentifier?: string;
+  size?: number;
+  Metadata?: PlexMetadata[];
+}
+
 export interface PlexContainer<T = PlexMetadata> {
   MediaContainer: {
     size?: number;
@@ -151,5 +158,6 @@ export interface PlexContainer<T = PlexMetadata> {
     offset?: number;
     Metadata?: T[];
     Directory?: PlexDirectory[];
+    Hub?: PlexHub[];
   };
 }

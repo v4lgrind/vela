@@ -4,7 +4,7 @@ import { AuthError } from '@/domain';
 import type { AuthStep, ClientIdentity } from '@/domain';
 
 import { createPlexAuthenticator } from './auth';
-import { orderConnections, raceConnections } from './connect';
+import { isPrivatePlexDirect, orderConnections, raceConnections, savedConnections } from './connect';
 
 const identity: ClientIdentity = { product: 'Vela', version: '1.0.0', deviceName: 'Phone', platform: 'Android' };
 const MACHINE = 'machine-1';
@@ -176,6 +176,58 @@ describe('reconnect', () => {
   it('moves to another saved address away from home', async () => {
     serve({ 'GET https://wan.example/identity': () => ({ MediaContainer: { machineIdentifier: MACHINE } }) });
     expect(await createPlexAuthenticator(identity).reconnect!(saved, 'server-token')).toBe('https://wan.example');
+  });
+});
+
+const identityAfter = (ms: number) => (_url: URL, init: RequestInit) => new Promise((resolve, reject) => {
+  const timer = setTimeout(() => resolve({ MediaContainer: { machineIdentifier: MACHINE } }), ms);
+  init.signal?.addEventListener('abort', () => { clearTimeout(timer); reject(new Error('aborted')); });
+});
+
+describe('address preference', () => {
+  const LAN = 'https://192-168-1-10.abc123.plex.direct:32400';
+  const WAN = 'https://203-0-113-7.abc123.plex.direct:32400';
+  const both = [{ uri: WAN, local: false, relay: false }, { uri: LAN, local: true, relay: false }];
+
+  it('takes the local address even when the public one answers first (no NAT loopback)', async () => {
+    serve({ [`GET ${LAN}/identity`]: identityAfter(60), [`GET ${WAN}/identity`]: identityAfter(5) });
+    expect(await raceConnections(both, MACHINE, {})).toBe(LAN);
+  });
+
+  it('falls back to the public address when the local one never answers', async () => {
+    serve({ [`GET ${LAN}/identity`]: identityAfter(60_000), [`GET ${WAN}/identity`]: identityAfter(5) });
+    const started = Date.now();
+    expect(await raceConnections(both, MACHINE, {})).toBe(WAN);
+    expect(Date.now() - started).toBeGreaterThanOrEqual(950);
+  });
+
+  it('takes the public address at once when the local one fails', async () => {
+    serve({ [`GET ${WAN}/identity`]: identityAfter(5) });
+    const started = Date.now();
+    expect(await raceConnections(both, MACHINE, {})).toBe(WAN);
+    expect(Date.now() - started).toBeLessThan(500);
+  });
+
+  it('recognises LAN addresses in saved plex.direct names', () => {
+    expect(isPrivatePlexDirect(LAN)).toBe(true);
+    expect(isPrivatePlexDirect('https://10-0-0-2.abc.plex.direct:32400')).toBe(true);
+    expect(isPrivatePlexDirect('https://172-20-0-2.abc.plex.direct:32400')).toBe(true);
+    expect(isPrivatePlexDirect(WAN)).toBe(false);
+    expect(isPrivatePlexDirect('https://172-40-0-2.abc.plex.direct:32400')).toBe(false);
+    expect(savedConnections(WAN, [LAN, WAN, 'https://relay.example:8443'])).toEqual([
+      { uri: LAN, local: true, relay: false, delayMs: 0 },
+      { uri: WAN, local: false, relay: false, delayMs: 0 },
+      { uri: 'https://relay.example:8443', local: false, relay: false, delayMs: 250 },
+    ]);
+  });
+
+  it('moves a reconnect from the saved public address back to the LAN', async () => {
+    serve({ [`GET ${LAN}/identity`]: identityAfter(60), [`GET ${WAN}/identity`]: identityAfter(5) });
+    const saved = {
+      kind: 'plex' as const, serverId: MACHINE, serverName: 'S', user: { id: 'u', name: 'U' }, tokenKey: 'k', deviceId: 'client-1',
+      baseUrl: WAN, candidateUrls: [LAN, WAN],
+    };
+    expect(await createPlexAuthenticator(identity).reconnect!(saved, 'server-token')).toBe(LAN);
   });
 });
 

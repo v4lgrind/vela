@@ -40,12 +40,12 @@
     <!-- Continue Watching -->
     <Section v-if="resumeItems.length" :title="t('home.continueWatching')">
       <MediaRail>
-        <div v-for="item in resumeItems" :key="item.Id" class="shrink-0 w-44 sm:w-52 group">
+        <div v-for="item in resumeItems" :key="item.id" class="shrink-0 w-44 sm:w-52 group">
           <!-- Thumbnail -->
           <div class="relative rounded-xl overflow-hidden bg-surface-raised aspect-video mb-1.5
                       group-hover:-translate-y-1 group-hover:shadow-xl transition-all duration-200 cursor-pointer active:scale-[0.97] active:opacity-75"
                @click="playResume(item)">
-            <LazyImg :src="getResumeImageUrl(item)" :alt="item.Name ?? undefined" :item-type="item.Type"
+            <LazyImg :src="resumeImageUrl(item)" :alt="item.title" :kind="item.kind"
               class="block w-full h-full object-cover" />
 
             <!-- Play overlay -->
@@ -58,11 +58,11 @@
             </div>
 
             <!-- Download badge -->
-            <div v-if="offlineStore.isItemDownloaded(item.Id)"
+            <div v-if="offlineStore.isItemDownloaded(item.id)"
               class="absolute top-1.5 left-1.5 bg-accent-purple/80 rounded-full p-1 shadow pointer-events-none">
               <DownloadIcon class="size-3 text-white" />
             </div>
-            <div v-else-if="downloadStore.isDownloading(item.Id)"
+            <div v-else-if="downloadStore.isDownloading(item.id)"
               class="absolute top-1.5 left-1.5 bg-accent-purple/80 rounded-full p-1 shadow pointer-events-none animate-pulse">
               <Loader2 class="size-3 text-white animate-spin" />
             </div>
@@ -72,14 +72,14 @@
               class="absolute top-1.5 right-1.5 p-1.5 rounded-full bg-black/50 text-white/70
                      opacity-100 sm:opacity-0 sm:group-hover:opacity-100 hover:bg-black/80 hover:text-white
                      transition-all duration-200 cursor-pointer pointer-events-auto">
-              <Loader2 v-if="markingPlayed.has(item.Id)" class="size-3 animate-spin" />
+              <Loader2 v-if="markingPlayed.has(item.id)" class="size-3 animate-spin" />
               <Check v-else class="size-3" />
             </button>
 
             <!-- Progress bar — after overlay in DOM so it always renders on top -->
             <div class="absolute bottom-0 left-0 right-0 h-1 bg-white/20">
               <div class="h-full bg-accent-purple transition-all"
-                :style="{ width: (item.UserData?.PlayedPercentage ?? 0) + '%' }" />
+                :style="{ width: playedPercent(item) + '%' }" />
             </div>
           </div>
 
@@ -89,8 +89,8 @@
                  :title="resumeTitle(item)">
               {{ resumeTitle(item) }}
             </div>
-            <div v-if="item.Type === 'Episode'" class="text-xs text-text-muted truncate mt-0.5">
-              S{{ item.ParentIndexNumber }}E{{ item.IndexNumber }}
+            <div v-if="item.kind === 'episode'" class="text-xs text-text-muted truncate mt-0.5">
+              S{{ item.seasonNumber }}E{{ item.episodeNumber }}
             </div>
             <div v-if="remainingTime(item)" class="text-xs text-text-muted mt-0.5">
               {{ remainingTime(item) }}
@@ -103,12 +103,12 @@
     <!-- Next Up -->
     <Section v-if="nextUpItems.length" :title="t('home.nextUp')">
       <MediaRail>
-        <div v-for="item in nextUpItems" :key="item.Id" class="shrink-0 w-44 sm:w-52 group">
+        <div v-for="item in nextUpItems" :key="item.id" class="shrink-0 w-44 sm:w-52 group">
           <!-- Thumbnail -->
           <div class="relative rounded-xl overflow-hidden bg-surface-raised aspect-video mb-1.5
                       group-hover:-translate-y-1 group-hover:shadow-xl transition-all duration-200 cursor-pointer active:scale-[0.97] active:opacity-75"
                @click="playResume(item)">
-            <LazyImg :src="getResumeImageUrl(item)" :alt="item.Name ?? undefined" :item-type="item.Type"
+            <LazyImg :src="resumeImageUrl(item)" :alt="item.title" :kind="item.kind"
               class="block w-full h-full object-cover" />
 
             <!-- Play overlay -->
@@ -121,11 +121,11 @@
             </div>
 
             <!-- Download badge -->
-            <div v-if="offlineStore.isItemDownloaded(item.Id)"
+            <div v-if="offlineStore.isItemDownloaded(item.id)"
               class="absolute top-1.5 left-1.5 bg-accent-purple/80 rounded-full p-1 shadow pointer-events-none">
               <DownloadIcon class="size-3 text-white" />
             </div>
-            <div v-else-if="downloadStore.isDownloading(item.Id)"
+            <div v-else-if="downloadStore.isDownloading(item.id)"
               class="absolute top-1.5 left-1.5 bg-accent-purple/80 rounded-full p-1 shadow pointer-events-none animate-pulse">
               <Loader2 class="size-3 text-white animate-spin" />
             </div>
@@ -135,7 +135,7 @@
               class="absolute top-1.5 right-1.5 p-1.5 rounded-full bg-black/50 text-white/70
                      opacity-100 sm:opacity-0 sm:group-hover:opacity-100 hover:bg-black/80 hover:text-white
                      transition-all duration-200 cursor-pointer pointer-events-auto">
-              <Loader2 v-if="markingPlayed.has(item.Id)" class="size-3 animate-spin" />
+              <Loader2 v-if="markingPlayed.has(item.id)" class="size-3 animate-spin" />
               <Check v-else class="size-3" />
             </button>
           </div>
@@ -143,11 +143,11 @@
           <!-- Title -->
           <div class="px-0.5 cursor-pointer" @click="goToItem(item)">
             <div class="text-xs font-semibold text-text-heading truncate hover:text-accent-purple-light transition-colors"
-                 :title="item.SeriesName ?? item.Name ?? undefined">
-              {{ item.SeriesName ?? item.Name }}
+                 :title="item.seriesTitle || item.title">
+              {{ item.seriesTitle || item.title }}
             </div>
             <div class="text-xs text-text-muted truncate mt-0.5">
-              S{{ item.ParentIndexNumber }}E{{ item.IndexNumber }} · {{ item.Name }}
+              S{{ item.seasonNumber }}E{{ item.episodeNumber }} · {{ item.title }}
             </div>
           </div>
         </div>
@@ -156,7 +156,7 @@
 
     <!-- Recently Added per library -->
     <template v-if="latestLoading">
-      <section v-for="lib in mediaItems" :key="'latest-skeleton-' + lib.Id" class="mt-section">
+      <section v-for="lib in libraries" :key="'latest-skeleton-' + lib.id" class="mt-section">
         <Skeleton class="mb-3 h-6 w-56 rounded-md" />
         <MediaRail>
           <Skeleton v-for="i in 5" :key="i" class="aspect-[2/3] w-32 shrink-0 rounded-xl sm:w-36" />
@@ -164,40 +164,40 @@
       </section>
     </template>
     <template v-else>
-      <Section v-for="lib in mediaItems" :key="'latest-' + lib.Id"
-        v-show="latestByLibrary[lib.Id]?.length"
-        :title="t('home.recentlyAdded', { library: lib.Name })">
+      <Section v-for="lib in libraries" :key="'latest-' + lib.id"
+        v-show="latestByLibrary[lib.id]?.length"
+        :title="t('home.recentlyAdded', { library: lib.title })">
         <MediaRail>
-          <div v-for="item in latestByLibrary[lib.Id]" :key="item.Id"
+          <div v-for="item in latestByLibrary[lib.id]" :key="item.id"
             class="shrink-0 w-32 sm:w-36 group cursor-pointer active:scale-[0.97] active:opacity-75 transition-all duration-200"
             @click="goToItem(item)">
             <div class="relative rounded-xl overflow-hidden bg-surface-raised mb-1.5 aspect-[2/3]
                         group-hover:-translate-y-1 group-hover:shadow-xl transition-all duration-200">
-              <LazyImg :src="getLatestImageUrl(item)" :alt="item.Name ?? undefined" :item-type="item.Type"
+              <LazyImg :src="imageUrl(item.images.poster, POSTER)" :alt="item.title" :kind="item.kind"
                 class="block w-full h-full object-cover" />
               <!-- Download badge -->
-              <div v-if="offlineStore.isItemDownloaded(item.Id)"
+              <div v-if="offlineStore.isItemDownloaded(item.id)"
                 class="absolute top-1.5 left-1.5 bg-accent-purple/80 rounded-full p-1 shadow pointer-events-none">
                 <DownloadIcon class="size-3 text-white" />
               </div>
-              <div v-else-if="downloadStore.isDownloading(item.Id)"
+              <div v-else-if="downloadStore.isDownloading(item.id)"
                 class="absolute top-1.5 left-1.5 bg-accent-purple/80 rounded-full p-1 shadow pointer-events-none animate-pulse">
                 <Loader2 class="size-3 text-white animate-spin" />
               </div>
             </div>
             <div class="px-0.5 text-xs font-semibold text-text-heading truncate
                         group-hover:text-accent-purple-light transition-colors"
-              :title="item.Name ?? undefined">
-              {{ item.Name }}
+              :title="item.title">
+              {{ item.title }}
             </div>
-            <div v-if="item.ProductionYear" class="px-0.5 text-xs text-text-muted mt-0.5">
-              {{ item.ProductionYear }}
+            <div v-if="item.year" class="px-0.5 text-xs text-text-muted mt-0.5">
+              {{ item.year }}
             </div>
           </div>
 
           <!-- View all button -->
           <router-link
-            :to="{ name: 'libraryItem', params: { id: lib.Id, name: lib.Name } }"
+            :to="{ name: 'libraryItem', params: { id: lib.id, name: lib.title } }"
             class="shrink-0 w-32 sm:w-36 flex flex-col items-center justify-center gap-2
                    aspect-[2/3] rounded-xl border border-white/10 bg-white/5
                    hover:bg-white/10 hover:border-white/20 transition-colors group">
@@ -225,17 +225,17 @@
 
       <!-- Library row -->
       <MediaRail v-else>
-        <router-link v-for="item in mediaItems" :key="item.Id"
+        <router-link v-for="item in libraries" :key="item.id"
           class="shrink-0 w-44 sm:w-52 group active:scale-[0.97] active:opacity-75 transition-all duration-200"
-          :to="{ name: 'libraryItem', params: { id: item.Id, name: item.Name } }">
+          :to="{ name: 'libraryItem', params: { id: item.id, name: item.title } }">
           <div class="relative rounded-xl overflow-hidden bg-surface-raised aspect-video mb-1.5
                       group-hover:-translate-y-1 group-hover:shadow-xl transition-all duration-200">
-            <LazyImg :src="item.imageUrl" :alt="item.Name" :item-type="item.Type"
+            <LazyImg :src="imageUrl(item.images.poster, LIBRARY_TILE)" :alt="item.title"
               class="block w-full h-full object-cover" />
           </div>
           <div class="px-0.5 text-xs font-semibold text-text-heading truncate
                       group-hover:text-accent-purple-light transition-colors">
-            {{ item.Name }}
+            {{ item.title }}
           </div>
         </router-link>
       </MediaRail>
@@ -248,9 +248,12 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
-import type { BaseItemDto } from '@jellyfin/sdk/lib/generated-client/models/base-item-dto';
-import { useJellyfinStore } from '@/store/jellyfin-store';
-import type { HomeCache, HomeItem, HomeLibraryCard } from '@/store/jellyfin-store';
+import { playedPercent, remainingMs } from '@/domain';
+import type { Episode, ImageSize, Library, MediaItem } from '@/domain';
+import { useBackend, useImageUrl } from '@/composables/useBackend';
+import { useHomeStore } from '@/store/home-store';
+import { useLibrariesStore } from '@/store/libraries-store';
+import { useSessionStore } from '@/store/session-store';
 import LazyImg from '@/components/LazyImg.vue';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -266,15 +269,27 @@ import { useRetryWhileFailed } from '@/composables/useRetryWhileFailed';
 import OfflineHome from '@/components/offline/OfflineHome.vue';
 
 const { t } = useI18n();
-const store = useJellyfinStore();
+const backend = useBackend();
+const imageUrl = useImageUrl();
+const session = useSessionStore();
+const homeStore = useHomeStore();
+const librariesStore = useLibrariesStore();
 const offlineStore = useOfflineStore();
 const downloadStore = useDownloadStore();
 const router = useRouter();
 
-const mediaItems = ref<HomeLibraryCard[]>([]);
-const resumeItems = ref<HomeItem[]>([]);
-const nextUpItems = ref<HomeItem[]>([]);
-const latestByLibrary = ref<Record<string, HomeItem[]>>({});
+const POSTER: ImageSize = { width: 300, height: 450 };
+const RESUME_IMAGE: ImageSize = { width: 640, height: 360 };
+const LIBRARY_TILE: ImageSize = { width: 800, height: 400 };
+const RESUME_LIMIT = 12;
+const UP_NEXT_LIMIT = 20;
+const LATEST_LIMIT = 10;
+const MIN_REMAINING_MS = 60_000;
+
+const libraries = ref<Library[]>([]);
+const resumeItems = ref<MediaItem[]>([]);
+const nextUpItems = ref<Episode[]>([]);
+const latestByLibrary = ref<Record<string, MediaItem[]>>({});
 const loading = ref(true);
 const latestLoading = ref(false);
 const refreshing = ref(false);
@@ -282,75 +297,59 @@ const audioStore = useAudioPlayerStore();
 const showAirPlay = ref(false);
 const error = ref<string | null>(null);
 
-function hasHomeItemId(item: BaseItemDto): item is HomeItem {
-  return typeof item.Id === 'string' && item.Id.length > 0;
-}
-
 function restoreCachedHome(): boolean {
-  const cache = store.homeCache;
-  const key = JSON.stringify([store.serverUrl, store.userId]);
-  if (!cache || cache.key !== key) return false;
-  mediaItems.value = cache.mediaItems;
-  resumeItems.value = cache.resumeItems;
-  nextUpItems.value = cache.nextUpItems;
-  latestByLibrary.value = cache.latestByLibrary;
+  const snapshot = homeStore.snapshot;
+  if (!snapshot || snapshot.accountKey !== session.activeKey) return false;
+  libraries.value = snapshot.libraries;
+  resumeItems.value = snapshot.resumeItems;
+  nextUpItems.value = snapshot.upNext;
+  latestByLibrary.value = snapshot.latestByLibrary;
   loading.value = false;
   latestLoading.value = false;
   return true;
 }
 
 function cacheCurrentHome() {
-  const snapshot: HomeCache = {
-    key: JSON.stringify([store.serverUrl, store.userId]),
-    mediaItems: mediaItems.value,
+  if (!session.activeKey) return;
+  homeStore.snapshot = {
+    accountKey: session.activeKey,
+    libraries: libraries.value,
     resumeItems: resumeItems.value,
-    nextUpItems: nextUpItems.value,
+    upNext: nextUpItems.value,
     latestByLibrary: latestByLibrary.value,
   };
-  store.homeCache = snapshot;
 }
 
 const isOffline = computed(() => !offlineStore.isFullyOnline);
 
+async function loadLatest(libs: Library[]) {
+  latestLoading.value = Object.keys(latestByLibrary.value).length === 0;
+  const latest = await Promise.all(libs.map((lib) => backend.value.catalog.latest(lib.id, LATEST_LIMIT)));
+  latestByLibrary.value = Object.fromEntries(libs.map((lib, index) => [lib.id, latest[index]]));
+}
+
 async function loadMedia(force = false) {
   if (isOffline.value) return;
   // A stale snapshot stays rendered while fresh data loads without a spinner.
-  if (!force && restoreCachedHome() && !store.homeCache?.stale) return;
+  if (!force && restoreCachedHome() && !homeStore.snapshot?.isStale) return;
 
-  const hasCachedContent = mediaItems.value.length > 0;
+  const hasCachedContent = libraries.value.length > 0;
   loading.value = !hasCachedContent;
   refreshing.value = force;
   error.value = null;
   try {
-    const [libs, resume, nextUp] = await Promise.all([
-      store.fetchLibraries(),
-      store.fetchResumeItems(12),
-      store.fetchAllNextUp(20),
+    const [libs, resume, upNext] = await Promise.all([
+      librariesStore.refresh(),
+      backend.value.catalog.resumeItems(RESUME_LIMIT),
+      backend.value.catalog.upNext(UP_NEXT_LIMIT),
     ]);
-    const validLibraries = libs.filter(hasHomeItemId);
     void offlineStore.cacheLibraryArtwork();
-    mediaItems.value = validLibraries.map(lib => ({
-      Id: lib.Id,
-      Name: lib.Name || '',
-      Type: lib.Type,
-      imageUrl: store.getImageUrl(lib.Id, 'Primary', 800, 400) || '',
-    }));
-    resumeItems.value = resume.filter(hasHomeItemId);
-    const resumeIds = new Set(resumeItems.value.map(item => item.Id));
-    nextUpItems.value = nextUp
-      .filter(hasHomeItemId)
-      .filter(item => !resumeIds.has(item.Id));
+    libraries.value = libs;
+    resumeItems.value = resume;
+    const resumeIds = new Set(resume.map((item) => item.id));
+    nextUpItems.value = upNext.filter((item) => !resumeIds.has(item.id));
     loading.value = false;
-
-    latestLoading.value = Object.keys(latestByLibrary.value).length === 0;
-    const latestResults = await Promise.all(
-      validLibraries.map(lib => store.fetchLatestItems(lib.Id, 10)),
-    );
-    const latestMap: Record<string, HomeItem[]> = {};
-    validLibraries.forEach((lib, index) => {
-      latestMap[lib.Id] = latestResults[index].filter(hasHomeItemId);
-    });
-    latestByLibrary.value = latestMap;
+    await loadLatest(libs);
     cacheCurrentHome();
   } catch {
     if (!hasCachedContent) error.value = t('home.loadError');
@@ -361,63 +360,42 @@ async function loadMedia(force = false) {
   }
 }
 
-function getLatestImageUrl(item: HomeItem): string {
-  if (item.Type === 'Episode') {
-    const posterId = item.SeriesId || item.ParentPrimaryImageItemId;
-    return posterId ? store.getImageUrl(posterId, 'Primary', 300, 450) : '';
-  }
-  return store.getImageUrl(item.Id, 'Primary', 300, 450) || '';
+/** Wide art for the resume rows: the item's backdrop (series backdrop for episodes), else its still or poster. */
+function resumeImageUrl(item: MediaItem): string {
+  return imageUrl(item.images.backdrop ?? item.images.thumb ?? item.images.poster, RESUME_IMAGE);
 }
 
-function getResumeImageUrl(item: HomeItem): string {
-  if (item.BackdropImageTags?.length) {
-    return store.getImageUrl(item.Id, 'Backdrop', 640, 360);
-  }
-  if (item.ParentBackdropItemId) {
-    return store.getImageUrl(item.ParentBackdropItemId, 'Backdrop', 640, 360);
-  }
-  return store.getImageUrl(item.Id, 'Primary', 640, 360) || '';
+function resumeTitle(item: MediaItem): string {
+  return item.kind === 'episode' ? item.seriesTitle || item.title : item.title;
 }
 
-function resumeTitle(item: HomeItem): string {
-  return (item.Type === 'Episode' ? item.SeriesName || item.Name : item.Name) || '';
-}
-
-function remainingTime(item: HomeItem): string {
-  const total = item.RunTimeTicks;
-  const position = item.UserData?.PlaybackPositionTicks ?? 0;
-  if (!total || !position) return '';
-  const remainingSecs = Math.max(0, Math.floor((total - position) / 10_000_000));
-  if (remainingSecs < 60) return '';
-  return formatRemaining(remainingSecs);
+function remainingTime(item: MediaItem): string {
+  const left = remainingMs(item);
+  return left < MIN_REMAINING_MS ? '' : formatRemaining(Math.floor(left / 1000));
 }
 
 const markingPlayed = ref<Set<string>>(new Set());
 
-async function markPlayed(item: HomeItem) {
-  if (markingPlayed.value.has(item.Id)) return;
-  markingPlayed.value.add(item.Id);
+async function markPlayed(item: MediaItem) {
+  if (markingPlayed.value.has(item.id)) return;
+  markingPlayed.value.add(item.id);
   try {
-    await store.markPlayed(item.Id);
-    resumeItems.value = resumeItems.value.filter(candidate => candidate.Id !== item.Id);
-    nextUpItems.value = nextUpItems.value.filter(candidate => candidate.Id !== item.Id);
+    await backend.value.userData.setPlayed(item.id, true);
+    resumeItems.value = resumeItems.value.filter((candidate) => candidate.id !== item.id);
+    nextUpItems.value = nextUpItems.value.filter((candidate) => candidate.id !== item.id);
     cacheCurrentHome();
   } finally {
-    markingPlayed.value.delete(item.Id);
+    markingPlayed.value.delete(item.id);
   }
 }
 
-function playResume(item: HomeItem) {
-  const ticks = item.UserData?.PlaybackPositionTicks;
-  router.push({
-    name: 'Player',
-    params: { id: item.Id },
-    query: ticks ? { startTicks: String(ticks) } : {},
-  });
+function playResume(item: MediaItem) {
+  const startMs = item.user.resumePositionMs;
+  router.push({ name: 'Player', params: { id: item.id }, query: startMs ? { startMs: String(startMs) } : {} });
 }
 
-function goToItem(item: HomeItem) {
-  router.push({ name: 'ItemDetails', params: { id: item.Id } });
+function goToItem(item: MediaItem) {
+  router.push({ name: 'ItemDetails', params: { id: item.id } });
 }
 
 useRetryWhileFailed(computed(() => error.value !== null), () => loadMedia());

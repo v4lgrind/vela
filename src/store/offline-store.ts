@@ -5,6 +5,8 @@ import { buildDownloadedMedia, offlineDatabase, type DownloadedMedia } from '../
 import { downloadService } from '../services/downloadService';
 import { syncService } from '../services/syncService';
 import { useJellyfinStore } from './jellyfin-store';
+import { useLibrariesStore } from './libraries-store';
+import { useSessionStore } from './session-store';
 import { useMetadataCacheStore } from './metadata-cache-store';
 import { Capacitor } from '@capacitor/core';
 import { DownloadPlugin } from '@/plugins/DownloadPlugin';
@@ -353,9 +355,8 @@ export const useOfflineStore = defineStore('offline', {
       const jellyfinStore = useJellyfinStore();
       const { serverUrl, accessToken } = jellyfinStore;
       if (!this.isFullyOnline || !serverUrl || !accessToken) return;
-      await Promise.allSettled(jellyfinStore.libraries
-        .filter((library) => library.Id)
-        .map((library) => downloadService.cacheArtworkById(serverUrl, accessToken, library.Id!, 'Primary', 800)));
+      await Promise.allSettled(useLibrariesStore().libraries
+        .map((library) => downloadService.cacheArtworkById(serverUrl, accessToken, library.id, 'Primary', 800)));
     },
 
     /** Library of each download, from Jellyfin, for records that lack it (online only). */
@@ -368,7 +369,7 @@ export const useOfflineStore = defineStore('offline', {
         if (!missing.length) return;
         for (const download of missing) {
           try {
-            const libraryId = await jellyfinStore.fetchLibraryIdOf(download.itemId);
+            const libraryId = await useSessionStore().backend?.catalog.libraryOf(download.itemId);
             if (libraryId) await offlineDatabase.patchDownload(download.itemId, { libraryId });
           } catch (error) {
             logger.warn('[OfflineStore] Could not find the library of', download.itemId, error);

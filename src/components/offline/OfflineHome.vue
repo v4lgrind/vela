@@ -27,7 +27,7 @@
     </Section>
 
     <!-- One row per music library: audiobooks never mix into the music. -->
-    <Section v-for="row in musicRows" :key="row.library.Id!" :title="row.library.Name || ''">
+    <Section v-for="row in musicRows" :key="row.library.id" :title="row.library.title">
       <template #actions>
         <Button variant="secondary" size="sm" class="rounded-full" @click="shuffle(row.tracks)">
           <Shuffle class="size-4" /> {{ t('library.music.shuffleAll') }}
@@ -66,7 +66,7 @@ import { useOfflineArtwork } from '@/composables/useOfflineArtwork';
 import { formatRemaining } from '@/i18n/format';
 import { offlineDatabase, type DownloadedMedia, type WatchProgress } from '@/services/offlineDatabase';
 import { useAudioPlayerStore } from '@/store/audio-player-store';
-import { useJellyfinStore } from '@/store/jellyfin-store';
+import { useLibrariesStore } from '@/store/libraries-store';
 import { useOfflineStore } from '@/store/offline-store';
 import { shuffleAround } from '@/utils/audioQueue';
 import { toAudioTrack } from '@/utils/audioTrack';
@@ -75,7 +75,8 @@ import { resumeCandidates } from '@/utils/watchProgress';
 
 const { t } = useI18n();
 const router = useRouter();
-const store = useJellyfinStore();
+const librariesStore = useLibrariesStore();
+librariesStore.importLegacy();
 const offlineStore = useOfflineStore();
 const audioStore = useAudioPlayerStore();
 const { artworkUrl, preload } = useOfflineArtwork();
@@ -87,10 +88,10 @@ const ALBUMS = {
   startIndex: 0, limit: 30, sortBy: 'SortName', sortOrder: 'Ascending' as const,
   unplayedOnly: false, favoritesOnly: false, genres: [], nameStartsWith: '', seed: 1,
 };
-const musicRows = computed(() => store.libraries
-  .filter((library) => library.CollectionType === 'music')
+const musicRows = computed(() => librariesStore.libraries
+  .filter((library) => library.kind === 'music')
   .map((library) => {
-    const downloads = downloadsInLibrary(offlineStore.downloads, library, store.libraries);
+    const downloads = downloadsInLibrary(offlineStore.downloads, library, librariesStore.libraries);
     return { library, tracks: downloadedTracks(downloads), albums: localLibraryPage(downloads, 'albums', 'music', ALBUMS).items };
   })
   .filter((row) => row.tracks.length));

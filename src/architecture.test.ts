@@ -20,8 +20,6 @@ const IMPORT = /(?:import|export)\s[^'"]*?from\s+['"]([^'"]+)['"]|import\(\s*['"
  * This list may only shrink: migrate a file, then remove it here.
  */
 const LEGACY_SDK_IMPORTERS = [
-  'pages/LibrariesPage.vue',
-  'pages/MediaList.vue',
   'store/jellyfin-store.ts',
   'utils/detailMeta.test.ts',
   'utils/detailMeta.ts',
@@ -59,7 +57,7 @@ describe('architecture', () => {
   });
 
   it('domain imports only itself', () => {
-    expect(violations(inside('domain'), (spec) => spec.startsWith('./'))).toEqual([]);
+    expect(violations(inside('domain'), (spec, path) => spec.startsWith('./') || (spec === 'vitest' && isTest(path)))).toEqual([]);
   });
 
   it('each backend imports only the domain, itself and its own SDK', () => {

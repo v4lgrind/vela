@@ -12,8 +12,6 @@ import {
   getLyricApi,
 } from "@jellyfin/sdk/lib/utils/api";
 
-import { pickLibraryId } from "@/utils/libraryOf";
-
 import { CLIENT_IDENTITY, useSessionStore } from "./session-store";
 
 function createJellyfinClient(deviceId: string): Jellyfin {
@@ -29,31 +27,11 @@ function activeJellyfin() {
   return session.active?.kind === "jellyfin" ? session.active : null;
 }
 
-export type HomeItem = BaseItemDto & { Id: string };
-
-export interface HomeLibraryCard {
-  Id: string;
-  Name: string;
-  imageUrl: string;
-  Type?: string;
-}
-
-export interface HomeCache {
-  key: string;
-  mediaItems: HomeLibraryCard[];
-  resumeItems: HomeItem[];
-  nextUpItems: HomeItem[];
-  latestByLibrary: Record<string, HomeItem[]>;
-  /** Playback may have changed resume/next-up data; refetch behind the snapshot. */
-  stale?: boolean;
-}
-
 interface State {
   libraries: any[];
   items: any[];
   api: Raw<Api>;
   currentItem: any | null;
-  homeCache: HomeCache | null;
 }
 
 export const useJellyfinStore = defineStore("jellyfin", {
@@ -62,7 +40,6 @@ export const useJellyfinStore = defineStore("jellyfin", {
     items: [],
     api: markRaw({} as Api),
     currentItem: null,
-    homeCache: null,
   }),
   persist: {
     // libraries: remembered so the offline library list shows the real ones.
@@ -79,7 +56,6 @@ export const useJellyfinStore = defineStore("jellyfin", {
       this.libraries = [];
       this.items = [];
       this.currentItem = null;
-      this.homeCache = null;
     },
     async fetchLibraries() {
       this.initializeApi();
@@ -127,13 +103,6 @@ export const useJellyfinStore = defineStore("jellyfin", {
       return { items: this.items, total: resp.data.TotalRecordCount ?? this.items.length };
     },
 
-    /** The library (user view) an item belongs to, from its ancestors. */
-    async fetchLibraryIdOf(itemId: string): Promise<string | undefined> {
-      this.initializeApi();
-      const resp = await getLibraryApi(this.api).getAncestors({ itemId, userId: this.userId });
-      const libraryIds = this.libraries.map((library) => library.Id).filter((id): id is string => !!id);
-      return pickLibraryId(resp.data ?? [], libraryIds);
-    },
 
     /** Items by id, with their user data (100 ids per request). */
     async fetchItemsByIds(ids: string[]): Promise<BaseItemDto[]> {
@@ -186,9 +155,6 @@ export const useJellyfinStore = defineStore("jellyfin", {
       url += `?${params.toString()}`;
       return url;
     },
-    markHomeCacheStale() {
-      if (this.homeCache) this.homeCache = { ...this.homeCache, stale: true };
-    },
     async fetchItemDetails(itemId: string) {
       this.initializeApi();
 
@@ -207,42 +173,7 @@ export const useJellyfinStore = defineStore("jellyfin", {
       return this.currentItem;
     },
 
-    async searchItems(opts: {
-      searchTerm: string;
-      limit?: number;
-      includeItemTypes?: string[];
-    }) {
-      this.initializeApi();
 
-      if (!this.api || !this.userId) return [];
-      const resp = await getLibraryApi(this.api).getItems({
-        userId: this.userId,
-        searchTerm: opts.searchTerm,
-        includeItemTypes: (opts.includeItemTypes ?? [
-          "Movie",
-          "Series",
-          "Episode",
-        ]) as any,
-        sortBy: ["SortName"],
-        sortOrder: ["Ascending"],
-        limit: opts.limit ?? 20,
-        recursive: true,
-      });
-      return resp.data.Items ?? [];
-    },
-
-    async fetchResumeItems(limit = 12) {
-      this.initializeApi();
-      const resp = await getLibraryApi(this.api).getResumeItems({
-        userId: this.userId!,
-        limit,
-        fields: ["Overview", "UserData", "SeriesInfo", "ParentId"] as any,
-        includeItemTypes: ["Movie", "Episode"] as any,
-        enableImageTypes: ["Backdrop", "Primary", "Thumb"] as any,
-        imageTypeLimit: 1,
-      });
-      return resp.data.Items ?? [];
-    },
 
     async fetchSeasons(seriesId: string) {
       this.initializeApi();
@@ -309,17 +240,6 @@ export const useJellyfinStore = defineStore("jellyfin", {
       return resp.data.Items?.[0] ?? null;
     },
 
-    async fetchAllNextUp(limit = 20) {
-      this.initializeApi();
-      const resp = await getShowApi(this.api).getNextUp({
-        userId: this.userId,
-        limit,
-        fields: ["PrimaryImageAspectRatio", "SeriesInfo", "ParentId", "UserData"] as any,
-        enableImageTypes: ["Primary", "Backdrop", "Thumb"] as any,
-        imageTypeLimit: 1,
-      });
-      return resp.data.Items ?? [];
-    },
 
     async fetchFirstUnwatchedEpisode(seasonId: string) {
       this.initializeApi();
@@ -348,43 +268,8 @@ export const useJellyfinStore = defineStore("jellyfin", {
       return resp.data.Items?.[0] ?? null;
     },
 
-    async fetchLatestItems(libraryId: string, limit = 10) {
-      this.initializeApi();
-      const resp = await getLibraryApi(this.api).getLatestMedia({
-        userId: this.userId!,
-        parentId: libraryId,
-        limit,
-        fields: ['PrimaryImageAspectRatio', 'Overview', 'ProductionYear'] as any,
-        enableImageTypes: ['Primary', 'Backdrop', 'Thumb'] as any,
-        imageTypeLimit: 1,
-      });
-      return resp.data ?? [];
-    },
 
-    async fetchPersonDetails(personId: string) {
-      this.initializeApi();
-      const resp = await getLibraryApi(this.api).getItems({
-        ids: [personId],
-        userId: this.userId,
-        fields: ['Overview', 'PrimaryImageAspectRatio'] as any,
-      });
-      return resp.data.Items?.[0] ?? null;
-    },
 
-    async fetchPersonFilmography(personId: string) {
-      this.initializeApi();
-      const resp = await getLibraryApi(this.api).getItems({
-        userId: this.userId,
-        personIds: [personId],
-        includeItemTypes: ['Movie', 'Series'] as any,
-        sortBy: ['PremiereDate'] as any,
-        sortOrder: ['Descending'] as any,
-        fields: ['Overview', 'UserData'] as any,
-        enableUserData: true,
-        recursive: true,
-      });
-      return resp.data.Items ?? [];
-    },
 
     async fetchSimilarItems(itemId: string, limit = 12) {
       this.initializeApi();
@@ -498,9 +383,6 @@ export const useJellyfinStore = defineStore("jellyfin", {
       const resp = await getLyricApi(this.api).getLyrics({ itemId });
       return resp.data;
     },
-    getPlaceholderImage(itemType?: string): string {
-      return generatePlaceholderImage(PLACEHOLDER_KEYS[itemType ?? ""] ?? itemType ?? "default");
-    },
   },
   getters: {
     // Read-only views of the session, kept while pages still use this store.
@@ -509,38 +391,3 @@ export const useJellyfinStore = defineStore("jellyfin", {
     accessToken: (): string => (activeJellyfin() ? useSessionStore().token ?? "" : ""),
   },
 });
-
-// Callers pass Jellyfin item types; placeholders are keyed by kind.
-const PLACEHOLDER_KEYS: Record<string, string> = {
-  Movie: "movie",
-  Series: "series",
-  Season: "series",
-  Episode: "episode",
-  MusicAlbum: "album",
-  Playlist: "album",
-  Audio: "audio",
-  MusicArtist: "artist",
-  Person: "person",
-};
-
-function generatePlaceholderImage(type: string = "default"): string {
-  const placeholders: Record<string, string> = {
-    movie: `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 450'%3E%3Crect fill='%231e1e1e' width='300' height='450'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-size='48' fill='%2399aa00' font-family='Arial'%3E🎬%3C/text%3E%3Ctext x='50%25' y='70%25' dominant-baseline='middle' text-anchor='middle' font-size='18' fill='%239aa0a6' font-family='Arial'%3ENo Image%3C/text%3E%3C/svg%3E`,
-
-    series: `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 450'%3E%3Crect fill='%231e1e1e' width='300' height='450'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-size='48' fill='%2338f9d7' font-family='Arial'%3E📺%3C/text%3E%3Ctext x='50%25' y='70%25' dominant-baseline='middle' text-anchor='middle' font-size='18' fill='%239aa0a6' font-family='Arial'%3ENo Image%3C/text%3E%3C/svg%3E`,
-
-    episode: `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 112'%3E%3Crect fill='%231e1e1e' width='200' height='112'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-size='32' fill='%2338f9d7' font-family='Arial'%3E🎞️%3C/text%3E%3Ctext x='50%25' y='75%25' dominant-baseline='middle' text-anchor='middle' font-size='12' fill='%239aa0a6' font-family='Arial'%3ENo Image%3C/text%3E%3C/svg%3E`,
-
-    album: `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 300'%3E%3Crect fill='%231e1e1e' width='300' height='300'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-size='48' fill='%2343e97b' font-family='Arial'%3E🎵%3C/text%3E%3Ctext x='50%25' y='70%25' dominant-baseline='middle' text-anchor='middle' font-size='18' fill='%239aa0a6' font-family='Arial'%3ENo Image%3C/text%3E%3C/svg%3E`,
-
-    audio: `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 140 140'%3E%3Crect fill='%231e1e1e' width='140' height='140'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-size='40' fill='%2343e97b' font-family='Arial'%3E🎵%3C/text%3E%3Ctext x='50%25' y='75%25' dominant-baseline='middle' text-anchor='middle' font-size='12' fill='%239aa0a6' font-family='Arial'%3ENo Image%3C/text%3E%3C/svg%3E`,
-
-    artist: `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 300'%3E%3Crect fill='%231e1e1e' width='300' height='300'/%3E%3Ccircle cx='150' cy='120' r='44' fill='%239aa0a6'/%3E%3Cpath d='M78 240c0-42 32-70 72-70s72 28 72 70z' fill='%239aa0a6'/%3E%3C/svg%3E`,
-
-    person: `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 140 210'%3E%3Crect fill='%231e1e1e' width='140' height='210'/%3E%3Ccircle cx='70' cy='65' r='28' fill='%239aa0a6'/%3E%3Cellipse cx='70' cy='145' rx='40' ry='35' fill='%239aa0a6'/%3E%3C/svg%3E`,
-
-    default: `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 450'%3E%3Crect fill='%231e1e1e' width='300' height='450'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-size='48' fill='%239aa0a6' font-family='Arial'%3E❓%3C/text%3E%3Ctext x='50%25' y='70%25' dominant-baseline='middle' text-anchor='middle' font-size='18' fill='%239aa0a6' font-family='Arial'%3ENo Image%3C/text%3E%3C/svg%3E`,
-  };
-
-  return placeholders[type] || placeholders.default;
-}

@@ -3,7 +3,6 @@ import { createPinia, setActivePinia } from 'pinia';
 
 import { syncService } from '@/services/syncService';
 
-import { useJellyfinStore } from './jellyfin-store';
 import { useOfflineStore } from './offline-store';
 
 /** In-memory stand-in for the IndexedDB `downloads` store, with the same semantics. */
@@ -28,6 +27,9 @@ vi.mock('@/services/offlineDatabase', async (importActual) => ({
 vi.mock('@/services/offlineDetection', () => ({ offlineDetection: { isFullyOnline: true, isOnline: { value: true } } }));
 vi.mock('@/services/syncService', () => ({ syncService: { syncWatchProgress: vi.fn(async () => ({ synced: 0, failed: 0, kept: 0 })) } }));
 vi.mock('@/services/downloadService', () => ({ downloadService: { cacheArtworkById: vi.fn(), cacheArtworkForMetadata: vi.fn() } }));
+const libraryOf = vi.fn();
+vi.mock('./session-store', () => ({ useSessionStore: () => ({ backend: { catalog: { libraryOf } } }) }));
+vi.mock('./libraries-store', () => ({ useLibrariesStore: () => ({ libraries: [] }) }));
 vi.mock('./jellyfin-store', () => {
   const store = { serverUrl: 'https://jf', accessToken: 'token', userId: 'u', libraries: [], fetchLibraryIdOf: vi.fn(), fetchItemsByIds: vi.fn(async () => []) };
   return { useJellyfinStore: () => store };
@@ -48,7 +50,7 @@ describe('offline store background work', () => {
     store.initialized = true;
     await store.loadDownloads();
     let answer!: (id: string) => void;
-    vi.mocked(useJellyfinStore().fetchLibraryIdOf).mockReturnValue(new Promise((resolve) => { answer = resolve; }));
+    libraryOf.mockReturnValue(new Promise((resolve) => { answer = resolve; }));
 
     const backfill = store.backfillLibraryIds();
     await store.removeDownload('a');
@@ -63,11 +65,11 @@ describe('offline store background work', () => {
     const store = useOfflineStore();
     store.initialized = true;
     await store.loadDownloads();
-    vi.mocked(useJellyfinStore().fetchLibraryIdOf).mockResolvedValue('music');
+    libraryOf.mockResolvedValue('music');
 
     await Promise.all([store.backfillLibraryIds(), store.backfillLibraryIds()]);
 
-    expect(useJellyfinStore().fetchLibraryIdOf).toHaveBeenCalledTimes(1);
+    expect(libraryOf).toHaveBeenCalledTimes(1);
     expect(rows.get('a').libraryId).toBe('music');
   });
 

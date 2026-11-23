@@ -16,8 +16,10 @@ vi.mock('./jellyfin-store', () => ({
   useJellyfinStore: () => ({
     serverUrl: 'https://jf.example', accessToken: 'token', libraries: [],
     fetchItemDetails: async (id: string) => ({ Id: id }),
-    fetchLibraryIdOf: async () => 'music',
   }),
+}));
+vi.mock('./session-store', () => ({
+  useSessionStore: () => ({ backend: { catalog: { libraryOf: async () => 'music' } } }),
 }));
 vi.mock('@/services/offlineDatabase', async (importActual) => ({
   ...(await importActual<typeof import('@/services/offlineDatabase')>()),

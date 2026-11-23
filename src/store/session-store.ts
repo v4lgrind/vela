@@ -1,7 +1,7 @@
 import { markRaw } from 'vue';
 import { defineStore } from 'pinia';
 
-import { authenticatorFor, createBackend } from '@/backends/registry';
+import { authenticatorFor, createBackend, decodeStoredItem, decodeStoredLibrary } from '@/backends/registry';
 import { getClientDeviceInfo } from '@/composables/usePlatform';
 import type {
   AuthStep, Authenticator, ClientIdentity, DeviceCodeSession, MediaBackend, ServerConnection, ServerKind,
@@ -67,6 +67,9 @@ export const useSessionStore = defineStore('session', {
   state: (): SessionState => ({ connections: [], activeKey: null, token: null, legacyMigrated: false }),
   persist: { pick: ['connections', 'activeKey', 'legacyMigrated'] },
   getters: {
+    /** Decoders for data saved in the legacy Jellyfin format (until Phase 6). */
+    decodeStoredItem: () => decodeStoredItem,
+    decodeStoredLibrary: () => decodeStoredLibrary,
     active: (state): ServerConnection | null => state.connections.find((c) => c.tokenKey === state.activeKey) ?? null,
     isAuthenticated(): boolean {
       return !!this.active && !!this.token;

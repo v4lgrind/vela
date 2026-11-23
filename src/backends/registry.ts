@@ -2,6 +2,7 @@ import type { Authenticator, ClientIdentity, MediaBackend, ServerConnection, Ser
 
 import { createJellyfinAuthenticator } from './jellyfin/auth';
 import { createJellyfinBackend } from './jellyfin';
+export { decodeStoredItem, decodeStoredLibrary } from './jellyfin/legacy';
 
 /**
  * The only entry point from the app into the backends. Everything else in

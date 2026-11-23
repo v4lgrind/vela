@@ -134,9 +134,9 @@ describe('localLibraryPage', () => {
 });
 
 describe('downloadsInLibrary', () => {
-  const music = { Id: 'm', CollectionType: 'music' };
-  const audiobooks = { Id: 'b', CollectionType: 'music' };
-  const films = { Id: 'f', CollectionType: 'movies' };
+  const music = { id: 'm', kind: 'music' as const };
+  const audiobooks = { id: 'b', kind: 'music' as const };
+  const films = { id: 'f', kind: 'movies' as const };
 
   it("keeps a library's own downloads", () => {
     const own = dl('Audio', { Id: 't1', Name: 'x' }, { libraryId: 'b' });
@@ -155,9 +155,9 @@ describe('downloadsInLibrary', () => {
 
 describe('librariesWithDownloads', () => {
   it('hides empty libraries', () => {
-    const libs = [{ Id: 'm', CollectionType: 'music' }, { Id: 'f', CollectionType: 'movies' }, { Id: 's', CollectionType: 'tvshows' }];
+    const libs = [{ id: 'm', kind: 'music' as const }, { id: 'f', kind: 'movies' as const }, { id: 's', kind: 'shows' as const }];
     const downloads = [dl('Movie', { Id: 'x', Name: 'x' }, { libraryId: 'f' }), dl('Audio', { Id: 'y', Name: 'y' })];
-    expect(librariesWithDownloads(libs, downloads).map((l) => l.Id)).toEqual(['m', 'f']);
+    expect(librariesWithDownloads(libs, downloads).map((l) => l.id)).toEqual(['m', 'f']);
   });
 });
 

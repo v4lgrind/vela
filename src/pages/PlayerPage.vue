@@ -276,6 +276,7 @@ import { useI18n } from 'vue-i18n';
 import { computed, ref, onMounted, onBeforeUnmount } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useJellyfinStore } from '@/store/jellyfin-store';
+import { useHomeStore } from '@/store/home-store';
 import { useAudioPlayerStore } from '@/store/audio-player-store';
 import { usePreferencesStore } from '@/store/preferences-store';
 import { useOfflineStore } from '@/store/offline-store';
@@ -499,7 +500,10 @@ onMounted(async () => {
 
     // Prefer ticks passed through the route query (set by the calling page which has live data).
     // Fall back to Jellyfin's stored value only if no route ticks are present.
-    const routeStartTicks = route.query.startTicks ? Number(route.query.startTicks) : null;
+    // `startMs` is the domain unit; `startTicks` remains for callers not migrated yet.
+    const routeStartTicks = route.query.startMs
+        ? Number(route.query.startMs) * 10_000
+        : route.query.startTicks ? Number(route.query.startTicks) : null;
     const resumeTicks = routeStartTicks ?? details?.UserData?.PlaybackPositionTicks;
     const resumeSeconds = resumeTicks ? resumeTicks / 10_000_000 : undefined;
 
@@ -544,7 +548,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
     unlockOrientation();
     // Resume position / next-up changed: home refetches behind its snapshot.
-    store.markHomeCacheStale();
+    useHomeStore().markStale();
 
     if (isNative) {
         // Save progress BEFORE removing listeners or stopping

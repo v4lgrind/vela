@@ -1,3 +1,4 @@
+import type { Library, LibraryKind } from '@/domain';
 import type { DownloadedMedia } from '@/services/offlineDatabase';
 
 /**
@@ -22,14 +23,11 @@ export interface LocalQuery {
   seed: number;
 }
 
-export interface LocalLibrary {
-  Id?: string | null;
-  CollectionType?: string | null;
-}
+export type LocalLibrary = Pick<Library, 'id' | 'kind'>;
 
-function collectionTypeOf(download: DownloadedMedia): string {
+function libraryKindOf(download: DownloadedMedia): LibraryKind {
   if (download.type === 'Movie') return 'movies';
-  if (download.type === 'Episode') return 'tvshows';
+  if (download.type === 'Episode') return 'shows';
   return 'music';
 }
 
@@ -43,9 +41,9 @@ export function downloadsInLibrary(
   libraries: LocalLibrary[],
 ): DownloadedMedia[] {
   return downloads.filter((download) => {
-    if (download.libraryId) return download.libraryId === library.Id;
-    const type = collectionTypeOf(download);
-    return libraries.find((lib) => lib.CollectionType === type)?.Id === library.Id;
+    if (download.libraryId) return download.libraryId === library.id;
+    const kind = libraryKindOf(download);
+    return libraries.find((lib) => lib.kind === kind)?.id === library.id;
   });
 }
 

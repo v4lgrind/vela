@@ -8,3 +8,4 @@ export type * from './query';
 export type * from './server';
 export { AuthError } from './auth';
 export { connectionKey } from './server';
+export { playedPercent, remainingMs } from './progress';

@@ -83,8 +83,18 @@ describe('Jellyfin backend: catalog', () => {
     expect((await backend().catalog.resumeItems(12)).map((i) => i.kind)).toEqual(['movie', 'episode', 'movie']);
 
     responses['/UserViews'] = { body: userViews };
-    responses['/Items/x/Ancestors'] = { body: [{ Id: 'folder', Type: 'Folder' }, { Id: userViews.Items[1].Id, Type: 'CollectionFolder' }] };
-    expect(await backend().catalog.libraryOf('x')).toBe(userViews.Items[1].Id);
+    const music = userViews.Items[2].Id;
+    responses['/Items/x/Ancestors'] = { body: [
+      { Id: 'album', Type: 'MusicAlbum' }, { Id: 'books', Type: 'CollectionFolder' },
+      { Id: music, Type: 'CollectionFolder' }, { Id: 'root', Type: 'UserRootFolder' },
+    ] };
+    // A known library wins over the first collection folder.
+    expect(await backend().catalog.libraryOf('x')).toBe(music);
+
+    responses['/Items/y/Ancestors'] = { body: [{ Id: 'album', Type: 'MusicAlbum' }, { Id: 'books', Type: 'CollectionFolder' }] };
+    expect(await backend().catalog.libraryOf('y')).toBe('books');
+    responses['/Items/z/Ancestors'] = { body: [{ Id: 'album', Type: 'MusicAlbum' }] };
+    expect(await backend().catalog.libraryOf('z')).toBeUndefined();
   });
 });
 

@@ -24,6 +24,7 @@ import { logger } from '@/utils/logger';
 import type { MediaStream } from '@/types/jellyfin';
 
 import { useJellyfinStore } from './jellyfin-store';
+import { useSessionStore } from './session-store';
 import { useMetadataCacheStore } from './metadata-cache-store';
 import { useOfflineStore } from './offline-store';
 import { usePreferencesStore } from './preferences-store';
@@ -303,7 +304,7 @@ export const useDownloadStore = defineStore('downloads', {
       }
       // Recorded with the download (online now) so it is listed in the right
       // library even if the app is offline before any backfill runs.
-      const libraryId = await jellyfinStore.fetchLibraryIdOf(itemId).catch(() => undefined);
+      const libraryId = await useSessionStore().backend?.catalog.libraryOf(itemId).catch(() => undefined);
       if (this.tasks.get(itemId)?.status === 'cancelled') {
         this._processQueue();
         return;

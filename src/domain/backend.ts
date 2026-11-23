@@ -12,7 +12,7 @@ import type {
 } from './media';
 import type { AudioStreamRequest, Lyrics } from './music';
 import type { Chapter, Marker, PlaybackPlan, PlaybackReporter, PlaybackRequest, StreamInfo, Trickplay } from './playback';
-import type { HomeSections, LibraryQuery, Page, SearchQuery } from './query';
+import type { LibraryQuery, Page, SearchQuery } from './query';
 import type { Capabilities, ServerConnection, ServerKind } from './server';
 
 export interface ImageSize {
@@ -27,11 +27,16 @@ export interface CatalogPort {
   item(id: ItemId): Promise<MediaItem>;
   items(ids: ItemId[]): Promise<MediaItem[]>;
   libraryOf(id: ItemId): Promise<string | undefined>;
-  home(libraryIds: string[]): Promise<HomeSections>;
+  /** Movies and episodes started and not finished, most recent first. */
+  resumeItems(limit: number): Promise<MediaItem[]>;
+  /** Next episode to watch for every series in progress. */
+  upNext(limit: number): Promise<Episode[]>;
+  /** Next episode to watch in one series. */
+  nextEpisode(seriesId: ItemId): Promise<Episode | null>;
+  latest(libraryId: string, limit: number): Promise<MediaItem[]>;
   seasons(seriesId: ItemId): Promise<Season[]>;
   episodes(seasonId: ItemId): Promise<Episode[]>;
   seriesEpisodes(seriesId: ItemId): Promise<Episode[]>;
-  nextUp(seriesId: ItemId): Promise<Episode | null>;
   search(query: SearchQuery): Promise<MediaItem[]>;
   similar(id: ItemId, limit?: number): Promise<MediaItem[]>;
   person(id: string): Promise<Person | null>;

@@ -1,8 +1,11 @@
+import { markRaw } from 'vue';
 import { defineStore } from 'pinia';
 
-import { authenticatorFor } from '@/backends/registry';
+import { authenticatorFor, createBackend } from '@/backends/registry';
 import { getClientDeviceInfo } from '@/composables/usePlatform';
-import type { AuthStep, Authenticator, ClientIdentity, DeviceCodeSession, ServerConnection, ServerKind } from '@/domain';
+import type {
+  AuthStep, Authenticator, ClientIdentity, DeviceCodeSession, MediaBackend, ServerConnection, ServerKind,
+} from '@/domain';
 import { readLegacyPreference, readToken, writeToken } from '@/services/tokenStorage';
 
 import { migrateLegacySession } from './sessionMigration';
@@ -67,6 +70,11 @@ export const useSessionStore = defineStore('session', {
     active: (state): ServerConnection | null => state.connections.find((c) => c.tokenKey === state.activeKey) ?? null,
     isAuthenticated(): boolean {
       return !!this.active && !!this.token;
+    },
+    /** The signed-in server, as a backend; recreated when the account or token changes. */
+    backend(): MediaBackend | null {
+      if (!this.active || !this.token) return null;
+      return markRaw(createBackend(this.active, this.token, CLIENT_IDENTITY));
     },
   },
   actions: {

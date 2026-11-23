@@ -1,8 +1,8 @@
-import type { Episode, ItemKind, MediaItem } from './media';
+import type { ItemKind } from './media';
 
 export type LibraryView = 'items' | 'artists' | 'albums' | 'tracks' | 'playlists';
 
-export type SortField = 'title' | 'dateAdded' | 'year' | 'rating' | 'random';
+export type SortField = 'title' | 'releaseDate' | 'dateAdded' | 'rating' | 'playCount' | 'random';
 
 export interface LibraryQuery {
   view: LibraryView;
@@ -27,11 +27,4 @@ export interface SearchQuery {
   term: string;
   kinds?: ItemKind[];
   limit?: number;
-}
-
-export interface HomeSections {
-  continueWatching: MediaItem[];
-  nextUp: Episode[];
-  /** Latest additions keyed by library id. */
-  latestByLibrary: Record<string, MediaItem[]>;
 }

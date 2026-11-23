@@ -33,6 +33,9 @@ const TYPE_BY_VIEW: Partial<Record<LibraryView, number>> = {
   tracks: PLEX_TYPE.track,
 };
 
+/** What a library lists by default: movies, shows, or albums for music. */
+const DEFAULT_TYPE_BY_SECTION: Record<string, number> = { movie: PLEX_TYPE.movie, show: PLEX_TYPE.show, artist: PLEX_TYPE.album };
+
 /** Libraries Vela lists for Plex. */
 const LISTED_SECTIONS = new Set(['movie', 'show', 'artist']);
 const VIDEO_SECTIONS = new Set(['movie', 'show']);
@@ -89,7 +92,7 @@ export function createPlexCatalog(client: PlexClient): CatalogPort {
   async function itemType(libraryId: string, view: LibraryView): Promise<number> {
     const byView = TYPE_BY_VIEW[view];
     if (byView) return byView;
-    return (await sectionType(libraryId)) === 'show' ? PLEX_TYPE.show : PLEX_TYPE.movie;
+    return DEFAULT_TYPE_BY_SECTION[(await sectionType(libraryId)) ?? ''] ?? PLEX_TYPE.movie;
   }
 
   async function browse(libraryId: string, query: LibraryQuery): Promise<Page<MediaItem>> {
@@ -132,8 +135,9 @@ export function createPlexCatalog(client: PlexClient): CatalogPort {
   }
 
   async function latest(libraryId: string, limit: number): Promise<MediaItem[]> {
-    const isShows = (await sectionType(libraryId)) === 'show';
-    const params = isShows ? { type: PLEX_TYPE.show, sort: 'episode.addedAt:desc' } : { type: PLEX_TYPE.movie, sort: 'addedAt:desc' };
+    const type = DEFAULT_TYPE_BY_SECTION[(await sectionType(libraryId)) ?? ''] ?? PLEX_TYPE.movie;
+    // Shows sort on their newest episode; movies and albums on when they were added.
+    const params = { type, sort: type === PLEX_TYPE.show ? 'episode.addedAt:desc' : 'addedAt:desc' };
     return toItems(await client.metadata(`/library/sections/${libraryId}/all`, params, { offset: 0, limit }));
   }
 

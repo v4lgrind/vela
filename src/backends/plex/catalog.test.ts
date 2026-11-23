@@ -57,6 +57,14 @@ describe('Plex catalog', () => {
     expect(new Set(libraries.map((l) => l.kind))).toEqual(new Set(['movies', 'shows', 'music']));
   });
 
+  it('lists the newest albums of a music library', async () => {
+    const musicSection = sections.MediaContainer.Directory.find((d: { type: string }) => d.type === 'artist').key;
+    routes[`/library/sections/${musicSection}/all`] = { MediaContainer: { Metadata: [{ ratingKey: '61', type: 'album', title: 'A' }] } };
+    const latest = await catalog().latest(musicSection, 10);
+    expect(Object.fromEntries(last().searchParams)).toMatchObject({ type: '9', sort: 'addedAt:desc' });
+    expect(latest.map((i) => i.kind)).toEqual(['album']);
+  });
+
   it('browses a library with type, sort, paging and the server token', async () => {
     const page = await catalog().browse(movieSection, query({ filter: { unplayed: true } }));
     expect(page.items.length).toBeGreaterThan(0);

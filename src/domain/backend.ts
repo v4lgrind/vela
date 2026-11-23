@@ -59,13 +59,17 @@ export interface OfflineProgress {
   itemId: ItemId;
   positionMs: number;
   played: boolean;
-  lastPlayedAt: string;
+  /** Epoch ms of the offline playback. */
+  lastPlayedAtMs: number;
 }
 
 export interface UserDataPort {
   setPlayed(id: ItemId, played: boolean): Promise<void>;
-  /** Pushes progress saved offline unless the server recorded a newer playback. */
-  pushOfflineProgress(progress: OfflineProgress): Promise<void>;
+  /**
+   * Pushes progress saved offline unless the server recorded a newer playback
+   * ('kept': the server's is more recent and stays).
+   */
+  pushOfflineProgress(progress: OfflineProgress): Promise<'pushed' | 'kept'>;
 }
 
 export interface PlaybackPort {

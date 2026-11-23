@@ -146,7 +146,9 @@ export interface Track extends ItemBase {
   albumId?: ItemId;
   albumTitle?: string;
   artists: ArtistRef[];
+  /** Display name of the album artist(s). */
   albumArtist?: string;
+  albumArtists: ArtistRef[];
   trackNumber?: number;
   discNumber?: number;
   /** Undefined when the server does not say. */

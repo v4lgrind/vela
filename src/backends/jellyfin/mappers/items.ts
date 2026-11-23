@@ -137,6 +137,7 @@ const BUILDERS: Partial<Record<ItemKind, Builder>> = {
     albumTitle: opt(dto.Album),
     artists: toArtistRefs(dto),
     albumArtist: opt(dto.AlbumArtist),
+    albumArtists: (dto.AlbumArtists ?? []).map((a) => ({ id: opt(a.Id), name: a.Name ?? '' })),
     trackNumber: opt(dto.IndexNumber),
     discNumber: opt(dto.ParentIndexNumber),
     hasLyrics: opt(dto.HasLyrics),

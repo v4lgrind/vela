@@ -144,6 +144,7 @@ const BUILDERS: Partial<Record<ItemKind, Builder>> = {
     albumTitle: item.parentTitle,
     artists: [{ id: item.grandparentRatingKey, name: item.originalTitle ?? item.grandparentTitle ?? '' }],
     albumArtist: item.grandparentTitle,
+    albumArtists: item.grandparentRatingKey ? [{ id: item.grandparentRatingKey, name: item.grandparentTitle ?? '' }] : [],
     trackNumber: item.index,
     discNumber: item.parentIndex,
     hasLyrics: hasLyricsStream(item.Media),

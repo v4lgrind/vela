@@ -1,6 +1,8 @@
 import type { Capabilities, ClientIdentity, MediaBackend, ServerConnection } from '@/domain';
 
 import { createJellyfinCatalog } from './catalog';
+import { planDownload } from './downloads';
+import { pushOfflineProgress } from './userData';
 import { JellyfinClient } from './client';
 import { jellyfinImageUrl } from './mappers';
 import { createJellyfinMusic } from './music';
@@ -23,24 +25,20 @@ const CAPABILITIES: Capabilities = {
   androidAuto: true,
 };
 
-/** Ports still served by the legacy code paths; they move here in later phases. */
-function notMigrated(port: string): never {
-  throw new Error(`Jellyfin ${port} is not served by the backend yet`);
-}
-
 export function createJellyfinBackend(connection: ServerConnection, token: string, identity: ClientIdentity): MediaBackend {
   const client = new JellyfinClient(connection, token, identity);
+  const catalog = createJellyfinCatalog(client);
   return {
     kind: 'jellyfin',
     connection,
     capabilities: CAPABILITIES,
     imageUrl: (ref, size) => jellyfinImageUrl(connection.baseUrl, ref, size),
     authHeaders: () => ({ Authorization: client.authorization }),
-    catalog: createJellyfinCatalog(client),
+    catalog,
     music: createJellyfinMusic(client),
     userData: {
       setPlayed: (id, played) => client.send(played ? 'POST' : 'DELETE', `/UserPlayedItems/${id}`, { userId: client.userId }),
-      pushOfflineProgress: () => notMigrated('offline progress sync'),
+      pushOfflineProgress: (progress) => pushOfflineProgress(client, progress),
     },
     playback: {
       negotiate: (request) => negotiate(client, request),
@@ -50,7 +48,7 @@ export function createJellyfinBackend(connection: ServerConnection, token: strin
       trickplay: (id, versionId) => fetchTrickplay(client, id, versionId),
       streamInfo: (plan) => fetchStreamInfo(client, plan),
     },
-    downloads: { plan: () => notMigrated('downloads') },
+    downloads: { plan: async (request) => planDownload(client, request, await catalog.item(request.itemId)) },
     signOut: async () => undefined,
   };
 }

@@ -22,7 +22,7 @@ export function createJellyfinMusic(client: JellyfinClient): MusicPort {
       userId,
       ApiKey: client.token,
       MaxStreamingBitrate: request.maxBitrate,
-      Container: request.directContainers,
+      Container: request.directContainers.join(','),
       TranscodingContainer: request.transcode.container,
       TranscodingProtocol: request.transcode.protocol,
       AudioCodec: request.transcode.codec,

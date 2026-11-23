@@ -10,6 +10,8 @@ export interface DeviceCapabilities {
   ffmpegVideoCodecs: string[];
   displayWidth: number;
   displayHeight: number;
+  /** False on platforms that cannot report their decoders (web preview, desktop). */
+  isKnown: boolean;
 }
 
 export interface SubtitleChoice {
@@ -38,9 +40,8 @@ export interface PlaybackRequest {
 
 /** The player's fallbacks, named. */
 export interface PlaybackConstraints {
-  /** False forces a transcode (quality cap, burn-in, decode failure). */
+  /** False forces a transcode (decode failure, user request). */
   allowDirectPlay: boolean;
-  allowVideoCopy: boolean;
   /** False after an audio decode failure (e.g. E-AC3 + Atmos). */
   allowAudioCopy: boolean;
   /** Codecs the transcoder must not output, e.g. ['hevc'] after a decode failure. */
@@ -67,12 +68,18 @@ export interface PlaybackPlan {
   externalSubtitles: ExternalSubtitle[];
   /** Opaque session handle for reporting and stopping the transcode. */
   sessionId: string;
+  /** Why the server transcodes, when it says (stream info panel). */
+  transcodeReasons: string[];
 }
 
 export interface PlaybackProgress {
   positionMs: number;
   durationMs?: number;
   isPaused: boolean;
+  audioStreamId?: string;
+  isMuted?: boolean;
+  /** 0–100. */
+  volume?: number;
 }
 
 /** Reports one playback session to the server and releases its resources. */
@@ -102,10 +109,11 @@ export interface Chapter {
 export type Trickplay =
   | {
       format: 'tiles';
+      /** `{index}` is replaced by the sheet number. */
       urlTemplate: string;
       headers: Record<string, string>;
-      tileWidth: number;
-      tileHeight: number;
+      thumbnailWidth: number;
+      thumbnailHeight: number;
       columns: number;
       rows: number;
       intervalMs: number;
@@ -115,10 +123,15 @@ export type Trickplay =
 
 /** Live session details shown in the player's stream info panel. */
 export interface StreamInfo {
-  method: PlayMethod;
   videoCodec?: string;
   audioCodec?: string;
   container?: string;
+  width?: number;
+  height?: number;
+  frameRate?: number;
+  /** Bits per second of the delivered stream. */
   bitrate?: number;
+  isVideoDirect: boolean;
+  isAudioDirect: boolean;
   transcodeReasons: string[];
 }

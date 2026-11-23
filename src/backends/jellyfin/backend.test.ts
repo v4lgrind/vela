@@ -53,10 +53,13 @@ describe('Jellyfin backend: catalog', () => {
     expect(page.items[0].kind).toBe('movie');
     const params = requests[0].params;
     expect(Object.fromEntries(params)).toMatchObject({
-      userId: 'u1', parentId: 'lib1', recursive: 'true', includeItemTypes: 'Movie,Series,MusicAlbum,BoxSet',
-      sortBy: 'DateCreated', sortOrder: 'Descending', filters: 'IsUnplayed,IsFavorite', genres: 'Drame|Thriller',
+      userId: 'u1', parentId: 'lib1', recursive: 'true', sortBy: 'DateCreated', sortOrder: 'Descending',
       nameStartsWith: 'B', startIndex: '48', limit: '48',
     });
+    // Lists are repeated parameters, as the SDK sends them.
+    expect(params.getAll('includeItemTypes')).toEqual(['Movie', 'Series', 'MusicAlbum', 'BoxSet']);
+    expect(params.getAll('filters')).toEqual(['IsUnplayed', 'IsFavorite']);
+    expect(params.getAll('genres')).toEqual(['Drame', 'Thriller']);
   });
 
   it('uses the album artists endpoint and audio playlists for music views', async () => {
@@ -73,7 +76,7 @@ describe('Jellyfin backend: catalog', () => {
     responses['/Items'] = { body: movieDetail };
     const item = await backend().catalog.item(movieDetail.Items[0].Id);
     expect(item.kind).toBe('movie');
-    expect(requests[0].params.get('fields')).toContain('MediaSources');
+    expect(requests[0].params.getAll('fields')).toContain('MediaSources');
     responses['/Items'] = { body: { Items: [] } };
     await expect(backend().catalog.item('missing')).rejects.toThrow('Item not found');
   });

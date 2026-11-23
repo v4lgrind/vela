@@ -63,7 +63,26 @@
 
 - Phase 3 done (2026-11-23): see the plan's "Phase 3 results".
 
+- Phase 4 in progress: golden PlaybackInfo files committed (b88a4bb,
+  `src/backends/jellyfin/__fixtures__/playback-info/*.json`, produced by
+  `src/composables/player/playbackInfo.characterization.test.ts`).
+  Uncommitted: `src/domain/device.ts` (pure device rules: codec MIME, audio
+  support incl. E-AC3 JOC rule, display bounds, recommended bitrate),
+  `DeviceCapabilities.isKnown`, `PlaybackPlan.transcodeReasons`,
+  `PlaybackConstraints.allowVideoCopy` removed (Jellyfin derives it).
+
 ## Next steps
-- Phase 4 (playback): characterization tests of today's PlaybackInfo requests
-  first, then `JellyfinBackend.playback`, then the player composables.
+- Phase 4 plan: (1) `backends/jellyfin/playback/` = profiles (moved from
+  `constants.ts`), profile editing (from `codecDetection`), URL helpers (from
+  `utils/playbackUrl.ts`), `negotiate(PlaybackRequest) → PlaybackPlan`,
+  reporter (Sessions/Playing*, ActiveEncodings), markers (MediaSegments),
+  chapters, trickplay; backend test must match the golden files.
+  (2) Player composables (`usePlayerSession` 43 refs, `useWebPlayer` 31,
+  `useNativePlayer` 29, `PlayerPage` 18, `useStreamInfo` 8,
+  `useOfflinePlayer` 7) consume `PlaybackPlan` / domain streams; native plugin
+  takes a headers map; language matching via `languageMatches`.
+  Old→new mapping: startTicks←startMs×1e4, audioStreamIndex←Number(id),
+  forceTranscode←!allowDirectPlay, useNativeProfile←target 'native',
+  transcodeAudio←!allowAudioCopy, stripHevc←excludeVideoCodecs∋'hevc',
+  subtitleStreamIndex←burn-in id, selectedBitrate←maxBitrate.
 - Commits: one per phase on `v4lgrind/plex-support`.

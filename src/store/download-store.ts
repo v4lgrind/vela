@@ -21,6 +21,7 @@ import { needsDesktopTranscode } from '@/utils/desktopCodec';
 import { languageMatches } from '@/utils/language';
 import { jellyfinAuthorization } from '@/utils/jellyfinAuthorization';
 import { logger } from '@/utils/logger';
+import type { MediaItem } from '@/domain';
 import type { MediaStream } from '@/types/jellyfin';
 
 import { useJellyfinStore } from './jellyfin-store';
@@ -28,6 +29,26 @@ import { useSessionStore } from './session-store';
 import { useMetadataCacheStore } from './metadata-cache-store';
 import { useOfflineStore } from './offline-store';
 import { usePreferencesStore } from './preferences-store';
+
+/** Jellyfin-shaped item, as stored with downloads until Phase 6. */
+type LegacyItem = { Id?: string; Name?: string; Type?: string; AlbumId?: string; Album?: string; [key: string]: unknown };
+
+const LEGACY_TYPE_BY_KIND: Partial<Record<MediaItem['kind'], string>> = {
+  movie: 'Movie', episode: 'Episode', track: 'Audio', album: 'MusicAlbum', series: 'Series', season: 'Season',
+};
+
+function isDomainItem(item: MediaItem | LegacyItem): item is MediaItem {
+  return typeof (item as MediaItem).kind === 'string' && typeof (item as MediaItem).id === 'string';
+}
+
+function legacyStub(item: MediaItem): LegacyItem {
+  return {
+    Id: item.id,
+    Name: item.title,
+    Type: LEGACY_TYPE_BY_KIND[item.kind],
+    ...(item.kind === 'track' ? { AlbumId: item.albumId, Album: item.albumTitle } : {}),
+  };
+}
 
 const MAX_CONCURRENT = 3;
 const clientPlatform = getClientPlatform();
@@ -220,7 +241,10 @@ export const useDownloadStore = defineStore('downloads', {
 
   actions: {
     /** Enqueue a download. Starts immediately if a slot is free, otherwise waits. */
-    async startDownload(itemId: string, metadata: any, transcodeOptions?: TranscodeOptions) {
+    async startDownload(itemId: string, item: MediaItem | LegacyItem, transcodeOptions?: TranscodeOptions) {
+      // The record stored for offline use is still the Jellyfin DTO, fetched in
+      // _executeDownload; a domain item only seeds it (until Phase 6).
+      const metadata = isDomainItem(item) ? legacyStub(item) : item;
       const existing = this.tasks.get(itemId);
       if (existing) {
         if (existing.status === 'cancelled' || existing.status === 'failed') {
@@ -243,7 +267,7 @@ export const useDownloadStore = defineStore('downloads', {
       const task: DownloadTask = {
         itemId,
         name: metadata.Name || 'Unknown',
-        type: metadata.Type,
+        type: metadata.Type as DownloadTask['type'],
         progress: 0,
         loaded: 0,
         total: 0,

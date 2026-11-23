@@ -110,134 +110,130 @@
     <section class="flex-1 relative">
       <!-- Songs: tap plays this page from that song -->
       <ul v-if="showSongList" class="list-none p-0 m-0 flex flex-col">
-        <li v-for="(song, i) in items" :key="song.Id"
+        <li v-for="(song, i) in songs" :key="song.id"
           class="flex items-center gap-3 py-2 px-1 border-b border-border-default cursor-pointer active:opacity-80"
-          :class="audioStore.currentTrack?.id === song.Id && 'bg-accent-purple/10'"
+          :class="audioStore.currentTrack?.id === song.id && 'bg-accent-purple/10'"
           @click="playSongs(i)">
           <div class="size-12 shrink-0 rounded-md overflow-hidden bg-black/60">
-            <LazyImg :src="getImageUrl(song.AlbumId || song.Id, 'MusicAlbum')" :alt="song.Album" item-type="MusicAlbum"
+            <LazyImg :src="songImageUrl(song)" :alt="song.albumTitle" kind="album"
               class="w-full h-full object-cover block" />
           </div>
           <div class="flex-1 min-w-0">
             <div class="text-sm font-semibold text-text-heading truncate"
-              :class="audioStore.currentTrack?.id === song.Id && 'text-accent-purple-light'">{{ song.Name }}</div>
-            <div class="text-xs text-text-muted truncate">{{ [song.AlbumArtist || song.Artists?.[0], song.Album].filter(Boolean).join(' · ') }}</div>
+              :class="audioStore.currentTrack?.id === song.id && 'text-accent-purple-light'">{{ song.title }}</div>
+            <div class="text-xs text-text-muted truncate">{{ [song.albumArtist || song.artists[0]?.name, song.albumTitle].filter(Boolean).join(' · ') }}</div>
           </div>
-          <DownloadIcon v-if="offlineStore.isItemDownloaded(song.Id)" class="size-3.5 shrink-0 text-accent-purple" :aria-label="t('common.downloaded')" />
-          <Loader2 v-else-if="downloadStore.isDownloading(song.Id)" class="size-3.5 shrink-0 animate-spin text-accent-purple" />
-          <span v-if="song.RunTimeTicks" class="text-xs text-text-subtle tabular-nums shrink-0">{{ formatTicksDuration(song.RunTimeTicks) }}</span>
+          <DownloadIcon v-if="offlineStore.isItemDownloaded(song.id)" class="size-3.5 shrink-0 text-accent-purple" :aria-label="t('common.downloaded')" />
+          <Loader2 v-else-if="downloadStore.isDownloading(song.id)" class="size-3.5 shrink-0 animate-spin text-accent-purple" />
+          <span v-if="song.durationMs" class="text-xs text-text-subtle tabular-nums shrink-0">{{ formatMsDuration(song.durationMs) }}</span>
           <TrackActionsMenu :track="song" @play-next="enqueueSong(song, 'next')" @add-to-queue="enqueueSong(song, 'end')" />
         </li>
       </ul>
 
       <!-- Grid view -->
       <ul v-else-if="viewMode === 'grid'" class="list-none p-0 m-0 grid grid-cols-3 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(150px,1fr))] sm:gap-4">
-        <li v-for="item in items" :key="item.Id" class="group">
+        <li v-for="item in items" :key="item.id" class="group">
           <!-- Poster with overlay -->
           <div class="relative w-full rounded-xl overflow-hidden bg-surface-raised"
             :class="isSquare(item) ? 'aspect-square' : 'aspect-[2/3]'">
             <router-link
-              :to="item.Type === 'BoxSet'
-                ? { name: 'libraryItem', params: { id: item.Id, name: item.Name } }
-                : { name: 'ItemDetails', params: { id: item.Id } }"
+              :to="itemRoute(item)"
               class="block w-full h-full">
-              <LazyImg :src="getImageUrl(item.Id, item.Type)" :alt="item.Name" :item-type="item.Type"
+              <LazyImg :src="itemImageUrl(item)" :alt="item.title" :kind="item.kind"
                 class="w-full h-full object-cover block" />
             </router-link>
 
             <!-- Watched badge: phones already show it in the action overlay -->
-            <div v-if="item.UserData?.Played"
+            <div v-if="item.user.played"
               class="absolute top-1.5 right-1.5 size-[18px] rounded-full bg-accent-purple items-center justify-center pointer-events-none"
-              :class="isSquare(item) || item.Type === 'BoxSet' ? 'flex' : 'hidden sm:flex'">
+              :class="isSquare(item) || item.kind === 'collection' ? 'flex' : 'hidden sm:flex'">
               <Check class="size-[11px] text-accent-ink" :stroke-width="3" />
             </div>
             <!-- Download badge -->
-            <div v-if="offlineStore.isItemDownloaded(item.Id)"
+            <div v-if="offlineStore.isItemDownloaded(item.id)"
               class="absolute top-1.5 left-1.5 size-5 rounded-full bg-accent-purple flex items-center justify-center pointer-events-none">
               <DownloadIcon class="size-[11px] text-accent-ink" />
             </div>
-            <div v-else-if="downloadStore.isDownloading(item.Id)"
+            <div v-else-if="downloadStore.isDownloading(item.id)"
               class="absolute top-1.5 left-1.5 size-5 rounded-full bg-accent-purple flex items-center justify-center pointer-events-none">
               <Loader2 class="size-[11px] text-accent-ink animate-spin" />
             </div>
 
             <!-- Action overlay: always visible on mobile, hover-only on desktop -->
-            <div v-if="!isSquare(item) && item.Type !== 'BoxSet'"
+            <div v-if="!isSquare(item) && item.kind !== 'collection'"
               class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent flex items-end justify-center gap-4 pb-2.5 transition-opacity duration-200 sm:opacity-0 sm:group-hover:opacity-100 pointer-events-none">
               <button
                 @click.prevent.stop="playItem(item)"
-                :disabled="playingId === item.Id"
+                :disabled="playingId === item.id"
                 class="relative flex size-7 items-center justify-center after:absolute after:-inset-2 after:content-[''] bg-white/90 hover:bg-white text-black rounded-full shadow-lg transition-all active:scale-95 disabled:opacity-60 pointer-events-auto"
                 :aria-label="t('common.play')">
-                <Loader2 v-if="playingId === item.Id" class="size-3.5 animate-spin" />
+                <Loader2 v-if="playingId === item.id" class="size-3.5 animate-spin" />
                 <Play v-else class="size-3.5 fill-black stroke-none" />
               </button>
               <button
                 @click.prevent.stop="toggleWatched(item)"
-                :disabled="watchingId === item.Id"
+                :disabled="watchingId === item.id"
                 class="relative flex size-7 items-center justify-center after:absolute after:-inset-2 after:content-[''] rounded-full shadow-lg transition-all active:scale-95 disabled:opacity-60 pointer-events-auto"
-                :class="item.UserData?.Played ? 'bg-accent-purple text-accent-ink' : 'bg-white/90 hover:bg-white text-black'"
-                :aria-label="item.UserData?.Played ? t('common.markUnwatched') : t('common.markWatched')">
+                :class="item.user.played ? 'bg-accent-purple text-accent-ink' : 'bg-white/90 hover:bg-white text-black'"
+                :aria-label="item.user.played ? t('common.markUnwatched') : t('common.markWatched')">
                 <Check class="size-3.5" />
               </button>
             </div>
           </div>
 
           <div class="mt-1.5 px-0.5">
-            <div class="text-caption font-medium text-text-heading truncate" :title="item.Name">{{ item.Name }}</div>
-            <div v-if="item.ProductionYear" class="text-label font-normal text-text-muted">{{ item.ProductionYear }}</div>
+            <div class="text-caption font-medium text-text-heading truncate" :title="item.title">{{ item.title }}</div>
+            <div v-if="item.year" class="text-label font-normal text-text-muted">{{ item.year }}</div>
           </div>
         </li>
       </ul>
 
       <!-- List view -->
       <ul v-else class="list-none p-0 m-0 flex flex-col">
-        <li v-for="item in items" :key="item.Id">
+        <li v-for="item in items" :key="item.id">
           <router-link
-            :to="item.Type === 'BoxSet'
-              ? { name: 'libraryItem', params: { id: item.Id, name: item.Name } }
-              : { name: 'ItemDetails', params: { id: item.Id } }"
+            :to="itemRoute(item)"
             class="flex items-center gap-3 py-2.5 px-1 border-b border-border-default hover:bg-surface-hover transition-colors active:opacity-80">
             <!-- Thumbnail -->
             <div class="w-[60px] shrink-0 rounded-md overflow-hidden bg-black/60"
               :class="isSquare(item) ? 'aspect-square' : 'aspect-[2/3]'">
-              <LazyImg :src="getImageUrl(item.Id, item.Type)" :alt="item.Name" :item-type="item.Type"
+              <LazyImg :src="itemImageUrl(item)" :alt="item.title" :kind="item.kind"
                 class="w-full h-full object-cover block" />
             </div>
             <!-- Info -->
             <div class="flex-1 min-w-0">
-              <div class="text-sm font-semibold text-text-heading truncate">{{ item.Name }}</div>
+              <div class="text-sm font-semibold text-text-heading truncate">{{ item.title }}</div>
               <div class="text-xs text-text-muted mt-0.5 flex items-center gap-2">
-                <span v-if="item.ProductionYear">{{ item.ProductionYear }}</span>
-                <span v-if="item.RunTimeTicks">{{ formatRuntime(item.RunTimeTicks) }}</span>
-                <span v-if="item.CommunityRating" class="inline-flex items-center gap-1">
-                  <Star class="size-2.5 fill-current stroke-none" aria-hidden="true" />{{ item.CommunityRating.toFixed(1) }}
+                <span v-if="item.year">{{ item.year }}</span>
+                <span v-if="item.durationMs">{{ formatRuntime(item.durationMs) }}</span>
+                <span v-if="item.rating" class="inline-flex items-center gap-1">
+                  <Star class="size-2.5 fill-current stroke-none" aria-hidden="true" />{{ item.rating.toFixed(1) }}
                 </span>
               </div>
               <!-- Progress bar for partially watched -->
-              <div v-if="item.UserData?.PlayedPercentage && !item.UserData?.Played" class="mt-1.5 h-1 bg-white/10 rounded-full overflow-hidden">
-                <div class="h-full bg-accent-purple rounded-full" :style="{ width: item.UserData.PlayedPercentage + '%' }" />
+              <div v-if="playedPercent(item) && !item.user.played" class="mt-1.5 h-1 bg-white/10 rounded-full overflow-hidden">
+                <div class="h-full bg-accent-purple rounded-full" :style="{ width: playedPercent(item) + '%' }" />
               </div>
             </div>
             <!-- Right side: download + watched + actions -->
             <div class="flex items-center gap-2 shrink-0">
-              <div v-if="offlineStore.isItemDownloaded(item.Id)"
+              <div v-if="offlineStore.isItemDownloaded(item.id)"
                 class="rounded-full p-1 bg-accent-purple/20 text-accent-purple" :title="t('common.downloaded')">
                 <DownloadIcon class="size-3" />
               </div>
-              <div v-else-if="downloadStore.isDownloading(item.Id)"
+              <div v-else-if="downloadStore.isDownloading(item.id)"
                 class="rounded-full p-1 bg-accent-purple/20 text-accent-purple animate-pulse">
                 <Loader2 class="size-3 animate-spin" />
               </div>
-              <div v-if="item.UserData?.Played" class="bg-accent-purple rounded-full p-0.5">
+              <div v-if="item.user.played" class="bg-accent-purple rounded-full p-0.5">
                 <Check class="size-3 text-accent-ink" />
               </div>
-              <button v-if="!isSquare(item) && item.Type !== 'BoxSet'"
+              <button v-if="!isSquare(item) && item.kind !== 'collection'"
                 @click.prevent.stop="playItem(item)"
-                :disabled="playingId === item.Id"
+                :disabled="playingId === item.id"
                 class="flex size-11 items-center justify-center bg-surface-raised border border-border-default rounded-full hover:border-accent-purple transition-colors"
                 :aria-label="t('common.play')">
-                <Loader2 v-if="playingId === item.Id" class="size-4 animate-spin" />
+                <Loader2 v-if="playingId === item.id" class="size-4 animate-spin" />
                 <Play v-else class="size-4 fill-text-primary stroke-none" />
               </button>
             </div>
@@ -266,11 +262,15 @@ import { useRetryWhileFailed } from '@/composables/useRetryWhileFailed';
 import { useI18n } from 'vue-i18n';
 import { logger } from '@/utils/logger';
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router';
-import { useJellyfinStore } from '@/store/jellyfin-store';
 import { usePreferencesStore } from '@/store/preferences-store';
 import LazyImg from '@/components/LazyImg.vue';
-import { formatTicksDuration, isAudioType } from '@/utils/helpers';
-import { toAudioTrack } from '@/utils/audioTrack';
+import { formatMsDuration } from '@/utils/helpers';
+import { trackToAudioTrack } from '@/utils/audioTrack';
+import { playedPercent } from '@/domain';
+import type { ImageSize, LibraryQuery, MediaItem, SortField, Track } from '@/domain';
+import { useBackend, useImageUrl } from '@/composables/useBackend';
+import { useLibrariesStore } from '@/store/libraries-store';
+import { useSessionStore } from '@/store/session-store';
 import TrackActionsMenu from '@/components/TrackActionsMenu.vue';
 import { useAudioPlayerStore } from '@/store/audio-player-store';
 import { useToast } from '@/composables/useToast';
@@ -290,7 +290,11 @@ import { shuffleAround } from '@/utils/audioQueue';
 import { downloadedTracks, downloadsInLibrary, localGenres, localLibraryPage, type LocalView } from '@/utils/offlineLibrary';
 
 const { t } = useI18n();
-const store = useJellyfinStore();
+const backend = useBackend();
+const imageUrl = useImageUrl();
+const session = useSessionStore();
+const librariesStore = useLibrariesStore();
+librariesStore.importLegacy();
 const offlineStore = useOfflineStore();
 const downloadStore = useDownloadStore();
 const audioStore = useAudioPlayerStore();
@@ -306,7 +310,8 @@ const libraryName = ref((route.params.name as string) || 'Library');
 const playingId = ref<string | null>(null);
 const watchingId = ref<string | null>(null);
 
-const items = ref<any[]>([]);
+const items = ref<MediaItem[]>([]);
+const songs = computed(() => items.value.filter((item): item is Track => item.kind === 'track'));
 const total = ref(0);
 const limit = 50;
 const hasMore = computed(() => items.value.length < total.value);
@@ -317,23 +322,31 @@ const error = ref<string | null>(null);
 let pageRequest = 0;
 // Filtering and sorting: changes apply at once, the sheet shows the live total.
 const sheetOpen = ref(false);
-const sortBy = ref('SortName');
-const sortOrder = ref('Ascending');
+const sortBy = ref<SortField>('title');
+const sortOrder = ref<'asc' | 'desc'>('asc');
 const unplayedOnly = ref(false);
 const favoritesOnly = ref(false);
 const selectedGenres = ref<string[]>([]);
-const SORT_OPTIONS = [
-  { value: 'SortName', label: 'library.sort.name' },
-  { value: 'PremiereDate', label: 'library.sort.releaseDate' },
-  { value: 'DateCreated', label: 'library.sort.dateAdded' },
-  { value: 'CommunityRating', label: 'library.sort.rating' },
-  { value: 'PlayCount', label: 'library.sort.playCount' },
-  { value: 'Random', label: 'library.sort.random' },
+const SORT_OPTIONS: { value: SortField; label: string }[] = [
+  { value: 'title', label: 'library.sort.name' },
+  { value: 'releaseDate', label: 'library.sort.releaseDate' },
+  { value: 'dateAdded', label: 'library.sort.dateAdded' },
+  { value: 'rating', label: 'library.sort.rating' },
+  { value: 'playCount', label: 'library.sort.playCount' },
+  { value: 'random', label: 'library.sort.random' },
 ];
 const SORT_ORDERS = [
-  { value: 'Ascending', label: 'library.ascending', arrow: '↑' },
-  { value: 'Descending', label: 'library.descending', arrow: '↓' },
+  { value: 'asc' as const, label: 'library.ascending', arrow: '↑' },
+  { value: 'desc' as const, label: 'library.descending', arrow: '↓' },
 ];
+/** Offline pages are built by the legacy local helpers, which use Jellyfin sort names. */
+const LOCAL_SORT: Record<SortField, string> = {
+  title: 'SortName', releaseDate: 'PremiereDate', dateAdded: 'DateCreated',
+  rating: 'CommunityRating', playCount: 'PlayCount', random: 'Random',
+};
+const POSTER: ImageSize = { width: 130, height: 195 };
+const SQUARE: ImageSize = { width: 150, height: 150 };
+const RANDOM_TRACKS = 300;
 
 type MusicTab = 'albums' | 'artists' | 'songs' | 'playlists';
 const MUSIC_TABS: { value: MusicTab; label: string }[] = [
@@ -344,8 +357,8 @@ const MUSIC_TABS: { value: MusicTab; label: string }[] = [
 ];
 const musicTab = ref<MusicTab>('albums');
 const currentLibrary = computed(() =>
-  store.libraries.find((l) => l.Id === libraryId.value) ?? { Id: libraryId.value, CollectionType: undefined });
-const isMusicLibrary = computed(() => currentLibrary.value.CollectionType === 'music');
+  librariesStore.libraries.find((l) => l.id === libraryId.value) ?? { id: libraryId.value, kind: 'other' as const });
+const isMusicLibrary = computed(() => currentLibrary.value.kind === 'music');
 
 // "Téléchargés": list only downloaded media, built from the device (forced on offline).
 const metadataCache = useMetadataCacheStore();
@@ -358,7 +371,7 @@ const visibleMusicTabs = computed(() => MUSIC_TABS.filter((tab) => !localMode.va
 let localSeed = 1;
 
 function libraryDownloads() {
-  return downloadsInLibrary(offlineStore.downloads, currentLibrary.value, store.libraries);
+  return downloadsInLibrary(offlineStore.downloads, currentLibrary.value, librariesStore.libraries);
 }
 
 function leavePlaylistsTab() {
@@ -379,12 +392,25 @@ function selectMusicTab(tab: MusicTab) {
   onFilterChange();
 }
 
-function isSquare(item: any): boolean {
-  return isAudioType(item.Type) || item.Type === 'Playlist';
+const SQUARE_KINDS = new Set<MediaItem['kind']>(['track', 'album', 'artist', 'playlist']);
+
+function isSquare(item: MediaItem): boolean {
+  return SQUARE_KINDS.has(item.kind);
+}
+
+function itemRoute(item: MediaItem) {
+  return item.kind === 'collection'
+    ? { name: 'libraryItem', params: { id: item.id, name: item.title } }
+    : { name: 'ItemDetails', params: { id: item.id } };
 }
 
 function playSongs(index: number) {
-  audioStore.playAlbum(items.value.map((song) => toAudioTrack(song)), index);
+  audioStore.playAlbum(songs.value.map((song) => trackToAudioTrack(song)), index);
+}
+
+/** Downloads stored before Phase 6 are Jellyfin items. */
+function localTracks(): Track[] {
+  return downloadedTracks(libraryDownloads()).map(session.decodeStoredItem).filter((item): item is Track => item.kind === 'track');
 }
 
 const shuffleLoading = ref(false);
@@ -392,15 +418,15 @@ const shuffleLoading = ref(false);
 /** Random songs from this library; audioPlayerService adds more as they run out. */
 async function shuffleLibrary() {
   if (localMode.value) {
-    const tracks = downloadedTracks(libraryDownloads()).map((song) => toAudioTrack(song));
+    const tracks = localTracks().map((song) => trackToAudioTrack(song));
     if (tracks.length) audioStore.playAlbum(shuffleAround(tracks, Math.floor(Math.random() * tracks.length)), 0);
     return;
   }
   const id = libraryId.value;
   shuffleLoading.value = true;
   try {
-    const songs = await store.fetchRandomTracks(id);
-    if (songs.length) audioStore.playLibraryShuffle(id, songs.map((song) => toAudioTrack(song)));
+    const random = await backend.value.music.randomTracks(id, RANDOM_TRACKS);
+    if (random.length) audioStore.playLibraryShuffle(id, random.map((song) => trackToAudioTrack(song)));
   } catch (e) {
     logger.error('Library shuffle failed', e);
     toast.showError(t('library.music.shuffleFailed'));
@@ -409,13 +435,13 @@ async function shuffleLibrary() {
   }
 }
 
-function enqueueSong(song: any, where: 'next' | 'end') {
-  if (where === 'next') audioStore.playNext([toAudioTrack(song)]);
-  else audioStore.addToQueue([toAudioTrack(song)]);
+function enqueueSong(song: Track, where: 'next' | 'end') {
+  if (where === 'next') audioStore.playNext([trackToAudioTrack(song)]);
+  else audioStore.addToQueue([trackToAudioTrack(song)]);
   toast.show(where === 'next' ? t('audio.playingNext') : t('audio.addedToQueue'), 'success', 2000);
 }
 const nameStartsWith = ref('');
-const sortChanged = computed(() => sortBy.value !== 'SortName' || sortOrder.value !== 'Ascending');
+const sortChanged = computed(() => sortBy.value !== 'title' || sortOrder.value !== 'asc');
 // The quick toggle (Non vus, or Favoris in music) is visible on its own: not counted.
 const activeFilterCount = computed(() =>
   (sortChanged.value ? 1 : 0) + (selectedGenres.value.length ? 1 : 0) + (!isMusicLibrary.value && favoritesOnly.value ? 1 : 0));
@@ -423,7 +449,7 @@ const filterSummary = computed(() => {
   const parts: string[] = [];
   if (sortChanged.value) {
     const sort = SORT_OPTIONS.find((o) => o.value === sortBy.value);
-    parts.push(`${sort ? t(sort.label) : sortBy.value} ${sortOrder.value === 'Ascending' ? '↑' : '↓'}`);
+    parts.push(`${sort ? t(sort.label) : sortBy.value} ${sortOrder.value === 'asc' ? '↑' : '↓'}`);
   }
   if (!isMusicLibrary.value && favoritesOnly.value) parts.push(t('library.favorites'));
   if (selectedGenres.value.length) parts.push(selectedGenres.value.join(', '));
@@ -432,8 +458,8 @@ const filterSummary = computed(() => {
 const availableGenres = ref<string[]>([]);
 
 type LibraryState = {
-  sortBy: string;
-  sortOrder: string;
+  sortBy: SortField;
+  sortOrder: 'asc' | 'desc';
   unplayedOnly: boolean;
   favoritesOnly: boolean;
   selectedGenres: string[];
@@ -443,12 +469,12 @@ type LibraryState = {
 };
 
 function stateKey(id: string) {
-  return `library-state:${JSON.stringify([store.serverUrl, store.userId, id])}`;
+  return `library-state:${JSON.stringify([session.activeKey, id])}`;
 }
 
 function restoreLibraryState() {
-  sortBy.value = 'SortName';
-  sortOrder.value = 'Ascending';
+  sortBy.value = 'title';
+  sortOrder.value = 'asc';
   unplayedOnly.value = false;
   favoritesOnly.value = false;
   selectedGenres.value = [];
@@ -460,10 +486,8 @@ function restoreLibraryState() {
     const saved = sessionStorage.getItem(stateKey(libraryId.value));
     if (saved) {
       const state = JSON.parse(saved) as Partial<LibraryState>;
-      if (['SortName', 'PremiereDate', 'DateCreated', 'CommunityRating', 'PlayCount', 'Random'].includes(state.sortBy ?? '')) {
-        sortBy.value = state.sortBy!;
-      }
-      if (state.sortOrder === 'Ascending' || state.sortOrder === 'Descending') sortOrder.value = state.sortOrder;
+      if (SORT_OPTIONS.some((option) => option.value === state.sortBy)) sortBy.value = state.sortBy!;
+      if (state.sortOrder === 'asc' || state.sortOrder === 'desc') sortOrder.value = state.sortOrder;
       unplayedOnly.value = state.unplayedOnly === true;
       favoritesOnly.value = state.favoritesOnly === true;
       if (Array.isArray(state.selectedGenres)) selectedGenres.value = state.selectedGenres.filter((g) => typeof g === 'string');
@@ -503,7 +527,7 @@ function toggleViewMode() {
 const alphabet = ['#', ...Array.from({ length: 26 }, (_, i) => String.fromCharCode(65 + i))];
 // Short lists don't need an index; keep it while a letter is applied so it can be changed or cleared.
 const showIndex = computed(() =>
-  sortBy.value === 'SortName' && (items.value.length >= 30 || hasMore.value || nameStartsWith.value !== ''));
+  sortBy.value === 'title' && (items.value.length >= 30 || hasMore.value || nameStartsWith.value !== ''));
 
 function jumpToLetter(letter: string) {
   if (nameStartsWith.value === letter) {
@@ -520,27 +544,34 @@ const countLabel = computed(() => {
   return t(key, total.value);
 });
 
-function getImageUrl(id: string, itemType?: string) {
-  const isAudio = itemType && isAudioType(itemType);
-  return artworkUrl(id, store.getImageUrl(id, 'Primary', isAudio ? 150 : 130, isAudio ? 150 : 195) || '');
+/** Offline, the copy cached with the download (keyed by item id) wins. */
+function itemImageUrl(item: MediaItem) {
+  return artworkUrl(item.id, imageUrl(item.images.poster, isSquare(item) ? SQUARE : POSTER));
 }
 
-function formatRuntime(ticks: number): string {
-  return formatDuration(Math.round(ticks / 600_000_000) * 60);
+/** Songs show their album cover, cached offline under the album id. */
+function songImageUrl(song: Track) {
+  return artworkUrl(song.albumId ?? song.id, imageUrl(song.images.poster, SQUARE));
 }
 
-function queryOptions() {
-  const filters = [
-    ...(unplayedOnly.value && !isMusicLibrary.value ? ['IsUnplayed'] : []),
-    ...(favoritesOnly.value ? ['IsFavorite'] : []),
-  ];
+function formatRuntime(ms: number): string {
+  return formatDuration(Math.round(ms / 60_000) * 60);
+}
+
+const VIEW_BY_TAB: Record<MusicTab, LibraryQuery['view']> = { albums: 'albums', artists: 'artists', songs: 'tracks', playlists: 'playlists' };
+
+function libraryQuery(offset: number): LibraryQuery {
   return {
+    view: isMusicLibrary.value ? VIEW_BY_TAB[musicTab.value] : 'items',
+    sort: { by: sortBy.value, order: sortOrder.value },
+    filter: {
+      unplayed: unplayedOnly.value && !isMusicLibrary.value,
+      favorites: favoritesOnly.value,
+      genres: selectedGenres.value,
+      letter: nameStartsWith.value || undefined,
+    },
+    offset,
     limit,
-    sortBy: [sortBy.value],
-    sortOrder: [sortOrder.value],
-    filters: filters.length ? filters : undefined,
-    genres: selectedGenres.value.length ? selectedGenres.value : undefined,
-    nameStartsWith: nameStartsWith.value === '#' ? '#' : nameStartsWith.value || undefined,
   };
 }
 
@@ -554,7 +585,7 @@ async function loadPage() {
   loadingMore.value = false;
   error.value = null;
   try {
-    const page = await fetchPage(id, { ...queryOptions(), startIndex: 0 });
+    const page = await fetchPage(id, libraryQuery(0));
     if (request !== pageRequest) return;
     items.value = page.items;
     total.value = page.total;
@@ -571,7 +602,7 @@ async function loadMore() {
   const request = pageRequest;
   loadingMore.value = true;
   try {
-    const page = await fetchPage(libraryId.value, { ...queryOptions(), startIndex: items.value.length });
+    const page = await fetchPage(libraryId.value, libraryQuery(items.value.length));
     if (request !== pageRequest) return;
     items.value = [...items.value, ...page.items];
     total.value = page.total;
@@ -594,35 +625,29 @@ useIntersectionObserver(sentinel, ([entry]) => {
   if (sentinelVisible) loadMore();
 }, { rootMargin: '800px' });
 
-type PageOptions = ReturnType<typeof queryOptions> & { startIndex: number };
+const LOCAL_COLLECTION: Record<string, string> = { movies: 'movies', shows: 'tvshows', music: 'music' };
 
-function localPage(opts: PageOptions) {
+function localPage(query: LibraryQuery) {
   const view: LocalView = !isMusicLibrary.value ? 'items'
     : musicTab.value === 'artists' ? 'artists'
     : musicTab.value === 'songs' ? 'songs'
     : 'albums';
-  return localLibraryPage(libraryDownloads(), view, currentLibrary.value.CollectionType, {
-    startIndex: opts.startIndex,
-    limit: opts.limit,
-    sortBy: sortBy.value,
-    sortOrder: sortOrder.value === 'Descending' ? 'Descending' : 'Ascending',
+  const page = localLibraryPage(libraryDownloads(), view, LOCAL_COLLECTION[currentLibrary.value.kind], {
+    startIndex: query.offset,
+    limit: query.limit,
+    sortBy: LOCAL_SORT[sortBy.value],
+    sortOrder: sortOrder.value === 'desc' ? 'Descending' : 'Ascending',
     unplayedOnly: unplayedOnly.value && !isMusicLibrary.value,
     favoritesOnly: favoritesOnly.value,
     genres: selectedGenres.value,
     nameStartsWith: nameStartsWith.value,
     seed: localSeed,
   }, (seriesId) => metadataCache.get(seriesId, true) ?? undefined);
+  return { items: page.items.map(session.decodeStoredItem), total: page.total };
 }
 
-async function fetchPage(id: string, opts: PageOptions) {
-  if (localMode.value) return localPage(opts);
-  if (!isMusicLibrary.value) return store.fetchItems(id, opts);
-  switch (musicTab.value) {
-    case 'artists': return store.fetchAlbumArtists(id, opts);
-    case 'playlists': return store.fetchAudioPlaylists(opts);
-    case 'songs': return store.fetchItems(id, { ...opts, includeItemTypes: ['Audio'] });
-    default: return store.fetchItems(id, { ...opts, includeItemTypes: ['MusicAlbum'] });
-  }
+async function fetchPage(id: string, query: LibraryQuery) {
+  return localMode.value ? localPage(query) : backend.value.catalog.browse(id, query);
 }
 
 async function loadGenres() {
@@ -632,7 +657,7 @@ async function loadGenres() {
   }
   const id = libraryId.value;
   try {
-    const genres = await store.fetchGenres(id);
+    const genres = await backend.value.catalog.genres(id);
     if (id === libraryId.value) availableGenres.value = genres;
   } catch (e) {
     logger.error('Failed to load genres', e);
@@ -661,21 +686,21 @@ function toggleGenre(genre: string) {
   onFilterChange();
 }
 
-function setSort(value: string) {
+function setSort(value: SortField) {
   if (sortBy.value === value) return;
   sortBy.value = value;
   onFilterChange();
 }
 
-function setOrder(value: string) {
+function setOrder(value: 'asc' | 'desc') {
   if (sortOrder.value === value) return;
   sortOrder.value = value;
   onFilterChange();
 }
 
 function resetFilters() {
-  sortBy.value = 'SortName';
-  sortOrder.value = 'Ascending';
+  sortBy.value = 'title';
+  sortOrder.value = 'asc';
   unplayedOnly.value = false;
   favoritesOnly.value = false;
   selectedGenres.value = [];
@@ -683,39 +708,27 @@ function resetFilters() {
   loadPage();
 }
 
-async function playItem(item: any) {
+/** A series plays its next episode (details page offline or when none is left). */
+async function playItem(item: MediaItem) {
   if (playingId.value) return;
-  playingId.value = item.Id;
+  playingId.value = item.id;
   try {
-    if (item.Type === 'Series' && isOffline.value) {
-      router.push({ name: 'ItemDetails', params: { id: item.Id } });
-    } else if (item.Type === 'Series') {
-      const nextEp = await store.fetchNextUp(item.Id);
-      if (nextEp) {
-        router.push({ name: 'Player', params: { id: nextEp.Id } });
-      } else {
-        router.push({ name: 'ItemDetails', params: { id: item.Id } });
-      }
-    } else {
-      router.push({ name: 'Player', params: { id: item.Id } });
-    }
+    const next = item.kind === 'series' && !isOffline.value ? await backend.value.catalog.nextEpisode(item.id) : null;
+    if (item.kind !== 'series') router.push({ name: 'Player', params: { id: item.id } });
+    else if (next) router.push({ name: 'Player', params: { id: next.id } });
+    else router.push({ name: 'ItemDetails', params: { id: item.id } });
   } finally {
     playingId.value = null;
   }
 }
 
-async function toggleWatched(item: any) {
+async function toggleWatched(item: MediaItem) {
   if (watchingId.value) return;
-  watchingId.value = item.Id;
+  watchingId.value = item.id;
   try {
-    if (item.UserData?.Played) {
-      await store.markUnplayed(item.Id);
-      if (item.UserData) item.UserData.Played = false;
-    } else {
-      await store.markPlayed(item.Id);
-      if (!item.UserData) item.UserData = {};
-      item.UserData.Played = true;
-    }
+    const played = !item.user.played;
+    await backend.value.userData.setPlayed(item.id, played);
+    item.user.played = played;
   } finally {
     watchingId.value = null;
   }
@@ -740,16 +753,16 @@ watch(isOffline, () => {
   loadGenres();
   loadPage();
 });
-watch(items, (list) => { void preload(list.flatMap((item) => [item.Id, item.AlbumId]).filter(Boolean)); });
+watch(items, (list) => { void preload(list.flatMap((item) => [item.id, item.kind === 'track' ? item.albumId : undefined]).filter((id): id is string => !!id)); });
 
 onMounted(async () => {
   restoreLibraryState();
   leavePlaylistsTab();
   loadGenres();
   // Needed to tell a music library apart (deep link / reload).
-  if (!store.libraries.length && !isOffline.value) {
+  if (!librariesStore.libraries.length && !isOffline.value) {
     try {
-      await store.fetchLibraries();
+      await librariesStore.refresh();
     } catch (e) {
       logger.error('Failed to load libraries', e);
     }

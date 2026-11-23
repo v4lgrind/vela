@@ -20,7 +20,7 @@
           <DropdownMenuItem v-if="isDownloaded" class="flex items-center gap-2.5 min-h-11 rounded-lg px-3 py-2.5 text-sm text-text-primary outline-none data-highlighted:bg-white/10 cursor-pointer" @select="removeDownload">
             <Trash2 class="size-4" /> {{ t('audio.removeDownload') }}
           </DropdownMenuItem>
-          <DropdownMenuItem v-else-if="isDownloading" class="flex items-center gap-2.5 min-h-11 rounded-lg px-3 py-2.5 text-sm text-text-primary outline-none data-highlighted:bg-white/10 cursor-pointer" @select="downloadStore.cancelDownload(track.Id)">
+          <DropdownMenuItem v-else-if="isDownloading" class="flex items-center gap-2.5 min-h-11 rounded-lg px-3 py-2.5 text-sm text-text-primary outline-none data-highlighted:bg-white/10 cursor-pointer" @select="downloadStore.cancelDownload(trackId)">
             <X class="size-4" /> {{ t('audio.cancelDownload') }}
           </DropdownMenuItem>
           <DropdownMenuItem v-else class="flex items-center gap-2.5 min-h-11 rounded-lg px-3 py-2.5 text-sm text-text-primary outline-none data-highlighted:bg-white/10 cursor-pointer" @select="download">
@@ -42,28 +42,34 @@ import { cn } from '@/lib/utils';
 import { downloadService } from '@/services/downloadService';
 import { useDownloadStore } from '@/store/download-store';
 import { useOfflineStore } from '@/store/offline-store';
+import type { Track } from '@/domain';
 
 const { t } = useI18n();
-// track: the Jellyfin Audio item; when given, the menu also downloads it for offline play.
-const props = defineProps<{ triggerClass?: string; track?: any }>();
+/** Pre-domain callers (item details page) still pass a Jellyfin item until phase 3d. */
+type LegacyTrack = { Id: string; Name?: string };
+// track: when given, the menu also downloads it for offline play.
+const props = defineProps<{ triggerClass?: string; track?: Track | LegacyTrack }>();
+const trackId = computed(() => (props.track && 'kind' in props.track ? props.track.id : props.track?.Id) ?? '');
+const trackName = computed(() => (props.track && 'kind' in props.track ? props.track.title : props.track?.Name) ?? '');
 const downloadStore = useDownloadStore();
 const offlineStore = useOfflineStore();
 const toast = useToast();
 
-const isDownloaded = computed(() => !!props.track && offlineStore.isItemDownloaded(props.track.Id));
-const isDownloading = computed(() => !!props.track && downloadStore.isDownloading(props.track.Id));
+const isDownloaded = computed(() => !!props.track && offlineStore.isItemDownloaded(trackId.value));
+const isDownloading = computed(() => !!props.track && downloadStore.isDownloading(trackId.value));
 
 function download() {
-  downloadStore.startDownload(props.track.Id, props.track).catch((error: any) => {
+  if (!props.track) return;
+  downloadStore.startDownload(trackId.value, props.track).catch((error: any) => {
     if (error?.name !== 'AbortError') toast.showError(t('detail.downloadFailed'));
   });
 }
 
 async function removeDownload() {
-  if (!confirm(t('detail.confirmDelete', { name: props.track.Name }))) return;
+  if (!confirm(t('detail.confirmDelete', { name: trackName.value }))) return;
   try {
-    await downloadService.deleteOfflineFile(props.track.Id);
-    await offlineStore.removeDownload(props.track.Id);
+    await downloadService.deleteOfflineFile(trackId.value);
+    await offlineStore.removeDownload(trackId.value);
   } catch {
     toast.showError(t('detail.deleteFailed'));
   }

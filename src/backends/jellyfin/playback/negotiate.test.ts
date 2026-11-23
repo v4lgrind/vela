@@ -98,4 +98,33 @@ describe('Jellyfin negotiate reproduces the pinned PlaybackInfo requests', () =>
     expect(plan.startOffsetMs).toBe(RESUME_MS);
     expect(plan.transcodeReasons).toEqual(['VideoCodecNotSupported', 'AudioCodecNotSupported']);
   });
+
+  it('lists text subtitles as sidecars and pins web burn-in in the URL', async () => {
+    const answer = structuredClone(SERVER_ANSWER);
+    answer.MediaSources[0].MediaStreams.push(
+      { Index: 2, Type: 'Subtitle', Codec: 'subrip', IsTextSubtitleStream: true, SupportsExternalStream: true } as never,
+      { Index: 3, Type: 'Subtitle', Codec: 'pgssub', IsTextSubtitleStream: false } as never,
+    );
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(answer))));
+    const client = new JellyfinClient(connection, 'tok', identity);
+    const plan = await negotiate(client, { ...SCENARIOS['web-default'], subtitle: { streamId: '3', mode: 'burn-in' } });
+    expect(plan.externalSubtitles).toEqual([
+      { streamId: '2', url: 'https://jf.example/Videos/item1/item1/Subtitles/2/0/Stream.vtt', format: 'vtt' },
+    ]);
+    expect(plan.url).toContain('SubtitleStreamIndex=3');
+    expect(plan.url).toContain('SubtitleMethod=Encode');
+    expect(plan.method).toBe('transcode');
+  });
+
+  it('builds a server stream with the chosen audio track when asked to (audio switch)', async () => {
+    const client = new JellyfinClient(connection, 'tok', identity);
+    const plan = await negotiate(client, { ...SCENARIOS['web-default'], audioStreamId: '2', preferStream: true });
+    expect(plan.url).toBe('https://jf.example/videos/item1/master.m3u8?MediaSourceId=item1&VideoCodec=h264&AudioStreamIndex=2');
+    expect(plan.method).toBe('transcode');
+
+    const direct = { ...SERVER_ANSWER, MediaSources: [{ ...SERVER_ANSWER.MediaSources[0], SupportsDirectPlay: true, TranscodingUrl: undefined }] };
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(direct))));
+    const manual = await negotiate(client, { ...SCENARIOS['web-default'], audioStreamId: '2', preferStream: true });
+    expect(manual.url).toBe('https://jf.example/Videos/item1/master.m3u8?mediaSourceId=item1&AudioStreamIndex=2&PlaySessionId=ps1');
+  });
 });

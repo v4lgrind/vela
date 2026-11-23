@@ -11,5 +11,6 @@ export { AuthError } from './auth';
 export { connectionKey } from './server';
 export { playedPercent, remainingMs } from './progress';
 export {
-  CODEC_MIME, displayBoundsFor, exceedsDisplay, isAudioCodecSupported, isDolbyVision, recommendedTranscodeBitrate, videoMime,
+  CODEC_MIME, canSoftwareDecode, displayBoundsFor, exceedsDisplay, isAudioCodecSupported, isDolbyVision,
+  recommendedTranscodeBitrate, videoMime,
 } from './device';

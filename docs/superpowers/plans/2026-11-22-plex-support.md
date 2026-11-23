@@ -454,6 +454,30 @@ must reproduce them byte for byte.
   (Kotlin `NativePlayerActivity` + `TrickplayThumbnails`); `trickplayJson`
   becomes a tagged union (`tiles` | `bif`) so Kotlin can grow BIF later.
 
+#### Phase 4 results (2026-11-23)
+
+- 4a (committed c0524f0): Jellyfin playback port: `negotiate` reproduces the
+  10 golden PlaybackInfo scenarios byte for byte; reporter, markers, chapters,
+  trickplay, live stream info. Pure device rules in `domain/device.ts`.
+  Jellyfin list parameters are sent repeated, like the SDK.
+- 4b: the player uses the port. `usePlayerSession.negotiate()` builds a
+  `PlaybackRequest`; `applyPlan()` makes a plan current (URL, method, reporter).
+  Web track switches use `preferStream`; the web burn-in URL, sidecar
+  subtitle URLs and the master-playlist fallback moved into the backend
+  (no more Jellyfin URL surgery in composables). Plan gains
+  `mediaElementUrl` (players that cannot send headers).
+- Codec checks, audio-track choice and subtitle choices work on domain streams
+  (`codecDetection` is now the platform probe only). Language preferences
+  match `fre`/`fra` via `languageMatches` everywhere in the player.
+- Player track indexes are `Number(stream.id)` (numeric on Jellyfin and Plex);
+  saved per-item choices keep their format.
+- Chapters now come from `playback.chapters()` (the old details request never
+  asked for them, so native chapters were always empty).
+- Native plugin still takes a single `authHeader` (Jellyfin `Authorization`);
+  the headers map lands with Plex (Phase 8, Kotlin).
+- The download store keeps a private copy of the audio-codec filter for its
+  Jellyfin transcode request until downloads move behind the backend (Phase 6).
+
 ### Phase 5 — Music on the domain (M)
 - `audioPlayerService`: `music.streamUrl`, reporter, `lyrics` → domain `Lyrics`
   (`{ synced, lines: { startMs?, text }[] }`).

@@ -1,51 +1,49 @@
 import { ref } from 'vue';
+
+import type { StreamInfo as LiveStreamInfo } from '@/domain';
+
 import type { PlayerSession } from './usePlayerSession';
 
+const POLL_INTERVAL_MS = 5000;
+
 /**
- * "Stream Info" modal state: polls Jellyfin's active session for live
- * transcoding details while the modal is open, and serialises the current
- * stream info for the native player overlay.
+ * "Stream Info" modal state: polls the server's live transcoding details while
+ * the modal is open, and serialises the current stream info for the native
+ * player overlay.
  */
 export function useStreamInfo(session: PlayerSession) {
-    const { serverUrl, embyAuthHeader, deviceId, playSessionId, playMethod, videoStream, activeAudioStream } = session;
+    const { backend, plan, playMethod, videoStream, activeAudioStream } = session;
 
     const infoModalOpen = ref(false);
-    const liveTranscodingInfo = ref<any>(null);
+    const liveTranscodingInfo = ref<LiveStreamInfo | null>(null);
     let infoPollingInterval: ReturnType<typeof setInterval> | null = null;
 
     async function fetchTranscodingInfo() {
         try {
-            const res = await fetch(
-                `${serverUrl}/Sessions?activeWithinSeconds=10`,
-                { headers: { 'Authorization': embyAuthHeader } }
-            );
-            if (!res.ok) return;
-            const sessions: any[] = await res.json();
-            // Match by our stable deviceId first, then fall back to playSessionId
-            const jfSession = sessions.find(s => s.DeviceId === deviceId)
-                ?? sessions.find(s => s.PlayState?.PlaySessionId === playSessionId.value);
-            liveTranscodingInfo.value = jfSession?.TranscodingInfo ?? null;
+            const current = plan.value;
+            liveTranscodingInfo.value = current && backend?.playback.streamInfo
+                ? await backend.playback.streamInfo(current)
+                : null;
         } catch { liveTranscodingInfo.value = null; }
     }
 
     function buildStreamInfoJson(): string {
         const vs = videoStream.value;
-        const as_ = activeAudioStream.value;
-        const ti = liveTranscodingInfo.value;
-        const info: Record<string, any> = { playMethod: playMethod.value };
-        if (ti?.TranscodeReasons?.length) info.transcodeReason = ti.TranscodeReasons[0];
-        if (ti?.Width != null) info.resolution = `${ti.Width}×${ti.Height}`;
-        else if (vs?.Width) info.resolution = `${vs.Width}×${vs.Height}`;
-        info.videoCodec = ti?.VideoCodec ?? vs?.Codec ?? '';
-        info.isVideoDirect = ti ? !!ti.IsVideoDirect : true;
-        if (ti?.Bitrate) info.videoBitrate = ti.Bitrate;
-        else if (vs?.BitRate) info.videoBitrate = vs.BitRate;
-        if (ti && !ti.IsVideoDirect) info.framerate = ti.Framerate ?? 0;
-        else info.framerate = vs?.RealFrameRate ?? vs?.AverageFrameRate ?? 0;
-        info.audioCodec = ti?.AudioCodec ?? as_?.Codec ?? '';
-        info.isAudioDirect = ti ? !!ti.IsAudioDirect : true;
-        info.audioChannels = as_?.ChannelLayout ?? (as_?.Channels ? `${as_.Channels}ch` : '');
-        if (as_?.BitRate) info.audioBitrate = as_.BitRate;
+        const audio = activeAudioStream.value;
+        const live = liveTranscodingInfo.value;
+        const info: Record<string, string | number | boolean> = { playMethod: playMethod.value };
+        if (live?.transcodeReasons.length) info.transcodeReason = live.transcodeReasons[0];
+        if (live?.width != null) info.resolution = `${live.width}×${live.height}`;
+        else if (vs?.width) info.resolution = `${vs.width}×${vs.height}`;
+        info.videoCodec = live?.videoCodec ?? vs?.codec ?? '';
+        info.isVideoDirect = live ? live.isVideoDirect : true;
+        if (live?.bitrate) info.videoBitrate = live.bitrate;
+        else if (vs?.bitrate) info.videoBitrate = vs.bitrate;
+        info.framerate = (live && !live.isVideoDirect ? live.frameRate : vs?.frameRate) ?? 0;
+        info.audioCodec = live?.audioCodec ?? audio?.codec ?? '';
+        info.isAudioDirect = live ? live.isAudioDirect : true;
+        info.audioChannels = audio?.channelLayout ?? (audio?.channels ? `${audio.channels}ch` : '');
+        if (audio?.bitrate) info.audioBitrate = audio.bitrate;
         return JSON.stringify(info);
     }
 
@@ -56,7 +54,7 @@ export function useStreamInfo(session: PlayerSession) {
     function openInfoModal() {
         infoModalOpen.value = true;
         fetchTranscodingInfo();
-        infoPollingInterval = setInterval(fetchTranscodingInfo, 5000);
+        infoPollingInterval = setInterval(fetchTranscodingInfo, POLL_INTERVAL_MS);
     }
 
     function closeInfoModal() {

@@ -35,6 +35,11 @@ export interface PlaybackRequest {
   /** Undefined on the web preview: the backend uses its browser profile. */
   device?: DeviceCapabilities;
   constraints: PlaybackConstraints;
+  /**
+   * The player needs a server-built stream that applies its track choices
+   * (e.g. switching audio on the web): never the raw file.
+   */
+  preferStream?: boolean;
   target: 'native' | 'web';
 }
 
@@ -61,6 +66,8 @@ export interface PlaybackPlan {
   url: string;
   /** Headers every request of this stream needs (playlist and segments). */
   headers: Record<string, string>;
+  /** Same stream for players that cannot send headers (an HTML media element). */
+  mediaElementUrl: string;
   /** Streams as the server will deliver them. */
   version: MediaVersion;
   /** Stream position at the URL's start; HLS transcodes start at the resume point. */

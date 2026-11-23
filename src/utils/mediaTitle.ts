@@ -1,18 +1,15 @@
+import type { MediaItem } from '@/domain';
+
+const pad = (n: number) => String(n).padStart(2, '0');
+
 /**
- * Human-readable player title for a Jellyfin item.
+ * Human-readable player title for an item.
  * Episodes render as "Series · S01E02 · Episode name".
  */
-export function buildMediaTitle(item: any): string {
+export function buildMediaTitle(item: MediaItem | null | undefined): string {
     if (!item) return '';
-    if (item.Type === 'Episode') {
-        const series = item.SeriesName || '';
-        const season = item.ParentIndexNumber != null ? item.ParentIndexNumber : null;
-        const episode = item.IndexNumber != null ? item.IndexNumber : null;
-        const epName = item.Name || '';
-        const code = season != null && episode != null
-            ? `S${String(season).padStart(2, '0')}E${String(episode).padStart(2, '0')}`
-            : null;
-        return [series, code, epName].filter(Boolean).join(' · ');
-    }
-    return item.Name || '';
+    if (item.kind !== 'episode') return item.title;
+    const { seasonNumber: season, episodeNumber: episode } = item;
+    const code = season != null && episode != null ? `S${pad(season)}E${pad(episode)}` : null;
+    return [item.seriesTitle, code, item.title].filter(Boolean).join(' · ');
 }

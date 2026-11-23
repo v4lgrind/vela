@@ -1,77 +1,41 @@
 import { describe, expect, it } from 'vitest';
 
-import type { MediaStream } from '@/types/jellyfin';
+import type { MediaVersion, SubtitleStream } from '@/domain';
 
 import { createSubtitleTracks, isBurnInSubtitleStream, parseSavedBurnInSubtitleIndex } from './subtitleTracks';
 
-const BASE_OPTIONS = {
-  serverUrl: 'https://jellyfin.example.test',
-  itemId: 'item-id',
-  mediaSourceId: 'source-id',
-};
+const subtitle = (id: string, extra: Partial<SubtitleStream> = {}): SubtitleStream => ({
+  id, isDefault: false, isForced: false, isHearingImpaired: false, isExternal: false, format: 'text', ...extra,
+});
+const version = (subtitles: SubtitleStream[]): MediaVersion => ({ id: 'v', video: [], audio: [], subtitles });
+const VTT = 'https://jellyfin.example.test/Videos/item-id/source-id/Subtitles/5/0/Stream.vtt';
 
 describe('createSubtitleTracks', () => {
-  it('keeps PGS streams as burn-in choices without inventing a VTT URL', () => {
-    const streams: MediaStream[] = [{
-      Index: 3,
-      Type: 'Subtitle',
-      Codec: 'PGSSUB',
-      Language: 'fra',
-      DisplayTitle: 'PGS French Complets - PGSSUB',
-      IsTextSubtitleStream: false,
-      SupportsExternalStream: true,
-    }];
-
-    expect(createSubtitleTracks({ ...BASE_OPTIONS, streams })).toEqual([{
-      index: 3,
-      language: 'fra',
-      label: 'PGS French Complets - PGSSUB',
-      playbackMode: 'burn-in',
-      deliveryUrl: undefined,
+  it('keeps PGS streams as burn-in choices without inventing a sidecar URL', () => {
+    const pgs = subtitle('3', { codec: 'PGSSUB', language: 'fra', title: 'PGS French Complets - PGSSUB', format: 'image' });
+    expect(createSubtitleTracks(version([pgs]), [])).toEqual([{
+      index: 3, language: 'fra', label: 'PGS French Complets - PGSSUB', playbackMode: 'burn-in', deliveryUrl: undefined,
     }]);
   });
 
-  it('constructs extraction URLs only for externally playable text streams', () => {
-    const streams: MediaStream[] = [{
-      Index: 5,
-      Type: 'Subtitle',
-      Codec: 'srt',
-      Language: 'eng',
-      IsTextSubtitleStream: true,
-      SupportsExternalStream: true,
-    }];
+  it('uses the server sidecar URL for text streams it serves', () => {
+    const tracks = createSubtitleTracks(version([subtitle('5', { language: 'eng' })]), [{ streamId: '5', url: VTT, format: 'vtt' }]);
+    expect(tracks[0]).toMatchObject({ index: 5, playbackMode: 'external', deliveryUrl: VTT, label: 'ENG' });
+  });
 
-    expect(createSubtitleTracks({ ...BASE_OPTIONS, streams })[0]).toMatchObject({
-      index: 5,
-      playbackMode: 'external',
-      deliveryUrl: 'https://jellyfin.example.test/Videos/item-id/source-id/Subtitles/5/0/Stream.vtt',
-    });
+  it('falls back to burn-in for a text stream the server does not serve as a sidecar', () => {
+    expect(createSubtitleTracks(version([subtitle('4')]), [])[0].playbackMode).toBe('burn-in');
+  });
+
+  it('labels forced tracks without a title', () => {
+    expect(createSubtitleTracks(version([subtitle('6', { language: 'fra', isForced: true })]), [])[0].label).toBe('FRA (Forced)');
   });
 });
 
 describe('isBurnInSubtitleStream', () => {
-  it('treats non-text (PGS) subtitle streams as burn-in', () => {
-    expect(isBurnInSubtitleStream({
-      Index: 3, Type: 'Subtitle', IsTextSubtitleStream: false, SupportsExternalStream: true,
-    })).toBe(true);
-  });
-
-  it('treats text subtitles without external delivery as burn-in (matches createSubtitleTracks)', () => {
-    const stream: MediaStream = {
-      Index: 4, Type: 'Subtitle', IsTextSubtitleStream: true, SupportsExternalStream: false,
-    };
-    expect(isBurnInSubtitleStream(stream)).toBe(true);
-    expect(createSubtitleTracks({ ...BASE_OPTIONS, streams: [stream] })[0].playbackMode).toBe('burn-in');
-  });
-
-  it('does not treat externally playable text subtitles as burn-in', () => {
-    expect(isBurnInSubtitleStream({
-      Index: 5, Type: 'Subtitle', IsTextSubtitleStream: true, SupportsExternalStream: true,
-    })).toBe(false);
-  });
-
-  it('ignores non-subtitle streams', () => {
-    expect(isBurnInSubtitleStream({ Index: 0, Type: 'Video' })).toBe(false);
+  it('treats image subtitles as burn-in before negotiation', () => {
+    expect(isBurnInSubtitleStream({ format: 'image' })).toBe(true);
+    expect(isBurnInSubtitleStream({ format: 'text' })).toBe(false);
   });
 });
 

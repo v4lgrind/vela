@@ -200,9 +200,9 @@
                             }">
                             {{ playMethod }}
                         </span>
-                        <span v-if="liveTranscodingInfo?.TranscodeReasons?.length"
-                            class="text-xs text-white/40" :title="liveTranscodingInfo.TranscodeReasons.join(', ')">
-                            {{ liveTranscodingInfo.TranscodeReasons[0] }}
+                        <span v-if="liveTranscodingInfo?.transcodeReasons?.length"
+                            class="text-xs text-white/40" :title="liveTranscodingInfo.transcodeReasons.join(', ')">
+                            {{ liveTranscodingInfo.transcodeReasons[0] }}
                         </span>
                     </div>
 
@@ -212,29 +212,29 @@
                         <div class="grid grid-cols-2 gap-x-4 gap-y-1.5">
                             <span class="text-white/50">{{ t('transcode.resolution') }}</span>
                             <span class="text-white font-medium">
-                                <template v-if="liveTranscodingInfo?.Width != null">{{ liveTranscodingInfo.Width }}×{{ liveTranscodingInfo.Height }} <span class="text-white/40 text-xs">({{ t('player.stream') }})</span></template>
-                                <template v-else>{{ videoStream.Width }}×{{ videoStream.Height }} <span class="text-white/40 text-xs">({{ t('player.source') }})</span></template>
+                                <template v-if="liveTranscodingInfo?.width != null">{{ liveTranscodingInfo.width }}×{{ liveTranscodingInfo.height }} <span class="text-white/40 text-xs">({{ t('player.stream') }})</span></template>
+                                <template v-else>{{ videoStream.width }}×{{ videoStream.height }} <span class="text-white/40 text-xs">({{ t('player.source') }})</span></template>
                             </span>
                             <span class="text-white/50">{{ t('player.codec') }}</span>
                             <span class="text-white font-medium uppercase">
-                                {{ liveTranscodingInfo?.VideoCodec ?? videoStream.Codec }}
+                                {{ liveTranscodingInfo?.videoCodec ?? videoStream.codec }}
                                 <span v-if="liveTranscodingInfo" class="text-xs text-white/40 normal-case">
-                                    ({{ liveTranscodingInfo.IsVideoDirect ? 'copy' : 'transcoding' }})
+                                    ({{ liveTranscodingInfo.isVideoDirect ? 'copy' : 'transcoding' }})
                                 </span>
                             </span>
                             <span class="text-white/50">{{ t('player.bitrate') }}</span>
                             <span class="text-white font-medium">
-                                <template v-if="liveTranscodingInfo?.Bitrate != null">{{ Math.round(liveTranscodingInfo.Bitrate / 1000) }} kbps <span class="text-white/40 text-xs">({{ t('player.stream') }})</span></template>
-                                <template v-else-if="videoStream.BitRate">{{ Math.round(videoStream.BitRate / 1000) }} kbps <span class="text-white/40 text-xs">({{ t('player.source') }})</span></template>
+                                <template v-if="liveTranscodingInfo?.bitrate != null">{{ Math.round(liveTranscodingInfo.bitrate / 1000) }} kbps <span class="text-white/40 text-xs">({{ t('player.stream') }})</span></template>
+                                <template v-else-if="videoStream.bitrate">{{ Math.round(videoStream.bitrate / 1000) }} kbps <span class="text-white/40 text-xs">({{ t('player.source') }})</span></template>
                                 <template v-else>—</template>
                             </span>
-                            <template v-if="liveTranscodingInfo && !liveTranscodingInfo.IsVideoDirect">
+                            <template v-if="liveTranscodingInfo && !liveTranscodingInfo.isVideoDirect">
                                 <span class="text-white/50">{{ t('player.encodeSpeed') }}</span>
-                                <span class="text-white font-medium">{{ liveTranscodingInfo.Framerate?.toFixed(1) ?? '—' }} fps</span>
+                                <span class="text-white font-medium">{{ liveTranscodingInfo.frameRate?.toFixed(1) ?? '—' }} fps</span>
                             </template>
                             <template v-else>
                                 <span class="text-white/50">{{ t('player.frameRate') }}</span>
-                                <span class="text-white font-medium">{{ videoStream.RealFrameRate?.toFixed(2) ?? videoStream.AverageFrameRate?.toFixed(2) ?? '—' }} fps</span>
+                                <span class="text-white font-medium">{{ videoStream.frameRate?.toFixed(2) ?? '—' }} fps</span>
                             </template>
                         </div>
                     </div>
@@ -245,15 +245,15 @@
                         <div class="grid grid-cols-2 gap-x-4 gap-y-1.5">
                             <span class="text-white/50">{{ t('player.codec') }}</span>
                             <span class="text-white font-medium uppercase">
-                                {{ liveTranscodingInfo?.AudioCodec ?? activeAudioStream.Codec }}
+                                {{ liveTranscodingInfo?.audioCodec ?? activeAudioStream.codec }}
                                 <span v-if="liveTranscodingInfo" class="text-xs text-white/40 normal-case">
-                                    ({{ liveTranscodingInfo.IsAudioDirect ? 'copy' : 'transcoding' }})
+                                    ({{ liveTranscodingInfo.isAudioDirect ? 'copy' : 'transcoding' }})
                                 </span>
                             </span>
                             <span class="text-white/50">{{ t('player.channels') }}</span>
-                            <span class="text-white font-medium">{{ activeAudioStream.ChannelLayout ?? (activeAudioStream.Channels + 'ch') }}</span>
+                            <span class="text-white font-medium">{{ activeAudioStream.channelLayout ?? (activeAudioStream.channels + 'ch') }}</span>
                             <span class="text-white/50">{{ t('player.bitrate') }}</span>
-                            <span class="text-white font-medium">{{ activeAudioStream.BitRate ? Math.round(activeAudioStream.BitRate / 1000) + ' kbps' : '—' }}</span>
+                            <span class="text-white font-medium">{{ activeAudioStream.bitrate ? Math.round(activeAudioStream.bitrate / 1000) + ' kbps' : '—' }}</span>
                         </div>
                     </div>
                 </div>
@@ -275,7 +275,9 @@ import { useI18n } from 'vue-i18n';
 //   useOfflinePlayer  — downloaded-file playback path
 import { computed, ref, onMounted, onBeforeUnmount } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { useJellyfinStore } from '@/store/jellyfin-store';
+import { useSessionStore } from '@/store/session-store';
+import type { SubtitleStream } from '@/domain';
+import { languageMatches } from '@/utils/language';
 import { useHomeStore } from '@/store/home-store';
 import { useAudioPlayerStore } from '@/store/audio-player-store';
 import { usePreferencesStore } from '@/store/preferences-store';
@@ -292,7 +294,7 @@ import { useWebPlayer } from '@/composables/player/useWebPlayer';
 import { useNativePlayer } from '@/composables/player/useNativePlayer';
 import { useOfflinePlayer } from '@/composables/player/useOfflinePlayer';
 import { pickPreferredAudioStream } from '@/utils/audioTrackSelection';
-import { getDeviceCapabilities } from '@/utils/codecDetection';
+import { deviceCapabilities } from '@/utils/codecDetection';
 import { formatTime } from '@/utils/helpers';
 import { buildMediaTitle } from '@/utils/mediaTitle';
 import { lockLandscape, unlockOrientation } from '@/utils/orientation';
@@ -304,7 +306,7 @@ import PlayerBottomSheet from '@/components/PlayerBottomSheet.vue';
 const route = useRoute();
 const { t } = useI18n();
 const router = useRouter();
-const store = useJellyfinStore();
+const sessionStore = useSessionStore();
 const audioPlayerStore = useAudioPlayerStore();
 const preferencesStore = usePreferencesStore();
 const offlineStore = useOfflineStore();
@@ -314,7 +316,7 @@ const videoEl = ref<HTMLVideoElement | null>(null);
 
 // ── Composables ────────────────────────────────────────────────────────────────
 
-const session = usePlayerSession(videoEl, isNative);
+const session = usePlayerSession(videoEl);
 const {
     itemId,
     isLoading, isPlaying, currentTime, duration, error, mediaTitle,
@@ -441,7 +443,7 @@ function openInfoModal() {
 
 function goBack() { router.back(); }
 
-function resolveInitialBurnInSubtitleIndex(streams: any[]): number | null {
+function resolveInitialBurnInSubtitleIndex(streams: SubtitleStream[]): number | null {
     const preferenceKey = isNative
         ? `msplayer-subtitle-native-${itemId}`
         : `msplayer-subtitle-${itemId}`;
@@ -449,17 +451,17 @@ function resolveInitialBurnInSubtitleIndex(streams: any[]): number | null {
     const savedIndex = parseSavedBurnInSubtitleIndex(savedValue);
     const savedTrack = savedIndex === null
         ? null
-        : streams.find(stream => stream.Index === savedIndex && isBurnInSubtitleStream(stream));
+        : streams.find(stream => Number(stream.id) === savedIndex && isBurnInSubtitleStream(stream));
 
-    if (savedTrack) return savedTrack.Index;
+    if (savedTrack) return Number(savedTrack.id);
     if (savedValue !== null) return null;
 
     const preferredLanguage = preferencesStore.preferredSubtitleLanguage;
     if (!preferredLanguage) return null;
     const preferredTrack = streams.find(stream =>
-        isBurnInSubtitleStream(stream) && stream.Language === preferredLanguage
+        isBurnInSubtitleStream(stream) && languageMatches(preferredLanguage, stream.language || '')
     );
-    return preferredTrack?.Index ?? null;
+    return preferredTrack ? Number(preferredTrack.id) : null;
 }
 
 // ── Lifecycle ──────────────────────────────────────────────────────────────────
@@ -479,7 +481,7 @@ onMounted(async () => {
         const offlineProgress = await offlineDatabase.getWatchProgress(itemId);
         const resumeSeconds = offlineResumeSeconds(cachedDownload.jellyfinItem, offlineProgress ?? undefined);
 
-        mediaTitle.value = buildMediaTitle(cachedDownload.jellyfinItem);
+        mediaTitle.value = buildMediaTitle(sessionStore.decodeStoredItem(cachedDownload.jellyfinItem));
         await offlinePlayer.initOfflinePlayer(cachedDownload, resumeSeconds, mediaTitle.value);
         if (!isNative) {
             document.addEventListener('fullscreenchange', onFullscreenChange);
@@ -489,47 +491,43 @@ onMounted(async () => {
         return;
     }
 
-    // Always fetch fresh details — cached currentItem may have stale PlaybackPositionTicks
-    let details: any = null;
-    try {
-        details = await store.fetchItemDetails(itemId);
-    } catch (e) {
+    // Always fetch fresh details: a cached item may carry a stale resume point.
+    const details = await session.backend?.catalog.item(itemId).catch((e) => {
         logger.warn('[Player] Failed to load item details:', e);
-    }
+        return null;
+    }) ?? null;
+    session.item.value = details;
     mediaTitle.value = buildMediaTitle(details);
 
-    // Prefer ticks passed through the route query (set by the calling page which has live data).
-    // Fall back to Jellyfin's stored value only if no route ticks are present.
-    // `startMs` is the domain unit; `startTicks` remains for callers not migrated yet.
-    const routeStartTicks = route.query.startMs
-        ? Number(route.query.startMs) * 10_000
-        : route.query.startTicks ? Number(route.query.startTicks) : null;
-    const resumeTicks = routeStartTicks ?? details?.UserData?.PlaybackPositionTicks;
-    const resumeSeconds = resumeTicks ? resumeTicks / 10_000_000 : undefined;
+    // Prefer the position passed by the calling page (it has live data), then the server's.
+    // `startTicks` remains for callers not migrated yet.
+    const routeStartMs = route.query.startMs
+        ? Number(route.query.startMs)
+        : route.query.startTicks ? Number(route.query.startTicks) / 10_000 : null;
+    const resumeMs = routeStartMs ?? details?.user.resumePositionMs;
+    const resumeSeconds = resumeMs ? resumeMs / 1000 : undefined;
 
-    // Determine preferred audio: saved user choice → global preferred lang → marked default → first track.
-    const allStreams: any[] = details?.MediaStreams || [];
+    const source = details && 'versions' in details ? details.versions[0] : undefined;
 
-    // Restore a saved/global bitmap subtitle before PlaybackInfo negotiation so
-    // Jellyfin returns a video stream with the subtitle burned in from the start.
-    activeBurnInSubtitleIndex.value = resolveInitialBurnInSubtitleIndex(allStreams);
+    // Restore a saved/global bitmap subtitle before negotiation so the server
+    // returns a video stream with the subtitle burned in from the start.
+    activeBurnInSubtitleIndex.value = resolveInitialBurnInSubtitleIndex(source?.subtitles ?? []);
 
-    // Within the preferred language, prefer the track this device decodes best.
-    const audioStreams = allStreams.filter(s => s.Type === 'Audio');
+    // Preferred audio: saved user choice → global preferred lang → marked default → first track;
+    // within the preferred language, the track this device decodes best.
     const preferred = pickPreferredAudioStream(
-        audioStreams,
+        source?.audio ?? [],
         [localStorage.getItem(`msplayer-audio-${itemId}`), preferencesStore.preferredAudioLanguage],
-        await getDeviceCapabilities(),
+        await deviceCapabilities(),
     );
-    const preferredAudioIndex: number | undefined = preferred?.Index;
+    const preferredAudioIndex: number | undefined = preferred ? Number(preferred.id) : undefined;
 
     if (isNative) {
-        const { forceTranscodeAudio, forceTranscodeVideo, stripHevc } =
-            await nativePlayer.detectCodecFallbacks(allStreams, preferred);
-        const chapters = (details?.Chapters || []).map((ch: any) => ({
-            name: ch.Name || '',
-            startMs: Math.floor((ch.StartPositionTicks || 0) / 10_000),
-        }));
+        const [{ forceTranscodeAudio, forceTranscodeVideo, stripHevc }, serverChapters] = await Promise.all([
+            nativePlayer.detectCodecFallbacks(source?.video[0], preferred),
+            session.backend?.capabilities.chapters ? session.backend.playback.chapters(itemId).catch(() => []) : [],
+        ]);
+        const chapters = serverChapters.map((chapter) => ({ name: chapter.title || '', startMs: Math.floor(chapter.startMs) }));
         await nativePlayer.initNativePlayer(resumeSeconds, preferredAudioIndex, buildMediaTitle(details), forceTranscodeAudio, forceTranscodeVideo, chapters, stripHevc);
     } else {
         await webPlayer.initPlayer(

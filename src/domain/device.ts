@@ -90,3 +90,9 @@ export function recommendedTranscodeBitrate(device: DeviceCapabilities): number 
   const short = Math.min(device.displayWidth, device.displayHeight);
   return BITRATE_BY_SHORT_EDGE.find(([edge]) => short >= edge)?.[1] ?? LOW_TRANSCODE_BITRATE;
 }
+
+/** Packaged FFmpeg can decode this video (used when no hardware decoder accepts it). */
+export function canSoftwareDecode(video: Pick<VideoStream, 'codec' | 'profile' | 'range'>, device: DeviceCapabilities): boolean {
+  const mime = videoMime(video);
+  return Boolean(mime && device.ffmpegVideoCodecs.includes(mime));
+}

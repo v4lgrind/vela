@@ -1,13 +1,13 @@
 import type { MediaSourceInfo } from '@jellyfin/sdk/lib/generated-client/models/media-source-info';
 
 import { displayBoundsFor, recommendedTranscodeBitrate } from '@/domain';
-import type { DeviceCapabilities, PlayMethod, PlaybackPlan, PlaybackRequest } from '@/domain';
+import type { DeviceCapabilities, ExternalSubtitle, PlayMethod, PlaybackPlan, PlaybackRequest } from '@/domain';
 
 import type { JellyfinClient } from '../client';
 import { msToTicks, toMediaVersion } from '../mappers';
 
 import { deviceProfile, nativeAndroidDeviceProfile, withAacTranscodeAudio, withDeviceAudioCodecs } from './profiles';
-import { buildPlaybackUrl, withMaxVideoSize } from './urls';
+import { buildPlaybackUrl, withMaxVideoSize, withPlaybackApiKey, withoutPlaybackApiKey } from './urls';
 
 /** Caps used when a native request arrives without capabilities (they could not be read). */
 const UNKNOWN_DEVICE: DeviceCapabilities = {
@@ -107,6 +107,48 @@ function limitToDisplay(source: MediaSourceInfo, device: DeviceCapabilities) {
   source.TranscodingUrl = withMaxVideoSize(source.TranscodingUrl, bounds.width, bounds.height);
 }
 
+/** Text subtitles Jellyfin serves as sidecars; the others can only be burned in. */
+function externalSubtitles(source: MediaSourceInfo, serverUrl: string, itemId: string): ExternalSubtitle[] {
+  const versionId = source.Id ?? itemId;
+  return (source.MediaStreams ?? [])
+    .filter((s) => s.Type === 'Subtitle' && s.IsTextSubtitleStream === true && (s.DeliveryUrl || s.SupportsExternalStream))
+    .map((s) => ({
+      streamId: String(s.Index ?? 0),
+      url: s.DeliveryUrl ? `${serverUrl}${s.DeliveryUrl}` : `${serverUrl}/Videos/${itemId}/${versionId}/Subtitles/${s.Index}/0/Stream.vtt`,
+      format: 'vtt' as const,
+    }));
+}
+
+/** The web path pins the burned-in subtitle in the stream URL (Jellyfin may leave it out). */
+function withBurnIn(url: string, subtitleIndex: number): string {
+  let next = url.replace('?&', '?');
+  next = /SubtitleStreamIndex=-?\d+/.test(next)
+    ? next.replace(/SubtitleStreamIndex=-?\d+/, `SubtitleStreamIndex=${subtitleIndex}`)
+    : `${next}&SubtitleStreamIndex=${subtitleIndex}`;
+  return /[?&]SubtitleMethod=Encode(?:&|$)/i.test(next) ? next : `${next}&SubtitleMethod=Encode`;
+}
+
+/** A track switch needs the server stream; Jellyfin doesn't always embed AudioStreamIndex from the body. */
+function preferredStreamUrl(client: JellyfinClient, source: MediaSourceInfo, terms: Terms, itemId: string, sessionId: string): string {
+  const audio = terms.audioStreamIndex;
+  if (source.TranscodingUrl) {
+    let url = source.TranscodingUrl.replace('?&', '?');
+    if (audio !== undefined) {
+      url = /AudioStreamIndex=\d+/.test(url) ? url.replace(/AudioStreamIndex=\d+/, `AudioStreamIndex=${audio}`) : `${url}&AudioStreamIndex=${audio}`;
+    }
+    return withoutPlaybackApiKey(`${client.serverUrl}${url}`);
+  }
+  const subtitle = terms.subtitleStreamIndex === undefined ? '' : `&SubtitleStreamIndex=${terms.subtitleStreamIndex}&SubtitleMethod=Encode`;
+  const audioQuery = audio === undefined ? '' : `&AudioStreamIndex=${audio}`;
+  return `${client.serverUrl}/Videos/${encodeURIComponent(itemId)}/master.m3u8?mediaSourceId=${encodeURIComponent(source.Id || itemId)}`
+    + `${audioQuery}${subtitle}&PlaySessionId=${encodeURIComponent(sessionId)}`;
+}
+
+function preferredStreamMethod(source: MediaSourceInfo, terms: Terms): PlayMethod {
+  if (terms.subtitleStreamIndex !== undefined || terms.selectedBitrate > 0) return 'transcode';
+  return source.SupportsDirectStream && source.TranscodingUrl ? 'direct-stream' : 'transcode';
+}
+
 function transcodeReasons(url: string | null | undefined): string[] {
   const reasons = url ? new URL(url, 'http://relative.invalid').searchParams.get('TranscodeReasons') : null;
   return reasons ? reasons.split(',') : [];
@@ -119,9 +161,16 @@ export async function negotiate(client: JellyfinClient, request: PlaybackRequest
   const source = response.MediaSources?.[0];
   if (!source) throw new Error(`No playable source for ${request.itemId}`);
   if (shouldLimit && terms.device) limitToDisplay(source, terms.device);
+  if (!terms.isNative && terms.subtitleStreamIndex !== undefined) {
+    if (!source.TranscodingUrl) throw new Error('Jellyfin did not return a burn-in stream');
+    source.TranscodingUrl = withBurnIn(source.TranscodingUrl, terms.subtitleStreamIndex);
+  }
 
   const sessionId = response.PlaySessionId ?? '';
-  const { method, url } = buildPlaybackUrl({
+  const resolved = request.preferStream
+    ? { method: preferredStreamMethod(source, terms), url: preferredStreamUrl(client, source, terms, request.itemId, sessionId) }
+    : null;
+  const { method: legacyMethod, url: legacyUrl } = buildPlaybackUrl({
     Id: source.Id ?? undefined,
     SupportsDirectPlay: source.SupportsDirectPlay,
     SupportsDirectStream: source.SupportsDirectStream,
@@ -129,15 +178,18 @@ export async function negotiate(client: JellyfinClient, request: PlaybackRequest
   }, {
     serverUrl: client.serverUrl, itemId: request.itemId, accessToken: client.token, isNative: terms.isNative, playSessionId: sessionId,
   });
-  const isDirectFile = method === 'DirectPlay' && !url.includes('.m3u8');
+  const method = resolved?.method ?? METHOD[legacyMethod];
+  const url = resolved?.url ?? legacyUrl;
+  const isDirectFile = method === 'direct-play' && !url.includes('.m3u8');
   const startsAtResume = !isDirectFile && url.includes('StartTimeTicks');
   return {
-    method: METHOD[method],
+    method,
     url,
     headers: { Authorization: client.authorization },
+    mediaElementUrl: withPlaybackApiKey(url, client.token),
     version: toMediaVersion(source, request.itemId),
     startOffsetMs: startsAtResume ? Math.floor(request.startMs ?? 0) : 0,
-    externalSubtitles: [],
+    externalSubtitles: externalSubtitles(source, client.serverUrl, request.itemId),
     sessionId,
     transcodeReasons: transcodeReasons(source.TranscodingUrl),
   };

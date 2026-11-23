@@ -5,7 +5,6 @@ import Hls from 'hls.js';
 import { usePreferencesStore } from '@/store/preferences-store';
 import { NativeVideo } from '@/plugins/NativeVideoPlugin';
 import { logger } from '@/utils/logger';
-import { withPlaybackApiKey, withoutPlaybackApiKey } from '@/utils/playbackUrl';
 import type { PlayerSession } from './usePlayerSession';
 import type { PlayerControls } from './usePlayerControls';
 
@@ -47,15 +46,15 @@ export function useWebPlayer(
     isNative: boolean,
 ) {
     const {
-        itemId, serverUrl, accessToken, embyAuthHeader,
+        itemId, authHeader, plan,
         isLoading, isPlaying, currentTime, duration, progressPct, error,
-        playSessionId, mediaSource, hlsUrl, playMethod,
+        hlsUrl, playMethod,
         audioList, selectedAudioIndex, subtitleList, selectedSubtitleIndex,
         activeBurnInSubtitleIndex,
         selectedBitrate, isSwitching, isOfflinePlayback,
         reportPlaybackProgress, startProgressReporting, stopProgressReporting,
-        deleteActiveEncodings, fetchPlaybackInfo,
-        parseAudioStreams, parseSubtitleStreams, determinePlaybackMethod,
+        deleteActiveEncodings, negotiate, applyPlan,
+        parseAudioStreams, parseSubtitleStreams,
     } = session;
 
     const preferencesStore = usePreferencesStore();
@@ -212,7 +211,7 @@ export function useWebPlayer(
                 // Local media:// sidecars need no token — and the custom header
                 // would trigger a CORS preflight the protocol handler rejects.
                 const init = sub.deliveryUrl.startsWith('http')
-                    ? { headers: { Authorization: embyAuthHeader } }
+                    ? { headers: { Authorization: authHeader.value } }
                     : undefined;
                 const resp = await fetch(sub.deliveryUrl, init);
                 blobUrl = URL.createObjectURL(await resp.blob());
@@ -256,7 +255,7 @@ export function useWebPlayer(
                 maxMaxBufferLength: 60,
                 fLoader: makeJellyfinFragmentLoader() as any,
                 xhrSetup: (xhr) => {
-                    xhr.setRequestHeader('Authorization', embyAuthHeader);
+                    xhr.setRequestHeader('Authorization', authHeader.value);
                 },
             });
             hls.loadSource(url);
@@ -286,7 +285,7 @@ export function useWebPlayer(
             });
         } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
             // Native HLS cannot attach headers to <video> manifest/segment requests.
-            video.src = withPlaybackApiKey(url, accessToken);
+            video.src = plan.value?.url === url ? plan.value.mediaElementUrl : url;
             video.play().catch(() => { });
             startProgressReporting();
         } else {
@@ -317,19 +316,6 @@ export function useWebPlayer(
         }
     }
 
-    function ensureBurnInUrl(ms: { TranscodingUrl?: string }, subtitleIndex?: number) {
-        if (subtitleIndex === undefined || !ms.TranscodingUrl) return;
-
-        let url = ms.TranscodingUrl.replace('?&', '?');
-        url = /SubtitleStreamIndex=-?\d+/.test(url)
-            ? url.replace(/SubtitleStreamIndex=-?\d+/, `SubtitleStreamIndex=${subtitleIndex}`)
-            : `${url}&SubtitleStreamIndex=${subtitleIndex}`;
-        if (!/[?&]SubtitleMethod=Encode(?:&|$)/i.test(url)) {
-            url = `${url}&SubtitleMethod=Encode`;
-        }
-        ms.TranscodingUrl = url;
-    }
-
     async function restartWithSubtitle(index: number | null) {
         if (isSwitching.value) return;
         const video = videoEl.value;
@@ -353,33 +339,19 @@ export function useWebPlayer(
         await deleteActiveEncodings();
 
         try {
-            const startTicks = movieTime > 0
-                ? Math.floor(movieTime * 10_000_000)
-                : undefined;
-            const data = await fetchPlaybackInfo(
-                startTicks,
-                selectedAudioIndex.value ?? undefined,
-                true,
-                false,
-                false,
-                false,
-                nextBurnInIndex,
-            );
-
-            mediaSource.value = data.MediaSources?.[0];
-            if (!mediaSource.value) throw new Error('No media source');
-            ensureBurnInUrl(mediaSource.value, nextBurnInIndex);
-            if (nextBurnInIndex !== undefined && !mediaSource.value.TranscodingUrl) {
-                throw new Error('Jellyfin did not return a burn-in stream');
-            }
-
-            if (data.PlaySessionId) playSessionId.value = data.PlaySessionId;
+            const next = await negotiate({
+                native: false,
+                startSeconds: movieTime,
+                audioIndex: selectedAudioIndex.value ?? undefined,
+                forceTranscode: true,
+                burnInSubtitleIndex: nextBurnInIndex,
+            });
+            applyPlan(next);
             selectedSubtitleIndex.value = index;
             activeBurnInSubtitleIndex.value = nextBurnInIndex ?? null;
             persistSubtitleSelection(index);
-            parseAudioStreams(mediaSource.value, selectedAudioIndex.value ?? undefined);
-            parseSubtitleStreams(mediaSource.value);
-            determinePlaybackMethod(mediaSource.value);
+            parseAudioStreams(next.version, selectedAudioIndex.value ?? undefined);
+            parseSubtitleStreams(next.version);
 
             if (playMethod.value === 'DirectPlay') {
                 startDirectPlay(video, movieTime);
@@ -414,34 +386,21 @@ export function useWebPlayer(
         isLoading.value = true;
 
         try {
-            const startTicks = resumeSeconds && resumeSeconds > 0
-                ? Math.floor(resumeSeconds * 10_000_000)
-                : undefined;
-
-            // Force transcode when resuming so Jellyfin always returns an HLS stream.
+            // Force a transcode when resuming so the server returns an HLS stream.
             // DirectPlay serves the raw file and relies on video.currentTime seeking, which
-            // is unreliable for MKV/HEVC content. HLS + StartTimeTicks is the reliable path.
-            const data = await fetchPlaybackInfo(
-                startTicks,
-                preferredAudioIndex,
-                Boolean(startTicks && startTicks > 0) || burnInSubtitleIndex !== undefined,
-                false,
-                false,
-                false,
+            // is unreliable for MKV/HEVC content. HLS from the resume point is the reliable path.
+            const isResuming = Boolean(resumeSeconds && resumeSeconds > 0);
+            const next = await negotiate({
+                native: false,
+                startSeconds: resumeSeconds,
+                audioIndex: preferredAudioIndex,
+                forceTranscode: isResuming || burnInSubtitleIndex !== undefined,
                 burnInSubtitleIndex,
-            );
-            mediaSource.value = data.MediaSources?.[0];
-            if (!mediaSource.value) throw new Error('No media source available');
-            ensureBurnInUrl(mediaSource.value, burnInSubtitleIndex);
-            if (burnInSubtitleIndex !== undefined && !mediaSource.value.TranscodingUrl) {
-                throw new Error('Jellyfin did not return a burn-in stream');
-            }
-
-            if (data.PlaySessionId) playSessionId.value = data.PlaySessionId;
+            });
+            applyPlan(next);
             activeBurnInSubtitleIndex.value = burnInSubtitleIndex ?? null;
-            parseAudioStreams(mediaSource.value, preferredAudioIndex);
-            parseSubtitleStreams(mediaSource.value);
-            determinePlaybackMethod(mediaSource.value);
+            parseAudioStreams(next.version, preferredAudioIndex);
+            parseSubtitleStreams(next.version);
 
             if (playMethod.value === 'DirectPlay') {
                 startDirectPlay(video, resumeSeconds);
@@ -485,26 +444,13 @@ export function useWebPlayer(
         if (!video) { isLoading.value = false; return; }
 
         try {
-            const startTicks = movieTime > 0 ? Math.floor(movieTime * 10_000_000) : undefined;
-            const data = await fetchPlaybackInfo(
-                startTicks,
-                previousIndex ?? undefined,
-                activeBurnInSubtitleIndex.value !== null,
-                false,
-                false,
-                false,
-                activeBurnInSubtitleIndex.value ?? undefined,
-            );
-
-            mediaSource.value = data.MediaSources?.[0];
-            if (!mediaSource.value) throw new Error('No media source for rollback');
-            ensureBurnInUrl(
-                mediaSource.value,
-                activeBurnInSubtitleIndex.value ?? undefined,
-            );
-
-            if (data.PlaySessionId) playSessionId.value = data.PlaySessionId;
-            determinePlaybackMethod(mediaSource.value);
+            applyPlan(await negotiate({
+                native: false,
+                startSeconds: movieTime,
+                audioIndex: previousIndex ?? undefined,
+                forceTranscode: activeBurnInSubtitleIndex.value !== null,
+                burnInSubtitleIndex: activeBurnInSubtitleIndex.value ?? undefined,
+            }));
 
             if (playMethod.value === 'DirectPlay') {
                 startDirectPlay(video, movieTime);
@@ -544,56 +490,19 @@ export function useWebPlayer(
         await deleteActiveEncodings();
 
         try {
-            const startTicks = Math.floor(movieTime * 10_000_000);
-            // forceTranscode=true strips DirectPlay profiles — ensures Jellyfin always
-            // returns a TranscodingUrl so we can select the specific audio stream.
-            const data = await fetchPlaybackInfo(
-                startTicks,
-                index,
-                true,
-                false,
-                false,
-                false,
-                activeBurnInSubtitleIndex.value ?? undefined,
-            );
-
-            mediaSource.value = data.MediaSources?.[0];
-            if (!mediaSource.value) throw new Error('No media source');
-            ensureBurnInUrl(
-                mediaSource.value,
-                activeBurnInSubtitleIndex.value ?? undefined,
-            );
-
-            if (data.PlaySessionId) playSessionId.value = data.PlaySessionId;
+            // DirectPlay serves the raw file and cannot select an audio stream: ask
+            // for the server stream applying the chosen track.
+            applyPlan(await negotiate({
+                native: false,
+                startSeconds: movieTime,
+                audioIndex: index,
+                forceTranscode: true,
+                burnInSubtitleIndex: activeBurnInSubtitleIndex.value ?? undefined,
+                preferStream: true,
+            }));
             selectedAudioIndex.value = index;
             const chosenLang = audioList.value.find(a => a.index === index)?.language;
             if (chosenLang) localStorage.setItem(`msplayer-audio-${itemId}`, chosenLang);
-
-            // For audio switching we must always use HLS — DirectPlay serves the raw
-            // file and cannot select a specific audio stream. We build the URL ourselves
-            // rather than calling determinePlaybackMethod(), which might resolve to
-            // DirectPlay if Jellyfin still marks SupportsDirectPlay even after we
-            // stripped DirectPlayProfiles via forceTranscode=true.
-            const ms = mediaSource.value;
-            if (ms.TranscodingUrl) {
-                // Ensure AudioStreamIndex is correct in the URL — Jellyfin doesn't always
-                // embed it from the request body.
-                let url = ms.TranscodingUrl.replace('?&', '?');
-                url = /AudioStreamIndex=\d+/.test(url)
-                    ? url.replace(/AudioStreamIndex=\d+/, `AudioStreamIndex=${index}`)
-                    : url + `&AudioStreamIndex=${index}`;
-                hlsUrl.value = withoutPlaybackApiKey(`${serverUrl}${url}`);
-                playMethod.value = activeBurnInSubtitleIndex.value !== null
-                    ? 'Transcode'
-                    : ms.SupportsDirectStream ? 'DirectStream' : 'Transcode';
-            } else {
-                // Jellyfin didn't return a TranscodingUrl — build one manually.
-                const subtitleQuery = activeBurnInSubtitleIndex.value !== null
-                    ? `&SubtitleStreamIndex=${activeBurnInSubtitleIndex.value}&SubtitleMethod=Encode`
-                    : '';
-                hlsUrl.value = `${serverUrl}/Videos/${encodeURIComponent(itemId)}/master.m3u8?mediaSourceId=${encodeURIComponent(ms.Id || itemId)}&AudioStreamIndex=${index}${subtitleQuery}&PlaySessionId=${encodeURIComponent(playSessionId.value)}`;
-                playMethod.value = 'Transcode';
-            }
 
             // Pass rollback as the fatal-error callback so an async HLS.js failure also
             // triggers recovery — not just synchronous errors caught below.
@@ -630,44 +539,23 @@ export function useWebPlayer(
         try {
             selectedBitrate.value = bitrate;
             preferencesStore.preferredBitrate = bitrate;
-            const startTicks = Math.floor(movieTime * 10_000_000);
-            // bitrate > 0 forces transcode (DirectPlay can't honour a bitrate cap)
-            const data = await fetchPlaybackInfo(
-                startTicks,
-                selectedAudioIndex.value ?? undefined,
-                bitrate > 0 || activeBurnInSubtitleIndex.value !== null,
-                false,
-                false,
-                false,
-                activeBurnInSubtitleIndex.value ?? undefined,
-            );
-            mediaSource.value = data.MediaSources?.[0];
-            if (!mediaSource.value) throw new Error('No media source');
-            ensureBurnInUrl(
-                mediaSource.value,
-                activeBurnInSubtitleIndex.value ?? undefined,
-            );
-            if (data.PlaySessionId) playSessionId.value = data.PlaySessionId;
-
-            parseAudioStreams(mediaSource.value, selectedAudioIndex.value ?? undefined);
-            parseSubtitleStreams(mediaSource.value);
-
-            const ms = mediaSource.value;
-            if (ms.TranscodingUrl) {
-                hlsUrl.value = withoutPlaybackApiKey(`${serverUrl}${ms.TranscodingUrl.replace('?&', '?')}`);
-                // If we requested AllowVideoStreamCopy:false (bitrate > 0), it's a real transcode.
-                // Otherwise fall back to what Jellyfin reports.
-                playMethod.value = bitrate > 0 || activeBurnInSubtitleIndex.value !== null
-                    ? 'Transcode'
-                    : (ms.SupportsDirectStream ? 'DirectStream' : 'Transcode');
-                initHls(hlsUrl.value, video, movieTime);
+            // A bitrate cap (or a burned-in subtitle) needs a real re-encode: use the server stream.
+            const isForced = bitrate > 0 || activeBurnInSubtitleIndex.value !== null;
+            const next = await negotiate({
+                native: false,
+                startSeconds: movieTime,
+                audioIndex: selectedAudioIndex.value ?? undefined,
+                forceTranscode: isForced,
+                burnInSubtitleIndex: activeBurnInSubtitleIndex.value ?? undefined,
+                preferStream: isForced,
+            });
+            applyPlan(next);
+            parseAudioStreams(next.version, selectedAudioIndex.value ?? undefined);
+            parseSubtitleStreams(next.version);
+            if (playMethod.value === 'DirectPlay') {
+                startDirectPlay(video, movieTime);
             } else {
-                determinePlaybackMethod(ms);
-                if (playMethod.value === 'DirectPlay') {
-                    startDirectPlay(video, movieTime);
-                } else {
-                    initHls(hlsUrl.value, video, movieTime);
-                }
+                initHls(hlsUrl.value, video, movieTime);
             }
         } catch (e: any) {
             logger.error('[switchQuality] error:', e);

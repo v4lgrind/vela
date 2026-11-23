@@ -4,7 +4,7 @@ import { NativeVideo } from '@/plugins/NativeVideoPlugin';
 import type { PlayerSession } from './usePlayerSession';
 
 /**
- * Intro/outro media segments: fetches the timestamps from Jellyfin, drives the
+ * Intro/credits markers: fetches them from the server, drives the
  * "Skip Intro" button visibility, and performs the skip seek (web or native).
  */
 export function useSkipIntro(
@@ -12,7 +12,7 @@ export function useSkipIntro(
     videoEl: Ref<HTMLVideoElement | null>,
     isNative: boolean,
 ) {
-    const { currentTime, serverUrl, embyAuthHeader, itemId, nativeResumeOffsetMs, reportPlaybackProgress } = session;
+    const { backend, currentTime, itemId, nativeResumeOffsetMs, reportPlaybackProgress } = session;
 
     const introEnd = ref<number | null>(null);
     const skipPromptStart = ref<number | null>(null);
@@ -34,34 +34,27 @@ export function useSkipIntro(
     }, { throttle: 500 });
 
     async function fetchIntroTimestamps() {
+        if (!backend?.capabilities.markers) return;
         try {
-            const res = await fetch(
-                `${serverUrl}/MediaSegments/${itemId}?includeSegmentTypes=Intro&includeSegmentTypes=Outro`,
-                { headers: { Authorization: embyAuthHeader } },
-            );
-            if (!res.ok) return;
-            const data = await res.json();
-            const intro = (data.Items ?? []).find((s: any) => s.Type === 'Intro');
+            const markers = await backend.playback.markers(itemId);
+            const intro = markers.find((m) => m.kind === 'intro');
             if (intro) {
-                // Timestamps are in ticks (100ns units)
-                const start = intro.StartTicks / 10_000_000;
-                const end = intro.EndTicks / 10_000_000;
+                const start = intro.startMs / 1000;
+                const end = intro.endMs / 1000;
                 introEnd.value = end;
                 skipPromptStart.value = start;
                 skipPromptEnd.value = end + 10;
                 if (isNative) {
                     // Send timestamps to the native Activity so it can show its own Skip Intro button
                     NativeVideo.setIntroTimestamps({
-                        introStartMs: Math.floor(start * 1000),
-                        introEndMs: Math.floor(end * 1000),
+                        introStartMs: Math.floor(intro.startMs),
+                        introEndMs: Math.floor(intro.endMs),
                     }).catch(() => {});
                 }
             }
-            const outro = (data.Items ?? []).find((s: any) => s.Type === 'Outro');
-            if (outro) {
-                creditsStartMs.value = Math.floor(outro.StartTicks / 10_000);
-            }
-        } catch { /* plugin not available or item has no segments */ }
+            const credits = markers.find((m) => m.kind === 'credits');
+            if (credits) creditsStartMs.value = Math.floor(credits.startMs);
+        } catch { /* server without markers for this item */ }
     }
 
     function skipIntro() {

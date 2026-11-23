@@ -7,16 +7,9 @@ import { QUALITY_PRESETS } from '@/constants';
 import { i18n } from '@/i18n';
 import { downloadService } from '@/services/downloadService';
 import { offlineDatabase } from '@/services/offlineDatabase';
-import {
-  canHardwareDecodeVideo,
-  canSoftwareDecodeVideo,
-  exceedsDeviceDisplay,
-  getDeviceCapabilities,
-  getDisplayBoundsForSource,
-  getRecommendedNativeTranscodeBitrate,
-  isAudioStreamSupported,
-  withDeviceAudioCodecs,
-} from '@/utils/codecDetection';
+import { canSoftwareDecode, displayBoundsFor, exceedsDisplay, isAudioCodecSupported, recommendedTranscodeBitrate } from '@/domain';
+import type { DeviceCapabilities } from '@/domain';
+import { canHardwareDecodeVideo, deviceCapabilities } from '@/utils/codecDetection';
 import { needsDesktopTranscode } from '@/utils/desktopCodec';
 import { languageMatches } from '@/utils/language';
 import { jellyfinAuthorization } from '@/utils/jellyfinAuthorization';
@@ -53,23 +46,31 @@ function jellyfinStreamIndex(id: string | undefined): number | undefined {
   return Number.isInteger(index) && index >= 0 ? index : undefined;
 }
 
-const LEGACY_RANGE_TYPE: Record<string, string> = {
-  sdr: 'SDR', hdr10: 'HDR10', 'hdr10+': 'HDR10Plus', hlg: 'HLG', 'dolby-vision': 'DOVI',
-};
-
-/** Domain streams in the shape the codec checks still expect (until they move to the domain in Phase 4). */
-function codecStreams(version: MediaVersion | undefined): MediaStream[] {
-  if (!version) return [];
-  const video: MediaStream[] = version.video.map((v) => ({
-    Index: Number(v.id), Type: 'Video', Codec: v.codec, Profile: v.profile, Level: v.level, Width: v.width,
-    Height: v.height, BitDepth: v.bitDepth, RealFrameRate: v.frameRate, VideoRangeType: LEGACY_RANGE_TYPE[v.range],
-  }));
-  const audio: MediaStream[] = version.audio.map((a) => ({
-    Index: Number(a.id), Type: 'Audio', Codec: a.codec, Profile: a.profile, Channels: a.channels,
-    ChannelLayout: a.channelLayout, Language: a.language, IsDefault: a.isDefault,
-  }));
-  return [...video, ...audio];
+/** Desktop container/codec rules still read the Jellyfin field names (desktopCodec, shared with offline files). */
+function desktopMetadata(item: MediaItem, version: MediaVersion | undefined) {
+  const streams = [
+    ...(version?.video ?? []).map((v) => ({ Type: 'Video', Codec: v.codec })),
+    ...(version?.audio ?? []).map((a) => ({ Type: 'Audio', Codec: a.codec })),
+  ];
+  return { Type: LEGACY_TYPE_BY_KIND[item.kind], Container: version?.container, MediaStreams: streams };
 }
+
+/**
+ * Restrict a Jellyfin transcode profile's audio codecs to what this device
+ * decodes offline. Same rule as the Jellyfin backend's playback profiles; this
+ * copy goes away when downloads move behind `backend.downloads` (Phase 6).
+ */
+function withDecodableAudio<T extends { TranscodingProfiles?: { Type?: string; AudioCodec?: string }[] }>(profile: T, device: DeviceCapabilities): T {
+  if (!device.isKnown) return profile;
+  const keep = (codecs: string) => codecs.split(',').filter((codec) => isAudioCodecSupported(codec, undefined, device)).join(',');
+  return {
+    ...profile,
+    TranscodingProfiles: profile.TranscodingProfiles?.map((p) =>
+      (p.Type === 'Video' && p.AudioCodec ? { ...p, AudioCodec: keep(p.AudioCodec) || 'aac' } : p)),
+  };
+}
+
+const MAX_SOFTWARE_DECODE_HEIGHT = 1080;
 
 const MAX_CONCURRENT = 3;
 const clientPlatform = getClientPlatform();
@@ -121,11 +122,12 @@ async function withDisplaySizedDownload(
 ): Promise<{ url: string; videoBitrate: number } | undefined> {
   const video = streams.find((stream) => stream.Type === 'Video');
   if (!video) return undefined;
-  const capabilities = await getDeviceCapabilities();
-  const bounds = getDisplayBoundsForSource(video, capabilities);
-  if (!bounds) return undefined;
+  const device = await deviceCapabilities();
+  const box = displayBoundsFor({ width: video.Width ?? undefined, height: video.Height ?? undefined }, device);
+  if (!box) return undefined;
+  const bounds = { maxWidth: box.width, maxHeight: box.height };
 
-  const recommendedBitrate = getRecommendedNativeTranscodeBitrate(capabilities);
+  const recommendedBitrate = recommendedTranscodeBitrate(device);
   const videoBitrate = sourceBitrate > 0
     ? Math.min(recommendedBitrate, sourceBitrate)
     : recommendedBitrate;
@@ -197,11 +199,6 @@ export interface TranscodeOptions {
 interface EpisodeParentMetadata {
   SeriesId?: string;
   SeasonId?: string;
-}
-
-interface CodecMetadata {
-  MediaStreams?: MediaStream[];
-  MediaSources?: Array<{ MediaStreams?: MediaStream[] }>;
 }
 
 interface DownloadStoreState {
@@ -489,32 +486,16 @@ export const useDownloadStore = defineStore('downloads', {
      */
     async checkNeedsTranscode(item: MediaItem): Promise<boolean> {
       const version = 'versions' in item ? item.versions[0] : undefined;
-      const metadata: CodecMetadata = { MediaStreams: codecStreams(version) };
-      if (isDesktopPlatform) {
-        return needsDesktopTranscode({ ...metadata, Type: LEGACY_TYPE_BY_KIND[item.kind], Container: version?.container });
-      }
-      if (!Capacitor.isNativePlatform()) return false;
+      if (isDesktopPlatform) return needsDesktopTranscode(desktopMetadata(item, version));
+      if (!Capacitor.isNativePlatform() || !version) return false;
       try {
-        const capabilities = await getDeviceCapabilities();
-        if (capabilities.androidApi <= 0) return false;
-
-        const streams: MediaStream[] =
-          metadata.MediaStreams || metadata.MediaSources?.[0]?.MediaStreams || [];
-        const maxSoftwareHeight = 1080;
-
-        for (const stream of streams) {
-          if (stream.Type === 'Audio' && !isAudioStreamSupported(stream, capabilities)) {
-            return true;
-          }
-          if (stream.Type !== 'Video') continue;
-
-          if (exceedsDeviceDisplay(stream, capabilities)) return true;
-
-          const hardwareResult = await canHardwareDecodeVideo(stream);
-          if (hardwareResult.supported) continue;
-
-          const canUseSoftware = (stream.Height || 0) <= maxSoftwareHeight
-            && canSoftwareDecodeVideo(stream, capabilities);
+        const device = await deviceCapabilities();
+        if (!device.isKnown) return false;
+        if (version.audio.some((a) => !isAudioCodecSupported(a.codec, a.profile, device))) return true;
+        for (const video of version.video) {
+          if (exceedsDisplay(video, device)) return true;
+          if ((await canHardwareDecodeVideo(video)).supported) continue;
+          const canUseSoftware = (video.height || 0) <= MAX_SOFTWARE_DECODE_HEIGHT && canSoftwareDecode(video, device);
           if (!canUseSoftware) return true;
         }
         return false;
@@ -541,7 +522,7 @@ export const useDownloadStore = defineStore('downloads', {
         const hasBitrateCap = bitrateCap > 0;
 
         if (!hasBitrateCap) {
-          const needsTranscode = await this.checkNeedsTranscode(metadata);
+          const needsTranscode = await this.checkNeedsTranscode(useSessionStore().decodeStoredItem(metadata));
           if (!needsTranscode) return undefined;
         }
 
@@ -582,10 +563,7 @@ export const useDownloadStore = defineStore('downloads', {
           AllowAudioStreamCopy: !isDesktopPlatform,
         };
         // Only stream-copy audio this device can decode offline (no-op off Android).
-        requestBody.DeviceProfile = withDeviceAudioCodecs(
-          requestBody.DeviceProfile,
-          await getDeviceCapabilities(),
-        );
+        requestBody.DeviceProfile = withDecodableAudio(requestBody.DeviceProfile, await deviceCapabilities());
 
         // Resolution cap: MaxStreamingBitrate + AllowVideoStreamCopy:false (set
         // above) forces Jellyfin to re-encode down to the requested bitrate,

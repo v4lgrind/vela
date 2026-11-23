@@ -15,13 +15,8 @@ const SRC = resolve(__dirname);
 const SOURCE_FILE = /\.(ts|vue)$/;
 const IMPORT = /(?:import|export)\s[^'"]*?from\s+['"]([^'"]+)['"]|import\(\s*['"]([^'"]+)['"]\s*\)|import\s+['"]([^'"]+)['"]/g;
 
-/**
- * Files that still import the Jellyfin SDK outside `backends/jellyfin`.
- * This list may only shrink: migrate a file, then remove it here.
- */
-const LEGACY_SDK_IMPORTERS = [
-  'store/jellyfin-store.ts',
-];
+/** Server SDKs, each usable only inside its own backend. */
+const SERVER_SDKS: Record<string, string> = { '@jellyfin/sdk': 'jellyfin' };
 
 /** The only app module allowed into `backends`, and only through the registry. */
 const BACKEND_IMPORTERS = ['store/session-store.ts'];
@@ -81,7 +76,9 @@ describe('architecture', () => {
 
   it('the app does not import backends', () => {
     const app = files.filter((f) => !f.path.startsWith('backends/') && !BACKEND_IMPORTERS.includes(f.path));
-    expect(violations(app, (spec) => !spec.startsWith('@/backends'))).toEqual([]);
+    const intoBackends = (spec: string, path: string) =>
+      spec.startsWith('@/backends') || (spec.startsWith('.') && relative(SRC, resolve(SRC, path, '..', spec)).startsWith('backends/'));
+    expect(violations(app, (spec, path) => !intoBackends(spec, path))).toEqual([]);
   });
 
   it('the session store reaches backends only through the registry', () => {
@@ -89,9 +86,11 @@ describe('architecture', () => {
     expect(violations(importers, (spec) => !spec.startsWith('@/backends') || spec === '@/backends/registry')).toEqual([]);
   });
 
-  it('no new Jellyfin SDK import outside the Jellyfin backend', () => {
-    const app = files.filter((f) => !f.path.startsWith('backends/jellyfin/'));
-    const importers = app.filter((f) => f.imports.some((spec) => spec.startsWith('@jellyfin/sdk'))).map((f) => f.path);
-    expect(importers.sort()).toEqual([...LEGACY_SDK_IMPORTERS].sort());
+  it('server SDKs are imported only by their own backend', () => {
+    const misplaced = files.flatMap(({ path, imports }) =>
+      imports
+        .filter((spec) => Object.entries(SERVER_SDKS).some(([sdk, backend]) => spec.startsWith(sdk) && !path.startsWith(`backends/${backend}/`)))
+        .map((spec) => `${path} → ${spec}`));
+    expect(misplaced).toEqual([]);
   });
 });

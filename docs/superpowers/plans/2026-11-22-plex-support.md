@@ -535,6 +535,28 @@ must reproduce them byte for byte.
   `qcDisabled`) become backend-neutral or backend-scoped.
 - **Release Jellyfin-only Vela on the new architecture** and watch for regressions.
 
+#### Phase 7 results (2026-11-23) — done, release pending
+
+- Deleted `store/jellyfin-store.ts`, `types/jellyfin.ts`,
+  `utils/jellyfinAuthorization.ts` and the Jellyfin item-type fallback of
+  `LazyImg` / `utils/placeholders.ts`. Downloads page artwork comes from domain
+  image refs; Cast reads the server URL and token from the session.
+- `architecture.test.ts`: no server SDK outside its own backend (the legacy
+  allowlist is gone); the app may not reach `backends/` through relative paths
+  either.
+- i18n: `forceOfflineHint` is backend-neutral. The Quick Connect strings stay:
+  only the Jellyfin sign-in shows them.
+- Kept on purpose: the pre-session keys (`jellyfin` in localStorage, the
+  `jellyfin_*` Preferences tokens). The session and library imports read them
+  once, behind their own flags, and keeping them lets a downgraded build sign
+  in again. Delete them in a later release.
+- Verified: 299 tests, type check, build, debug APK. Download records in the
+  old format, seeded into IndexedDB, show on the downloads page and are
+  converted once (domain item, server id, intro segment → marker).
+- Left for later: split `ItemDetailsPage.vue` (~1270 lines); the native
+  `audioSwitchJellyfin` event name (renamed with the Phase 8 plugin changes).
+- Release of Jellyfin-only Vela on the new architecture: the user's call.
+
 ### Phase 8 — Plex backend, video v1 (L)
 - `plex/client.ts`, `auth.ts` (pins, Home users + switch, resources, connection
   probing), `mappers.ts` (fixture-tested), catalog (movie and show libraries),

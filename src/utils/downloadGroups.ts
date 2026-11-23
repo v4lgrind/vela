@@ -1,3 +1,4 @@
+import type { ImageRef, MediaItem } from '@/domain';
 import type { DownloadedMedia } from '@/services/offlineDatabase';
 import type { DownloadTask } from '@/store/download-store';
 
@@ -9,6 +10,8 @@ export interface ActiveGroup {
   total: number;
   progress: number;
   itemIds: string[];
+  /** Server artwork, shown until the cached copy exists. */
+  image?: ImageRef;
 }
 
 export interface StoredGroup {
@@ -18,8 +21,12 @@ export interface StoredGroup {
   count: number;
   size: number;
   itemIds: string[];
+  /** Id the artwork is cached under (series, album or item). */
   imageId: string;
+  image?: ImageRef;
 }
+
+const posterOf = (item: MediaItem | undefined): ImageRef | undefined => item?.images.poster ?? item?.images.thumb;
 
 const isActive = (task: DownloadTask) => task.status === 'downloading' || task.status === 'queued';
 
@@ -39,6 +46,7 @@ export function groupActiveTasks(tasks: DownloadTask[]): ActiveGroup[] {
       total: members.length,
       progress: Math.round(members.reduce((sum, task) => sum + (task.status === 'completed' ? 100 : task.progress), 0) / members.length),
       itemIds: members.map((task) => task.itemId),
+      image: posterOf(members[0].metadata),
     }));
 }
 
@@ -56,7 +64,7 @@ export function groupStored(downloads: DownloadedMedia[]): StoredGroup[] {
       group.size += download.fileSize || 0;
       group.itemIds.push(download.itemId);
     } else {
-      groups.set(key, { key, kind, name, count: 1, size: download.fileSize || 0, itemIds: [download.itemId], imageId });
+      groups.set(key, { key, kind, name, count: 1, size: download.fileSize || 0, itemIds: [download.itemId], imageId, image: posterOf(download.item) });
     }
   }
   return [...groups.values()].sort((a, b) => a.name.localeCompare(b.name));

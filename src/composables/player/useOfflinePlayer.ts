@@ -16,7 +16,7 @@ import type { SkipIntro } from './useSkipIntro';
  * Offline playback path: plays a downloaded file with zero network calls.
  * Native uses ExoPlayer on the raw file:// URI; web reads the file from the
  * Capacitor Filesystem into a blob URL. Watch progress is saved locally to
- * IndexedDB and synced back to Jellyfin later by the sync service.
+ * IndexedDB and synced back to the server later by the sync service.
  */
 export function useOfflinePlayer(
     session: PlayerSession,

@@ -276,7 +276,7 @@
                             @click="goToItem(season.id)">
                             <div class="relative w-full aspect-[2/3] overflow-hidden">
                                 <LazyImg :src="artUrl(season.id, season.images.poster, POSTER)" :alt="season.title"
-                                    item-type="Season" class="w-full h-full object-cover" />
+                                    kind="season" class="w-full h-full object-cover" />
                                 <button @click.stop="toggleWatchedSeason(season)" :disabled="watchingSeasonId === season.id"
                                     class="absolute top-1 right-1 flex size-10 items-center justify-center rounded-full transition-all duration-200 cursor-pointer pointer-events-auto disabled:opacity-50"
                                     :class="season.user.played ? 'bg-accent-purple text-accent-ink' : 'bg-black/50 text-white/80'"
@@ -308,7 +308,7 @@
                             <div class="relative group w-[100px] h-[56px] sm:w-[180px] sm:h-[101px] rounded-lg overflow-hidden shrink-0 bg-black/40"
                                 :class="ep.user.played && 'opacity-60'">
                                 <LazyImg :src="artUrl(ep.id, ep.images.thumb ?? ep.images.poster, EPISODE_STILL)" :alt="ep.title"
-                                    item-type="Episode" class="w-full h-full object-cover" />
+                                    kind="episode" class="w-full h-full object-cover" />
                                 <div class="absolute inset-0 bg-black/50 flex items-center justify-center sm:opacity-0 sm:group-hover:opacity-100 transition-opacity pointer-events-none">
                                     <button @click.stop="playEpisode(ep)" :aria-label="t('common.play')"
                                         class="flex size-10 items-center justify-center bg-white/90 text-black rounded-full shadow-lg pointer-events-auto active:scale-95 cursor-pointer">
@@ -507,7 +507,6 @@ import { useAudioPlayerStore, type AudioTrack } from '@/store/audio-player-store
 import { useDownloadStore } from '@/store/download-store';
 import { useMetadataCacheStore } from '@/store/metadata-cache-store';
 import { useSessionStore } from '@/store/session-store';
-import { useJellyfinStore } from '@/store/jellyfin-store';
 import {
     buildOfflineArtworkTargets,
     downloadService,
@@ -536,7 +535,6 @@ import type { TranscodeOptions } from '@/store/download-store';
 const backend = useBackend();
 const imageUrl = useImageUrl();
 const session = useSessionStore();
-const legacyStore = useJellyfinStore();
 const offlineStore = useOfflineStore();
 const audioPlayerStore = useAudioPlayerStore();
 const downloadStore = useDownloadStore();
@@ -744,8 +742,8 @@ function castCurrentItem() {
     if (!item.value) return Promise.resolve();
     return CastPlugin.castMedia({
         itemId: item.value.id,
-        serverUrl: legacyStore.serverUrl,
-        accessToken: legacyStore.accessToken,
+        serverUrl: session.active?.baseUrl ?? '',
+        accessToken: session.token ?? '',
         startPositionTicks: (item.value.user.resumePositionMs ?? 0) * TICKS_PER_MS,
         title: item.value.title,
     });

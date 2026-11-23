@@ -34,7 +34,7 @@
         </div>
         <ul class="flex flex-col">
           <li v-for="group in activeGroups" :key="group.key" class="flex items-center gap-3 py-2">
-            <LazyImg :src="imageOf(group.key)" :alt="group.name" item-type="Audio"
+            <LazyImg :src="artworkUrl(group.key, imageUrl(group.image, SMALL))" :alt="group.name" kind="track"
               class="size-12 shrink-0 rounded-lg object-cover" />
             <div class="flex min-w-0 flex-1 flex-col gap-1.5">
               <div class="flex justify-between gap-2">
@@ -89,8 +89,8 @@
         <ul class="flex flex-col">
           <li v-for="group in storedGroups" :key="group.key" class="flex items-center gap-3 py-1.5">
             <router-link :to="{ name: 'ItemDetails', params: { id: group.imageId } }" class="flex min-h-11 min-w-0 flex-1 items-center gap-3">
-              <LazyImg :src="artworkUrl(group.imageId, jellyfinStore.getImageUrl(group.imageId, 'Primary', 150, 150) || '')"
-                :alt="group.name" :item-type="group.kind === 'album' ? 'MusicAlbum' : 'Movie'"
+              <LazyImg :src="artworkUrl(group.imageId, imageUrl(group.image, SMALL))"
+                :alt="group.name" :kind="group.kind"
                 class="size-12 shrink-0 rounded-lg object-cover" />
               <div class="min-w-0">
                 <div class="truncate text-body font-semibold text-text-heading">{{ group.name }}</div>
@@ -116,16 +116,17 @@ import { Download as DownloadIcon, RotateCcw, Trash2, X } from 'lucide-vue-next'
 import LazyImg from '@/components/LazyImg.vue';
 import { AppPage, EmptyState, PageHeader } from '@/components/layout';
 import { Button } from '@/components/ui/button';
+import { useImageUrl } from '@/composables/useBackend';
 import { useOfflineArtwork } from '@/composables/useOfflineArtwork';
 import { downloadService } from '@/services/downloadService';
 import { useDownloadStore } from '@/store/download-store';
-import { useJellyfinStore } from '@/store/jellyfin-store';
 import { useOfflineStore } from '@/store/offline-store';
 import { groupActiveTasks, groupStored, storageByKind, type StoredGroup } from '@/utils/downloadGroups';
 
 const { t } = useI18n();
 const offlineStore = useOfflineStore();
-const jellyfinStore = useJellyfinStore();
+const imageUrl = useImageUrl();
+const SMALL = { width: 150, height: 150 };
 const downloadStore = useDownloadStore();
 const { artworkUrl, preload } = useOfflineArtwork();
 
@@ -140,11 +141,6 @@ const storageDetail = computed(() => [
   storage.value.series && t('downloads.storageOf', { type: t('downloads.shows'), size: formatSize(storage.value.series) }),
   storage.value.music && t('downloads.storageOf', { type: t('downloads.music'), size: formatSize(storage.value.music) }),
 ].filter(Boolean).join(' · '));
-
-/** The album (or item) image of a running download row. */
-function imageOf(key: string): string {
-  return artworkUrl(key, jellyfinStore.getImageUrl(key, 'Primary', 150, 150) || '');
-}
 
 function groupMeta(group: StoredGroup): string {
   const size = formatSize(group.size);

@@ -263,7 +263,7 @@
     "original": "Originale",
     "connectivity": "Connexion",
     "forceOffline": "Forcer le mode hors ligne",
-    "forceOfflineHint": "Coupe toutes les requêtes vers Jellyfin",
+    "forceOfflineHint": "Coupe toutes les requêtes vers le serveur",
     "diagnostics": "Diagnostic",
     "debugLogs": "Journaux de débogage",
     "debugLogsHint": "Voir et exporter les journaux de lecture",

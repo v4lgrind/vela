@@ -266,7 +266,7 @@
 import { useI18n } from 'vue-i18n';
 // Orchestrates the player page. All playback logic lives in the composables
 // under src/composables/player/:
-//   usePlayerSession  — shared state + Jellyfin session API/reporting
+//   usePlayerSession  — shared state + backend playback session/reporting
 //   usePlayerControls — controls overlay, menus, tap gestures
 //   useSkipIntro      — intro/outro segments + Skip Intro button
 //   useStreamInfo     — Stream Info modal + live transcoding info
@@ -469,7 +469,7 @@ onMounted(async () => {
     if (audioPlayerStore.isMiniPlayerVisible) audioPlayerStore.stop();
     lockLandscape();
 
-    // If offline and item is downloaded, bypass all Jellyfin network calls.
+    // If offline and item is downloaded, bypass all server calls.
     const cachedDownload = offlineStore.getDownload(itemId);
     const isOffline = !offlineStore.isFullyOnline || preferencesStore.forceOfflineMode;
     if (isOffline && cachedDownload) {

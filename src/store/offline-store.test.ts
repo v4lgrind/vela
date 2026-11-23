@@ -35,10 +35,6 @@ const session = {
 };
 vi.mock('./session-store', () => ({ useSessionStore: () => session }));
 vi.mock('./libraries-store', () => ({ useLibrariesStore: () => ({ libraries: [] }) }));
-vi.mock('./jellyfin-store', () => {
-  const store = { serverUrl: 'https://jf', accessToken: 'token', userId: 'u', libraries: [], fetchLibraryIdOf: vi.fn(), fetchItemsByIds: vi.fn(async () => []) };
-  return { useJellyfinStore: () => store };
-});
 
 const track = (itemId: string) => ({ itemId, type: 'Audio', name: itemId, filePath: `content://${itemId}`, fileSize: 1, downloadDate: 0, jellyfinItem: { Id: itemId } });
 

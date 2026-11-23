@@ -263,7 +263,7 @@
     "original": "Original",
     "connectivity": "Connectivity",
     "forceOffline": "Force offline mode",
-    "forceOfflineHint": "Disable all Jellyfin network requests",
+    "forceOfflineHint": "Disable all server network requests",
     "diagnostics": "Diagnostics",
     "debugLogs": "Debug logs",
     "debugLogsHint": "View and export playback diagnostic logs",

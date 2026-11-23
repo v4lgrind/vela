@@ -74,8 +74,11 @@
 - Phase 6 done (2026-11-23): downloads and offline on the domain; old
   download records are converted on load. See the plan's "Phase 6 results".
 
+- Phase 7 done (2026-11-23): legacy Jellyfin store and types deleted, SDK
+  confined to its backend by the architecture test; old-format downloads
+  checked in the web build. See the plan's "Phase 7 results".
+
 ## Next steps
-- Phase 7 (seal): remove `jellyfin-store.ts`, `types/jellyfin.ts`,
-  `utils/jellyfinAuthorization.ts`; tighten `architecture.test.ts`;
-  backend-neutral i18n; check old downloads on a device; release.
-- Phase 8 (Plex backend, video v1).
+- Release the Jellyfin-only build (user's decision).
+- Phase 8 (Plex backend, video v1): plex.tv/link auth, Home profiles, server
+  race, catalog, playback decision + HLS, timeline reporting, native headers map.

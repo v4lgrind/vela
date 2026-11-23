@@ -36,14 +36,3 @@ const PLACEHOLDER_BY_KIND: Partial<Record<ItemKind, string>> = {
 export function placeholderImage(kind?: ItemKind): string {
   return PLACEHOLDERS[PLACEHOLDER_BY_KIND[kind ?? 'other'] ?? 'default'] ?? PLACEHOLDERS.default;
 }
-
-/** Pre-domain callers pass Jellyfin item types. */
-const KIND_BY_LEGACY_TYPE: Record<string, ItemKind> = {
-  Movie: 'movie', Series: 'series', Season: 'season', Episode: 'episode', BoxSet: 'collection',
-  MusicAlbum: 'album', Playlist: 'playlist', Audio: 'track', MusicArtist: 'artist', Person: 'person',
-  person: 'person', movie: 'movie', series: 'series',
-};
-
-export function legacyTypeToKind(type?: string): ItemKind | undefined {
-  return type ? KIND_BY_LEGACY_TYPE[type] : undefined;
-}

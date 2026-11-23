@@ -41,6 +41,8 @@ export interface ServerConnection {
   tokenKey: string;
   /** Device / client identifier the token was issued to; sent with every request. */
   deviceId: string;
+  /** Secure-storage key of the account token (Plex), see `AccountSecret`. */
+  accountKey?: string;
 }
 
 /** How Vela introduces itself to servers. */

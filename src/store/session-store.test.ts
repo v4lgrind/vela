@@ -82,6 +82,35 @@ describe('session store', () => {
     expect(await readToken('jellyfin:srv-1:u1')).toBeNull();
   });
 
+  it('keeps the Plex account token while one of its profiles is saved', async () => {
+    const session = useSessionStore();
+    const plex = (user: string) => connection({
+      kind: 'plex', serverId: 'm1', user: { id: user, name: user }, tokenKey: `plex:m1:${user}`, accountKey: 'plex-account:a1',
+    });
+    const account = { key: 'plex-account:a1', token: 'account-tok' };
+    await session.settle({ step: 'connected', connection: plex('kid'), token: 'kid-tok', account });
+    await session.settle({ step: 'connected', connection: plex('adult'), token: 'adult-tok', account });
+    expect(await readToken('plex-account:a1')).toBe('account-tok');
+    await session.forget('plex:m1:kid');
+    expect(await readToken('plex-account:a1')).toBe('account-tok');
+    await session.forget('plex:m1:adult');
+    expect(await readToken('plex-account:a1')).toBeNull();
+  });
+
+  it('reuses the Plex client id of this install', async () => {
+    const session = useSessionStore();
+    expect(session.deviceIdFor('plex')).not.toBe(session.deviceIdFor('plex'));
+    session.connections = [connection({ kind: 'plex', deviceId: 'plex-dev' })];
+    expect(session.deviceIdFor('plex')).toBe('plex-dev');
+    expect(session.deviceIdFor('jellyfin')).not.toBe('plex-dev');
+  });
+
+  it('cannot switch profile on a Jellyfin account', async () => {
+    const session = useSessionStore();
+    await session.settle({ step: 'connected', connection: connection(), token: 'tok' });
+    expect(await session.switchProfile()).toBeNull();
+  });
+
   it('imports the old Jellyfin accounts once, on first restore', async () => {
     localStorage.setItem('jellyfin', JSON.stringify({
       serverUrl: 'https://jf.home',

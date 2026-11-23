@@ -2,6 +2,7 @@ import type { Authenticator, ClientIdentity, MediaBackend, ServerConnection, Ser
 
 import { createJellyfinAuthenticator } from './jellyfin/auth';
 import { createJellyfinBackend } from './jellyfin';
+import { createPlexAuthenticator } from './plex/auth';
 export { decodeStoredItem, decodeStoredLibrary } from './jellyfin/legacy';
 
 /**
@@ -9,8 +10,7 @@ export { decodeStoredItem, decodeStoredLibrary } from './jellyfin/legacy';
  * `src/backends` is private to its backend (see architecture.test.ts).
  */
 export function authenticatorFor(kind: ServerKind, identity: ClientIdentity): Authenticator {
-  if (kind === 'jellyfin') return createJellyfinAuthenticator(identity);
-  throw new Error(`No authenticator for ${kind} yet`);
+  return kind === 'plex' ? createPlexAuthenticator(identity) : createJellyfinAuthenticator(identity);
 }
 
 export function createBackend(connection: ServerConnection, token: string, identity: ClientIdentity): MediaBackend {

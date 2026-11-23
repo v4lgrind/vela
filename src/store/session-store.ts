@@ -110,14 +110,29 @@ export const useSessionStore = defineStore('session', {
       return this.settle(step);
     },
 
+    /** Plex lists every client id as a device: reuse this install's id. */
+    deviceIdFor(kind: ServerKind): string {
+      return (kind === 'plex' && this.connections.find((c) => c.kind === 'plex')?.deviceId) || newDeviceId();
+    },
+
     startDeviceCode(kind: ServerKind, serverUrl?: string): Promise<DeviceCodeSession> {
-      return this.authenticator(kind).startDeviceCode(newDeviceId(), serverUrl);
+      return this.authenticator(kind).startDeviceCode(this.deviceIdFor(kind), serverUrl);
+    },
+
+    /** Plex Home: back to the profile choice without a new plex.tv/link code; null if not possible. */
+    async switchProfile(): Promise<AuthStep | null> {
+      const active = this.active;
+      const authenticator = active ? this.authenticator(active.kind) : null;
+      const accountToken = active?.accountKey ? await readToken(active.accountKey) : null;
+      if (!active || !authenticator?.resumeAccount || !accountToken) return null;
+      return authenticator.resumeAccount(accountToken, active.deviceId);
     },
 
     /** Stores a finished sign-in; other steps are returned for the login page to render. */
     async settle(step: AuthStep): Promise<AuthStep> {
       if (step.step !== 'connected') return step;
       await writeToken(step.connection.tokenKey, step.token);
+      if (step.account) await writeToken(step.account.key, step.account.token);
       this.connections = this.connections.filter((c) => !isSameAccount(c, step.connection));
       this.connections.push(step.connection);
       this.activeKey = step.connection.tokenKey;
@@ -147,8 +162,10 @@ export const useSessionStore = defineStore('session', {
     },
 
     async forget(tokenKey: string): Promise<void> {
+      const accountKey = this.connections.find((c) => c.tokenKey === tokenKey)?.accountKey;
       await writeToken(tokenKey, null);
       this.connections = this.connections.filter((c) => c.tokenKey !== tokenKey);
+      if (accountKey && !this.connections.some((c) => c.accountKey === accountKey)) await writeToken(accountKey, null);
       if (this.activeKey === tokenKey) this.signOut();
     },
   },

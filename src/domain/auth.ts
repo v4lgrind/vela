@@ -8,7 +8,7 @@ import type { ServerConnection, ServerKind } from './server';
  * - Plex: device code (plex.tv/link) → choose Home profile (+ PIN) → choose server → connected.
  */
 export type AuthStep =
-  | { step: 'connected'; connection: ServerConnection; token: string }
+  | { step: 'connected'; connection: ServerConnection; token: string; account?: AccountSecret }
   | { step: 'choose-profile'; profiles: AuthProfile[]; choose(profileId: string, pin?: string): Promise<AuthStep> }
   | { step: 'choose-server'; servers: AuthServer[]; choose(serverId: string): Promise<AuthStep> };
 
@@ -30,6 +30,16 @@ export class AuthError extends Error {
     super(message);
     this.name = 'AuthError';
   }
+}
+
+/**
+ * Account-level credential kept beside the connection (Plex: the plex.tv token
+ * that can switch Home profiles without a new plex.tv/link code). Stored in
+ * secure storage under `key`; `ServerConnection.accountKey` points to it.
+ */
+export interface AccountSecret {
+  key: string;
+  token: string;
 }
 
 export interface AuthProfile {
@@ -80,4 +90,6 @@ export interface Authenticator {
   signInWithPassword?(request: PasswordSignIn): Promise<AuthStep>;
   /** `deviceId` identifies this install/connection to the server. */
   startDeviceCode(deviceId: string, serverUrl?: string): Promise<DeviceCodeSession>;
+  /** Plex: back to the profile choice with a stored account token (switch profile). */
+  resumeAccount?(accountToken: string, deviceId: string): Promise<AuthStep>;
 }

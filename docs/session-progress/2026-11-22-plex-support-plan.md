@@ -105,7 +105,14 @@
     `BackendEvents.onConnectionChange`). User confirmed: Wi-Fi → mobile →
     Wi-Fi works.
 
+- Phase 9 done (2026-11-23): Plex music, downloads (original + MKV
+  conversion), BIF previews, Cast (Default Media Receiver), Android Auto. See
+  the plan's "Phase 9 results". Not yet tested on the phone (versionCode 40
+  to install), in a car or with a Cast device.
+
 ## Next steps
+- Install versionCode 40 on the user's phone (on request) and test Plex music,
+  a download, Cast and Android Auto.
 - Done in ec7ebda: one shared request per Plex item (3 s), native player
   reports playing/paused (timeline said "paused" for Plex and Jellyfin), a
   request silent for 3 s checks its address and moves only if it is dead

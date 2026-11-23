@@ -613,6 +613,31 @@ Commits: 8a 2231ecc (auth), 8b 0a2f0ef (catalog), 8c 0b6b119 (playback),
 - Cast for Plex via the Default Media Receiver (URL + token), or keep it hidden.
 - Plex transcoded downloads.
 
+#### Phase 9 results (2026-11-23) — done, phone test pending
+
+Plan: `docs/superpowers/plans/2026-11-23-plex-phase-9.md`. Commits ac2efc2 →
+6bfefdc.
+
+- Music: Plex MusicPort; tracks stream their part file directly (Range) via
+  `MediaVersion.streamRef` / `AudioTrack.streamRef`, else the universal music
+  stream (needs a musicProfile client profile; no Range, so only for
+  conversions or a quality cap below 10 Mb/s). Lyrics from the track's
+  `streamType 4` stream (LRC → synced).
+- Downloads: original part `?download=1`; converted downloads as Matroska
+  (`start.mkv`, context streaming): PMS refuses the `static` context and
+  streams an empty progressive MP4.
+- BIF previews: `/library/parts/{id}/indexes/sd` when the part has
+  `indexes`; native `SeekPreviews` (BIF or Jellyfin tiles), `BifIndex` JUnit-
+  tested. The user's server has no generated previews: not verified live.
+- Cast: `MediaBackend.castMode`; Plex casts a browser-profile stream URL (token
+  inside) on the Default Media Receiver. Stream checked without headers; no
+  Cast device available for an end-to-end test.
+- Android Auto: `MusicLibrary` (Jellyfin / Plex) chosen from the pushed config;
+  `PlexMusicApi` JUnit-tested and checked against the real server. Not tested
+  in a car.
+- Plex images without a size are served as the original (the photo
+  transcoder answers 400 without one).
+
 ### Phase 10 — Verification & docs
 - Emulator smoke test on both backends (login → browse → play → resume → change
   audio/subtitles → mark watched → music + lyrics → download → offline playback).

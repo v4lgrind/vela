@@ -568,6 +568,43 @@ must reproduce them byte for byte.
 - No changes expected outside `backends/plex`, the login page and capability
   gating; if a page needs a change, the domain model was wrong: fix the model.
 
+#### Phase 8 results (2026-11-23) — done, user test pending
+
+Commits: 8a 2231ecc (auth), 8b 0a2f0ef (catalog), 8c 0b6b119 (playback),
+8d/8e 04546f2 (login UI, profile switch, headers map).
+
+- Auth: plex.tv/link PIN → `GET /api/v2/user` + `/api/v2/home/users` →
+  `POST /api/v2/home/users/{uuid}/switch` (PIN) → `/api/v2/resources` with the
+  profile's token → parallel `/identity` race (relays 1.5 s later). PMS
+  requests carry the resource `accessToken`; the plex.tv account token is kept
+  under `ServerConnection.accountKey` for "Switch Plex profile". The session
+  re-races the saved addresses once per account per app run (3 s budget).
+- Catalog (verified live, read-only): paging needs both
+  `X-Plex-Container-Start` and `-Size`; letters via
+  `/library/sections/{id}/firstCharacter/{L}` (honours type, sort, genre,
+  paging); genres filter by tag id; shows "latest" sorts on `episode.addedAt`;
+  people via `/library/people/{id}` + per-section `actor=`. No favourites.
+- Playback: Vela decides direct play itself (container + device decoders +
+  chosen audio). PMS's generic profile refuses direct play when the chosen
+  audio is not the first track ("app cannot select audio streams"), and
+  `add-setting` in the profile extra does not change that. Otherwise the
+  decision runs with `X-Plex-Client-Profile-Extra` and `start.m3u8` repeats
+  its parameters. Verified live as the managed profile: direct play (Range),
+  forced transcode, 2 Mb/s cap, audio switch (direct-stream, alternate track
+  delivered), PGS burn-in. Embedded subtitles cannot be fetched
+  (`/library/streams/{id}` → 501): only files beside the video are sidecars;
+  the rest is burned in (or read by ExoPlayer in direct play).
+- Players take a headers map (hls.js, subtitle fetch, ExoPlayer, trickplay).
+  SRT sidecars become WebVTT on the web; ExoPlayer gets each sidecar's MIME.
+- Verified end to end: web build (Playwright, plex.tv simulated except
+  `resources`): sign-in, wrong PIN, profiles, home, libraries, grid, details,
+  HLS playback, switch profile. Emulator: same sign-in through CDP Fetch,
+  native ExoPlayer HLS playback on the user's server. Jellyfin regressions:
+  web login/migration/playback, native playback.
+- Known: one `/photo/:/transcode` image is blocked by the browser (ORB);
+  the timeline is only exercised by unit tests and by the emulator run, so the
+  watched state of a real profile still needs the user's own test.
+
 ### Phase 9 — After v1: Plex music, downloads, native & extras (M)
 - Plex music (artists, albums, playlists, lyrics) and original-file downloads.
 - Kotlin: `MediaCatalog` interface, `JellyfinCatalog` (from `JellyfinLibrary.kt`),

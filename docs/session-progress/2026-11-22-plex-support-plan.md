@@ -78,7 +78,17 @@
   confined to its backend by the architecture test; old-format downloads
   checked in the web build. See the plan's "Phase 7 results".
 
+- Phase 8 done (2026-11-23): Plex backend (auth, catalog, playback, login UI,
+  profile switch, players' headers map). Tested live with the managed
+  "claude" profile only. Incident: during the emulator run the CDP script that
+  blocked watch-state calls disconnected before the app was stopped, so a few
+  `/:/timeline` "paused" calls (~10 s position) reached the server as
+  "claude"; its watch state stayed empty (checked). See the plan's
+  "Phase 8 results".
+
 ## Next steps
-- Release the Jellyfin-only build (user's decision).
-- Phase 8 (Plex backend, video v1): plex.tv/link auth, Home profiles, server
-  race, catalog, playback decision + HLS, timeline reporting, native headers map.
+- User test on a phone: sign in to Plex with the real plex.tv/link code
+  (owner account approves), pick a profile, play, check resume / watched state.
+- Release (Jellyfin refactor + Plex v1), user's decision.
+- Phase 9: Plex music, downloads, Android Auto, Cast, BIF trickplay;
+  split `ItemDetailsPage.vue`.

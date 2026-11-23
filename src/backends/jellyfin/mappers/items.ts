@@ -57,8 +57,9 @@ function toCredit(person: BaseItemPerson): Credit {
   };
 }
 
-function toArtistRefs(dto: BaseItemDto): ArtistRef[] {
-  if (dto.ArtistItems?.length) return dto.ArtistItems.map((a) => ({ id: opt(a.Id), name: a.Name ?? '' }));
+function toArtistRefs(dto: BaseItemDto, preferAlbumArtists = false): ArtistRef[] {
+  const refs = preferAlbumArtists && dto.AlbumArtists?.length ? dto.AlbumArtists : dto.ArtistItems;
+  if (refs?.length) return refs.map((a) => ({ id: opt(a.Id), name: a.Name ?? '' }));
   return list(dto.Artists).map((name) => ({ name }));
 }
 
@@ -120,6 +121,7 @@ const BUILDERS: Partial<Record<ItemKind, Builder>> = {
     seriesId: dto.SeriesId ?? '',
     seriesTitle: dto.SeriesName ?? '',
     seasonId: opt(dto.SeasonId ?? dto.ParentId),
+    seasonTitle: opt(dto.SeasonName),
     seasonNumber: opt(dto.ParentIndexNumber),
     episodeNumber: opt(dto.IndexNumber),
     versions: toMediaVersions(dto),
@@ -127,7 +129,7 @@ const BUILDERS: Partial<Record<ItemKind, Builder>> = {
   }),
   collection: (dto, base) => ({ ...base, kind: 'collection', itemCount: opt(dto.ChildCount) }),
   artist: (dto, base) => ({ ...base, kind: 'artist', albumCount: opt(dto.AlbumCount) }),
-  album: (dto, base) => ({ ...base, kind: 'album', artists: toArtistRefs(dto), trackCount: opt(dto.ChildCount ?? dto.SongCount) }),
+  album: (dto, base) => ({ ...base, kind: 'album', artists: toArtistRefs(dto, true), trackCount: opt(dto.ChildCount ?? dto.SongCount) }),
   track: (dto, base) => ({
     ...base,
     kind: 'track',

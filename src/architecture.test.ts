@@ -21,8 +21,6 @@ const IMPORT = /(?:import|export)\s[^'"]*?from\s+['"]([^'"]+)['"]|import\(\s*['"
  */
 const LEGACY_SDK_IMPORTERS = [
   'store/jellyfin-store.ts',
-  'utils/detailMeta.test.ts',
-  'utils/detailMeta.ts',
   'utils/lyrics.ts',
 ];
 

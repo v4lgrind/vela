@@ -33,6 +33,11 @@ export interface PlexStream {
   bitDepth?: number;
   frameRate?: number;
   colorTrc?: string;
+  colorSpace?: string;
+  colorPrimaries?: string;
+  chromaSubsampling?: string;
+  scanType?: string;
+  refFrames?: number;
   DOVIPresent?: boolean;
   DOVIProfile?: number;
   channels?: number;
@@ -51,6 +56,7 @@ export interface PlexStream {
 export interface PlexPart {
   id: number;
   key: string;
+  file?: string;
   duration?: number;
   size?: number;
   container?: string;
@@ -60,6 +66,7 @@ export interface PlexPart {
 export interface PlexMedia {
   id: number;
   duration?: number;
+  aspectRatio?: number;
   bitrate?: number;
   container?: string;
   videoResolution?: string;

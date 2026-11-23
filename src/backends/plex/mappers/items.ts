@@ -123,6 +123,7 @@ const BUILDERS: Partial<Record<ItemKind, Builder>> = {
     seriesId: item.grandparentRatingKey ?? '',
     seriesTitle: item.grandparentTitle ?? '',
     seasonId: item.parentRatingKey,
+    seasonTitle: item.parentTitle,
     seasonNumber: item.parentIndex,
     episodeNumber: item.index,
     versions: versions(item),

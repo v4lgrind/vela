@@ -19,7 +19,7 @@ export function videoRange(stream: Pick<PlexStream, 'colorTrc' | 'DOVIPresent'>)
   return RANGE_BY_TRANSFER[stream.colorTrc ?? ''] ?? 'sdr';
 }
 
-function toVideoStream(stream: PlexStream): VideoStream {
+function toVideoStream(stream: PlexStream, aspectRatio?: number): VideoStream {
   const range = videoRange(stream);
   return {
     id: String(stream.id),
@@ -33,6 +33,13 @@ function toVideoStream(stream: PlexStream): VideoStream {
     bitrate: kbpsToBps(stream.bitrate),
     range,
     dolbyVisionProfile: range === 'dolby-vision' ? stream.DOVIProfile : undefined,
+    aspectRatio: aspectRatio === undefined ? undefined : String(aspectRatio),
+    isInterlaced: stream.scanType === undefined ? undefined : stream.scanType === 'interlaced',
+    pixelFormat: stream.chromaSubsampling,
+    refFrames: stream.refFrames,
+    colorSpace: stream.colorSpace,
+    colorTransfer: stream.colorTrc,
+    colorPrimaries: stream.colorPrimaries,
   };
 }
 
@@ -73,11 +80,12 @@ export function toMediaVersion(media: PlexMedia): MediaVersion {
   return {
     id: String(media.id),
     name: media.editionTitle ?? media.videoResolution,
+    path: parts[0]?.file,
     container: media.container,
     sizeBytes: sizes.length ? sizes.reduce((a, b) => a + b, 0) : undefined,
     bitrate: kbpsToBps(media.bitrate),
     durationMs: media.duration,
-    video: streams.filter((s) => s.streamType === 1).map(toVideoStream),
+    video: streams.filter((s) => s.streamType === 1).map((s) => toVideoStream(s, media.aspectRatio)),
     audio: streams.filter((s) => s.streamType === 2).map(toAudioStream),
     subtitles: streams.filter((s) => s.streamType === 3).map(toSubtitleStream),
   };

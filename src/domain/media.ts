@@ -5,6 +5,8 @@
  * Units: durations and positions are milliseconds. Dates are ISO 8601 strings.
  */
 
+import type { MediaVersion } from './streams';
+
 /** Opaque item id, unique within one server. */
 export type ItemId = string;
 
@@ -111,6 +113,7 @@ export interface Episode extends ItemBase {
   seriesId: ItemId;
   seriesTitle: string;
   seasonId?: ItemId;
+  seasonTitle?: string;
   seasonNumber?: number;
   episodeNumber?: number;
   versions: MediaVersion[];
@@ -187,63 +190,4 @@ export interface Library {
   title: string;
   kind: LibraryKind;
   images: Images;
-}
-
-// ── Media versions and streams ───────────────────────────────────────────────
-
-export type VideoRange = 'sdr' | 'hdr10' | 'hdr10+' | 'hlg' | 'dolby-vision' | 'unknown';
-
-export interface VideoStream {
-  /** Opaque, backend-specific. */
-  id: string;
-  codec?: string;
-  profile?: string;
-  level?: number;
-  width?: number;
-  height?: number;
-  bitDepth?: number;
-  frameRate?: number;
-  bitrate?: number;
-  range: VideoRange;
-  /** Dolby Vision profile number when `range` is dolby-vision. */
-  dolbyVisionProfile?: number;
-}
-
-export interface AudioStream {
-  id: string;
-  language?: string;
-  title?: string;
-  codec?: string;
-  profile?: string;
-  channels?: number;
-  channelLayout?: string;
-  bitrate?: number;
-  sampleRate?: number;
-  isDefault: boolean;
-}
-
-export interface SubtitleStream {
-  id: string;
-  language?: string;
-  title?: string;
-  codec?: string;
-  isDefault: boolean;
-  isForced: boolean;
-  isHearingImpaired: boolean;
-  isExternal: boolean;
-  /** Image subtitles (PGS, VobSub) can only be burned in. */
-  format: 'text' | 'image';
-}
-
-/** One file (or edition) of an item. */
-export interface MediaVersion {
-  id: string;
-  name?: string;
-  container?: string;
-  sizeBytes?: number;
-  bitrate?: number;
-  durationMs?: number;
-  video: VideoStream[];
-  audio: AudioStream[];
-  subtitles: SubtitleStream[];
 }

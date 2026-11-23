@@ -405,6 +405,46 @@ must reproduce them byte for byte.
   it helps) → `SearchPage` → `PersonDetailPage` → `LazyImg` placeholders by `kind`.
 - `jellyfin-store` data methods deleted as their last caller goes.
 
+#### Phase 3 execution notes (2026-11-23)
+
+- 3a (done, committed): `JellyfinBackend` catalog / music browse / played
+  state / image URLs; `session.backend`; `useBackend()` / `useImageUrl()`.
+  The catalog port exposes home sections separately (`resumeItems`, `upNext`,
+  `latest`) to keep progressive home loading.
+- 3c: browse pages without downstream coupling: Libraries, Person, Search,
+  Home (online part), Library grid. Offline lists still hold Jellyfin-shaped
+  objects until Phase 6; they reach pages through a decode bridge
+  (`registry.decodeStoredItem`, via the session store).
+- 3d: Item details page, together with what it calls: codec checks
+  (`codecDetection` on domain streams, pulled from Phase 4), the transcode
+  download dialog, the download entry point (takes a small domain subject;
+  the store still fetches and stores the Jellyfin DTO until Phase 6) and the
+  audio-track conversion (pulled from Phase 5).
+
+#### Phase 3 results (2026-11-23) — done
+
+- All browse screens (home, libraries, grid, details, search, person) read
+  domain types through `useBackend()`; image URLs come from domain image refs.
+- New stores: `libraries-store` (per account, imports the old remembered
+  libraries), `home-store` (snapshot keyed by account).
+- Offline data (downloads, metadata cache) is still Jellyfin-shaped and reaches
+  pages through `session.decodeStoredItem` until Phase 6.
+- Domain additions found while migrating: `seasonTitle` on episodes, album
+  artists with ids, technical video fields + file path for the media info
+  dialog (Jellyfin-only flags such as IsAVC or pre-negotiation DirectPlay
+  support were dropped from the dialog), `playedPercent` / `remainingMs`.
+- Download entry point and transcode dialog take domain items / stream ids;
+  `download-store` keeps its Jellyfin internals (Phase 6) behind a small
+  domain→codec shim (`codecStreams`) until codec checks move in Phase 4.
+- Cast button gated by `capabilities.cast`; downloads by `capabilities.downloads`.
+- `jellyfin-store` is down to what the player, audio service and offline
+  sync still use: `initializeApi`, `fetchItemDetails`, `fetchItemsByIds`,
+  `fetchEpisodes`, `markPlayed`, `fetchRandomTracks`, `fetchLyrics`, `getImageUrl`.
+- Known follow-up: `ItemDetailsPage.vue` is still ~1270 lines (limit 250);
+  split it into kind-specific sections in a dedicated UI pass.
+- Checks: 48 files / 288 tests, `vue-tsc`, build; Chromium smoke tests of every
+  browse screen against the fake server (no page errors).
+
 ### Phase 4 — Playback on the domain (L, highest risk)
 - Characterization tests (above), then `negotiate`, `reporter`, `markers`,
   `trickplay`, `serverStreamInfo` for Jellyfin.

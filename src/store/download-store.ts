@@ -21,7 +21,7 @@ import { needsDesktopTranscode } from '@/utils/desktopCodec';
 import { languageMatches } from '@/utils/language';
 import { jellyfinAuthorization } from '@/utils/jellyfinAuthorization';
 import { logger } from '@/utils/logger';
-import type { MediaItem } from '@/domain';
+import type { MediaItem, MediaVersion } from '@/domain';
 import type { MediaStream } from '@/types/jellyfin';
 
 import { useJellyfinStore } from './jellyfin-store';
@@ -37,10 +37,6 @@ const LEGACY_TYPE_BY_KIND: Partial<Record<MediaItem['kind'], string>> = {
   movie: 'Movie', episode: 'Episode', track: 'Audio', album: 'MusicAlbum', series: 'Series', season: 'Season',
 };
 
-function isDomainItem(item: MediaItem | LegacyItem): item is MediaItem {
-  return typeof (item as MediaItem).kind === 'string' && typeof (item as MediaItem).id === 'string';
-}
-
 function legacyStub(item: MediaItem): LegacyItem {
   return {
     Id: item.id,
@@ -48,6 +44,31 @@ function legacyStub(item: MediaItem): LegacyItem {
     Type: LEGACY_TYPE_BY_KIND[item.kind],
     ...(item.kind === 'track' ? { AlbumId: item.albumId, Album: item.albumTitle } : {}),
   };
+}
+
+/** Jellyfin domain stream ids are its stream indexes (this store is Jellyfin-only until Phase 6). */
+function jellyfinStreamIndex(id: string | undefined): number | undefined {
+  if (id === undefined || id === '') return undefined;
+  const index = Number(id);
+  return Number.isInteger(index) && index >= 0 ? index : undefined;
+}
+
+const LEGACY_RANGE_TYPE: Record<string, string> = {
+  sdr: 'SDR', hdr10: 'HDR10', 'hdr10+': 'HDR10Plus', hlg: 'HLG', 'dolby-vision': 'DOVI',
+};
+
+/** Domain streams in the shape the codec checks still expect (until they move to the domain in Phase 4). */
+function codecStreams(version: MediaVersion | undefined): MediaStream[] {
+  if (!version) return [];
+  const video: MediaStream[] = version.video.map((v) => ({
+    Index: Number(v.id), Type: 'Video', Codec: v.codec, Profile: v.profile, Level: v.level, Width: v.width,
+    Height: v.height, BitDepth: v.bitDepth, RealFrameRate: v.frameRate, VideoRangeType: LEGACY_RANGE_TYPE[v.range],
+  }));
+  const audio: MediaStream[] = version.audio.map((a) => ({
+    Index: Number(a.id), Type: 'Audio', Codec: a.codec, Profile: a.profile, Channels: a.channels,
+    ChannelLayout: a.channelLayout, Language: a.language, IsDefault: a.isDefault,
+  }));
+  return [...video, ...audio];
 }
 
 const MAX_CONCURRENT = 3;
@@ -160,8 +181,9 @@ export interface DownloadTask {
 }
 
 export interface TranscodeOptions {
-  audioStreamIndex?: number;
-  subtitleStreamIndex?: number;
+  /** Domain stream ids (see MediaVersion); undefined = server default / no subtitle. */
+  audioStreamId?: string;
+  subtitleStreamId?: string;
   /**
    * Max streaming bitrate in bps for the transcoded download (e.g. 8_000_000 for
    * 720p). 0 or undefined = keep the source resolution (Auto). A cap forces a
@@ -241,10 +263,13 @@ export const useDownloadStore = defineStore('downloads', {
 
   actions: {
     /** Enqueue a download. Starts immediately if a slot is free, otherwise waits. */
-    async startDownload(itemId: string, item: MediaItem | LegacyItem, transcodeOptions?: TranscodeOptions) {
+    async startDownload(itemId: string, item: MediaItem, transcodeOptions?: TranscodeOptions) {
       // The record stored for offline use is still the Jellyfin DTO, fetched in
-      // _executeDownload; a domain item only seeds it (until Phase 6).
-      const metadata = isDomainItem(item) ? legacyStub(item) : item;
+      // _executeDownload; the domain item only seeds it (until Phase 6).
+      await this._enqueue(itemId, legacyStub(item), transcodeOptions);
+    },
+
+    async _enqueue(itemId: string, metadata: LegacyItem, transcodeOptions?: TranscodeOptions) {
       const existing = this.tasks.get(itemId);
       if (existing) {
         if (existing.status === 'cancelled' || existing.status === 'failed') {
@@ -351,11 +376,12 @@ export const useDownloadStore = defineStore('downloads', {
 
         // Build subtitle info for sidecar download (when user chose a subtitle track)
         let subtitleInfo: { streamIndex: number; label: string; language: string } | undefined;
-        if (transcodeOptions?.subtitleStreamIndex != null && transcodeOptions.subtitleStreamIndex >= 0) {
+        const subtitleIndex = jellyfinStreamIndex(transcodeOptions?.subtitleStreamId);
+        if (subtitleIndex !== undefined) {
           const streams: any[] = metadata.MediaStreams || [];
-          const subStream = streams.find((s: any) => s.Index === transcodeOptions.subtitleStreamIndex);
+          const subStream = streams.find((s: any) => s.Index === subtitleIndex);
           subtitleInfo = {
-            streamIndex: transcodeOptions.subtitleStreamIndex,
+            streamIndex: subtitleIndex,
             label: subStream?.DisplayTitle || subStream?.Language || 'Unknown',
             language: subStream?.Language || 'und',
           };
@@ -461,8 +487,12 @@ export const useDownloadStore = defineStore('downloads', {
      * Check if any video or audio codec in the media is unsupported by the device.
      * Returns true if transcoding would be beneficial.
      */
-    async checkNeedsTranscode(metadata: CodecMetadata): Promise<boolean> {
-      if (isDesktopPlatform) return needsDesktopTranscode(metadata);
+    async checkNeedsTranscode(item: MediaItem): Promise<boolean> {
+      const version = 'versions' in item ? item.versions[0] : undefined;
+      const metadata: CodecMetadata = { MediaStreams: codecStreams(version) };
+      if (isDesktopPlatform) {
+        return needsDesktopTranscode({ ...metadata, Type: LEGACY_TYPE_BY_KIND[item.kind], Container: version?.container });
+      }
       if (!Capacitor.isNativePlatform()) return false;
       try {
         const capabilities = await getDeviceCapabilities();
@@ -517,7 +547,7 @@ export const useDownloadStore = defineStore('downloads', {
 
         // Request a transcoding URL from Jellyfin
         logger.log(`[DownloadStore] Requesting transcoded download for ${itemId}` +
-          (transcodeOptions ? ` (audio=${transcodeOptions.audioStreamIndex} sub=${transcodeOptions.subtitleStreamIndex} maxBitrate=${bitrateCap || 'auto'})` : ' (auto-detected)'));
+          (transcodeOptions ? ` (audio=${transcodeOptions.audioStreamId} sub=${transcodeOptions.subtitleStreamId} maxBitrate=${bitrateCap || 'auto'})` : ' (auto-detected)'));
         const serverUrl = jellyfinStore.serverUrl!;
         const token = jellyfinStore.accessToken!;
         const transcodeContainer = isDesktopPlatform ? 'mp4' : 'ts';
@@ -565,9 +595,8 @@ export const useDownloadStore = defineStore('downloads', {
           requestBody.DeviceProfile.MaxStreamingBitrate = bitrateCap;
         }
 
-        if (transcodeOptions?.audioStreamIndex != null) {
-          requestBody.AudioStreamIndex = transcodeOptions.audioStreamIndex;
-        }
+        const audioIndex = jellyfinStreamIndex(transcodeOptions?.audioStreamId);
+        if (audioIndex !== undefined) requestBody.AudioStreamIndex = audioIndex;
         // Subtitles are downloaded separately as sidecar files — don't include in transcode
 
         const response = await fetch(
@@ -640,7 +669,7 @@ export const useDownloadStore = defineStore('downloads', {
     async retry(itemId: string) {
       const task = this.tasks.get(itemId);
       if (task?.status !== 'failed' || !task.metadata) return;
-      await this.startDownload(itemId, task.metadata, task.transcodeOptions);
+      await this._enqueue(itemId, task.metadata, task.transcodeOptions);
     },
 
     cancelDownload(itemId: string) {

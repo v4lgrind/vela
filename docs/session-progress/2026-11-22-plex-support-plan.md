@@ -53,7 +53,17 @@
 - Phase 2 done (2026-11-23): session store, Jellyfin authenticator, legacy
   account migration; see the plan's "Phase 2 results".
 
+- Phase 3 progress (2026-11-23): 3a backend catalog (commit 015d7e9), 3c home /
+  libraries / search / person (1af2669), library grid (0816d97). 3d in progress
+  (uncommitted): domain stream technical fields + `domain/streams.ts`,
+  `detailMeta` on domain items, transcode dialog on domain versions, download
+  options take domain stream ids, `checkNeedsTranscode(item)` via a local
+  domain→codec shim. Remaining for 3d: `ItemDetailsPage.vue` itself, then drop
+  the legacy union in `TrackActionsMenu` and `download-store.startDownload`.
+
+- Phase 3 done (2026-11-23): see the plan's "Phase 3 results".
+
 ## Next steps
-- Phase 3: `JellyfinBackend.catalog` + `imageUrl`, then switch screens one by
-  one to domain types (home → libraries → grid → details → search → person).
+- Phase 4 (playback): characterization tests of today's PlaybackInfo requests
+  first, then `JellyfinBackend.playback`, then the player composables.
 - Commits: one per phase on `v4lgrind/plex-support`.

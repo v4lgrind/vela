@@ -82,6 +82,14 @@ describe('Jellyfin → domain: shows', () => {
     expect(episode.images.backdrop?.startsWith(dto.SeriesId!)).toBe(true);
   });
 
+  it('gives a season the series backdrop only when the series has one', () => {
+    const withBackdrop = toMediaItem({ Id: 's1', Type: 'Season', SeriesId: 'x', ParentBackdropItemId: 'x', ParentBackdropImageTags: ['t'] });
+    expect(withBackdrop.images.backdrop).toBe('x/Backdrop/t');
+    const without = toMediaItem({ Id: 's1', Type: 'Season', SeriesId: 'x', ImageTags: { Primary: 'p' }, ParentBackdropImageTags: [] });
+    expect(without.images.backdrop).toBeUndefined();
+    expect(without.images.poster).toBe('s1/Primary/p');
+  });
+
   it('maps a mixed resume list', () => {
     expect(items(resume).map((dto) => toMediaItem(dto).kind)).toEqual(['movie', 'episode', 'movie']);
   });

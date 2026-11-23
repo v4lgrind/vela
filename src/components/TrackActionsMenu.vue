@@ -45,12 +45,10 @@ import { useOfflineStore } from '@/store/offline-store';
 import type { Track } from '@/domain';
 
 const { t } = useI18n();
-/** Pre-domain callers (item details page) still pass a Jellyfin item until phase 3d. */
-type LegacyTrack = { Id: string; Name?: string };
 // track: when given, the menu also downloads it for offline play.
-const props = defineProps<{ triggerClass?: string; track?: Track | LegacyTrack }>();
-const trackId = computed(() => (props.track && 'kind' in props.track ? props.track.id : props.track?.Id) ?? '');
-const trackName = computed(() => (props.track && 'kind' in props.track ? props.track.title : props.track?.Name) ?? '');
+const props = defineProps<{ triggerClass?: string; track?: Track }>();
+const trackId = computed(() => props.track?.id ?? '');
+const trackName = computed(() => props.track?.title ?? '');
 const downloadStore = useDownloadStore();
 const offlineStore = useOfflineStore();
 const toast = useToast();

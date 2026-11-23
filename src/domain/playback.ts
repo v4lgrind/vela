@@ -1,4 +1,5 @@
-import type { ItemId, MediaVersion } from './media';
+import type { ItemId } from './media';
+import type { MediaVersion } from './streams';
 
 /** What the device can decode; filled by the platform layer (codec detection). */
 export interface DeviceCapabilities {

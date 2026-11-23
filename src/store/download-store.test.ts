@@ -1,3 +1,4 @@
+import type { Movie, Track } from '@/domain';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 
@@ -25,6 +26,12 @@ vi.mock('@/services/offlineDatabase', async (importActual) => ({
   ...(await importActual<typeof import('@/services/offlineDatabase')>()),
   offlineDatabase: { getAllDownloads: vi.fn(async () => []), patchDownload: vi.fn(async () => true) },
 }));
+
+const user = { played: false, playCount: 0, favorite: false };
+const base = (id: string, title: string) => ({ id, title, genres: [], studios: [], images: {}, user });
+const track = (id: string, title: string, extra: Partial<Track> = {}): Track =>
+  ({ ...base(id, title), kind: 'track', artists: [], versions: [], ...extra });
+const movie = (id: string, title: string): Movie => ({ ...base(id, title), kind: 'movie', versions: [], credits: [] });
 
 describe('withForcedVideoParams', () => {
   it('adds video bitrate and resolution box params', () => {
@@ -74,7 +81,7 @@ describe('download queue', () => {
 
   it('starts each queued download once, at most 3 at a time', async () => {
     const store = useDownloadStore();
-    for (const id of ['a', 'b', 'c', 'd', 'e']) store.startDownload(id, { Name: id, Type: 'Audio' });
+    for (const id of ['a', 'b', 'c', 'd', 'e']) store.startDownload(id, track(id, id));
     await new Promise((resolve) => setTimeout(resolve));
 
     const started = vi.mocked(downloadService.downloadForOffline).mock.calls.map((call) => call[1]);
@@ -92,7 +99,7 @@ describe('download retry', () => {
   it('retries a failed download from its metadata', async () => {
     vi.mocked(downloadService.downloadForOffline).mockRejectedValueOnce(new Error('HTTP 500'));
     const store = useDownloadStore();
-    store.startDownload('t1', { Name: 'Adagio', Type: 'Audio', AlbumId: 'al1', Album: 'Plague' });
+    store.startDownload('t1', track('t1', 'Adagio', { albumId: 'al1', albumTitle: 'Plague' }));
     await new Promise((resolve) => setTimeout(resolve));
     expect(store.getTask('t1')).toMatchObject({ status: 'failed', groupId: 'al1', groupName: 'Plague' });
 
@@ -113,19 +120,19 @@ describe('download bookkeeping', () => {
   it('retries with the transcode choices of the first attempt', async () => {
     vi.mocked(downloadService.downloadForOffline).mockRejectedValueOnce(new Error('HTTP 500'));
     const store = useDownloadStore();
-    store.startDownload('m1', { Name: 'Dune', Type: 'Movie' }, { maxBitrate: 8_000_000, audioStreamIndex: 2 });
+    store.startDownload('m1', movie('m1', 'Dune'), { maxBitrate: 8_000_000, audioStreamId: '2' });
     await new Promise((resolve) => setTimeout(resolve));
     expect(store.getTask('m1')?.status).toBe('failed');
 
     await store.retry('m1');
 
-    expect(store._transcodeOptionsQueue.get('m1')).toEqual({ maxBitrate: 8_000_000, audioStreamIndex: 2 });
+    expect(store._transcodeOptionsQueue.get('m1')).toEqual({ maxBitrate: 8_000_000, audioStreamId: '2' });
   });
 
   it('records the library of a finished download', async () => {
     vi.mocked(downloadService.downloadForOffline).mockResolvedValueOnce(undefined);
     const store = useDownloadStore();
-    store.startDownload('t1', { Name: 'Adagio', Type: 'Audio' });
+    store.startDownload('t1', track('t1', 'Adagio'));
 
     await vi.waitFor(() => expect(offlineDatabase.patchDownload).toHaveBeenCalledWith('t1', { libraryId: 'music' }));
   });

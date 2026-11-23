@@ -40,6 +40,14 @@ function toVideoStream(stream: MediaStream): VideoStream {
     bitrate: opt(stream.BitRate),
     range,
     dolbyVisionProfile: range === 'dolby-vision' ? opt(stream.DvProfile) : undefined,
+    dolbyVisionLevel: range === 'dolby-vision' ? opt(stream.DvLevel) : undefined,
+    aspectRatio: opt(stream.AspectRatio),
+    isInterlaced: opt(stream.IsInterlaced),
+    pixelFormat: opt(stream.PixelFormat),
+    refFrames: opt(stream.RefFrames),
+    colorSpace: opt(stream.ColorSpace),
+    colorTransfer: opt(stream.ColorTransfer),
+    colorPrimaries: opt(stream.ColorPrimaries),
   };
 }
 
@@ -82,6 +90,7 @@ export function toMediaVersion(source: MediaSourceInfo, fallbackId: string): Med
   return {
     id: source.Id ?? fallbackId,
     name: opt(source.Name),
+    path: opt(source.Path),
     container: opt(source.Container),
     sizeBytes: opt(source.Size),
     bitrate: opt(source.Bitrate),

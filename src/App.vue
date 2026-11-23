@@ -1,5 +1,6 @@
 <template>
-  <div :style="{ marginLeft: shellStyle.marginLeft }">
+  <!-- --shell-bottom: space the nav bar and mini player take, for fixed page parts (A–Z index). -->
+  <div :style="{ marginLeft: shellStyle.marginLeft, '--shell-bottom': shellStyle.paddingBottom ?? '0px' }">
     <!-- Library lists stay alive while an item opened from them is shown, so
          going back keeps their loaded pages and scroll position. -->
     <router-view v-slot="{ Component }">
@@ -47,6 +48,12 @@ const preferencesStore = usePreferencesStore();
 useDpadNavigation();
 const { isNative } = usePlatform();
 const isAuthenticated = computed(() => session.isAuthenticated);
+
+// The audio queue belongs to the account it was started from: signing out,
+// removing it or switching accounts stops it (its tracks cannot load anymore).
+watch(() => session.activeKey, (key, previous) => {
+  if (previous && key !== previous) audioStore.stop();
+});
 
 // Bottom nav: visible on the main authenticated screens. Hidden on the
 // fullscreen player, the login screen, and while the expanded audio player

@@ -113,7 +113,8 @@
     "addToQueue": "Ajouter à la file",
     "removeDownload": "Supprimer le téléchargement",
     "cancelDownload": "Annuler le téléchargement",
-    "offlineNoNext": "Pas de connexion, et aucun titre téléchargé à lire ensuite"
+    "offlineNoNext": "Pas de connexion, et aucun titre téléchargé à lire ensuite",
+    "tracksFailing": "Plusieurs morceaux d’affilée n’ont pas pu être lus. Lecture arrêtée."
   },
   "detail": {
     "episodes": "{n} épisode | {n} épisodes",
@@ -327,7 +328,9 @@
     "wrongPin": "Code PIN incorrect. Réessayez.",
     "profileRefused": "Ce profil ne peut pas ouvrir le serveur.",
     "chooseServer": "Choisissez un serveur",
-    "serverOffline": "Hors ligne"
+    "serverOffline": "Hors ligne",
+    "removeAccount": "Retirer {name} ({server})",
+    "confirmRemoveAccount": "Retirer {name} sur {server} de cet appareil ? Il faudra se reconnecter pour l’utiliser. Les téléchargements restent sur l’appareil."
   },
   "logs": {
     "entries": "{n} entrée | {n} entrées",

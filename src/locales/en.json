@@ -113,7 +113,8 @@
     "addToQueue": "Add to queue",
     "removeDownload": "Remove download",
     "cancelDownload": "Cancel download",
-    "offlineNoNext": "No connection, and no downloaded track to play next"
+    "offlineNoNext": "No connection, and no downloaded track to play next",
+    "tracksFailing": "Several tracks in a row could not be played. Playback stopped."
   },
   "detail": {
     "episodes": "{n} episode | {n} episodes",
@@ -327,7 +328,9 @@
     "wrongPin": "Wrong PIN. Please try again.",
     "profileRefused": "This profile cannot open the server.",
     "chooseServer": "Choose a server",
-    "serverOffline": "Offline"
+    "serverOffline": "Offline",
+    "removeAccount": "Remove {name} ({server})",
+    "confirmRemoveAccount": "Remove {name} on {server} from this device? You will need to sign in again to use it. Downloads stay on the device."
   },
   "logs": {
     "entries": "{n} entry | {n} entries",

@@ -35,6 +35,9 @@ const ARTWORK_SIZE = { width: 512, height: 512 };
 const DEVICE_CONTAINERS = ['opus', 'webm|opus', 'mp3', 'aac', 'm4a|aac', 'm4a|alac', 'm4b|aac', 'flac', 'webma', 'webm|webma', 'wav', 'ogg'];
 const CAST_CONTAINERS = ['opus', 'webm|opus', 'mp3', 'aac', 'm4a|aac', 'm4b|aac', 'flac', 'webma', 'webm|webma', 'wav', 'ogg'];
 
+/** Failed tracks in a row before the player stops skipping. */
+const MAX_SKIPPED_ERRORS = 3;
+
 /**
  * Bridges the audio store and the playback engine: resolves stream / local
  * URLs, mirrors engine state into the store and reports playback to the server.
@@ -53,6 +56,8 @@ class AudioPlayerService implements AudioController {
   private reportedTrackId = '';
   private reportedToServer = false;
   private lastPosition = 0;
+  /** Tracks that failed in a row: past MAX_SKIPPED_ERRORS the queue stops instead of racing through. */
+  private failedInARow = 0;
   private lastDuration = 0;
   private reportInterval: ReturnType<typeof setInterval> | null = null;
   private ops: Promise<unknown> = Promise.resolve();
@@ -275,6 +280,7 @@ class AudioPlayerService implements AudioController {
       this.audioStore.stop();
       return;
     }
+    if (s.isPlaying && s.position > 0) this.failedInARow = 0;
     this.audioStore.applySnapshot({
       index: s.index,
       isPlaying: s.isPlaying,
@@ -290,6 +296,15 @@ class AudioPlayerService implements AudioController {
   private onEngineError(message: string, network = false) {
     logger.error('[AudioPlayer] Playback error:', message);
     if (!network) {
+      // A bad file is skipped; when every track fails (signed out, server gone) stop
+      // instead of trying the whole queue, which also froze the app.
+      this.failedInARow += 1;
+      if (this.failedInARow >= MAX_SKIPPED_ERRORS) {
+        this.failedInARow = 0;
+        if (this.audioStore.isPlaying) this.audioStore.togglePlayPause();
+        useToast().showError(i18n.global.t('audio.tracksFailing'));
+        return;
+      }
       if (this.audioStore.hasNext) this.audioStore.next();
       return;
     }

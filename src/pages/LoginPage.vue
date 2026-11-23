@@ -19,21 +19,29 @@
         </CardHeader>
         <CardContent class="flex flex-col gap-3">
           <p class="text-xs text-text-muted text-center mb-1">{{ t('login.selectAccount') }}</p>
-          <button
+          <div
             v-for="s in session.connections"
             :key="s.tokenKey"
-            class="flex items-center gap-3 w-full rounded-xl border border-border-input bg-surface-raised hover:bg-surface-hover px-4 py-3 text-left transition-colors"
-            @click="quickSwitch(s)"
+            class="flex items-center w-full rounded-xl border border-border-input bg-surface-raised hover:bg-surface-hover transition-colors"
           >
-            <span class="size-10 overflow-hidden rounded-full bg-accent-purple/20 flex items-center justify-center shrink-0">
-              <img v-if="s.user.avatarUrl" :src="s.user.avatarUrl" alt="" class="size-full object-cover" />
-              <span v-else class="text-accent-purple font-bold text-base uppercase">{{ s.user.name.charAt(0) }}</span>
-            </span>
-            <span class="min-w-0">
-              <span class="block text-sm font-medium text-text-heading truncate">{{ s.user.name }}</span>
-              <span class="block text-xs text-text-muted truncate">{{ s.serverName }} · {{ t(`login.kind.${s.kind}`) }}</span>
-            </span>
-          </button>
+            <button class="flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left" @click="quickSwitch(s)">
+              <span class="size-10 overflow-hidden rounded-full bg-accent-purple/20 flex items-center justify-center shrink-0">
+                <img v-if="s.user.avatarUrl" :src="s.user.avatarUrl" alt="" class="size-full object-cover" />
+                <span v-else class="text-accent-purple font-bold text-base uppercase">{{ s.user.name.charAt(0) }}</span>
+              </span>
+              <span class="min-w-0">
+                <span class="block text-sm font-medium text-text-heading truncate">{{ s.user.name }}</span>
+                <span class="block text-xs text-text-muted truncate">{{ s.serverName }} · {{ t(`login.kind.${s.kind}`) }}</span>
+              </span>
+            </button>
+            <button
+              class="flex size-11 shrink-0 items-center justify-center rounded-lg mr-1 text-text-muted hover:text-error transition-colors"
+              :aria-label="t('login.removeAccount', { name: s.user.name, server: s.serverName })"
+              @click="removeAccount(s)"
+            >
+              <Trash2 class="size-4" />
+            </button>
+          </div>
           <Separator />
           <button class="text-sm text-accent-purple hover:underline text-center py-1" @click="showNewServer = true">
             + {{ t('login.addServer') }}
@@ -77,7 +85,7 @@
 import { onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
-import { ArrowLeft } from 'lucide-vue-next';
+import { ArrowLeft, Trash2 } from 'lucide-vue-next';
 
 import AuthStepPicker from '@/components/login/AuthStepPicker.vue';
 import JellyfinSignIn from '@/components/login/JellyfinSignIn.vue';
@@ -111,6 +119,13 @@ async function enter(step: AuthStep) {
   } else {
     pendingStep.value = settled;
   }
+}
+
+/** Forgets a saved account and its token; downloads made from it stay on the device. */
+async function removeAccount(connection: ServerConnection) {
+  if (!confirm(t('login.confirmRemoveAccount', { name: connection.user.name, server: connection.serverName }))) return;
+  await session.forget(connection.tokenKey);
+  if (session.connections.length === 0) showNewServer.value = true;
 }
 
 async function quickSwitch(connection: ServerConnection) {

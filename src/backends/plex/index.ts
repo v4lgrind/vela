@@ -1,6 +1,7 @@
 import type { BackendEvents, Capabilities, ClientIdentity, MediaBackend, ServerConnection } from '@/domain';
 
 import { createPlexCatalog } from './catalog';
+import { planPlexDownload } from './downloads';
 import { PlexClient } from './client';
 import { plexImageUrl } from './mappers';
 import { createPlexMusic } from './music';
@@ -10,8 +11,8 @@ import { createPlexUserData } from './userData';
 /** v1 is video only (docs/superpowers/plans/2026-11-22-plex-support.md, "Decisions"). */
 const CAPABILITIES: Capabilities = {
   music: true,
-  downloads: false,
-  transcodedDownloads: false,
+  downloads: true,
+  transcodedDownloads: true,
   markers: true,
   chapters: true,
   trickplay: false,
@@ -22,10 +23,6 @@ const CAPABILITIES: Capabilities = {
   serverStreamInfo: false,
   cast: false,
   androidAuto: false,
-};
-
-const unsupported = (what: string) => () => {
-  throw new Error(`Plex ${what} is not supported yet`);
 };
 
 export function createPlexBackend(connection: ServerConnection, token: string, identity: ClientIdentity, events: BackendEvents = {}): MediaBackend {
@@ -40,7 +37,7 @@ export function createPlexBackend(connection: ServerConnection, token: string, i
     music: createPlexMusic(client),
     userData: createPlexUserData(client),
     playback: createPlexPlayback(client),
-    downloads: { plan: async () => unsupported('downloads')() },
+    downloads: { plan: (request) => planPlexDownload(client, request) },
     // The server token stays valid; Vela only forgets it (session store).
     signOut: async () => undefined,
   };

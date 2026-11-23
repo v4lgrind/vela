@@ -110,7 +110,7 @@ function playsDirectly(media: PlexMedia, request: PlaybackRequest): boolean {
   return containers.includes(container) && (!video || video.codec === 'h264') && (!audio || WEB_AUDIO.includes(audio.codec ?? ''));
 }
 
-function pickMedia(item: PlexMetadata, versionId: string | undefined): { media: PlexMedia; index: number } {
+export function pickMedia(item: PlexMetadata, versionId: string | undefined): { media: PlexMedia; index: number } {
   const all = item.Media ?? [];
   const index = Math.max(0, versionId ? all.findIndex((media) => String(media.id) === versionId) : 0);
   const media = all[index];

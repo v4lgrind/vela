@@ -43,6 +43,8 @@ function importsOf(path: string): string[] {
 const files = sourceFiles(SRC).map((path) => ({ path: relative(SRC, path), imports: importsOf(path) }));
 const inside = (dir: string) => files.filter((f) => f.path.startsWith(`${dir}/`));
 const isTest = (path: string) => path.endsWith('.test.ts');
+/** Tests may use the test runner and Node built-ins (fixtures on disk). */
+const isTestTooling = (spec: string, path: string) => isTest(path) && (spec === 'vitest' || spec.startsWith('node:'));
 
 function violations(scope: { path: string; imports: string[] }[], isAllowed: (spec: string, path: string) => boolean): string[] {
   return scope.flatMap(({ path, imports }) => imports.filter((spec) => !isAllowed(spec, path)).map((spec) => `${path} → ${spec}`));
@@ -55,14 +57,14 @@ describe('architecture', () => {
   });
 
   it('domain imports only itself', () => {
-    expect(violations(inside('domain'), (spec, path) => spec.startsWith('./') || (spec === 'vitest' && isTest(path)))).toEqual([]);
+    expect(violations(inside('domain'), (spec, path) => spec.startsWith('./') || isTestTooling(spec, path))).toEqual([]);
   });
 
   it('each backend imports only the domain, itself and its own SDK', () => {
     const allowed = (spec: string, path: string) => {
       const backend = path.split('/')[1];
       if (spec === '@/domain' || spec.startsWith('./') || spec.startsWith('../')) return true;
-      if (spec === 'vitest' && isTest(path)) return true;
+      if (isTestTooling(spec, path)) return true;
       return backend === 'jellyfin' && spec.startsWith('@jellyfin/sdk');
     };
     expect(violations(inside('backends'), allowed)).toEqual([]);

@@ -11,7 +11,7 @@ import showDetail from '../__fixtures__/show-detail.json';
 import showSeasons from '../__fixtures__/show-seasons.json';
 import type { PlexContainer, PlexDirectory, PlexMetadata } from '../types';
 
-import { plexImageUrl, toChapters, toLibrary, toMarkers, toMediaItem, videoRange } from './index';
+import { plexImageUrl, toChapters, toLibrary, toLyrics, toMarkers, toMediaItem, videoRange } from './index';
 
 const metadata = (fixture: unknown): PlexMetadata[] => (fixture as PlexContainer).MediaContainer.Metadata ?? [];
 const first = (fixture: unknown): PlexMetadata => metadata(fixture)[0];
@@ -132,5 +132,31 @@ describe('Plex → domain: music, libraries, misc', () => {
     expect(videoRange({ colorTrc: 'arib-std-b67' })).toBe('hlg');
     expect(videoRange({ colorTrc: 'smpte2084', DOVIPresent: true })).toBe('dolby-vision');
     expect(videoRange({ colorTrc: 'bt709' })).toBe('sdr');
+  });
+});
+
+describe('Plex → domain: music files and lyrics', () => {
+  const track = {
+    ratingKey: '7', type: 'track', title: 'Song', parentRatingKey: '6', grandparentRatingKey: '5',
+    Media: [{ id: 70, container: 'mp3', Part: [{ id: 700, key: '/library/parts/700/1712/file.mp3', container: 'mp3', Stream: [] }] }],
+  } as unknown as PlexMetadata;
+
+  it('track versions carry the part key as streamRef', () => {
+    const item = toMediaItem(track) as Track;
+    expect(item.versions[0]).toMatchObject({ id: '70', container: 'mp3', streamRef: '/library/parts/700/1712/file.mp3' });
+  });
+
+  it('parses LRC lyrics into synced lines', () => {
+    expect(toLyrics('[ar:Someone]\n[00:01.50]Hello\n[01:02.034]World\n', 'lrc')).toEqual({
+      synced: true,
+      lines: [{ startMs: 1500, text: 'Hello' }, { startMs: 62034, text: 'World' }],
+    });
+  });
+
+  it('plain text lyrics are unsynced', () => {
+    expect(toLyrics('Line one\r\nLine two\n', 'txt')).toEqual({
+      synced: false,
+      lines: [{ startMs: null, text: 'Line one' }, { startMs: null, text: 'Line two' }],
+    });
   });
 });

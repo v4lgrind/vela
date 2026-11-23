@@ -59,6 +59,8 @@ export interface MediaVersion {
   name?: string;
   /** File path on the server, when exposed. */
   path?: string;
+  /** Backend-specific locator of the file for direct streaming (Plex: the part key). */
+  streamRef?: string;
   container?: string;
   sizeBytes?: number;
   bitrate?: number;

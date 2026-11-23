@@ -81,6 +81,7 @@ export function toMediaVersion(media: PlexMedia): MediaVersion {
     id: String(media.id),
     name: media.editionTitle ?? media.videoResolution,
     path: parts[0]?.file,
+    streamRef: parts[0]?.key,
     container: media.container,
     sizeBytes: sizes.length ? sizes.reduce((a, b) => a + b, 0) : undefined,
     bitrate: kbpsToBps(media.bitrate),

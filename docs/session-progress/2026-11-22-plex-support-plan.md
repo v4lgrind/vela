@@ -119,8 +119,9 @@
   Plex music tracks are scrobbled when stopped after 90 % (2aa07b8).
 
 ## Next steps
-- Still untested on real devices: Cast, Android Auto, BIF previews (the
-  server has no generated previews).
+- Cast confirmed by the user on 2026-11-24. Still untested on real devices:
+  Android Auto, BIF previews (the server has no generated previews).
+- Released as v1.4.0 from main (PR + release workflow).
 - Done in ec7ebda: one shared request per Plex item (3 s), native player
   reports playing/paused (timeline said "paused" for Plex and Jellyfin), a
   request silent for 3 s checks its address and moves only if it is dead

@@ -1,0 +1,153 @@
+{
+  "MediaContainer": {
+    "size": 27,
+    "allowSync": false,
+    "art": "/:/resources/movie-fanart.jpg",
+    "content": "secondary",
+    "identifier": "com.plexapp.plugins.library",
+    "mediaTagPrefix": "/system/bundle/media/flags/",
+    "mediaTagVersion": 1792751798,
+    "thumb": "/:/resources/movie.png",
+    "title1": "title1 1",
+    "title2": "title2 1",
+    "viewGroup": "secondary",
+    "viewMode": 65592,
+    "Directory": [
+      {
+        "size": 15,
+        "key": "%23",
+        "title": "title 54"
+      },
+      {
+        "size": 76,
+        "key": "A",
+        "title": "title 55"
+      },
+      {
+        "size": 67,
+        "key": "B",
+        "title": "title 56"
+      },
+      {
+        "size": 77,
+        "key": "C",
+        "title": "title 57"
+      },
+      {
+        "size": 66,
+        "key": "D",
+        "title": "title 58"
+      },
+      {
+        "size": 31,
+        "key": "E",
+        "title": "title 59"
+      },
+      {
+        "size": 49,
+        "key": "F",
+        "title": "title 60"
+      },
+      {
+        "size": 39,
+        "key": "G",
+        "title": "title 61"
+      },
+      {
+        "size": 42,
+        "key": "H",
+        "title": "title 62"
+      },
+      {
+        "size": 40,
+        "key": "I",
+        "title": "title 63"
+      },
+      {
+        "size": 33,
+        "key": "J",
+        "title": "title 64"
+      },
+      {
+        "size": 21,
+        "key": "K",
+        "title": "title 65"
+      },
+      {
+        "size": 217,
+        "key": "L",
+        "title": "title 66"
+      },
+      {
+        "size": 88,
+        "key": "M",
+        "title": "title 67"
+      },
+      {
+        "size": 29,
+        "key": "N",
+        "title": "title 68"
+      },
+      {
+        "size": 18,
+        "key": "O",
+        "title": "title 69"
+      },
+      {
+        "size": 70,
+        "key": "P",
+        "title": "title 70"
+      },
+      {
+        "size": 3,
+        "key": "Q",
+        "title": "title 71"
+      },
+      {
+        "size": 50,
+        "key": "R",
+        "title": "title 72"
+      },
+      {
+        "size": 127,
+        "key": "S",
+        "title": "title 73"
+      },
+      {
+        "size": 69,
+        "key": "T",
+        "title": "title 74"
+      },
+      {
+        "size": 17,
+        "key": "U",
+        "title": "title 75"
+      },
+      {
+        "size": 19,
+        "key": "V",
+        "title": "title 76"
+      },
+      {
+        "size": 27,
+        "key": "W",
+        "title": "title 77"
+      },
+      {
+        "size": 8,
+        "key": "X",
+        "title": "title 78"
+      },
+      {
+        "size": 3,
+        "key": "Y",
+        "title": "title 79"
+      },
+      {
+        "size": 4,
+        "key": "Z",
+        "title": "title 80"
+      }
+    ]
+  }
+}

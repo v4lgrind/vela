@@ -27,7 +27,7 @@ import com.google.common.util.concurrent.ListenableFuture
 import org.json.JSONObject
 
 private const val TAG = "NativeAudio"
-// MediaMetadata extra holding the app's AudioTrack JSON (also set by JellyfinLibrary).
+// MediaMetadata extra holding the app's AudioTrack JSON (also set by the MusicLibrary implementations).
 internal const val TRACK_EXTRA = "track"
 private const val TICK_MS = 1000L
 
@@ -272,11 +272,13 @@ class NativeAudioPlugin : Plugin() {
     /** Server and credentials for browsing the library from Android Auto. */
     @PluginMethod
     fun setLibraryConfig(call: PluginCall) {
-        JellyfinLibrary.saveConfig(
+        MusicLibrary.saveConfig(
             context,
+            call.getString("kind") ?: "jellyfin",
             call.getString("serverUrl") ?: "",
             call.getString("accessToken") ?: "",
             call.getString("userId") ?: "",
+            call.getString("clientId") ?: "",
             call.data.optLong("maxBitrate", 140_000_000L),
         )
         call.resolve()

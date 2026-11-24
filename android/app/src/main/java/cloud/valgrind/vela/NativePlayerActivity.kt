@@ -63,7 +63,7 @@ class NativePlayerActivity : AppCompatActivity() {
 
     companion object {
         const val EXTRA_URL = "url"
-        const val EXTRA_AUTH_HEADER = "authHeader"
+        const val EXTRA_HEADERS = "headers"
         const val EXTRA_START_MS = "startPositionMs"
         const val EXTRA_TITLE = "title"
         const val EXTRA_PLAY_METHOD = "playMethod"
@@ -339,7 +339,7 @@ class NativePlayerActivity : AppCompatActivity() {
     private lateinit var tvScrubOverlay: TextView
 
     // Trickplay thumbnails shown while seeking (null when the server has none)
-    private var trickplay: TrickplayThumbnails? = null
+    private var trickplay: SeekPreviews? = null
     private lateinit var trickplayPreview: View
     private lateinit var trickplayImage: android.widget.ImageView
     private lateinit var trickplayTime: TextView
@@ -357,7 +357,7 @@ class NativePlayerActivity : AppCompatActivity() {
 
     // Store build parameters so we can rebuild the player for DV fallback.
     private var buildUrl = ""
-    private var buildAuthHeader = ""
+    private var buildHeaders: Map<String, String> = emptyMap()
     private var buildPlayMethod = ""
     private var buildSubtitleTracksJson = "[]"
 
@@ -470,7 +470,7 @@ class NativePlayerActivity : AppCompatActivity() {
             finish()
             return
         }
-        val authHeader = intent.getStringExtra(EXTRA_AUTH_HEADER) ?: ""
+        val headers = parseHeaders(intent.getStringExtra(EXTRA_HEADERS))
         val startMs = intent.getLongExtra(EXTRA_START_MS, 0L)
         android.util.Log.d("NativePlayer", "NativePlayerActivity.onCreate: url=$url startMs=$startMs")
         val title = intent.getStringExtra(EXTRA_TITLE) ?: ""
@@ -514,9 +514,7 @@ class NativePlayerActivity : AppCompatActivity() {
 
         tvTitle.text = title
 
-        trickplay = TrickplayThumbnails.parse(intent.getStringExtra(EXTRA_TRICKPLAY_JSON))?.let {
-            TrickplayThumbnails(it, authHeader)
-        }
+        trickplay = SeekPreviews.from(intent.getStringExtra(EXTRA_TRICKPLAY_JSON), headers)
 
         // SRT subtitle overlay — parsed from file, rendered outside ExoPlayer pipeline
         val srtPath = intent.getStringExtra(EXTRA_SRT_FILE_PATH) ?: ""
@@ -538,7 +536,7 @@ class NativePlayerActivity : AppCompatActivity() {
         }
 
         setupControls()
-        buildPlayer(url, authHeader, startMs, playMethod, subtitleTracksJson)
+        buildPlayer(url, headers, startMs, playMethod, subtitleTracksJson)
 
         ContextCompat.registerReceiver(
             this,
@@ -703,19 +701,19 @@ class NativePlayerActivity : AppCompatActivity() {
 
     private fun buildPlayer(
         url: String,
-        authHeader: String,
+        headers: Map<String, String>,
         startMs: Long,
         playMethod: String,
         subtitleTracksJson: String
     ) {
         // Store params for potential DV fallback rebuild
         buildUrl = url
-        buildAuthHeader = authHeader
+        buildHeaders = headers
         buildPlayMethod = playMethod
         buildSubtitleTracksJson = subtitleTracksJson
 
         val httpFactory = DefaultHttpDataSource.Factory()
-            .setDefaultRequestProperties(mapOf("Authorization" to authHeader))
+            .setDefaultRequestProperties(headers)
         val dataFactory = DefaultDataSource.Factory(this, httpFactory)
 
         val audioAttr = AudioAttributes.Builder()
@@ -870,6 +868,12 @@ class NativePlayerActivity : AppCompatActivity() {
                 btnPlayPause.setImageResource(if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play)
             }
 
+            // Pause / play reaches the server at once instead of at the next 5 s tick.
+            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                val p = player ?: return
+                sendProgressBroadcast(p.currentPosition, effectiveDuration(), !playWhenReady)
+            }
+
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
                 debugLog("[AudioCrash] onPlayerError: code=${error.errorCode} msg=${error.message}")
                 debugLog("[AudioCrash]   pendingIdx=$audioSwitchPendingGroupIndex pendingLang=$audioSwitchPendingLanguage selectedAudioGroupIndex=$selectedAudioGroupIndex")
@@ -913,7 +917,7 @@ class NativePlayerActivity : AppCompatActivity() {
                         tracksReported = false
                         player?.release()
                         player = null
-                        buildPlayer(buildUrl, buildAuthHeader, resumeMs, buildPlayMethod, buildSubtitleTracksJson)
+                        buildPlayer(buildUrl, buildHeaders, resumeMs, buildPlayMethod, buildSubtitleTracksJson)
                         return
                     }
 
@@ -1029,6 +1033,14 @@ class NativePlayerActivity : AppCompatActivity() {
         tvSrtSubtitle?.textSize = 22f * scale
     }
 
+    /** `{"Header": "value"}` from the plugin; malformed input sends no extra header. */
+    private fun parseHeaders(json: String?): Map<String, String> = try {
+        val obj = JSONObject(json ?: "{}")
+        obj.keys().asSequence().associateWith { obj.optString(it) }
+    } catch (e: Exception) {
+        emptyMap()
+    }
+
     private fun parseSubtitleConfigs(json: String): List<MediaItem.SubtitleConfiguration> {
         return try {
             val arr = JSONArray(json)
@@ -1038,7 +1050,7 @@ class NativePlayerActivity : AppCompatActivity() {
                 val lang = obj.optString("lang", "und")
                 val label = obj.optString("label", lang)
                 MediaItem.SubtitleConfiguration.Builder(android.net.Uri.parse(url))
-                    .setMimeType(MimeTypes.TEXT_VTT)
+                    .setMimeType(obj.optString("mimeType").takeIf { it.isNotEmpty() } ?: MimeTypes.TEXT_VTT)
                     .setLanguage(lang)
                     .setLabel(label)
                     .build()
@@ -1919,11 +1931,13 @@ class NativePlayerActivity : AppCompatActivity() {
 
     // ── Broadcast helpers ──────────────────────────────────────────────────────
 
-    private fun sendProgressBroadcast(posMs: Long, durMs: Long) {
-        android.util.Log.d("NativePlayer", "progress: posMs=$posMs durMs=$durMs")
+    /** `isPaused`: the user paused (buffering while asked to play still counts as playing). */
+    private fun sendProgressBroadcast(posMs: Long, durMs: Long, isPaused: Boolean = player?.playWhenReady == false) {
+        android.util.Log.d("NativePlayer", "progress: posMs=$posMs durMs=$durMs paused=$isPaused")
         val intent = Intent(ACTION_PROGRESS)
         intent.putExtra("positionMs", posMs)
         intent.putExtra("durationMs", durMs)
+        intent.putExtra("isPaused", isPaused)
         intent.setPackage(packageName)
         sendBroadcast(intent)
     }

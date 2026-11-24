@@ -14,21 +14,21 @@
     <EmptyState v-else-if="isOffline && !shownLibraries.length" :icon="Download" :title="t('offline.noDownloads')" />
 
     <div v-else class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-      <router-link v-for="lib in shownLibraries" :key="lib.Id!"
-        :to="{ name: 'libraryItem', params: { id: lib.Id!, name: lib.Name || '' } }"
-        :aria-label="lib.Name ?? undefined"
+      <router-link v-for="lib in shownLibraries" :key="lib.id"
+        :to="{ name: 'libraryItem', params: { id: lib.id, name: lib.title } }"
+        :aria-label="lib.title"
         class="group relative rounded-xl overflow-hidden aspect-video bg-surface-raised
                active:scale-[0.97] active:opacity-75 transition-all duration-200">
-        <!-- Jellyfin's generated library images already carry the name; offline
-             without a cached image, the name is written instead. -->
-        <LazyImg v-if="tileImage(lib.Id!)" :src="tileImage(lib.Id!)" :alt="lib.Name ?? undefined"
-          :item-type="lib.Type" class="block w-full h-full object-cover" />
+        <!-- Server library images usually carry the name; without one (or offline
+             without a cached copy) the name is written instead. -->
+        <LazyImg v-if="tileImage(lib)" :src="tileImage(lib)" :alt="lib.title"
+          class="block w-full h-full object-cover" />
         <span v-else class="absolute inset-0 flex items-center justify-center px-3 text-center text-body font-semibold text-text-heading">
-          {{ lib.Name }}
+          {{ lib.title }}
         </span>
         <span class="absolute top-2 left-2 size-8 rounded-full bg-black/50 backdrop-blur-sm
                      flex items-center justify-center">
-          <component :is="iconFor(lib.CollectionType)" class="size-4 text-white/90" />
+          <component :is="ICONS[lib.kind]" class="size-4 text-white/90" />
         </span>
       </router-link>
     </div>
@@ -38,24 +38,27 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import type { BaseItemDto } from '@jellyfin/sdk/lib/generated-client/models/base-item-dto';
-import { BookOpen, Download, Film, Folder, Library, Music, Tv } from 'lucide-vue-next';
+import { Download, Film, Folder, Music, Tv } from 'lucide-vue-next';
+import type { Library, LibraryKind } from '@/domain';
 import LazyImg from '@/components/LazyImg.vue';
 import { AppPage, EmptyState, PageHeader } from '@/components/layout';
 import OfflineBanner from '@/components/offline/OfflineBanner.vue';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useJellyfinStore } from '@/store/jellyfin-store';
+import { useImageUrl } from '@/composables/useBackend';
 import { useRetryWhileFailed } from '@/composables/useRetryWhileFailed';
 import { useOfflineArtwork } from '@/composables/useOfflineArtwork';
+import { useLibrariesStore } from '@/store/libraries-store';
 import { useOfflineStore } from '@/store/offline-store';
 import { librariesWithDownloads } from '@/utils/offlineLibrary';
 
 const { t } = useI18n();
-const store = useJellyfinStore();
+const librariesStore = useLibrariesStore();
 const offlineStore = useOfflineStore();
+const imageUrl = useImageUrl();
 const { artworkUrl, preload } = useOfflineArtwork();
+librariesStore.importLegacy();
 // Libraries already fetched (or remembered from the last time online) render right away.
-const libraries = ref<BaseItemDto[]>(store.libraries ?? []);
+const libraries = computed(() => librariesStore.libraries);
 const isOffline = computed(() => !offlineStore.isFullyOnline);
 const loading = ref(libraries.value.length === 0 && !isOffline.value);
 const error = ref<string | null>(null);
@@ -63,20 +66,16 @@ const error = ref<string | null>(null);
 const shownLibraries = computed(() =>
   isOffline.value ? librariesWithDownloads(libraries.value, offlineStore.downloads) : libraries.value);
 
-const ICONS: Record<string, typeof Film> = {
+const ICONS: Record<LibraryKind, typeof Film> = {
   movies: Film,
-  tvshows: Tv,
+  shows: Tv,
   music: Music,
-  books: BookOpen,
-  boxsets: Library,
+  mixed: Folder,
+  other: Folder,
 };
 
-function iconFor(collectionType?: string | null) {
-  return (collectionType && ICONS[collectionType]) || Folder;
-}
-
-function tileImage(id: string): string {
-  return artworkUrl(id, store.getImageUrl(id, 'Primary', 800, 450) || '');
+function tileImage(library: Library): string {
+  return artworkUrl(library.id, imageUrl(library.images.poster, { width: 800, height: 450 }));
 }
 
 async function loadLibraries() {
@@ -85,7 +84,7 @@ async function loadLibraries() {
     return;
   }
   try {
-    libraries.value = (await store.fetchLibraries()).filter((lib) => lib.Id);
+    await librariesStore.refresh();
     error.value = null;
     void offlineStore.cacheLibraryArtwork();
   } catch {
@@ -97,6 +96,6 @@ async function loadLibraries() {
 
 useRetryWhileFailed(computed(() => error.value !== null), loadLibraries);
 watch(isOffline, (offline) => { if (!offline) loadLibraries(); });
-watch(shownLibraries, (libs) => { void preload(libs.map((lib) => lib.Id!)); }, { immediate: true });
+watch(shownLibraries, (libs) => { void preload(libs.map((lib) => lib.id)); }, { immediate: true });
 onMounted(loadLibraries);
 </script>

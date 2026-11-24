@@ -46,7 +46,7 @@
 import { useI18n } from 'vue-i18n';
 import { computed, ref, watch } from 'vue';
 import { useAudioPlayerStore } from '@/store/audio-player-store';
-import { useJellyfinStore } from '@/store/jellyfin-store';
+import { useImageUrl } from '@/composables/useBackend';
 import { Button } from '@/components/ui/button';
 import { Airplay, Cast, SkipBack, SkipForward, Play, Pause, X } from 'lucide-vue-next';
 import { useBottomNavVisible } from '@/composables/useBottomNav';
@@ -56,7 +56,7 @@ import { miniPlayerStyle } from '@/utils/shellLayout';
 
 const { t } = useI18n();
 const audioStore = useAudioPlayerStore();
-const jellyfinStore = useJellyfinStore();
+const imageUrl = useImageUrl();
 
 // When the bottom nav is on screen, sit just above it (nav: 66px tall, 4px
 // offset, +8px gap) instead of flush to the bottom edge.
@@ -70,7 +70,7 @@ const currentTrack = computed(() => audioStore.currentTrack);
 const albumArtUrl = computed(() => {
   const track = currentTrack.value;
   if (!track) return '';
-  return jellyfinStore.getImageUrl(track.albumId || track.id, 'Primary', 96, 96);
+  return imageUrl(track.artwork, { width: 96, height: 96 });
 });
 
 // A cover that failed to load (network cut while locked) is fetched again.

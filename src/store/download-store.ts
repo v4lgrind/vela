@@ -4,124 +4,33 @@ import { Capacitor } from '@capacitor/core';
 import { getClientPlatform } from '@/composables/usePlatform';
 import { useToast } from '@/composables/useToast';
 import { QUALITY_PRESETS } from '@/constants';
+import { canSoftwareDecode, displayBoundsFor, exceedsDisplay, isAudioCodecSupported, recommendedTranscodeBitrate } from '@/domain';
+import type { DeviceCapabilities, DownloadRequest, MediaBackend, MediaItem, MediaVersion } from '@/domain';
 import { i18n } from '@/i18n';
-import { downloadService } from '@/services/downloadService';
-import { offlineDatabase } from '@/services/offlineDatabase';
-import {
-  canHardwareDecodeVideo,
-  canSoftwareDecodeVideo,
-  exceedsDeviceDisplay,
-  getDeviceCapabilities,
-  getDisplayBoundsForSource,
-  getRecommendedNativeTranscodeBitrate,
-  isAudioStreamSupported,
-  withDeviceAudioCodecs,
-} from '@/utils/codecDetection';
+import { artworkResolverFor, buildOfflineArtworkTargets, downloadService } from '@/services/downloadService';
+import { offlineDatabase, type DownloadedMedia } from '@/services/offlineDatabase';
+import { canHardwareDecodeVideo, deviceCapabilities } from '@/utils/codecDetection';
 import { needsDesktopTranscode } from '@/utils/desktopCodec';
 import { languageMatches } from '@/utils/language';
-import { jellyfinAuthorization } from '@/utils/jellyfinAuthorization';
 import { logger } from '@/utils/logger';
-import type { MediaStream } from '@/types/jellyfin';
 
-import { useJellyfinStore } from './jellyfin-store';
 import { useMetadataCacheStore } from './metadata-cache-store';
 import { useOfflineStore } from './offline-store';
 import { usePreferencesStore } from './preferences-store';
+import { useSessionStore } from './session-store';
 
 const MAX_CONCURRENT = 3;
-const clientPlatform = getClientPlatform();
-const isDesktopPlatform = ['linux', 'macos', 'windows'].includes(clientPlatform);
+const MAX_SOFTWARE_DECODE_HEIGHT = 1080;
+const isDesktopPlatform = ['linux', 'macos', 'windows'].includes(getClientPlatform());
 
-/**
- * Force resolution + video bitrate on a Jellyfin transcode URL.
- *
- * Jellyfin does not reliably apply `MaxStreamingBitrate` from the device profile to
- * downloaded (progressive) transcodes — it can transcode at the source resolution and
- * ignore the cap, producing a file even larger than the original. Setting
- * `maxWidth`/`maxHeight`/`videoBitRate` directly on the stream URL is honoured
- * unconditionally. Existing values are replaced case-insensitively so ASP.NET never
- * sees duplicate keys. `width` defaults to a 16:9 box around `height`.
- */
-export function withForcedVideoParams(
-  rawUrl: string,
-  videoBitrate: number,
-  height: number,
-  width = Math.round((height * 16) / 9),
-): string {
-  try {
-    const u = new URL(rawUrl);
-    const setParam = (key: string, value: string) => {
-      for (const existing of [...u.searchParams.keys()]) {
-        if (existing.toLowerCase() === key.toLowerCase()) u.searchParams.delete(existing);
-      }
-      u.searchParams.set(key, value);
-    };
-    setParam('videoBitRate', String(videoBitrate));
-    if (height > 0) {
-      setParam('maxHeight', String(height));
-      setParam('maxWidth', String(width));
-    }
-    return u.toString();
-  } catch {
-    return rawUrl;
-  }
-}
-
-/**
- * Bound an auto-detected transcode of a source larger than the display to the
- * display size and the device's recommended bitrate (never above the source).
- */
-async function withDisplaySizedDownload(
-  url: string,
-  streams: MediaStream[],
-  sourceBitrate: number,
-): Promise<{ url: string; videoBitrate: number } | undefined> {
-  const video = streams.find((stream) => stream.Type === 'Video');
-  if (!video) return undefined;
-  const capabilities = await getDeviceCapabilities();
-  const bounds = getDisplayBoundsForSource(video, capabilities);
-  if (!bounds) return undefined;
-
-  const recommendedBitrate = getRecommendedNativeTranscodeBitrate(capabilities);
-  const videoBitrate = sourceBitrate > 0
-    ? Math.min(recommendedBitrate, sourceBitrate)
-    : recommendedBitrate;
-  logger.log(`[DownloadStore] Bounding transcoded download to ${bounds.maxWidth}x${bounds.maxHeight} at ${videoBitrate} bps`);
-  return {
-    url: withForcedVideoParams(url, videoBitrate, bounds.maxHeight, bounds.maxWidth),
-    videoBitrate,
-  };
-}
-
-/**
- * Pick a text subtitle stream for a sidecar download: the user's preferred
- * language first, then the default-flagged stream, then the first text stream.
- */
-function pickSidecarSubtitle(
-  metadata: any,
-): { streamIndex: number; label: string; language: string } | undefined {
-  const streams: any[] = metadata.MediaStreams || metadata.MediaSources?.[0]?.MediaStreams || [];
-  const textSubs = streams.filter((s: any) => s.Type === 'Subtitle' && s.IsTextSubtitleStream);
-  if (textSubs.length === 0) return undefined;
-
-  const preferredLanguage = usePreferencesStore().preferredSubtitleLanguage;
-  const stream = (preferredLanguage
-    ? textSubs.find((s: any) => languageMatches(preferredLanguage, s.Language || ''))
-    : undefined)
-    || textSubs.find((s: any) => s.IsDefault)
-    || textSubs[0];
-
-  return {
-    streamIndex: stream.Index,
-    label: stream.DisplayTitle || stream.Language || 'Unknown',
-    language: stream.Language || 'und',
-  };
-}
+const STORAGE_TYPE: Partial<Record<MediaItem['kind'], DownloadedMedia['type']>> = {
+  movie: 'Movie', episode: 'Episode', track: 'Audio', album: 'MusicAlbum',
+};
 
 export interface DownloadTask {
   itemId: string;
   name: string;
-  type: 'Movie' | 'Episode' | 'Audio' | 'MusicAlbum';
+  type: DownloadedMedia['type'];
   progress: number;
   loaded: number;
   total: number;
@@ -133,13 +42,14 @@ export interface DownloadTask {
   groupId?: string;
   groupName?: string;
   /** Kept after a failure, so the download can be retried as it was asked. */
-  metadata?: any;
+  metadata?: MediaItem;
   transcodeOptions?: TranscodeOptions;
 }
 
 export interface TranscodeOptions {
-  audioStreamIndex?: number;
-  subtitleStreamIndex?: number;
+  /** Domain stream ids (see MediaVersion); undefined = server default / no subtitle. */
+  audioStreamId?: string;
+  subtitleStreamId?: string;
   /**
    * Max streaming bitrate in bps for the transcoded download (e.g. 8_000_000 for
    * 720p). 0 or undefined = keep the source resolution (Auto). A cap forces a
@@ -150,37 +60,67 @@ export interface TranscodeOptions {
   forceOriginal?: boolean;
 }
 
-interface EpisodeParentMetadata {
-  SeriesId?: string;
-  SeasonId?: string;
-}
-
-interface CodecMetadata {
-  MediaStreams?: MediaStream[];
-  MediaSources?: Array<{ MediaStreams?: MediaStream[] }>;
-}
-
 interface DownloadStoreState {
   tasks: Map<string, DownloadTask>;
-  // Metadata kept separately — not reactive, just for queue execution
-  _metadataQueue: Map<string, any>;
+  // Items kept separately — not reactive, just for queue execution
+  _itemQueue: Map<string, MediaItem>;
   _transcodeOptionsQueue: Map<string, TranscodeOptions>;
   showIndicator: boolean;
+}
+
+function firstVersion(item: MediaItem): MediaVersion | undefined {
+  return 'versions' in item ? item.versions[0] : undefined;
+}
+
+/** Desktop container/codec rules (desktopCodec) read the first-schema field names. */
+function desktopMetadata(item: MediaItem, version: MediaVersion | undefined) {
+  const streams = [
+    ...(version?.video ?? []).map((v) => ({ Type: 'Video', Codec: v.codec })),
+    ...(version?.audio ?? []).map((a) => ({ Type: 'Audio', Codec: a.codec })),
+  ];
+  return { Type: STORAGE_TYPE[item.kind], Container: version?.container, MediaStreams: streams };
+}
+
+/** A quality preset as encoder settings: its bitrate, and its height in a 16:9 box. */
+function presetVideo(bitrate: number) {
+  const height = QUALITY_PRESETS.find((p) => p.bitrate === bitrate)?.minHeight ?? 0;
+  return { bitrate, maxSize: height > 0 ? { width: Math.round((height * 16) / 9), height } : undefined };
+}
+
+/** A source larger than the display is bounded to it, at the device's recommended bitrate (never above the source). */
+function displaySizedVideo(version: MediaVersion | undefined, device: DeviceCapabilities | undefined) {
+  const video = version?.video[0];
+  const box = video && device ? displayBoundsFor(video, device) : null;
+  if (!box || !device) return undefined;
+  const recommended = recommendedTranscodeBitrate(device);
+  const bitrate = version?.bitrate ? Math.min(recommended, version.bitrate) : recommended;
+  logger.log(`[DownloadStore] Bounding transcoded download to ${box.width}x${box.height} at ${bitrate} bps`);
+  return { bitrate, maxSize: box };
+}
+
+/**
+ * Desktop direct downloads: Chromium's <video> exposes no embedded subtitle
+ * tracks, so a text sidecar is picked (preferred language, else default, else first).
+ */
+function desktopSidecarSubtitle(version: MediaVersion | undefined): string | undefined {
+  const textSubs = (version?.subtitles ?? []).filter((s) => s.format === 'text');
+  const preferred = usePreferencesStore().preferredSubtitleLanguage;
+  const stream = (preferred ? textSubs.find((s) => languageMatches(preferred, s.language || '')) : undefined)
+    ?? textSubs.find((s) => s.isDefault) ?? textSubs[0];
+  return stream?.id;
 }
 
 export const useDownloadStore = defineStore('downloads', {
   state: (): DownloadStoreState => ({
     tasks: new Map(),
-    _metadataQueue: new Map(),
+    _itemQueue: new Map(),
     _transcodeOptionsQueue: new Map(),
     showIndicator: false,
   }),
 
   getters: {
     activeDownloads(): DownloadTask[] {
-      return Array.from(this.tasks.values()).filter(
-        (t) => t.status === 'downloading' || t.status === 'queued'
-      );
+      return Array.from(this.tasks.values()).filter((t) => t.status === 'downloading' || t.status === 'queued');
     },
 
     completedDownloads(): DownloadTask[] {
@@ -203,263 +143,178 @@ export const useDownloadStore = defineStore('downloads', {
       return totalSize > 0 ? Math.round((totalLoaded / totalSize) * 100) : 0;
     },
 
-    isDownloading:
-      (state) =>
-      (itemId: string): boolean => {
-        const task = state.tasks.get(itemId);
-        return task?.status === 'downloading' || task?.status === 'queued';
-      },
+    isDownloading: (state) => (itemId: string): boolean => {
+      const task = state.tasks.get(itemId);
+      return task?.status === 'downloading' || task?.status === 'queued';
+    },
 
-    getTask:
-      (state) =>
-      (itemId: string): DownloadTask | undefined => {
-        return state.tasks.get(itemId);
-      },
+    getTask: (state) => (itemId: string): DownloadTask | undefined => state.tasks.get(itemId),
   },
 
   actions: {
     /** Enqueue a download. Starts immediately if a slot is free, otherwise waits. */
-    async startDownload(itemId: string, metadata: any, transcodeOptions?: TranscodeOptions) {
+    async startDownload(itemId: string, item: MediaItem, transcodeOptions?: TranscodeOptions) {
       const existing = this.tasks.get(itemId);
       if (existing) {
         if (existing.status === 'cancelled' || existing.status === 'failed') {
-          // Clear stale task so it can be retried
-          this.tasks.delete(itemId);
+          this.tasks.delete(itemId); // stale task: allow a new attempt
         } else if (existing.status === 'downloading' && !downloadService.isDownloading(itemId)) {
           logger.warn('[DownloadStore] Stale downloading task for', itemId, '— allowing retry');
           this.tasks.delete(itemId);
-        } else if (existing.status === 'downloading' || existing.status === 'queued') {
+        } else {
           logger.log('[DownloadStore] Already queued/downloading:', itemId);
           return;
         }
       }
+      if (!useSessionStore().backend) throw new Error('Not connected to server');
 
-      const jellyfinStore = useJellyfinStore();
-      if (!jellyfinStore.serverUrl || !jellyfinStore.accessToken) {
-        throw new Error('Not connected to server');
-      }
-
-      const task: DownloadTask = {
+      this.tasks.set(itemId, {
         itemId,
-        name: metadata.Name || 'Unknown',
-        type: metadata.Type,
+        name: item.title || 'Unknown',
+        type: STORAGE_TYPE[item.kind] ?? 'Movie',
         progress: 0,
         loaded: 0,
         total: 0,
         status: 'queued',
         startedAt: Date.now(),
         transcoding: false,
-        groupId: metadata.Type === 'Audio' ? metadata.AlbumId : undefined,
-        groupName: metadata.Type === 'Audio' ? metadata.Album : undefined,
-      };
-
-      this.tasks.set(itemId, task);
-      this._metadataQueue.set(itemId, metadata);
-      if (transcodeOptions) {
-        this._transcodeOptionsQueue.set(itemId, transcodeOptions);
-      }
+        groupId: item.kind === 'track' ? item.albumId : undefined,
+        groupName: item.kind === 'track' ? item.albumTitle : undefined,
+      });
+      this._itemQueue.set(itemId, item);
+      if (transcodeOptions) this._transcodeOptionsQueue.set(itemId, transcodeOptions);
       this.showIndicator = true;
-
       this._processQueue();
     },
 
     /** Process the queue: start up to MAX_CONCURRENT downloads. */
     _processQueue() {
-      const downloading = Array.from(this.tasks.values()).filter(
-        (t) => t.status === 'downloading'
-      ).length;
-
+      const downloading = Array.from(this.tasks.values()).filter((t) => t.status === 'downloading').length;
       const slots = MAX_CONCURRENT - downloading;
       if (slots <= 0) return;
+      const queued = Array.from(this.tasks.values()).filter((t) => t.status === 'queued').slice(0, slots);
+      for (const task of queued) this._executeDownload(task.itemId);
+    },
 
-      const queued = Array.from(this.tasks.values())
-        .filter((t) => t.status === 'queued')
-        .slice(0, slots);
-
-      for (const task of queued) {
-        this._executeDownload(task.itemId);
+    /**
+     * What to ask the server for: the original, a capped transcode (quality
+     * preset), or — when this device can't play the source — a display-sized one.
+     */
+    async _downloadRequest(item: MediaItem, options: TranscodeOptions | undefined): Promise<DownloadRequest> {
+      const version = firstVersion(item);
+      const device = Capacitor.isNativePlatform() ? await deviceCapabilities() : undefined;
+      const base = { itemId: item.id, target: isDesktopPlatform ? 'desktop' as const : 'native' as const, device };
+      const cap = options?.maxBitrate ?? 0;
+      const canTranscode = !options?.forceOriginal && (Capacitor.isNativePlatform() || isDesktopPlatform);
+      let transcode: DownloadRequest['transcode'];
+      if (canTranscode && cap > 0) {
+        transcode = { maxBitrate: cap, video: presetVideo(cap), audioStreamId: options?.audioStreamId };
+      } else if (canTranscode && await this.checkNeedsTranscode(item)) {
+        transcode = { video: displaySizedVideo(version, device), audioStreamId: options?.audioStreamId };
       }
+      const subtitleStreamId = options?.subtitleStreamId
+        ?? (isDesktopPlatform && !transcode ? desktopSidecarSubtitle(version) : undefined);
+      return { ...base, transcode, subtitleStreamId };
     },
 
     /** Actually run a single download. Called internally when a slot is free. */
     async _executeDownload(itemId: string) {
       const task = this.tasks.get(itemId);
-      let metadata = this._metadataQueue.get(itemId);
-      if (!task || !metadata) return;
+      const queued = this._itemQueue.get(itemId);
+      if (!task || !queued) return;
 
-      // Take the slot now: the next _processQueue() call can run before the await below.
+      // Take the slot now: the next _processQueue() call can run before the awaits below.
       task.status = 'downloading';
-      const jellyfinStore = useJellyfinStore();
+      const session = useSessionStore();
+      const backend = session.backend;
+      const serverId = session.active?.serverId ?? '';
       const transcodeOptions = this._transcodeOptionsQueue.get(itemId);
-
-      // List/bulk responses can omit People and other detail fields. Persist the
-      // complete item so summary, cast, streams, and artwork remain available offline.
-      try {
-        const detailedMetadata = await jellyfinStore.fetchItemDetails(itemId);
-        metadata = { ...metadata, ...detailedMetadata };
-        this._metadataQueue.set(itemId, metadata);
-      } catch (error) {
-        logger.warn('[DownloadStore] Could not enrich offline metadata:', itemId, error);
-      }
-      // Recorded with the download (online now) so it is listed in the right
-      // library even if the app is offline before any backfill runs.
-      const libraryId = await jellyfinStore.fetchLibraryIdOf(itemId).catch(() => undefined);
-      if (this.tasks.get(itemId)?.status === 'cancelled') {
-        this._processQueue();
-        return;
-      }
+      let item = queued;
 
       try {
-        // Check if video codec needs transcoding before downloading
-        let transcodedUrl: string | undefined;
-        let transcodedContainer: string | undefined;
-        let estimatedTranscodeSize = 0;
-        if (Capacitor.isNativePlatform() || isDesktopPlatform) {
-          const transcodeResult = await this._getTranscodeUrlIfNeeded(itemId, metadata, jellyfinStore, transcodeOptions);
-          if (transcodeResult) {
-            transcodedUrl = transcodeResult.url;
-            transcodedContainer = transcodeResult.container;
-            estimatedTranscodeSize = transcodeResult.estimatedSize;
-            task.transcoding = true;
-          }
-        }
+        if (!backend) throw new Error('Not connected to server');
+        // List/bulk items can omit cast, streams and artwork: store the complete item offline.
+        item = await backend.catalog.item(itemId).catch(() => queued);
+        // Recorded with the download so it lands in the right library even offline.
+        const libraryId = await backend.catalog.libraryOf(itemId).catch(() => undefined);
+        if (this.tasks.get(itemId)?.status === 'cancelled') return;
 
-        // Build subtitle info for sidecar download (when user chose a subtitle track)
-        let subtitleInfo: { streamIndex: number; label: string; language: string } | undefined;
-        if (transcodeOptions?.subtitleStreamIndex != null && transcodeOptions.subtitleStreamIndex >= 0) {
-          const streams: any[] = metadata.MediaStreams || [];
-          const subStream = streams.find((s: any) => s.Index === transcodeOptions.subtitleStreamIndex);
-          subtitleInfo = {
-            streamIndex: transcodeOptions.subtitleStreamIndex,
-            label: subStream?.DisplayTitle || subStream?.Language || 'Unknown',
-            language: subStream?.Language || 'und',
-          };
-        } else if (isDesktopPlatform && !transcodedUrl) {
-          // Desktop direct downloads: auto-pick a text subtitle. Chromium's
-          // <video> exposes no embedded subtitle tracks, so without a sidecar
-          // a directly downloaded file has no subtitles offline at all.
-          subtitleInfo = pickSidecarSubtitle(metadata);
-        }
-
-        await downloadService.downloadForOffline(
-          jellyfinStore.serverUrl!,
-          itemId,
-          jellyfinStore.accessToken!,
-          metadata,
-          (progress) => {
-            const t = this.tasks.get(itemId);
-            if (t) {
-              t.progress = progress.percentage >= 0 ? progress.percentage : 0;
-              t.loaded = progress.loaded;
-              // Never reset a known total back to 0 — a later event with no content-length
-              // would otherwise wipe out the estimated size we calculated upfront.
-              if (progress.total > 0 || t.total === 0) {
-                t.total = progress.total;
-              }
-            }
-          },
-          transcodedUrl,
-          estimatedTranscodeSize || undefined,
-          subtitleInfo,
-          transcodedContainer,
-        );
+        const plan = await backend.downloads.plan(await this._downloadRequest(item, transcodeOptions));
+        task.transcoding = plan.isTranscoded;
+        await downloadService.downloadForOffline(item, serverId, plan, artworkResolverFor(backend), (progress) => {
+          const t = this.tasks.get(itemId);
+          if (!t) return;
+          t.progress = progress.percentage >= 0 ? progress.percentage : 0;
+          t.loaded = progress.loaded;
+          // Never reset a known total back to 0 (a later event may lack content-length).
+          if (progress.total > 0 || t.total === 0) t.total = progress.total;
+        });
 
         const t = this.tasks.get(itemId);
         if (t) { t.status = 'completed'; t.progress = 100; }
-
         if (libraryId) await offlineDatabase.patchDownload(itemId, { libraryId });
         const offlineStore = useOfflineStore();
         await offlineStore.loadDownloads();
         void offlineStore.backfillLibraryIds();
-
         // Parent metadata and artwork are part of a completed episode download.
-        if (metadata.Type === 'Episode') {
-          await this._cacheParentMetadata(metadata, jellyfinStore);
-        }
-
-        logger.log('[DownloadStore] Completed:', metadata.Name);
+        if (item.kind === 'episode') await this._cacheParentMetadata(item, backend);
+        logger.log('[DownloadStore] Completed:', item.title);
       } catch (error: any) {
         const t = this.tasks.get(itemId);
         if (t) {
           t.status = error?.name === 'AbortError' ? 'cancelled' : 'failed';
           if (t.status === 'failed') {
-            t.error = error.message || 'Download failed';
-            t.metadata = metadata;
+            t.error = error?.message || 'Download failed';
+            t.metadata = item;
             t.transcodeOptions = transcodeOptions;
           }
         }
         // The download runs after startDownload() resolved, so no caller sees this failure.
         if (error?.name !== 'AbortError') {
-          useToast().showError(i18n.global.t('detail.downloadEpisodeFailed', { name: metadata.Name }));
+          useToast().showError(i18n.global.t('detail.downloadEpisodeFailed', { name: item.title }));
         }
       } finally {
-        this._metadataQueue.delete(itemId);
+        this._itemQueue.delete(itemId);
         this._transcodeOptionsQueue.delete(itemId);
-        // Start next queued item regardless of outcome
         this._processQueue();
       }
     },
 
-    /** Fetch and cache Series + Season metadata and artwork for an episode. */
-    async _cacheParentMetadata(
-      episodeMetadata: EpisodeParentMetadata,
-      jellyfinStore: ReturnType<typeof useJellyfinStore>,
-    ) {
+    /** Fetch and cache the series and season of an episode, with their artwork. */
+    async _cacheParentMetadata(episode: MediaItem & { kind: 'episode' }, backend: MediaBackend) {
       const metaCache = useMetadataCacheStore();
-      const parentIds = [episodeMetadata.SeriesId, episodeMetadata.SeasonId]
-        .filter((id): id is string => typeof id === 'string' && id.length > 0);
-
+      const parentIds = [episode.seriesId, episode.seasonId].filter((id): id is string => !!id);
       for (const id of parentIds) {
         let parent = metaCache.get(id, true);
         if (!parent) {
           try {
-            const fetched = await jellyfinStore.fetchItemDetails(id);
-            if (!fetched) continue;
-            metaCache.set(fetched);
-            parent = metaCache.get(id, true);
+            parent = await backend.catalog.item(id);
+            metaCache.set(parent);
           } catch (error) {
             logger.warn('[DownloadStore] Could not cache parent metadata:', id, error);
             continue;
           }
         }
-        if (parent && jellyfinStore.serverUrl && jellyfinStore.accessToken) {
-          await downloadService.cacheArtworkForMetadata(
-            jellyfinStore.serverUrl,
-            jellyfinStore.accessToken,
-            parent,
-          );
-        }
+        await downloadService.cacheArtwork(buildOfflineArtworkTargets(parent), artworkResolverFor(backend));
       }
     },
 
     /**
-     * Check if any video or audio codec in the media is unsupported by the device.
-     * Returns true if transcoding would be beneficial.
+     * Whether any video or audio stream is unsupported by this device
+     * (a transcode would then be needed to play it offline).
      */
-    async checkNeedsTranscode(metadata: CodecMetadata): Promise<boolean> {
-      if (isDesktopPlatform) return needsDesktopTranscode(metadata);
-      if (!Capacitor.isNativePlatform()) return false;
+    async checkNeedsTranscode(item: MediaItem): Promise<boolean> {
+      const version = firstVersion(item);
+      if (isDesktopPlatform) return needsDesktopTranscode(desktopMetadata(item, version));
+      if (!Capacitor.isNativePlatform() || !version) return false;
       try {
-        const capabilities = await getDeviceCapabilities();
-        if (capabilities.androidApi <= 0) return false;
-
-        const streams: MediaStream[] =
-          metadata.MediaStreams || metadata.MediaSources?.[0]?.MediaStreams || [];
-        const maxSoftwareHeight = 1080;
-
-        for (const stream of streams) {
-          if (stream.Type === 'Audio' && !isAudioStreamSupported(stream, capabilities)) {
-            return true;
-          }
-          if (stream.Type !== 'Video') continue;
-
-          if (exceedsDeviceDisplay(stream, capabilities)) return true;
-
-          const hardwareResult = await canHardwareDecodeVideo(stream);
-          if (hardwareResult.supported) continue;
-
-          const canUseSoftware = (stream.Height || 0) <= maxSoftwareHeight
-            && canSoftwareDecodeVideo(stream, capabilities);
+        const device = await deviceCapabilities();
+        if (!device.isKnown) return false;
+        if (version.audio.some((a) => !isAudioCodecSupported(a.codec, a.profile, device))) return true;
+        for (const video of version.video) {
+          if (exceedsDisplay(video, device)) return true;
+          if ((await canHardwareDecodeVideo(video)).supported) continue;
+          const canUseSoftware = (video.height || 0) <= MAX_SOFTWARE_DECODE_HEIGHT && canSoftwareDecode(video, device);
           if (!canUseSoftware) return true;
         }
         return false;
@@ -468,150 +323,7 @@ export const useDownloadStore = defineStore('downloads', {
       }
     },
 
-    async _getTranscodeUrlIfNeeded(
-      itemId: string,
-      metadata: any,
-      jellyfinStore: ReturnType<typeof useJellyfinStore>,
-      transcodeOptions?: TranscodeOptions,
-    ): Promise<{ container: string; url: string; estimatedSize: number } | undefined> {
-      try {
-        // Decide whether this download needs transcoding:
-        //  - forceOriginal: user explicitly kept the original file — never transcode.
-        //  - a resolution/bitrate cap always forces a re-encode, even for a
-        //    device-compatible file (that's the whole point of downscaling).
-        //  - otherwise, auto-detect based on device codec capabilities.
-        if (transcodeOptions?.forceOriginal) return undefined;
-
-        const bitrateCap = transcodeOptions?.maxBitrate ?? 0;
-        const hasBitrateCap = bitrateCap > 0;
-
-        if (!hasBitrateCap) {
-          const needsTranscode = await this.checkNeedsTranscode(metadata);
-          if (!needsTranscode) return undefined;
-        }
-
-        // Request a transcoding URL from Jellyfin
-        logger.log(`[DownloadStore] Requesting transcoded download for ${itemId}` +
-          (transcodeOptions ? ` (audio=${transcodeOptions.audioStreamIndex} sub=${transcodeOptions.subtitleStreamIndex} maxBitrate=${bitrateCap || 'auto'})` : ' (auto-detected)'));
-        const serverUrl = jellyfinStore.serverUrl!;
-        const token = jellyfinStore.accessToken!;
-        const transcodeContainer = isDesktopPlatform ? 'mp4' : 'ts';
-
-        const requestBody: any = {
-          DeviceProfile: {
-            DirectPlayProfiles: [],
-            TranscodingProfiles: [
-              {
-                Container: transcodeContainer,
-                Type: 'Video',
-                VideoCodec: 'h264',
-                AudioCodec: isDesktopPlatform ? 'aac' : 'aac,mp3,ac3,eac3',
-                Context: 'Streaming',
-                Protocol: 'http',
-                CopyTimestamps: true,
-                MaxAudioChannels: '8',
-              },
-            ],
-            SubtitleProfiles: [
-              { Format: 'srt',    Method: 'External' },
-              { Format: 'subrip', Method: 'External' },
-              { Format: 'ass',    Method: 'External' },
-              { Format: 'ssa',    Method: 'External' },
-              { Format: 'pgs',    Method: 'External' },
-              { Format: 'pgssub', Method: 'External' },
-            ],
-            CodecProfiles: [],
-          },
-          MediaSourceId: itemId,
-          AllowVideoStreamCopy: false,
-          AllowAudioStreamCopy: !isDesktopPlatform,
-        };
-        // Only stream-copy audio this device can decode offline (no-op off Android).
-        requestBody.DeviceProfile = withDeviceAudioCodecs(
-          requestBody.DeviceProfile,
-          await getDeviceCapabilities(),
-        );
-
-        // Resolution cap: MaxStreamingBitrate + AllowVideoStreamCopy:false (set
-        // above) forces Jellyfin to re-encode down to the requested bitrate,
-        // scaling the resolution to match — mirrors the streaming quality picker.
-        if (hasBitrateCap) {
-          requestBody.MaxStreamingBitrate = bitrateCap;
-          requestBody.DeviceProfile.MaxStreamingBitrate = bitrateCap;
-        }
-
-        if (transcodeOptions?.audioStreamIndex != null) {
-          requestBody.AudioStreamIndex = transcodeOptions.audioStreamIndex;
-        }
-        // Subtitles are downloaded separately as sidecar files — don't include in transcode
-
-        const response = await fetch(
-          `${serverUrl}/Items/${itemId}/PlaybackInfo?userId=${jellyfinStore.userId}`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: jellyfinAuthorization(token),
-            },
-            body: JSON.stringify(requestBody),
-          }
-        );
-
-        if (!response.ok) {
-          logger.warn(`[DownloadStore] PlaybackInfo request failed: ${response.status} ${response.statusText}`);
-          return undefined;
-        }
-        const result = await response.json();
-        const ms = result.MediaSources?.[0];
-        logger.log(`[DownloadStore] PlaybackInfo response: HasTranscodingUrl=${Boolean(ms?.TranscodingUrl)} SupportsTranscoding=${ms?.SupportsTranscoding} Protocol=${ms?.TranscodingSubProtocol}`);
-
-        if (ms?.TranscodingUrl) {
-          const streamUrl = new URL(`${serverUrl}${ms.TranscodingUrl}`);
-          // The transport authenticates with a header; server-provided stream URLs
-          // may still include a query token, which Jellyfin 12 no longer accepts.
-          for (const key of [...streamUrl.searchParams.keys()]) {
-            if (key.toLowerCase() === 'api_key' || key.toLowerCase() === 'apikey') {
-              streamUrl.searchParams.delete(key);
-            }
-          }
-          let url = streamUrl.toString();
-          // Bitrate we expect the video track to actually be encoded at. Defaults to
-          // whatever Jellyfin reports, but a cap forces the real value on the URL below.
-          let effectiveVideoBitrate = ms.Bitrate || 0;
-
-          if (hasBitrateCap) {
-            const targetHeight = QUALITY_PRESETS.find((p) => p.bitrate === bitrateCap)?.minHeight ?? 0;
-            url = withForcedVideoParams(url, bitrateCap, targetHeight);
-            effectiveVideoBitrate = bitrateCap;
-          } else {
-            const streams: MediaStream[] = ms.MediaStreams
-              || metadata.MediaStreams
-              || metadata.MediaSources?.[0]?.MediaStreams
-              || [];
-            const bounded = await withDisplaySizedDownload(url, streams, ms.Bitrate || 0);
-            if (bounded) {
-              url = bounded.url;
-              effectiveVideoBitrate = bounded.videoBitrate;
-            }
-          }
-
-          const runtimeSec = (ms.RunTimeTicks || metadata.RunTimeTicks || 0) / 10_000_000;
-          const estimatedSize = (effectiveVideoBitrate && runtimeSec)
-            ? Math.ceil((effectiveVideoBitrate / 8) * runtimeSec)
-            : 0;
-          logger.log(`[DownloadStore] Transcoded download estimated at ${Math.round(estimatedSize / 1024 / 1024)}MB`);
-          return { container: transcodeContainer, url, estimatedSize };
-        }
-
-        logger.warn('[DownloadStore] PlaybackInfo returned no TranscodingUrl — falling back to raw download');
-        return undefined;
-      } catch (e) {
-        logger.warn('[DownloadStore] Codec check failed, downloading raw:', e);
-        return undefined;
-      }
-    },
-
-    /** Starts a failed download again, from the metadata it kept. */
+    /** Starts a failed download again, as it was asked. */
     async retry(itemId: string) {
       const task = this.tasks.get(itemId);
       if (task?.status !== 'failed' || !task.metadata) return;
@@ -623,7 +335,7 @@ export const useDownloadStore = defineStore('downloads', {
       if (!task) return;
       if (task.status === 'queued') {
         task.status = 'cancelled';
-        this._metadataQueue.delete(itemId);
+        this._itemQueue.delete(itemId);
         this._transcodeOptionsQueue.delete(itemId);
         this._processQueue();
       } else {
@@ -636,7 +348,7 @@ export const useDownloadStore = defineStore('downloads', {
       for (const task of this.tasks.values()) {
         if (task.status === 'queued') {
           task.status = 'cancelled';
-          this._metadataQueue.delete(task.itemId);
+          this._itemQueue.delete(task.itemId);
           this._transcodeOptionsQueue.delete(task.itemId);
         } else if (task.status === 'downloading') {
           downloadService.cancelDownload(task.itemId);
@@ -647,16 +359,14 @@ export const useDownloadStore = defineStore('downloads', {
 
     removeTask(itemId: string) {
       this.tasks.delete(itemId);
-      this._metadataQueue.delete(itemId);
+      this._itemQueue.delete(itemId);
       this._transcodeOptionsQueue.delete(itemId);
       if (this.tasks.size === 0) this.showIndicator = false;
     },
 
     clearCompleted() {
       for (const [id, task] of this.tasks) {
-        if (task.status === 'completed' || task.status === 'failed' || task.status === 'cancelled') {
-          this.tasks.delete(id);
-        }
+        if (task.status === 'completed' || task.status === 'failed' || task.status === 'cancelled') this.tasks.delete(id);
       }
       if (this.tasks.size === 0) this.showIndicator = false;
     },

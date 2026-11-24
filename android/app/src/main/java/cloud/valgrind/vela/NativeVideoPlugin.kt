@@ -23,7 +23,8 @@ class NativeVideoPlugin : Plugin() {
             call.reject("url is required")
             return
         }
-        val authHeader = call.getString("authHeader") ?: ""
+        // Headers every request of the stream needs (Jellyfin Authorization, Plex X-Plex-*).
+        val headersJson = call.getObject("headers")?.toString() ?: "{}"
         // call.getLong() only matches JSON Long type; JS numbers within int range arrive as Integer.
         // optLong() coerces Integer → Long correctly.
         val startPositionMs = call.data.optLong("startPositionMs", 0L)
@@ -56,7 +57,7 @@ class NativeVideoPlugin : Plugin() {
 
         val intent = Intent(activity, NativePlayerActivity::class.java).apply {
             putExtra(NativePlayerActivity.EXTRA_URL, url)
-            putExtra(NativePlayerActivity.EXTRA_AUTH_HEADER, authHeader)
+            putExtra(NativePlayerActivity.EXTRA_HEADERS, headersJson)
             putExtra(NativePlayerActivity.EXTRA_START_MS, startPositionMs)
             putExtra(NativePlayerActivity.EXTRA_TITLE, title)
             putExtra(NativePlayerActivity.EXTRA_PLAY_METHOD, playMethod)
@@ -465,6 +466,7 @@ class NativeVideoPlugin : Plugin() {
                         val data = JSObject()
                         data.put("positionMs", posMs)
                         data.put("durationMs", durMs)
+                        data.put("isPaused", intent.getBooleanExtra("isPaused", false))
                         notifyListeners("progress", data)
                     }
                     NativePlayerActivity.ACTION_ENDED -> {

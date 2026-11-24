@@ -8,7 +8,7 @@ import {
   type AudioTrack,
   type RepeatMode,
 } from '../store/audio-player-store';
-import { useJellyfinStore } from '../store/jellyfin-store';
+import { useSessionStore } from '../store/session-store';
 import { useOfflineStore } from '../store/offline-store';
 import { usePreferencesStore } from '../store/preferences-store';
 import { downloadService } from './downloadService';
@@ -21,17 +21,27 @@ import { AirPlay } from '@/plugins/AirPlayPlugin';
 import { useToast } from '@/composables/useToast';
 import { WebAudioEngine } from './audio/webAudioEngine';
 import type { AudioEngine, EngineState, QueueItem } from './audio/types';
+import { autoLibraryConfig } from '@/utils/autoLibraryConfig';
 import { logger } from '@/utils/logger';
-import { jellyfinAuthorization } from '@/utils/jellyfinAuthorization';
-import { toAudioTrack } from '@/utils/audioTrack';
+import type { MediaBackend, PlaybackReporter } from '@/domain';
+import { trackToAudioTrack } from '@/utils/audioTrack';
 import { freshTracks, LIBRARY_SHUFFLE_REFILL_AT } from '@/utils/audioQueue';
 
 const isNative = Capacitor.isNativePlatform();
 const REPORT_INTERVAL_MS = 10_000;
+const DEFAULT_MUSIC_BITRATE = 140_000_000;
+const LIBRARY_SHUFFLE_BATCH = 300;
+const ARTWORK_SIZE = { width: 512, height: 512 };
+/** Containers (and container|codec pairs) each output plays without a transcode. */
+const DEVICE_CONTAINERS = ['opus', 'webm|opus', 'mp3', 'aac', 'm4a|aac', 'm4a|alac', 'm4b|aac', 'flac', 'webma', 'webm|webma', 'wav', 'ogg'];
+const CAST_CONTAINERS = ['opus', 'webm|opus', 'mp3', 'aac', 'm4a|aac', 'm4b|aac', 'flac', 'webma', 'webm|webma', 'wav', 'ogg'];
+
+/** Failed tracks in a row before the player stops skipping. */
+const MAX_SKIPPED_ERRORS = 3;
 
 /**
  * Bridges the audio store and the playback engine: resolves stream / local
- * URLs, mirrors engine state into the store and reports playback to Jellyfin.
+ * URLs, mirrors engine state into the store and reports playback to the server.
  */
 class AudioPlayerService implements AudioController {
   private engine!: AudioEngine;
@@ -39,14 +49,16 @@ class AudioPlayerService implements AudioController {
   private localEngine!: AudioEngine;
   private castEngine: CastAudioEngine | null = null;
   private audioStore!: ReturnType<typeof useAudioPlayerStore>;
-  private jellyfinStore!: ReturnType<typeof useJellyfinStore>;
+  private session!: ReturnType<typeof useSessionStore>;
   private offlineStore!: ReturnType<typeof useOfflineStore>;
   private preferencesStore!: ReturnType<typeof usePreferencesStore>;
   private initialized = false;
-  private playSessionId = '';
+  private reporter: PlaybackReporter | null = null;
   private reportedTrackId = '';
   private reportedToServer = false;
   private lastPosition = 0;
+  /** Tracks that failed in a row: past MAX_SKIPPED_ERRORS the queue stops instead of racing through. */
+  private failedInARow = 0;
   private lastDuration = 0;
   private reportInterval: ReturnType<typeof setInterval> | null = null;
   private ops: Promise<unknown> = Promise.resolve();
@@ -57,7 +69,7 @@ class AudioPlayerService implements AudioController {
     this.initialized = true;
 
     this.audioStore = useAudioPlayerStore();
-    this.jellyfinStore = useJellyfinStore();
+    this.session = useSessionStore();
     this.offlineStore = useOfflineStore();
     this.preferencesStore = usePreferencesStore();
 
@@ -71,7 +83,24 @@ class AudioPlayerService implements AudioController {
     }
     registerAudioController(this);
     this.restoreFromEngine();
+    void this.backfillArtwork();
     this.setupLibraryShuffleRefill();
+  }
+
+  /** Queues saved before tracks carried their cover get it from the server once. */
+  private async backfillArtwork() {
+    const store = this.audioStore;
+    const missing = [...new Set([...store.queue, ...store.unshuffledQueue].filter((t) => !t.artwork).map((t) => t.id))];
+    const backend = this.backend();
+    if (!missing.length || !backend || !this.offlineStore.isFullyOnline) return;
+    try {
+      const art = new Map((await backend.catalog.items(missing)).map((item) => [item.id, item.images.poster]));
+      const withArt = (track: AudioTrack) => (track.artwork ? track : { ...track, artwork: art.get(track.id) });
+      store.queue = store.queue.map(withArt);
+      store.unshuffledQueue = store.unshuffledQueue.map(withArt);
+    } catch (e) {
+      logger.warn('[AudioPlayer] Could not fetch queue artwork', e);
+    }
   }
 
   // --- Library shuffle: more random picks before the queue runs out ---
@@ -91,7 +120,8 @@ class AudioPlayerService implements AudioController {
     if (this.refilling) return;
     this.refilling = true;
     try {
-      const picks = (await this.jellyfinStore.fetchRandomTracks(libraryId)).map((item) => toAudioTrack(item));
+      const random = await this.backend()?.music.randomTracks(libraryId, LIBRARY_SHUFFLE_BATCH) ?? [];
+      const picks = random.map((track) => trackToAudioTrack(track));
       // The user may have started something else meanwhile.
       if (this.audioStore.libraryShuffle === libraryId) this.audioStore.addToQueue(freshTracks(this.audioStore.queue, picks));
     } catch (e) {
@@ -140,21 +170,17 @@ class AudioPlayerService implements AudioController {
   // --- Android Auto: the car browses the library natively and may start a queue ---
 
   private setupAndroidAuto() {
-    // The car can start the music service without the app: it needs its own credentials.
+    // The car can start the music service without the app: it needs its own credentials
+    // (Jellyfin or Plex), cleared when signed out.
     watch(
-      () => [
-        this.jellyfinStore.serverUrl,
-        this.jellyfinStore.accessToken,
-        this.jellyfinStore.userId,
-        this.preferencesStore.musicMaxBitrate,
-      ] as const,
-      ([serverUrl, accessToken, userId, maxBitrate]) => {
-        NativeAudio.setLibraryConfig({
-          serverUrl: serverUrl || '',
-          accessToken: accessToken || '',
-          userId: userId || '',
-          maxBitrate: maxBitrate || 140_000_000,
-        }).catch((e) => logger.error('[AudioPlayer] setLibraryConfig failed', e));
+      () => JSON.stringify(autoLibraryConfig({
+        active: this.session.active,
+        token: this.session.token,
+        androidAuto: this.session.backend?.capabilities.androidAuto ?? false,
+        maxBitrate: this.preferencesStore.musicMaxBitrate,
+      })),
+      (config) => {
+        NativeAudio.setLibraryConfig(JSON.parse(config)).catch((e) => logger.error('[AudioPlayer] setLibraryConfig failed', e));
       },
       { immediate: true },
     );
@@ -250,6 +276,7 @@ class AudioPlayerService implements AudioController {
       this.audioStore.stop();
       return;
     }
+    if (s.isPlaying && s.position > 0) this.failedInARow = 0;
     this.audioStore.applySnapshot({
       index: s.index,
       isPlaying: s.isPlaying,
@@ -265,6 +292,15 @@ class AudioPlayerService implements AudioController {
   private onEngineError(message: string, network = false) {
     logger.error('[AudioPlayer] Playback error:', message);
     if (!network) {
+      // A bad file is skipped; when every track fails (signed out, server gone) stop
+      // instead of trying the whole queue, which also froze the app.
+      this.failedInARow += 1;
+      if (this.failedInARow >= MAX_SKIPPED_ERRORS) {
+        this.failedInARow = 0;
+        if (this.audioStore.isPlaying) this.audioStore.togglePlayPause();
+        useToast().showError(i18n.global.t('audio.tracksFailing'));
+        return;
+      }
       if (this.audioStore.hasNext) this.audioStore.next();
       return;
     }
@@ -329,12 +365,12 @@ class AudioPlayerService implements AudioController {
   private async toQueueItem(track: AudioTrack): Promise<QueueItem> {
     return {
       track,
-      url: await this.resolveUrl(track.id),
-      artworkUrl: this.jellyfinStore.getImageUrl(track.albumId || track.id, 'Primary', 512, 512),
+      url: await this.resolveUrl(track.id, track.streamRef),
+      artworkUrl: track.artwork ? this.backend()?.imageUrl(track.artwork, ARTWORK_SIZE) ?? '' : '',
     };
   }
 
-  private async resolveUrl(itemId: string): Promise<string> {
+  private async resolveUrl(itemId: string, streamRef?: string): Promise<string> {
     // A Cast device fetches from the server itself; local files are out of reach.
     if (this.offlineStore.isItemDownloaded(itemId) && this.engine !== this.castEngine) {
       const local = isNative
@@ -343,25 +379,26 @@ class AudioPlayerService implements AudioController {
       if (local) return local;
       logger.error('[AudioPlayer] Fichier local introuvable', itemId);
     }
-    return this.buildStreamUrl(itemId);
+    return this.buildStreamUrl(itemId, streamRef);
   }
 
-  private buildStreamUrl(itemId: string): string {
-    const params = new URLSearchParams({
-      userId: this.jellyfinStore.userId || '',
-      ApiKey: this.jellyfinStore.accessToken || '',
-      MaxStreamingBitrate: String(this.preferencesStore.musicMaxBitrate || 140_000_000),
+  private backend(): MediaBackend | null {
+    return this.session.backend;
+  }
+
+  private buildStreamUrl(itemId: string, streamRef?: string): string {
+    const backend = this.backend();
+    if (!backend) return '';
+    return backend.music.streamUrl(itemId, {
+      maxBitrate: this.preferencesStore.musicMaxBitrate || DEFAULT_MUSIC_BITRATE,
       // Cast devices can't decode ALAC, so it gets transcoded for them.
-      Container: this.engine === this.castEngine
-        ? 'opus,webm|opus,mp3,aac,m4a|aac,m4b|aac,flac,webma,webm|webma,wav,ogg'
-        : 'opus,webm|opus,mp3,aac,m4a|aac,m4a|alac,m4b|aac,flac,webma,webm|webma,wav,ogg',
+      directContainers: this.engine === this.castEngine ? CAST_CONTAINERS : DEVICE_CONTAINERS,
       // ExoPlayer picks the extractor from the URL, so it can't follow a
       // redirect to an HLS playlist; ask for a progressive transcode instead.
-      TranscodingContainer: isNative ? 'mp3' : 'ts',
-      TranscodingProtocol: isNative ? 'http' : 'hls',
-      AudioCodec: isNative ? 'mp3' : 'aac',
-    });
-    return `${this.jellyfinStore.serverUrl}/Audio/${itemId}/universal?${params.toString()}`;
+      transcode: isNative
+        ? { container: 'mp3', codec: 'mp3', protocol: 'http' }
+        : { container: 'ts', codec: 'aac', protocol: 'hls' },
+    }, streamRef);
   }
 
   // --- Playback reporting ---
@@ -404,50 +441,31 @@ class AudioPlayerService implements AudioController {
     });
   }
 
-  private get reportingHeaders() {
+  private progress(positionSeconds: number) {
     return {
-      'Content-Type': 'application/json',
-      Authorization: jellyfinAuthorization(this.jellyfinStore.accessToken || ''),
+      positionMs: Math.floor(positionSeconds * 1000),
+      isPaused: !this.audioStore.isPlaying,
+      isMuted: this.audioStore.volume === 0,
+      volume: Math.round(this.audioStore.volume * 100),
     };
   }
 
-  private buildReportingPayload(itemId: string, positionSeconds: number) {
-    return {
-      ItemId: itemId,
-      SessionId: this.playSessionId,
-      MediaSourceId: itemId,
-      PositionTicks: Math.floor(positionSeconds * 10_000_000),
-      PlayMethod: 'DirectStream',
-      PlaySessionId: this.playSessionId,
-      IsMuted: this.audioStore.volume === 0,
-      VolumeLevel: this.audioStore.volume,
-      IsPaused: !this.audioStore.isPlaying,
-    };
-  }
-
-  private async postSession(path: string, body: object) {
-    try {
-      await fetch(`${this.jellyfinStore.serverUrl}/Sessions/Playing${path}`, {
-        method: 'POST',
-        headers: this.reportingHeaders,
-        body: JSON.stringify(body),
-      });
-    } catch (e) {
-      logger.error(`[AudioPlayer] report ${path || 'start'} error`, e);
-    }
+  private report(what: string, call: (reporter: PlaybackReporter) => Promise<void>) {
+    if (!this.reporter) return;
+    call(this.reporter).catch((e) => logger.error(`[AudioPlayer] report ${what} error`, e));
   }
 
   private reportPlaybackStart(itemId: string) {
-    this.playSessionId = `session-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
-    this.postSession('', this.buildReportingPayload(itemId, 0));
+    this.reporter = this.backend()?.music.reporter(itemId) ?? null;
+    this.report('start', (r) => r.start(this.progress(0)));
   }
 
   private reportPlaybackProgress() {
-    this.postSession('/Progress', this.buildReportingPayload(this.reportedTrackId, this.lastPosition));
+    this.report('progress', (r) => r.progress(this.progress(this.lastPosition)));
   }
 
-  private reportPlaybackStopped(itemId: string, positionSeconds: number) {
-    this.postSession('/Stopped', this.buildReportingPayload(itemId, positionSeconds));
+  private reportPlaybackStopped(_itemId: string, positionSeconds: number) {
+    this.report('stopped', (r) => r.stop(this.progress(positionSeconds)));
   }
 }
 

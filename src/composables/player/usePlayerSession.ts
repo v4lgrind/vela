@@ -1,66 +1,53 @@
 import { ref, computed, type Ref } from 'vue';
 import { useRoute } from 'vue-router';
-import { useJellyfinStore } from '@/store/jellyfin-store';
+
+import type { MediaItem, MediaVersion, PlaybackPlan, PlaybackReporter, PlaybackRequest, PlayMethod } from '@/domain';
+import { QUALITY_PRESETS } from '@/constants';
 import { usePreferencesStore } from '@/store/preferences-store';
-import { deviceProfile, nativeAndroidDeviceProfile, QUALITY_PRESETS } from '@/constants';
+import { useSessionStore } from '@/store/session-store';
+import type { AudioTrack, SubtitleTrack } from '@/types/player';
+import { deviceCapabilities } from '@/utils/codecDetection';
 import { debugLog } from '@/utils/debugLog';
+import { languageMatches } from '@/utils/language';
 import { logger } from '@/utils/logger';
-import {
-    getDeviceCapabilities,
-    getDisplayBoundsForSource,
-    getRecommendedNativeTranscodeBitrate,
-    withAacTranscodeAudio,
-    withDeviceAudioCodecs,
-} from '@/utils/codecDetection';
-import { buildPlaybackUrl, withMaxVideoSize } from '@/utils/playbackUrl';
 import { createSubtitleTracks, parseSavedBurnInSubtitleIndex } from '@/utils/subtitleTracks';
-import type { NativeDeviceCapabilities } from '@/plugins/NativeVideoPlugin';
-import type { MediaSource, MediaStream, SubtitleTrack, AudioTrack } from '@/types/jellyfin';
 
-// Stable per-browser device ID so Jellyfin can match DELETE /Videos/ActiveEncodings
-// to the session we created. Without it, Jellyfin can't kill the FFmpeg job on demand.
-function getDeviceId(): string {
-    let id = localStorage.getItem('msplayer-device-id');
-    if (!id) {
-        id = `browser-${Math.random().toString(36).slice(2, 15)}`;
-        localStorage.setItem('msplayer-device-id', id);
-    }
-    return id;
-}
+/** Play method names the native plugin and the stream info panel use. */
+export type PlayMethodName = 'DirectPlay' | 'DirectStream' | 'Transcode';
+const PLAY_METHOD_NAME: Record<PlayMethod, PlayMethodName> = {
+    'direct-play': 'DirectPlay', 'direct-stream': 'DirectStream', transcode: 'Transcode',
+};
+const PROGRESS_INTERVAL_MS = 10_000;
 
-const ALL_QUALITY_PRESETS = QUALITY_PRESETS;
-
-// An automatic native transcode is only bitrate-capped by the device profile,
-// which does not stop Jellyfin from keeping the source resolution. Add explicit
-// size limits so an oversized source is scaled down to the display.
-function limitTranscodeToDisplay(ms: MediaSource, capabilities: NativeDeviceCapabilities) {
-    const video = ms.MediaStreams?.find((stream) => stream.Type === 'Video');
-    const bounds = video ? getDisplayBoundsForSource(video, capabilities) : null;
-    if (!bounds || !ms.TranscodingUrl) return;
-    ms.TranscodingUrl = withMaxVideoSize(ms.TranscodingUrl, bounds.maxWidth, bounds.maxHeight);
-    debugLog(`[Codec] Transcode limited to display ${bounds.maxWidth}x${bounds.maxHeight}`);
+/** One negotiation, in the player's terms (seconds, numeric track indexes). */
+export interface NegotiateOptions {
+    native: boolean;
+    startSeconds?: number;
+    audioIndex?: number;
+    forceTranscode?: boolean;
+    transcodeAudio?: boolean;
+    stripHevc?: boolean;
+    burnInSubtitleIndex?: number;
+    /** Never the raw file: the server stream applying the track choices (web audio switch). */
+    preferStream?: boolean;
 }
 
 /**
- * Shared playback state and Jellyfin session API for the player page.
+ * Shared playback state and server session for the player page.
  *
  * Owns everything the web, native and offline playback paths have in common:
- * the reactive playback state (position, tracks, quality…), session reporting
- * (Sessions/Playing/*), PlaybackInfo negotiation and stream parsing.
+ * the reactive playback state (position, tracks, quality…), negotiation through
+ * the backend's playback port, and session reporting.
+ * Track indexes are the numeric form of domain stream ids (numeric on every server).
  */
-export function usePlayerSession(videoEl: Ref<HTMLVideoElement | null>, isNative: boolean) {
+export function usePlayerSession(videoEl: Ref<HTMLVideoElement | null>) {
     const route = useRoute();
-    const store = useJellyfinStore();
+    const session = useSessionStore();
     const preferencesStore = usePreferencesStore();
+    const backend = session.backend;
 
     const itemId = route.params.id as string;
     const nextEpisodeId = (route.query.nextEpisodeId as string | undefined) || '';
-    const accessToken = store.accessToken || '';
-    const serverUrl = store.serverUrl;
-
-    const deviceId = getDeviceId();
-    const embyAuthHeader = `MediaBrowser Client="MediaServerClient", Device="Browser", DeviceId="${deviceId}", Version="1.0.0", Token="${accessToken}"`;
-    const reportingHeaders = { 'Content-Type': 'application/json', 'Authorization': embyAuthHeader };
 
     // ── Playback state ─────────────────────────────────────────────────────────
 
@@ -71,26 +58,25 @@ export function usePlayerSession(videoEl: Ref<HTMLVideoElement | null>, isNative
     const progressPct = ref(0);
     const error = ref<string | null>(null);
     const mediaTitle = ref('');
+    /** The item being played (title, artwork); set by the page once loaded. */
+    const item = ref<MediaItem | null>(null);
 
-    // Jellyfin session
-    const playSessionId = ref('');
-    const mediaSource = ref<MediaSource | null>(null);
+    const plan = ref<PlaybackPlan | null>(null);
+    const version = ref<MediaVersion | null>(null);
+    const playSessionId = computed(() => plan.value?.sessionId ?? '');
     const hlsUrl = ref('');
-    const playMethod = ref<'DirectPlay' | 'DirectStream' | 'Transcode'>('Transcode');
+    const playMethod = ref<PlayMethodName>('Transcode');
+    /** Headers the players send with every request of the stream. */
+    const requestHeaders = computed<Record<string, string>>(() => plan.value?.headers ?? backend?.authHeaders() ?? {});
 
-    // Audio tracks
     const audioList = ref<AudioTrack[]>([]);
     const selectedAudioIndex = ref<number | null>(null);
-
-    // Subtitle tracks
     const subtitleList = ref<SubtitleTrack[]>([]);
     const selectedSubtitleIndex = ref<number | null>(null); // null = off
-    // Jellyfin stream index of the PGS/image subtitle currently burned into the
-    // transcoded video (null = none). Owned here so the native path can restart
-    // playback with a new SubtitleStreamIndex.
+    // Stream index of the image subtitle currently burned into the transcoded
+    // video (null = none). Owned here so the native path can restart playback.
     const activeBurnInSubtitleIndex = ref<number | null>(null);
 
-    // Quality / bitrate
     const selectedBitrate = ref(preferencesStore.preferredBitrate); // 0 = Auto (unlimited)
 
     // For HLS transcode streams the native position is stream-relative; this
@@ -102,111 +88,67 @@ export function usePlayerSession(videoEl: Ref<HTMLVideoElement | null>, isNative
     const isOfflinePlayback = ref(false);
     const restartInProgress = ref(false);
 
-    const videoStream = computed((): MediaStream | undefined =>
-        mediaSource.value?.MediaStreams?.find((s) => s.Type === 'Video')
-    );
-    const activeAudioStream = computed(() =>
-        (mediaSource.value?.MediaStreams ?? []).find((s: any) => s.Type === 'Audio' && s.Index === selectedAudioIndex.value)
-        ?? (mediaSource.value?.MediaStreams ?? []).find((s: any) => s.Type === 'Audio')
-    );
+    const videoStream = computed(() => version.value?.video[0]);
+    const activeAudioStream = computed(() => {
+        const audio = version.value?.audio ?? [];
+        return audio.find((s) => Number(s.id) === selectedAudioIndex.value) ?? audio[0];
+    });
 
     // Only show presets that make sense for the source resolution
     const availablePresets = computed(() => {
-        const sourceHeight = videoStream.value?.Height ?? 0;
-        if (!sourceHeight) return ALL_QUALITY_PRESETS;
-        return ALL_QUALITY_PRESETS.filter(p => p.minHeight === 0 || p.minHeight <= sourceHeight);
+        const sourceHeight = videoStream.value?.height ?? 0;
+        if (!sourceHeight) return QUALITY_PRESETS;
+        return QUALITY_PRESETS.filter(p => p.minHeight === 0 || p.minHeight <= sourceHeight);
     });
     const currentQualityLabel = computed(() =>
-        ALL_QUALITY_PRESETS.find(p => p.bitrate === selectedBitrate.value)?.label ?? 'Auto'
+        QUALITY_PRESETS.find(p => p.bitrate === selectedBitrate.value)?.label ?? 'Auto'
     );
 
-    const posterUrl = computed(() => store.getImageUrl(itemId, 'Primary') || '');
+    const posterUrl = computed(() => {
+        const images = item.value?.images;
+        return images && backend ? backend.imageUrl(images.thumb ?? images.poster ?? '') : '';
+    });
 
-    // ── Jellyfin reporting ─────────────────────────────────────────────────────
+    // ── Reporting ──────────────────────────────────────────────────────────────
 
+    let reporter: PlaybackReporter | null = null;
     let progressInterval: ReturnType<typeof setInterval> | null = null;
 
-    function buildReportingPayload(overrides: Record<string, any> = {}) {
+    function progressNow() {
         const video = videoEl.value;
-        // On native path, videoEl is not available — use currentTime ref.
-        // Prefer video.currentTime when it has a real position; fall back to the
-        // pre-seeded currentTime ref so reportPlaybackStart sends the correct
-        // resume position before the seek has taken effect (video.currentTime is
-        // still 0, but currentTime.value was pre-seeded to resumeSeconds).
-        const positionSec = (video?.currentTime && video.currentTime > 0)
-            ? video.currentTime
-            : (currentTime.value || 0);
+        // On the native path videoEl is absent: use the currentTime ref. Before a
+        // resume seek lands, video.currentTime is still 0 while the ref holds the
+        // resume point, so a real video position wins only when it is set.
+        const positionSec = (video?.currentTime && video.currentTime > 0) ? video.currentTime : (currentTime.value || 0);
         return {
-            ItemId: itemId,
-            SessionId: playSessionId.value,
-            MediaSourceId: mediaSource.value?.Id || itemId,
-            PositionTicks: Math.floor(positionSec * 10_000_000),
-            AudioStreamIndex: selectedAudioIndex.value,
-            PlayMethod: playMethod.value,
-            PlaySessionId: playSessionId.value,
-            ...overrides
+            positionMs: Math.floor(positionSec * 1000),
+            isPaused: !isPlaying.value,
+            audioStreamId: selectedAudioIndex.value === null ? undefined : String(selectedAudioIndex.value),
+            isMuted: video?.muted ?? false,
+            volume: Math.floor((video?.volume ?? 1) * 100),
         };
     }
 
-    async function reportPlaybackStart() {
-        const video = videoEl.value;
-        try {
-            await fetch(`${serverUrl}/Sessions/Playing`, {
-                method: 'POST',
-                headers: reportingHeaders,
-                body: JSON.stringify(buildReportingPayload({
-                    IsPaused: false,
-                    IsMuted: video?.muted || false,
-                    VolumeLevel: Math.floor((video?.volume || 1) * 100),
-                    CanSeek: true,
-                }))
-            });
-        } catch (e) { logger.error('reportPlaybackStart error', e); }
-    }
+    const report = (what: string, call: (r: PlaybackReporter) => Promise<void>) =>
+        (reporter ? call(reporter) : Promise.resolve()).catch((e) => logger.error(`${what} error`, e));
 
-    async function reportPlaybackProgress() {
-        const video = videoEl.value;
-        try {
-            await fetch(`${serverUrl}/Sessions/Playing/Progress`, {
-                method: 'POST',
-                headers: reportingHeaders,
-                body: JSON.stringify(buildReportingPayload({
-                    IsPaused: !isPlaying.value,
-                    IsMuted: video?.muted ?? false,
-                    VolumeLevel: Math.floor((video?.volume ?? 1) * 100),
-                }))
-            });
-        } catch (e) { logger.error('reportPlaybackProgress error', e); }
-    }
+    const reportPlaybackStart = () => report('reportPlaybackStart', (r) => r.start({ ...progressNow(), isPaused: false }));
+    const reportPlaybackProgress = () => report('reportPlaybackProgress', (r) => r.progress(progressNow()));
+    const reportPlaybackStopped = () => report('reportPlaybackStopped', (r) => r.stop(progressNow()));
 
-    async function reportPlaybackStopped() {
-        try {
-            await fetch(`${serverUrl}/Sessions/Playing/Stopped`, {
-                method: 'POST',
-                headers: reportingHeaders,
-                body: JSON.stringify(buildReportingPayload()),
-                keepalive: true,
-            });
-        } catch (e) { logger.error('reportPlaybackStopped error', e); }
-    }
-
+    /** Kills the server transcode of the current plan (track switch, quality change, exit). */
     async function deleteActiveEncodings() {
-        if (!playSessionId.value) return;
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 5000);
         try {
-            await fetch(
-                `${serverUrl}/Videos/ActiveEncodings?deviceId=${encodeURIComponent(deviceId)}&playSessionId=${encodeURIComponent(playSessionId.value)}`,
-                { method: 'DELETE', headers: { 'Authorization': embyAuthHeader }, signal: controller.signal, keepalive: true }
-            );
-        } catch (e) { logger.warn('[deleteActiveEncodings] error:', e); }
-        finally { clearTimeout(timer); }
+            await reporter?.release();
+        } catch (e) {
+            logger.warn('[deleteActiveEncodings] error:', e);
+        }
     }
 
     function startProgressReporting() {
         if (progressInterval) clearInterval(progressInterval);
         reportPlaybackStart();
-        progressInterval = setInterval(reportPlaybackProgress, 10_000);
+        progressInterval = setInterval(reportPlaybackProgress, PROGRESS_INTERVAL_MS);
     }
 
     function stopProgressReporting() {
@@ -217,209 +159,102 @@ export function usePlayerSession(videoEl: Ref<HTMLVideoElement | null>, isNative
         }
     }
 
-    // ── Jellyfin API ───────────────────────────────────────────────────────────
+    // ── Negotiation ────────────────────────────────────────────────────────────
 
-    async function fetchPlaybackInfo(
-        startTimeTicks?: number,
-        audioStreamIndex?: number,
-        forceTranscode = false,
-        useNativeProfile = false,
-        transcodeAudio = false,
-        stripHevc = false,
-        subtitleStreamIndex?: number,
-    ) {
-        const shouldBurnSubtitle = subtitleStreamIndex !== undefined;
-        const needsNativeVideoTranscode = useNativeProfile
-            && selectedBitrate.value === 0
-            && (forceTranscode || shouldBurnSubtitle);
-        const nativeCapabilities = useNativeProfile ? await getDeviceCapabilities() : null;
-        const bitrateCap = selectedBitrate.value || (
-            needsNativeVideoTranscode && nativeCapabilities
-                ? getRecommendedNativeTranscodeBitrate(nativeCapabilities)
-                : 1_000_000_000
-        );
-        // When a quality cap is active we must force a real video re-encode.
-        // Stripping DirectPlayProfiles prevents DirectPlay, but Jellyfin can still
-        // fall back to DirectStream (remux without re-encoding), which ignores the
-        // bitrate cap completely. AllowVideoStreamCopy: false tells Jellyfin it MUST
-        // re-encode the video, so the bitrate/resolution cap is actually honoured.
-        const shouldForce = forceTranscode || selectedBitrate.value > 0 || shouldBurnSubtitle;
-
-        const baseDeviceProfile = nativeCapabilities
-            ? {
-                ...nativeAndroidDeviceProfile,
-                DeviceProfile: withDeviceAudioCodecs(nativeAndroidDeviceProfile.DeviceProfile, nativeCapabilities),
-            }
-            : deviceProfile;
-        const stripDirectPlay = shouldForce || transcodeAudio;
-
-        // When stripHevc is set (video fallback after HEVC decode failure), remove
-        // hevc/h265 from TranscodingProfiles so Jellyfin transcodes to H.264 instead
-        // of picking HEVC again (which would fail in the same way).
-        const removeHevcCodec = (csv: string) => csv.split(',').filter(c => c !== 'hevc' && c !== 'h265').join(',');
-        const patchedDeviceProfile = stripHevc
-            ? {
-                ...baseDeviceProfile.DeviceProfile,
-                TranscodingProfiles: (baseDeviceProfile.DeviceProfile.TranscodingProfiles || []).map((tp: any) =>
-                    tp.VideoCodec ? { ...tp, VideoCodec: removeHevcCodec(tp.VideoCodec) } : tp
-                ),
-            }
-            : baseDeviceProfile.DeviceProfile;
-
-        const transcodeProfile = transcodeAudio ? withAacTranscodeAudio(patchedDeviceProfile) : patchedDeviceProfile;
-        const baseProfile = stripDirectPlay
-            ? { ...transcodeProfile, DirectPlayProfiles: [], MaxStreamingBitrate: bitrateCap }
-            : patchedDeviceProfile;
-
-        // AllowVideoStreamCopy: false forces a real re-encode so the bitrate cap
-        // is honoured. BUT Jellyfin has a bug where it drops StartTimeTicks from the
-        // TranscodingUrl when AllowVideoStreamCopy=false. So when we have a resume
-        // position, skip the flag — MaxStreamingBitrate + stripped DirectPlayProfiles
-        // still force transcoding, and StartTimeTicks is preserved.
-        const blockVideoCopy = shouldBurnSubtitle || (shouldForce && !startTimeTicks);
-
-        const profile: any = {
-            ...baseDeviceProfile,
-            MaxStreamingBitrate: bitrateCap,
-            ...(blockVideoCopy ? { AllowVideoStreamCopy: false } : {}),
-            // transcodeAudio: keep video copy (DirectStream) but force Jellyfin to re-encode audio
-            // (used when the device can't decode a specific audio format like E-AC3+Atmos)
-            ...(transcodeAudio ? { AllowAudioStreamCopy: false } : {}),
-            ...(shouldBurnSubtitle ? {
-                AllowSubtitleStreamCopy: false,
-                AlwaysBurnInSubtitleWhenTranscoding: true,
-            } : {}),
-            DeviceProfile: baseProfile,
-            MediaSourceId: itemId,
-            ...(startTimeTicks !== undefined ? { StartTimeTicks: startTimeTicks } : {}),
-            ...(audioStreamIndex !== undefined ? { AudioStreamIndex: audioStreamIndex } : {}),
-            // Burn-in for PGS/image subtitles: Jellyfin re-encodes the video with the
-            // subtitle rendered in when a SubtitleStreamIndex with Encode delivery is set.
-            ...(subtitleStreamIndex !== undefined ? { SubtitleStreamIndex: subtitleStreamIndex } : {}),
+    async function negotiate(options: NegotiateOptions): Promise<PlaybackPlan> {
+        if (!backend) throw new Error('No signed-in server');
+        const startMs = options.startSeconds && options.startSeconds > 0 ? Math.floor(options.startSeconds * 1000) : undefined;
+        const request: PlaybackRequest = {
+            itemId,
+            startMs,
+            audioStreamId: options.audioIndex === undefined ? undefined : String(options.audioIndex),
+            subtitle: options.burnInSubtitleIndex === undefined ? null : { streamId: String(options.burnInSubtitleIndex), mode: 'burn-in' },
+            maxBitrate: selectedBitrate.value || undefined,
+            device: options.native ? await deviceCapabilities() : undefined,
+            constraints: {
+                allowDirectPlay: !options.forceTranscode,
+                allowAudioCopy: !options.transcodeAudio,
+                excludeVideoCodecs: options.stripHevc ? ['hevc'] : [],
+            },
+            preferStream: options.preferStream,
+            target: options.native ? 'native' : 'web',
         };
-
-        debugLog(`[AudioCrash] fetchPlaybackInfo: forceTranscode=${forceTranscode} transcodeAudio=${transcodeAudio} shouldForce=${shouldForce} stripDirectPlay=${stripDirectPlay} stripHevc=${stripHevc} audioStreamIndex=${audioStreamIndex} subtitleStreamIndex=${subtitleStreamIndex ?? 'off'}`);
-        debugLog(`[AudioCrash]   DirectPlayProfiles count=${baseProfile.DirectPlayProfiles?.length ?? 'N/A'} AllowAudioStreamCopy=${transcodeAudio ? false : 'unset'} AllowVideoStreamCopy=${shouldForce ? false : 'unset'}`);
-
-        // Pass StartTimeTicks as both a query parameter and in the body.
-        // Some Jellyfin versions ignore it in the body when AllowVideoStreamCopy=false,
-        // but honour it from the query string.
-        const pbQuery = new URLSearchParams({ userId: store.userId! });
-        if (startTimeTicks !== undefined) pbQuery.set('StartTimeTicks', String(startTimeTicks));
-        if (subtitleStreamIndex !== undefined) {
-            pbQuery.set('SubtitleStreamIndex', String(subtitleStreamIndex));
-        }
-        const response = await fetch(
-            `${serverUrl}/Items/${itemId}/PlaybackInfo?${pbQuery}`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': embyAuthHeader },
-                body: JSON.stringify(profile),
-            }
-        );
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const result = await response.json();
-        const ms0 = result.MediaSources?.[0];
-        if (ms0 && needsNativeVideoTranscode && nativeCapabilities) {
-            limitTranscodeToDisplay(ms0, nativeCapabilities);
-        }
-        if (ms0) {
-            debugLog(`[NativePlayer] PlaybackInfo response: SupportsDirectPlay=${ms0.SupportsDirectPlay} SupportsDirectStream=${ms0.SupportsDirectStream} TranscodingUrl=${ms0.TranscodingUrl ? 'YES' : 'NO'}`);
-            if (ms0.TranscodingUrl) {
-                const hasStartTicks = ms0.TranscodingUrl.includes('StartTimeTicks');
-                debugLog(`[NativePlayer] TranscodingUrl hasStartTimeTicks=${hasStartTicks}: ${ms0.TranscodingUrl}`);
-            }
-            const audioStreams = (ms0.MediaStreams || []).filter((s: any) => s.Type === 'Audio');
-            audioStreams.forEach((s: any) => debugLog(`[AudioCrash]   Audio stream: idx=${s.Index} lang=${s.Language} codec=${s.Codec} channels=${s.Channels} displayTitle="${s.DisplayTitle}"`));
-        }
+        debugLog(`[Playback] negotiate ${JSON.stringify({ ...request, device: request.device ? 'native' : undefined })}`);
+        const result = await backend.playback.negotiate(request);
+        debugLog(`[Playback] plan method=${result.method} startOffsetMs=${result.startOffsetMs} url=${result.url}`);
         return result;
     }
 
-    function parseAudioStreams(ms: any, preferredIndex?: number) {
-        const streams: any[] = ms.MediaStreams || [];
-        const audioStreams = streams.filter(s => s.Type === 'Audio');
+    /** Makes a negotiated plan current: stream URL, method, reporting session. */
+    function applyPlan(next: PlaybackPlan) {
+        plan.value = next;
+        version.value = next.version;
+        reporter = backend ? backend.playback.reporter(next, itemId) : null;
+        playMethod.value = PLAY_METHOD_NAME[next.method];
+        hlsUrl.value = next.url;
+    }
 
-        audioList.value = audioStreams.map(s => ({
-            index: s.Index as number,
-            language: (s.Language || 'und') as string,
-            label: `${(s.Language || 'und').toUpperCase()} ${
-                s.ChannelLayout ? `(${s.ChannelLayout})` :
-                s.Channels ? `(${s.Channels}ch)` : ''
-            } ${s.Codec ? `- ${s.Codec.toUpperCase()}` : ''}`.trim(),
+    function audioLabel(language: string, channelLayout?: string, channels?: number, codec?: string): string {
+        const layout = channelLayout ? `(${channelLayout})` : channels ? `(${channels}ch)` : '';
+        return `${language.toUpperCase()} ${layout} ${codec ? `- ${codec.toUpperCase()}` : ''}`.trim();
+    }
+
+    function parseAudioStreams(source: MediaVersion, preferredIndex?: number) {
+        audioList.value = source.audio.map((s) => ({
+            index: Number(s.id),
+            language: s.language || 'und',
+            label: audioLabel(s.language || 'und', s.channelLayout, s.channels, s.codec),
         }));
 
         if (preferredIndex !== undefined) {
             selectedAudioIndex.value = preferredIndex;
-        } else {
-            const globalLang = preferencesStore.preferredAudioLanguage;
-            const preferred =
-                (globalLang ? audioStreams.find(s => s.Language === globalLang) : null) ||
-                audioStreams.find(s => s.IsDefault) ||
-                audioStreams[0];
-            selectedAudioIndex.value = preferred?.Index ?? 0;
+            return;
         }
+        const globalLang = preferencesStore.preferredAudioLanguage;
+        const preferred = (globalLang ? source.audio.find((s) => languageMatches(globalLang, s.language || '')) : undefined)
+            ?? source.audio.find((s) => s.isDefault)
+            ?? source.audio[0];
+        selectedAudioIndex.value = preferred ? Number(preferred.id) : 0;
     }
 
-    function parseSubtitleStreams(ms: any) {
-        const msId = ms.Id || itemId;
-        const tracks = createSubtitleTracks({
-            streams: ms.MediaStreams || [],
-            serverUrl,
-            itemId,
-            mediaSourceId: msId,
-        });
-        subtitleList.value = tracks;
+    function parseSubtitleStreams(source: MediaVersion, external = plan.value?.externalSubtitles ?? []) {
+        subtitleList.value = createSubtitleTracks(source, external);
 
         // Per-item saved choice (null = never set) → global language preference → off
         // Stored value: 'off' = explicitly off, numeric string = exact stream index
         const savedVal = localStorage.getItem(`msplayer-subtitle-${itemId}`);
         const globalSubLang = preferencesStore.preferredSubtitleLanguage;
-        let preferred = null;
+        let preferred: SubtitleTrack | null = null;
         if (savedVal !== null) {
             if (savedVal !== 'off') {
-                const savedIdx = parseSavedBurnInSubtitleIndex(savedVal)
-                    ?? Number.parseInt(savedVal, 10);
+                const savedIdx = parseSavedBurnInSubtitleIndex(savedVal) ?? Number.parseInt(savedVal, 10);
                 preferred = !isNaN(savedIdx) ? subtitleList.value.find(s => s.index === savedIdx) ?? null : null;
             }
         } else if (globalSubLang) {
-            preferred = subtitleList.value.find(s => s.language === globalSubLang) ?? null;
+            preferred = subtitleList.value.find(s => languageMatches(globalSubLang, s.language)) ?? null;
         }
         selectedSubtitleIndex.value = preferred?.index ?? null;
     }
 
-    function determinePlaybackMethod(ms: any) {
-        const { method, url } = buildPlaybackUrl(ms, {
-            serverUrl, itemId, accessToken, isNative, playSessionId: playSessionId.value,
-        });
-        playMethod.value = method;
-        hlsUrl.value = url;
-        debugLog(`[NativePlayer] determinePlaybackMethod: ${playMethod.value}`);
-        debugLog(`[NativePlayer] TranscodingUrl from Jellyfin: ${ms.TranscodingUrl ? 'YES' : 'NO'}`);
-    }
-
-    async function fetchNextEpisodeForItem(epItemId: string): Promise<string> {
+    async function fetchNextEpisodeForItem(episodeId: string): Promise<string> {
+        if (!backend) return '';
         try {
-            const item = await store.fetchItemDetails(epItemId);
-            if (item.Type !== 'Episode' || !item.SeasonId) return '';
-            const episodes = await store.fetchEpisodes(item.SeasonId);
-            const sorted = [...episodes].sort((a: any, b: any) => (a.IndexNumber ?? 0) - (b.IndexNumber ?? 0));
-            const idx = sorted.findIndex((e: any) => e.Id === epItemId);
-            if (idx < 0 || idx >= sorted.length - 1) return '';
-            return (sorted[idx + 1] as any).Id ?? '';
+            const current = await backend.catalog.item(episodeId);
+            if (current.kind !== 'episode' || !current.seasonId) return '';
+            const episodes = await backend.catalog.episodes(current.seasonId);
+            const sorted = [...episodes].sort((a, b) => (a.episodeNumber ?? 0) - (b.episodeNumber ?? 0));
+            const index = sorted.findIndex((e) => e.id === episodeId);
+            return index >= 0 ? sorted[index + 1]?.id ?? '' : '';
         } catch {
             return '';
         }
     }
 
     return {
-        // Identity / auth
+        backend,
         itemId,
         nextEpisodeId,
-        accessToken,
-        serverUrl,
-        deviceId,
-        embyAuthHeader,
-        // Playback state
+        requestHeaders,
         isLoading,
         isPlaying,
         currentTime,
@@ -427,8 +262,10 @@ export function usePlayerSession(videoEl: Ref<HTMLVideoElement | null>, isNative
         progressPct,
         error,
         mediaTitle,
+        item,
+        plan,
         playSessionId,
-        mediaSource,
+        version,
         hlsUrl,
         playMethod,
         audioList,
@@ -446,18 +283,16 @@ export function usePlayerSession(videoEl: Ref<HTMLVideoElement | null>, isNative
         videoStream,
         activeAudioStream,
         posterUrl,
-        // Reporting
         reportPlaybackStart,
         reportPlaybackProgress,
         reportPlaybackStopped,
         deleteActiveEncodings,
         startProgressReporting,
         stopProgressReporting,
-        // Jellyfin API
-        fetchPlaybackInfo,
+        negotiate,
+        applyPlan,
         parseAudioStreams,
         parseSubtitleStreams,
-        determinePlaybackMethod,
         fetchNextEpisodeForItem,
     };
 }

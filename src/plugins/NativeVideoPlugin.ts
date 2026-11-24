@@ -5,6 +5,8 @@ export interface SubtitleTrack {
     url: string;
     lang: string;
     label: string;
+    /** Media3 MIME type; WebVTT when omitted. */
+    mimeType?: string;
 }
 
 export interface BurnInSubtitleTrack {
@@ -15,7 +17,8 @@ export interface BurnInSubtitleTrack {
 
 export interface NativeVideoStartOptions {
     url: string;
-    authHeader: string;
+    /** Headers every request of the stream needs (Jellyfin Authorization, Plex X-Plex-*). */
+    headers: Record<string, string>;
     startPositionMs?: number;
     title?: string;
     playMethod?: 'DirectPlay' | 'DirectStream' | 'Transcode';
@@ -40,6 +43,8 @@ export interface NativeVideoStartOptions {
 export interface NativeVideoProgressEvent {
     positionMs: number;
     durationMs: number;
+    /** The user paused (buffering while asked to play counts as playing). */
+    isPaused?: boolean;
 }
 
 export interface NativeVideoStoppedEvent {

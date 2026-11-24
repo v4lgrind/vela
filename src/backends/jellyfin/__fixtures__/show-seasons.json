@@ -1,0 +1,23 @@
+{
+    "Items": [
+        {
+            "Id": "sea00008600000000000000000000000",
+            "Name": "Saison 1",
+            "Type": "Season",
+            "IndexNumber": 1,
+            "ParentId": "ser00008500000000000000000000000",
+            "SeriesId": "ser00008500000000000000000000000",
+            "SeriesName": "Cold Signal",
+            "ProductionYear": 2023,
+            "ImageTags": {
+                "Primary": "t"
+            },
+            "ChildCount": 8,
+            "UserData": {
+                "UnplayedItemCount": 3
+            }
+        }
+    ],
+    "TotalRecordCount": 1,
+    "StartIndex": 0
+}

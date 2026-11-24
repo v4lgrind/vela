@@ -54,11 +54,11 @@
         <div class="flex flex-col gap-1 max-h-48 overflow-y-auto">
           <button
             v-for="track in audioTracks"
-            :key="track.Index"
-            @click="selectedAudio = track.Index"
+            :key="track.id"
+            @click="selectedAudio = track.id"
             :class="[
               'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-left transition-all cursor-pointer',
-              selectedAudio === track.Index
+              selectedAudio === track.id
                 ? 'bg-accent-blue/20 border border-accent-blue/50 text-text-heading'
                 : 'bg-surface-hover border border-border-input text-text-primary hover:bg-border-input',
             ]"
@@ -66,12 +66,12 @@
             <div
               :class="[
                 'size-4 rounded-full border-2 flex items-center justify-center flex-shrink-0',
-                selectedAudio === track.Index ? 'border-accent-blue' : 'border-text-subtle',
+                selectedAudio === track.id ? 'border-accent-blue' : 'border-text-subtle',
               ]"
             >
-              <div v-if="selectedAudio === track.Index" class="size-2 rounded-full bg-accent-blue" />
+              <div v-if="selectedAudio === track.id" class="size-2 rounded-full bg-accent-blue" />
             </div>
-            <span class="truncate">{{ track.DisplayTitle || `${track.Language || 'Unknown'} - ${track.Codec}` }}</span>
+            <span class="truncate">{{ track.title || `${track.language || 'Unknown'} - ${track.codec}` }}</span>
           </button>
         </div>
       </div>
@@ -81,10 +81,10 @@
         <label class="text-xs font-medium text-text-muted uppercase tracking-wide">{{ t('transcode.subtitles') }}</label>
         <div class="flex flex-col gap-1 max-h-48 overflow-y-auto">
           <button
-            @click="selectedSubtitle = -1"
+            @click="selectedSubtitle = NO_SUBTITLE"
             :class="[
               'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-left transition-all cursor-pointer',
-              selectedSubtitle === -1
+              selectedSubtitle === NO_SUBTITLE
                 ? 'bg-accent-blue/20 border border-accent-blue/50 text-text-heading'
                 : 'bg-surface-hover border border-border-input text-text-primary hover:bg-border-input',
             ]"
@@ -92,20 +92,20 @@
             <div
               :class="[
                 'size-4 rounded-full border-2 flex items-center justify-center flex-shrink-0',
-                selectedSubtitle === -1 ? 'border-accent-blue' : 'border-text-subtle',
+                selectedSubtitle === NO_SUBTITLE ? 'border-accent-blue' : 'border-text-subtle',
               ]"
             >
-              <div v-if="selectedSubtitle === -1" class="size-2 rounded-full bg-accent-blue" />
+              <div v-if="selectedSubtitle === NO_SUBTITLE" class="size-2 rounded-full bg-accent-blue" />
             </div>
             <span>{{ t('transcode.none') }}</span>
           </button>
           <button
             v-for="track in subtitleTracks"
-            :key="track.Index"
-            @click="selectedSubtitle = track.Index"
+            :key="track.id"
+            @click="selectedSubtitle = track.id"
             :class="[
               'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-left transition-all cursor-pointer',
-              selectedSubtitle === track.Index
+              selectedSubtitle === track.id
                 ? 'bg-accent-blue/20 border border-accent-blue/50 text-text-heading'
                 : 'bg-surface-hover border border-border-input text-text-primary hover:bg-border-input',
             ]"
@@ -113,12 +113,12 @@
             <div
               :class="[
                 'size-4 rounded-full border-2 flex items-center justify-center flex-shrink-0',
-                selectedSubtitle === track.Index ? 'border-accent-blue' : 'border-text-subtle',
+                selectedSubtitle === track.id ? 'border-accent-blue' : 'border-text-subtle',
               ]"
             >
-              <div v-if="selectedSubtitle === track.Index" class="size-2 rounded-full bg-accent-blue" />
+              <div v-if="selectedSubtitle === track.id" class="size-2 rounded-full bg-accent-blue" />
             </div>
-            <span class="truncate">{{ track.DisplayTitle || `${track.Language || 'Unknown'} - ${track.Codec}` }}</span>
+            <span class="truncate">{{ track.title || `${track.language || 'Unknown'} - ${track.codec}` }}</span>
           </button>
         </div>
       </div>
@@ -154,14 +154,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from '@/components/ui/button';
 import { Download, Check, AlertTriangle } from 'lucide-vue-next';
 import { QUALITY_PRESETS } from '@/constants';
+import type { MediaItem, MediaVersion } from '@/domain';
+import type { TranscodeOptions } from '@/store/download-store';
 import { formatBytes } from '@/utils/helpers';
 
 const { t } = useI18n();
 const props = defineProps<{
   /** Representative item — drives audio/subtitle track lists and source resolution. */
-  item: any;
+  item: MediaItem | null;
   /** All items covered by this download (single item, a season, or several episodes). */
-  items?: any[];
+  items?: MediaItem[];
   /** Whether the source needs conversion to play on this device. */
   needsConversion?: boolean;
 }>();
@@ -169,27 +171,27 @@ const props = defineProps<{
 const open = defineModel<boolean>('open', { required: true });
 
 const emit = defineEmits<{
-  confirm: [options: { audioStreamIndex: number; subtitleStreamIndex: number; maxBitrate: number }];
+  confirm: [options: TranscodeOptions];
   original: [];
 }>();
 
-const audioTracks = computed(() =>
-  (props.item?.MediaStreams ?? []).filter((s: any) => s.Type === 'Audio')
-);
+const NO_SUBTITLE = '';
+const MS_PER_SECOND = 1000;
 
-const subtitleTracks = computed(() =>
-  (props.item?.MediaStreams ?? []).filter((s: any) => s.Type === 'Subtitle')
-);
+function versionOf(item: MediaItem | null | undefined): MediaVersion | undefined {
+  return item && 'versions' in item ? item.versions[0] : undefined;
+}
 
-const selectedAudio = ref(-1);
-const selectedSubtitle = ref(-1);
+const version = computed(() => versionOf(props.item));
+const audioTracks = computed(() => version.value?.audio ?? []);
+const subtitleTracks = computed(() => version.value?.subtitles ?? []);
+
+const selectedAudio = ref<string | undefined>(undefined);
+const selectedSubtitle = ref(NO_SUBTITLE);
 const selectedBitrate = ref(0); // 0 = Auto / original resolution
 
 // Only offer presets at or below the source resolution.
-const sourceHeight = computed(() => {
-  const streams = props.item?.MediaStreams ?? props.item?.MediaSources?.[0]?.MediaStreams ?? [];
-  return streams.find((s: any) => s.Type === 'Video')?.Height ?? 0;
-});
+const sourceHeight = computed(() => version.value?.video[0]?.height ?? 0);
 const resolutionPresets = computed(() => {
   const h = sourceHeight.value;
   if (!h) return QUALITY_PRESETS;
@@ -202,31 +204,25 @@ const downloadItems = computed(() =>
 const itemCount = computed(() => downloadItems.value.length);
 
 /** Estimate a single item's on-disk size for the selected bitrate. */
-function estimateItemBytes(it: any, bitrate: number): number {
-  const runtimeTicks = it?.RunTimeTicks ?? it?.MediaSources?.[0]?.RunTimeTicks ?? 0;
-  const seconds = runtimeTicks / 10_000_000;
+function estimateItemBytes(item: MediaItem, bitrate: number): number {
+  const source = versionOf(item);
+  const seconds = (item.durationMs ?? source?.durationMs ?? 0) / MS_PER_SECOND;
   if (bitrate > 0) return (bitrate / 8) * seconds;
   // Auto / original: prefer the real file size, else derive from the source bitrate.
-  const size = it?.MediaSources?.[0]?.Size ?? it?.Size ?? 0;
-  if (size > 0) return size;
-  const srcBitrate = it?.MediaSources?.[0]?.Bitrate ?? it?.Bitrate ?? 0;
-  return srcBitrate > 0 ? (srcBitrate / 8) * seconds : 0;
+  if (source?.sizeBytes) return source.sizeBytes;
+  return source?.bitrate ? (source.bitrate / 8) * seconds : 0;
 }
 
 const totalBytes = computed(() =>
-  downloadItems.value.reduce((sum, it) => sum + estimateItemBytes(it, selectedBitrate.value), 0)
+  downloadItems.value.reduce((sum, item) => sum + estimateItemBytes(item, selectedBitrate.value), 0)
 );
 const sizeLabel = computed(() => formatBytes(totalBytes.value) ?? t('transcode.unknown'));
 
 // Pre-select default tracks and reset resolution when dialog opens
 watch(open, (isOpen) => {
   if (isOpen) {
-    const defaultAudio = audioTracks.value.find((t: any) => t.IsDefault);
-    selectedAudio.value = defaultAudio?.Index ?? audioTracks.value[0]?.Index ?? -1;
-
-    const defaultSub = subtitleTracks.value.find((t: any) => t.IsDefault);
-    selectedSubtitle.value = defaultSub?.Index ?? -1;
-
+    selectedAudio.value = (audioTracks.value.find((track) => track.isDefault) ?? audioTracks.value[0])?.id;
+    selectedSubtitle.value = subtitleTracks.value.find((track) => track.isDefault)?.id ?? NO_SUBTITLE;
     selectedBitrate.value = 0;
   }
 });
@@ -234,8 +230,8 @@ watch(open, (isOpen) => {
 function handleConfirm() {
   open.value = false;
   emit('confirm', {
-    audioStreamIndex: selectedAudio.value,
-    subtitleStreamIndex: selectedSubtitle.value,
+    audioStreamId: selectedAudio.value,
+    subtitleStreamId: selectedSubtitle.value || undefined,
     maxBitrate: selectedBitrate.value,
   });
 }

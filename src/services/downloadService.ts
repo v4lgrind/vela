@@ -5,8 +5,7 @@ import type { PluginListenerHandle } from '@capacitor/core';
 
 import { usePlatform } from '@/composables/usePlatform';
 import { DownloadPlugin } from '@/plugins/DownloadPlugin';
-import { getPrimaryContainer } from '@/utils/desktopCodec';
-import { jellyfinAuthorization } from '@/utils/jellyfinAuthorization';
+import type { DownloadPlan, ImageRef, MediaBackend, MediaItem } from '@/domain';
 import { logger } from '@/utils/logger';
 
 import {
@@ -43,55 +42,81 @@ interface NativeDownloadOptions {
   url: string;
 }
 
+/** Cached images keep their first-schema keys (`<itemId>_<Primary|Backdrop>.jpg`). */
 export type OfflineArtworkType = 'Primary' | 'Backdrop';
 
 export interface OfflineArtworkTarget {
   itemId: string;
   imageType: OfflineArtworkType;
+  ref: ImageRef;
   maxWidth: number;
 }
 
-interface OfflineArtworkMetadata {
-  Id?: string;
-  Type?: string;
-  SeriesId?: string;
-  SeasonId?: string;
-  AlbumId?: string;
-  People?: Array<{
-    Id?: string;
-    PrimaryImageTag?: string;
-  }>;
+/** Turns an image ref into a fetchable URL (the active backend). */
+export type ArtworkResolver = (ref: ImageRef, maxWidth: number) => { url: string; headers: Record<string, string> };
+
+const MAX_CACHED_PEOPLE = 20;
+
+/** Artwork comes from the signed-in server, with its auth headers. */
+export function artworkResolverFor(backend: MediaBackend): ArtworkResolver {
+  return (ref, maxWidth) => ({ url: backend.imageUrl(ref, { width: maxWidth }), headers: backend.authHeaders() });
 }
 
 /**
- * Build the complete image set required by the offline library and detail page.
- * Duplicate IDs are collapsed because an episode can share artwork with a parent.
+ * Every image the offline library and detail page show for an item: its own
+ * art, the series art of an episode, the album cover of a track, cast portraits.
+ * Duplicate keys are collapsed because an episode shares artwork with its series.
  */
-export function buildOfflineArtworkTargets(metadata: OfflineArtworkMetadata): OfflineArtworkTarget[] {
+export function buildOfflineArtworkTargets(item: MediaItem): OfflineArtworkTarget[] {
   const targets = new Map<string, OfflineArtworkTarget>();
-  const add = (itemId: string | undefined, imageType: OfflineArtworkType, maxWidth: number) => {
-    if (!itemId) return;
-    targets.set(`${itemId}:${imageType}`, { itemId, imageType, maxWidth });
+  const add = (itemId: string | undefined, imageType: OfflineArtworkType, ref: ImageRef | undefined, maxWidth: number) => {
+    if (itemId && ref) targets.set(`${itemId}:${imageType}`, { itemId, imageType, ref, maxWidth });
   };
-
-  add(metadata.Id, 'Primary', metadata.Type === 'Episode' ? 960 : 600);
-  add(metadata.Id, 'Backdrop', 1920);
-
-  if (metadata.Type === 'Episode') {
-    add(metadata.SeriesId, 'Primary', 600);
-    add(metadata.SeriesId, 'Backdrop', 1920);
-    add(metadata.SeasonId, 'Primary', 600);
+  const { images } = item;
+  if (item.kind === 'episode') {
+    add(item.id, 'Primary', images.thumb ?? images.poster, 960);
+    add(item.seriesId, 'Primary', images.poster, 600);
+    add(item.seriesId, 'Backdrop', images.backdrop, 1920);
+  } else {
+    add(item.id, 'Primary', images.poster, 600);
+    add(item.id, 'Backdrop', images.backdrop, 1920);
   }
   // A track rarely has its own image: the album cover is what lists show.
-  if (metadata.Type === 'Audio') add(metadata.AlbumId, 'Primary', 600);
-
-  for (const person of (metadata.People || []).slice(0, 20)) {
-    if (person.PrimaryImageTag) add(person.Id, 'Primary', 400);
-  }
-
+  if (item.kind === 'track') add(item.albumId, 'Primary', images.poster, 600);
+  const credits = 'credits' in item ? item.credits : [];
+  for (const person of credits.slice(0, MAX_CACHED_PEOPLE)) add(person.personId, 'Primary', person.image, 400);
   return [...targets.values()];
 }
 
+const FOLDER_BY_KIND: Partial<Record<MediaItem['kind'], (item: MediaItem, clean: (v: string | undefined, f: string) => string) => string>> = {
+  movie: (item, clean) => `Movies/${clean(item.title, 'Unknown')}`,
+  episode: (item, clean) => (item.kind === 'episode'
+    ? `TV Shows/${clean(item.seriesTitle, 'Unknown Series')}/Season ${item.seasonNumber ?? 1}` : ''),
+  track: (item, clean) => (item.kind === 'track'
+    ? `Music/${clean(item.albumArtist ?? item.artists[0]?.name, 'Unknown Artist')}/${clean(item.albumTitle, 'Unknown Album')}` : ''),
+};
+
+const pad2 = (n: number) => String(n).padStart(2, '0');
+const unsafeFileChars = (name: string) => name.replace(/[/\\?%*:|"<>]/g, '-');
+
+/**
+ * File name of a download, unique within its folder: items of one album or
+ * season often share a title (audiobook chapters, "Intro"), and same-named
+ * downloads overwrote each other. Numbers keep the folder readable; the item
+ * id is the fallback when there is none.
+ */
+export function offlineFileName(item: MediaItem, extension: string): string {
+  const title = item.title || item.id;
+  let base = `${title} (${item.id})`;
+  if (item.kind === 'track' && item.trackNumber) {
+    base = `${item.discNumber && item.discNumber > 1 ? `${item.discNumber}-` : ''}${pad2(item.trackNumber)} - ${title}`;
+  } else if (item.kind === 'episode' && item.episodeNumber !== undefined) {
+    base = `S${pad2(item.seasonNumber ?? 0)}E${pad2(item.episodeNumber)} - ${title}`;
+  } else if (item.kind === 'movie') {
+    base = item.year ? `${title} (${item.year})` : title;
+  }
+  return unsafeFileChars(`${base}.${extension}`);
+}
 
 class DownloadService {
   private downloads: Map<string, ActiveDownload> = new Map();
@@ -103,34 +128,23 @@ class DownloadService {
    * The download survives app backgrounding, screen-off, and retries on network errors.
    */
   async downloadForOffline(
-    serverUrl: string,
-    itemId: string,
-    accessToken: string,
-    metadata: any,
+    item: MediaItem,
+    serverId: string,
+    plan: DownloadPlan,
+    resolveArtwork: ArtworkResolver,
     onProgress?: (progress: DownloadProgress) => void,
-    transcodedUrl?: string,
-    estimatedSize?: number,
-    subtitleInfo?: { streamIndex: number; label: string; language: string },
-    transcodedContainer?: string,
   ): Promise<void> {
+    const itemId = item.id;
     if (this.downloads.has(itemId)) {
       throw new Error(`Download already in progress for ${itemId}`);
     }
 
-    // Android uses TS; desktop uses MP4 for Chromium-compatible offline playback.
-    const extension = transcodedUrl
-      ? (transcodedContainer || 'ts')
-      : this.getFileExtension(metadata);
-    const filename = this.sanitizeFilename(`${metadata.Name || itemId}.${extension}`);
-    const filePath = this.buildFilePath(metadata, filename);
-    const downloadUrl = transcodedUrl || `${serverUrl}/Items/${itemId}/Download`;
-    const authHeaders = { Authorization: jellyfinAuthorization(accessToken) };
-
-    if (transcodedUrl) {
-      logger.log('📥 Transcoded download:', filename);
-    } else {
-      logger.log('📥 Native download:', filename);
-    }
+    const filename = offlineFileName(item, plan.fileExtension);
+    const filePath = this.buildFilePath(item, filename);
+    const downloadUrl = plan.url;
+    const authHeaders = plan.headers;
+    const estimatedSize = plan.estimatedSizeBytes;
+    logger.log(plan.isTranscoded ? '📥 Transcoded download:' : '📥 Native download:', filename);
 
     if (onProgress) this.progressCallbacks.set(itemId, onProgress);
 
@@ -163,12 +177,12 @@ class DownloadService {
       } else {
         // Android ForegroundService keeps downloads alive while the app is backgrounded.
         // Persist metadata so offline-store can reconcile a completed native download.
-        localStorage.setItem(`dl_meta_${itemId}`, JSON.stringify({ metadata, filePath }));
+        localStorage.setItem(`dl_meta_${itemId}`, JSON.stringify({ item, serverId, markers: plan.markers, filePath }));
         ({ filePath: storedFilePath, fileSize } = await this.downloadAndroidFile({
           activeDownload,
           estimatedSize,
           headers: authHeaders,
-          itemName: metadata.Name || '',
+          itemName: item.title || '',
           operationId: itemId,
           relativePath: filePath,
           url: downloadUrl,
@@ -196,30 +210,27 @@ class DownloadService {
         } catch { /* ignore */ }
       }
 
-      const downloadedMedia: DownloadedMedia = buildDownloadedMedia(metadata, storedFilePath, fileSize);
+      const downloadedMedia: DownloadedMedia = buildDownloadedMedia(item, serverId, storedFilePath, fileSize, plan.markers);
 
-      // Download sidecar subtitle file. Desktop uses WebVTT (the only format
-      // Chromium's <track> renders); Android uses SRT for ExoPlayer. The
-      // server converts from the source format either way.
-      if (subtitleInfo && subtitleInfo.streamIndex >= 0) {
+      // Sidecar subtitle file, in the format the backend chose for this platform
+      // (WebVTT for Chromium's <track>, SRT for ExoPlayer).
+      const subtitle = plan.sidecars[0];
+      if (subtitle) {
         try {
-          const subExtension = isDesktop ? 'vtt' : 'srt';
-          const subPath = filePath.replace(/\.[^.]+$/, `.${subExtension}`);
-          const subUrl = `${serverUrl}/Videos/${itemId}/${itemId}/Subtitles/${subtitleInfo.streamIndex}/Stream.${subExtension}`;
+          const subPath = filePath.replace(/\.[^.]+$/, `.${subtitle.format}`);
           logger.log('📝 Downloading subtitle:', subPath);
           downloadedMedia.subtitleFilePath = isDesktop
-            ? await this.downloadDesktopSidecar(`subtitle-${itemId}`, subUrl, subPath, authHeaders)
+            ? await this.downloadDesktopSidecar(`subtitle-${itemId}`, subtitle.url, subPath, authHeaders)
             : await this.downloadAndroidFile({
                 activeDownload,
                 headers: authHeaders,
-                itemName: `${metadata.Name || itemId} subtitles`,
+                itemName: `${item.title || itemId} subtitles`,
                 operationId: `subtitle-${itemId}`,
                 relativePath: subPath,
-                url: subUrl,
+                url: subtitle.url,
               }).then((result) => result.filePath);
-          downloadedMedia.subtitleLabel = subtitleInfo.label;
-          downloadedMedia.subtitleLanguage = subtitleInfo.language;
-          logger.log('✅ Subtitle downloaded:', subPath);
+          downloadedMedia.subtitleLabel = subtitle.label;
+          downloadedMedia.subtitleLanguage = subtitle.language;
         } catch (e) {
           logger.warn('⚠️ Subtitle download failed (non-critical):', e);
         }
@@ -229,31 +240,13 @@ class DownloadService {
         throw Object.assign(new Error('AbortError'), { name: 'AbortError' });
       }
 
-      // Fetch intro/outro segment timestamps so skip-intro works offline
-      try {
-        const segRes = await fetch(
-          `${serverUrl}/MediaSegments/${itemId}?includeSegmentTypes=Intro&includeSegmentTypes=Outro`,
-          { headers: authHeaders }
-        );
-        if (segRes.ok) {
-          const segData = await segRes.json();
-          if (segData.Items?.length) {
-            downloadedMedia.introSegments = segData.Items.map((s: any) => ({
-              Type: s.Type,
-              StartTicks: s.StartTicks,
-              EndTicks: s.EndTicks,
-            }));
-          }
-        }
-      } catch { /* non-critical — skip intro just won't work offline for this item */ }
-
       await offlineDatabase.addDownload(downloadedMedia);
       localStorage.removeItem(`dl_meta_${itemId}`);
       logger.log('✅ Download complete:', filename);
 
       // Artwork is part of the offline contract. Wait for every requested image
       // before reporting completion so airplane mode cannot race this work.
-      await this.cacheArtworkForMetadata(serverUrl, accessToken, metadata);
+      await this.cacheArtwork(buildOfflineArtworkTargets(item), resolveArtwork);
 
       // Final 100% callback
       const callback = this.progressCallbacks.get(itemId);
@@ -261,7 +254,7 @@ class DownloadService {
 
     } catch (error: any) {
       if (error.name === 'AbortError' || activeDownload.aborted) {
-        logger.log('🚫 Download cancelled:', metadata.Name);
+        logger.log('🚫 Download cancelled:', item.title);
         try { await this.deleteFile(storedFilePath); } catch { /* ignore */ }
         const err = Object.assign(new Error('AbortError'), { name: 'AbortError' });
         throw err;
@@ -452,59 +445,22 @@ class DownloadService {
       : { directory: Directory.Data, path: filePath };
   }
 
-  private getFileExtension(metadata: any): string {
-    // Normalized single container — the raw item-level Container can be an
-    // ffprobe CSV like "mov,mp4,m4a,3gp,3g2,mj2", which is no file extension.
-    const container = getPrimaryContainer(metadata);
-    if (container) return container;
-    switch (metadata.Type) {
-      case 'Movie':
-      case 'Episode': return 'mkv';
-      case 'Audio': return 'mp3';
-      default: return 'bin';
-    }
-  }
-
   private sanitizeFilename(filename: string): string {
-    return filename.replace(/[/\\?%*:|"<>]/g, '-');
+    return unsafeFileChars(filename);
   }
 
-  private buildFilePath(metadata: any, filename: string): string {
-    const s = (v: string | undefined | null, fallback: string) =>
-      this.sanitizeFilename(v || fallback);
-    const root = 'Vela';
-    switch (metadata.Type) {
-      case 'Movie':
-        return `${root}/Movies/${s(metadata.Name, 'Unknown')}/${filename}`;
-      case 'Episode': {
-        const series = s(metadata.SeriesName, 'Unknown Series');
-        const season = `Season ${metadata.ParentIndexNumber ?? 1}`;
-        return `${root}/TV Shows/${series}/${season}/${filename}`;
-      }
-      case 'Audio': {
-        const artist = s(metadata.AlbumArtist ?? metadata.Artists?.[0], 'Unknown Artist');
-        const album = s(metadata.Album, 'Unknown Album');
-        return `${root}/Music/${artist}/${album}/${filename}`;
-      }
-      default:
-        return `${root}/${filename}`;
-    }
+  private buildFilePath(item: MediaItem, filename: string): string {
+    const clean = (v: string | undefined, fallback: string) => this.sanitizeFilename(v || fallback);
+    const folder = FOLDER_BY_KIND[item.kind]?.(item, clean);
+    return folder ? `Vela/${folder}/${filename}` : `Vela/${filename}`;
   }
 
-  /**
-   * Cache every image used by offline list/detail views: item poster/backdrop,
-   * episode parents, and cast portraits.
-   */
-  async cacheArtworkForMetadata(
-    serverUrl: string,
-    accessToken: string,
-    metadata: OfflineArtworkMetadata,
-  ): Promise<void> {
-    await Promise.allSettled(
-      buildOfflineArtworkTargets(metadata).map(({ itemId, imageType, maxWidth }) =>
-        this.cacheArtworkById(serverUrl, accessToken, itemId, imageType, maxWidth)
-      ),
-    );
+  /** Caches images for the offline views; failures are tolerated (placeholders show instead). */
+  async cacheArtwork(targets: OfflineArtworkTarget[], resolve: ArtworkResolver): Promise<void> {
+    await Promise.allSettled(targets.map(({ itemId, imageType, ref, maxWidth }) => {
+      const { url, headers } = resolve(ref, maxWidth);
+      return this.cacheImage(itemId, imageType, url, headers);
+    }));
   }
 
   /**
@@ -528,12 +484,15 @@ class DownloadService {
    * Cache one image, de-duplicating concurrent episode downloads that share
    * series, season, or cast artwork.
    */
-  async cacheArtworkById(
-    serverUrl: string,
-    accessToken: string,
+  /**
+   * Cache one image, de-duplicating concurrent episode downloads that share
+   * series, season, or cast artwork.
+   */
+  async cacheImage(
     itemId: string,
-    imageType: OfflineArtworkType = 'Primary',
-    maxWidth = 400,
+    imageType: OfflineArtworkType,
+    url: string,
+    headers: Record<string, string>,
   ): Promise<void> {
     const imgPath = `Vela/Images/${itemId}_${imageType}.jpg`;
     try {
@@ -545,18 +504,12 @@ class DownloadService {
     if (pending) return pending;
 
     const task = (async () => {
-      const imgUrl = `${serverUrl}/Items/${itemId}/Images/${imageType}?maxWidth=${maxWidth}&quality=80`;
       const dirPath = imgPath.substring(0, imgPath.lastIndexOf('/'));
       try {
         await this.ensureDirectory(dirPath);
       } catch { /* may exist */ }
 
-      await this.downloadFile(
-        `artwork-${imageType}-${itemId}`,
-        imgUrl,
-        imgPath,
-        { Authorization: jellyfinAuthorization(accessToken) },
-      );
+      await this.downloadFile(`artwork-${imageType}-${itemId}`, url, imgPath, headers);
     })();
 
     this.artworkDownloads.set(imgPath, task);

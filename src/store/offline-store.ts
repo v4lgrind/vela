@@ -2,9 +2,12 @@ import { defineStore } from 'pinia';
 import { offlineDetection } from '../services/offlineDetection';
 import { usePreferencesStore } from './preferences-store';
 import { buildDownloadedMedia, offlineDatabase, type DownloadedMedia } from '../services/offlineDatabase';
-import { downloadService } from '../services/downloadService';
+import { artworkResolverFor, buildOfflineArtworkTargets, downloadService } from '../services/downloadService';
 import { syncService } from '../services/syncService';
-import { useJellyfinStore } from './jellyfin-store';
+import type { Marker, MediaBackend, MediaItem } from '@/domain';
+import { needsNormalizing, normalizeDownload } from '@/utils/offlineRecords';
+import { useLibrariesStore } from './libraries-store';
+import { useSessionStore } from './session-store';
 import { useMetadataCacheStore } from './metadata-cache-store';
 import { Capacitor } from '@capacitor/core';
 import { DownloadPlugin } from '@/plugins/DownloadPlugin';
@@ -184,11 +187,28 @@ export const useOfflineStore = defineStore('offline', {
      */
     async loadDownloads() {
       try {
-        this.downloads = await offlineDatabase.getAllDownloads();
+        const session = useSessionStore();
+        const fallbackServerId = session.active?.serverId ?? '';
+        const stored = await offlineDatabase.getAllDownloads();
+        this.downloads = stored.map((record) => normalizeDownload(record, session.decodeStoredItem, fallbackServerId));
+        // Records from before the domain model are converted once and saved in the current format.
+        if (fallbackServerId) {
+          for (const media of this.downloads.filter((_, i) => needsNormalizing(stored[i]))) {
+            await offlineDatabase.patchDownload(media.itemId, { item: media.item, serverId: media.serverId, markers: media.markers });
+          }
+        }
         logger.log(`[OfflineStore] Loaded ${this.downloads.length} downloads`);
       } catch (error) {
         logger.error('[OfflineStore] Failed to load downloads:', error);
       }
+    },
+
+    /** The signed-in server, with the downloads that came from it. */
+    activeServer(): { backend: MediaBackend; downloads: DownloadedMedia[] } | null {
+      const session = useSessionStore();
+      const serverId = session.active?.serverId;
+      if (!session.backend || !serverId || !this.isFullyOnline) return null;
+      return { backend: session.backend, downloads: this.downloads.filter((d) => d.serverId === serverId) };
     },
 
     /**
@@ -196,68 +216,52 @@ export const useOfflineStore = defineStore('offline', {
      * downloads. New downloads already perform the same work before completion.
      */
     async refreshOfflineAssets() {
-      if (
-        this.offlineAssetsRefreshInProgress
-        || this.offlineAssetsRefreshed
-        || !this.isFullyOnline
-      ) return;
-
-      const jellyfinStore = useJellyfinStore();
-      if (!jellyfinStore.serverUrl || !jellyfinStore.accessToken) return;
-
+      if (this.offlineAssetsRefreshInProgress || this.offlineAssetsRefreshed) return;
+      const server = this.activeServer();
+      if (!server) return;
+      const { backend } = server;
+      const resolve = artworkResolverFor(backend);
       this.offlineAssetsRefreshInProgress = true;
       let complete = true;
-      const metadataCache = useMetadataCacheStore();
-
       try {
-        for (const download of [...this.downloads]) {
-          let metadata = download.jellyfinItem;
+        for (const download of server.downloads) {
+          let item = download.item;
           try {
-            const detailed = await jellyfinStore.fetchItemDetails(download.itemId);
-            metadata = { ...metadata, ...detailed };
-            await offlineDatabase.patchDownload(download.itemId, { jellyfinItem: metadata });
+            item = await backend.catalog.item(download.itemId);
+            await offlineDatabase.patchDownload(download.itemId, { item });
           } catch (error) {
             complete = false;
             logger.warn('[OfflineStore] Could not refresh downloaded metadata:', download.itemId, error);
           }
-
-          await downloadService.cacheArtworkForMetadata(
-            jellyfinStore.serverUrl,
-            jellyfinStore.accessToken,
-            metadata,
-          );
-
-          if (download.type !== 'Episode') continue;
-          const parentIds = [download.seriesId, download.seasonId]
-            .filter((id): id is string => typeof id === 'string' && id.length > 0);
-          for (const parentId of parentIds) {
-            let parent = metadataCache.get(parentId, true);
-            if (!parent) {
-              try {
-                const fetched = await jellyfinStore.fetchItemDetails(parentId);
-                if (!fetched) continue;
-                metadataCache.set(fetched);
-                parent = metadataCache.get(parentId, true);
-              } catch (error) {
-                complete = false;
-                logger.warn('[OfflineStore] Could not refresh parent metadata:', parentId, error);
-                continue;
-              }
-            }
-            if (parent) {
-              await downloadService.cacheArtworkForMetadata(
-                jellyfinStore.serverUrl,
-                jellyfinStore.accessToken,
-                parent,
-              );
-            }
-          }
+          await downloadService.cacheArtwork(buildOfflineArtworkTargets(item), resolve);
+          if (item.kind === 'episode') complete = await this.refreshParents(item, backend) && complete;
         }
         await this.loadDownloads();
         this.offlineAssetsRefreshed = complete;
       } finally {
         this.offlineAssetsRefreshInProgress = false;
       }
+    },
+
+    /** Series and season of an episode, cached with their artwork for offline pages. */
+    async refreshParents(episode: MediaItem & { kind: 'episode' }, backend: MediaBackend): Promise<boolean> {
+      const metadataCache = useMetadataCacheStore();
+      let complete = true;
+      for (const parentId of [episode.seriesId, episode.seasonId].filter((id): id is string => !!id)) {
+        let parent = metadataCache.get(parentId, true);
+        if (!parent) {
+          try {
+            parent = await backend.catalog.item(parentId);
+            metadataCache.set(parent);
+          } catch (error) {
+            complete = false;
+            logger.warn('[OfflineStore] Could not refresh parent metadata:', parentId, error);
+            continue;
+          }
+        }
+        await downloadService.cacheArtwork(buildOfflineArtworkTargets(parent), artworkResolverFor(backend));
+      }
+      return complete;
     },
 
     /**
@@ -280,11 +284,17 @@ export const useOfflineStore = defineStore('offline', {
             logger.warn('[OfflineStore] No saved metadata for', item.itemId);
             continue;
           }
-          const { metadata, filePath } = JSON.parse(savedStr) as { metadata: any; filePath: string };
-          const media = buildDownloadedMedia(metadata, item.filePath || filePath, item.fileSize);
+          const saved = JSON.parse(savedStr) as {
+            item?: MediaItem; serverId?: string; markers?: Marker[]; metadata?: unknown; filePath: string;
+          };
+          // Downloads started by a pre-domain version saved the Jellyfin DTO instead.
+          const session = useSessionStore();
+          const downloaded = saved.item ?? session.decodeStoredItem(saved.metadata);
+          const serverId = saved.serverId ?? session.active?.serverId ?? '';
+          const media = buildDownloadedMedia(downloaded, serverId, item.filePath || saved.filePath, item.fileSize, saved.markers ?? []);
           await offlineDatabase.addDownload(media);
           localStorage.removeItem(`dl_meta_${item.itemId}`);
-          logger.log('[OfflineStore] Reconciled:', metadata.Name);
+          logger.log('[OfflineStore] Reconciled:', downloaded.title);
         } catch (e) {
           logger.error('[OfflineStore] Failed to reconcile item', item.itemId, e);
         }
@@ -334,41 +344,26 @@ export const useOfflineStore = defineStore('offline', {
       return this.downloads.find((d) => d.itemId === itemId);
     },
 
-    /**
-     * Get downloads for a series
-     */
-    async getSeriesDownloads(seriesId: string): Promise<DownloadedMedia[]> {
-      return await offlineDatabase.getDownloadsBySeries(seriesId);
-    },
-
-    /**
-     * Get downloads for a season
-     */
-    async getSeasonDownloads(seasonId: string): Promise<DownloadedMedia[]> {
-      return await offlineDatabase.getDownloadsBySeason(seasonId);
-    },
-
     /** Library tiles are cached so the library list still has its images offline. */
     async cacheLibraryArtwork() {
-      const jellyfinStore = useJellyfinStore();
-      const { serverUrl, accessToken } = jellyfinStore;
-      if (!this.isFullyOnline || !serverUrl || !accessToken) return;
-      await Promise.allSettled(jellyfinStore.libraries
-        .filter((library) => library.Id)
-        .map((library) => downloadService.cacheArtworkById(serverUrl, accessToken, library.Id!, 'Primary', 800)));
+      const server = this.activeServer();
+      if (!server) return;
+      const targets = useLibrariesStore().libraries.flatMap((library) => (library.images.poster
+        ? [{ itemId: library.id, imageType: 'Primary' as const, ref: library.images.poster, maxWidth: 800 }]
+        : []));
+      await downloadService.cacheArtwork(targets, artworkResolverFor(server.backend));
     },
 
-    /** Library of each download, from Jellyfin, for records that lack it (online only). */
+    /** Library of each download, from its server, for records that lack it (online only). */
     backfillLibraryIds(): Promise<void> {
       return once('libraryIds', async () => {
-        if (!this.isFullyOnline) return;
-        const jellyfinStore = useJellyfinStore();
-        if (!jellyfinStore.serverUrl || !jellyfinStore.accessToken) return;
-        const missing = this.downloads.filter((download) => !download.libraryId);
+        const server = this.activeServer();
+        if (!server) return;
+        const missing = server.downloads.filter((download) => !download.libraryId);
         if (!missing.length) return;
         for (const download of missing) {
           try {
-            const libraryId = await jellyfinStore.fetchLibraryIdOf(download.itemId);
+            const libraryId = await server.backend.catalog.libraryOf(download.itemId);
             if (libraryId) await offlineDatabase.patchDownload(download.itemId, { libraryId });
           } catch (error) {
             logger.warn('[OfflineStore] Could not find the library of', download.itemId, error);
@@ -383,15 +378,13 @@ export const useOfflineStore = defineStore('offline', {
      * so progress made on another device shows offline too (online only).
      */
     async refreshDownloadedUserData() {
-      if (!this.isFullyOnline || !this.downloads.length) return;
-      const jellyfinStore = useJellyfinStore();
-      if (!jellyfinStore.serverUrl || !jellyfinStore.accessToken) return;
+      const server = this.activeServer();
+      if (!server?.downloads.length) return;
       try {
-        const items = await jellyfinStore.fetchItemsByIds(this.downloads.map((download) => download.itemId));
-        const userData = new Map(items.map((item) => [item.Id, item.UserData]));
-        for (const download of this.downloads) {
-          const fresh = userData.get(download.itemId);
-          if (fresh) await offlineDatabase.patchDownload(download.itemId, { jellyfinItem: { ...download.jellyfinItem, UserData: fresh } });
+        const fresh = new Map((await server.backend.catalog.items(server.downloads.map((d) => d.itemId))).map((item) => [item.id, item.user]));
+        for (const download of server.downloads) {
+          const user = fresh.get(download.itemId);
+          if (user) await offlineDatabase.patchDownload(download.itemId, { item: { ...download.item, user } });
         }
         await this.loadDownloads();
       } catch (error) {
@@ -444,23 +437,14 @@ export const useOfflineStore = defineStore('offline', {
         logger.log('[OfflineStore] Skipping sync (already in progress or offline)');
         return;
       }
-
-      const jellyfinStore = useJellyfinStore();
-
-      if (!jellyfinStore.serverUrl || !jellyfinStore.accessToken) {
-        logger.error('[OfflineStore] Cannot sync: API not initialized');
-        return;
-      }
-
+      const session = useSessionStore();
+      if (!session.backend || !session.active) return;
+      const serverId = session.active.serverId;
+      // Progress of a non-downloaded item (streamed then cut off) belongs to the active server too.
+      const otherServer = new Set(this.downloads.filter((d) => d.serverId !== serverId).map((d) => d.itemId));
       this.syncInProgress = true;
-
       try {
-        const result = await syncService.syncWatchProgress(
-          jellyfinStore.serverUrl,
-          jellyfinStore.accessToken,
-          jellyfinStore.userId ?? '',
-        );
-
+        const result = await syncService.syncWatchProgress(session.backend, (itemId) => !otherServer.has(itemId));
         this.lastSyncTime = Date.now();
         logger.log(`[OfflineStore] Sync complete: ${result.synced} synced, ${result.kept} kept, ${result.failed} failed`);
         await this.refreshDownloadedUserData();

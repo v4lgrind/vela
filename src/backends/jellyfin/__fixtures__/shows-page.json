@@ -1,0 +1,249 @@
+{
+    "Items": [
+        {
+            "Id": "ser00008500000000000000000000000",
+            "Name": "Cold Signal",
+            "SortName": "Cold Signal",
+            "Type": "Series",
+            "ParentId": "lib00000200000000000000000000000",
+            "ProductionYear": 2023,
+            "Genres": [
+                "Drame",
+                "Mystère"
+            ],
+            "OfficialRating": "12",
+            "CommunityRating": 7.800000000000001,
+            "Overview": "Quand une cartographe découvre une île absente de toutes les cartes, elle entraîne son frère et une ancienne pilote dans une traversée qui va bouleverser ce qu’ils croyaient savoir de leur famille. Un récit lumineux sur la mémoire et les lieux qui nous gardent.",
+            "ImageTags": {
+                "Primary": "t",
+                "Logo": "t"
+            },
+            "BackdropImageTags": [
+                "b"
+            ],
+            "People": [
+                {
+                    "Id": "per00000400000000000000000000000",
+                    "Name": "Maren Holt",
+                    "Role": "Ines",
+                    "Type": "Director",
+                    "PrimaryImageTag": "t"
+                },
+                {
+                    "Id": "per00000500000000000000000000000",
+                    "Name": "Idris Kovač",
+                    "Role": "Capitaine Rook",
+                    "Type": "Actor",
+                    "PrimaryImageTag": "t"
+                },
+                {
+                    "Id": "per00000600000000000000000000000",
+                    "Name": "Léa Fontaine",
+                    "Role": "Maud",
+                    "Type": "Actor",
+                    "PrimaryImageTag": "t"
+                },
+                {
+                    "Id": "per00000700000000000000000000000",
+                    "Name": "Tomás Ribeiro",
+                    "Role": "Le passeur",
+                    "Type": "Actor",
+                    "PrimaryImageTag": "t"
+                },
+                {
+                    "Id": "per00000800000000000000000000000",
+                    "Name": "Ana Sörensen",
+                    "Role": "Hana",
+                    "Type": "Actor",
+                    "PrimaryImageTag": "t"
+                },
+                {
+                    "Id": "per00000900000000000000000000000",
+                    "Name": "Kenji Arata",
+                    "Role": "Oskar",
+                    "Type": "Actor",
+                    "PrimaryImageTag": "t"
+                },
+                {
+                    "Id": "per00001000000000000000000000000",
+                    "Name": "Yasmin Okafor",
+                    "Role": "La pilote",
+                    "Type": "Actor",
+                    "PrimaryImageTag": "t"
+                }
+            ],
+            "Status": "Continuing",
+            "ChildCount": 1,
+            "RunTimeTicks": 28800000000,
+            "UserData": {
+                "UnplayedItemCount": 5,
+                "Played": false
+            },
+            "DateCreated": "2026-11-20T20:44:47.850Z"
+        },
+        {
+            "Id": "ser00013200000000000000000000000",
+            "Name": "Deep Field",
+            "SortName": "Deep Field",
+            "Type": "Series",
+            "ParentId": "lib00000200000000000000000000000",
+            "ProductionYear": 2022,
+            "Genres": [
+                "Drame",
+                "Mystère"
+            ],
+            "OfficialRating": "12",
+            "CommunityRating": 8.200000000000001,
+            "Overview": "Quand une cartographe découvre une île absente de toutes les cartes, elle entraîne son frère et une ancienne pilote dans une traversée qui va bouleverser ce qu’ils croyaient savoir de leur famille. Un récit lumineux sur la mémoire et les lieux qui nous gardent.",
+            "ImageTags": {
+                "Primary": "t",
+                "Logo": "t"
+            },
+            "BackdropImageTags": [
+                "b"
+            ],
+            "People": [
+                {
+                    "Id": "per00000400000000000000000000000",
+                    "Name": "Maren Holt",
+                    "Role": "Ines",
+                    "Type": "Director",
+                    "PrimaryImageTag": "t"
+                },
+                {
+                    "Id": "per00000500000000000000000000000",
+                    "Name": "Idris Kovač",
+                    "Role": "Capitaine Rook",
+                    "Type": "Actor",
+                    "PrimaryImageTag": "t"
+                },
+                {
+                    "Id": "per00000600000000000000000000000",
+                    "Name": "Léa Fontaine",
+                    "Role": "Maud",
+                    "Type": "Actor",
+                    "PrimaryImageTag": "t"
+                },
+                {
+                    "Id": "per00000700000000000000000000000",
+                    "Name": "Tomás Ribeiro",
+                    "Role": "Le passeur",
+                    "Type": "Actor",
+                    "PrimaryImageTag": "t"
+                },
+                {
+                    "Id": "per00000800000000000000000000000",
+                    "Name": "Ana Sörensen",
+                    "Role": "Hana",
+                    "Type": "Actor",
+                    "PrimaryImageTag": "t"
+                },
+                {
+                    "Id": "per00000900000000000000000000000",
+                    "Name": "Kenji Arata",
+                    "Role": "Oskar",
+                    "Type": "Actor",
+                    "PrimaryImageTag": "t"
+                },
+                {
+                    "Id": "per00001000000000000000000000000",
+                    "Name": "Yasmin Okafor",
+                    "Role": "La pilote",
+                    "Type": "Actor",
+                    "PrimaryImageTag": "t"
+                }
+            ],
+            "Status": "Continuing",
+            "ChildCount": 2,
+            "RunTimeTicks": 28800000000,
+            "UserData": {
+                "UnplayedItemCount": 5,
+                "Played": false
+            },
+            "DateCreated": "2026-11-18T20:44:47.850Z"
+        },
+        {
+            "Id": "ser00003800000000000000000000000",
+            "Name": "Harbor Lights",
+            "SortName": "Harbor Lights",
+            "Type": "Series",
+            "ParentId": "lib00000200000000000000000000000",
+            "ProductionYear": 2021,
+            "Genres": [
+                "Drame",
+                "Mystère"
+            ],
+            "OfficialRating": "12",
+            "CommunityRating": 7.4,
+            "Overview": "Quand une cartographe découvre une île absente de toutes les cartes, elle entraîne son frère et une ancienne pilote dans une traversée qui va bouleverser ce qu’ils croyaient savoir de leur famille. Un récit lumineux sur la mémoire et les lieux qui nous gardent.",
+            "ImageTags": {
+                "Primary": "t",
+                "Logo": "t"
+            },
+            "BackdropImageTags": [
+                "b"
+            ],
+            "People": [
+                {
+                    "Id": "per00000400000000000000000000000",
+                    "Name": "Maren Holt",
+                    "Role": "Ines",
+                    "Type": "Director",
+                    "PrimaryImageTag": "t"
+                },
+                {
+                    "Id": "per00000500000000000000000000000",
+                    "Name": "Idris Kovač",
+                    "Role": "Capitaine Rook",
+                    "Type": "Actor",
+                    "PrimaryImageTag": "t"
+                },
+                {
+                    "Id": "per00000600000000000000000000000",
+                    "Name": "Léa Fontaine",
+                    "Role": "Maud",
+                    "Type": "Actor",
+                    "PrimaryImageTag": "t"
+                },
+                {
+                    "Id": "per00000700000000000000000000000",
+                    "Name": "Tomás Ribeiro",
+                    "Role": "Le passeur",
+                    "Type": "Actor",
+                    "PrimaryImageTag": "t"
+                },
+                {
+                    "Id": "per00000800000000000000000000000",
+                    "Name": "Ana Sörensen",
+                    "Role": "Hana",
+                    "Type": "Actor",
+                    "PrimaryImageTag": "t"
+                },
+                {
+                    "Id": "per00000900000000000000000000000",
+                    "Name": "Kenji Arata",
+                    "Role": "Oskar",
+                    "Type": "Actor",
+                    "PrimaryImageTag": "t"
+                },
+                {
+                    "Id": "per00001000000000000000000000000",
+                    "Name": "Yasmin Okafor",
+                    "Role": "La pilote",
+                    "Type": "Actor",
+                    "PrimaryImageTag": "t"
+                }
+            ],
+            "Status": "Continuing",
+            "ChildCount": 3,
+            "RunTimeTicks": 28800000000,
+            "UserData": {
+                "UnplayedItemCount": 5,
+                "Played": false
+            },
+            "DateCreated": "2026-11-22T20:44:47.850Z"
+        }
+    ],
+    "TotalRecordCount": 6,
+    "StartIndex": 0
+}

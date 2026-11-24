@@ -11,33 +11,16 @@ import java.net.URL
 import java.net.URLEncoder
 
 /**
- * The music library as seen from Android Auto: a small Jellyfin client that
- * builds the browse tree and playable queues natively, so it works while the
- * app (and its WebView) isn't running. The WebView pushes the server and
- * credentials through [NativeAudioPlugin.setLibraryConfig].
- *
- * Media ids: `root`, `shuffle:<libraryId>`, `latest`, `albums`, `artists`, `playlists`,
- * `album:<id>`, `artist:<id>`, `playlist:<id>`, and for browse tracks
- * `track:<trackId>:<parent>` so a pick can queue the rest of its parent.
- * Queued items use the plain track id, like the queues the app builds.
+ * Jellyfin's music library for Android Auto ([MusicLibrary]): a small Jellyfin
+ * client that builds the browse tree and playable queues natively.
  */
-class JellyfinLibrary(private val context: Context) {
+class JellyfinLibrary(private val context: Context) : MusicLibrary {
 
     companion object {
-        const val ROOT = "root"
-        /** `shuffle:<libraryId>`: random picks from a music library; MusicService tops the queue up. */
-        const val SHUFFLE_PREFIX = "shuffle:"
-        private const val PREFS = "music_library"
+        private const val ROOT = MusicLibrary.ROOT
+        private const val SHUFFLE_PREFIX = MusicLibrary.SHUFFLE_PREFIX
+        private const val PREFS = MusicLibrary.PREFS
         private const val PAGE = 300
-
-        fun saveConfig(context: Context, serverUrl: String, token: String, userId: String, maxBitrate: Long) {
-            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-                .putString("serverUrl", serverUrl.trimEnd('/'))
-                .putString("token", token)
-                .putString("userId", userId)
-                .putLong("maxBitrate", maxBitrate)
-                .apply()
-        }
     }
 
     private val prefs get() = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -45,14 +28,14 @@ class JellyfinLibrary(private val context: Context) {
     private val token get() = prefs.getString("token", "") ?: ""
     private val userId get() = prefs.getString("userId", "") ?: ""
 
-    val isConfigured get() = server.isNotEmpty() && token.isNotEmpty() && userId.isNotEmpty()
+    override val isConfigured get() = server.isNotEmpty() && token.isNotEmpty() && userId.isNotEmpty()
 
     // --- Browse tree ---
 
-    fun root(): MediaItem = folder(ROOT, "Vela")
+    override fun root(): MediaItem = folder(ROOT, "Vela")
 
     /** Blocking (network). Children of a browsable [parentId]. */
-    fun children(parentId: String): List<MediaItem> = when {
+    override fun children(parentId: String): List<MediaItem> = when {
         // Audiobooks often live in a "music" library too: one shuffle entry per library.
         parentId == ROOT -> musicLibraries().map(::shuffleItem) + listOf(
             folder("latest", context.getString(R.string.auto_latest)),
@@ -73,7 +56,7 @@ class JellyfinLibrary(private val context: Context) {
     }
 
     /** Blocking (network). Artists, albums and songs matching [query]. */
-    fun search(query: String): List<MediaItem> {
+    override fun search(query: String): List<MediaItem> {
         if (query.isBlank()) return emptyList()
         return items("SearchTerm" to query, "IncludeItemTypes" to "MusicArtist,MusicAlbum,Audio", "Limit" to "60")
             .mapNotNull {
@@ -93,7 +76,7 @@ class JellyfinLibrary(private val context: Context) {
      * index: a browse track plays its whole album/playlist from that track, an
      * album or playlist plays from the top, a voice query plays its matches.
      */
-    fun resolve(items: List<MediaItem>): Pair<List<MediaItem>, Int>? {
+    override fun resolve(items: List<MediaItem>): Pair<List<MediaItem>, Int>? {
         val first = items.firstOrNull() ?: return null
         first.requestMetadata.searchQuery?.let { query ->
             val songs = items("SearchTerm" to query, "IncludeItemTypes" to "Audio", "Limit" to "50")
@@ -119,7 +102,7 @@ class JellyfinLibrary(private val context: Context) {
     }
 
     /** Blocking (network). Random songs from a music library. */
-    fun randomTracks(libraryId: String): List<MediaItem> =
+    override fun randomTracks(libraryId: String): List<MediaItem> =
         items("ParentId" to libraryId, "IncludeItemTypes" to "Audio", "SortBy" to "Random").map(::queueItem)
 
     // --- Jellyfin queries ---
@@ -293,8 +276,7 @@ class JellyfinLibrary(private val context: Context) {
         }
     }
 
-    /** For [ArtworkProvider]: the image URL and auth header of [itemId]. */
-    fun imageRequest(itemId: String): Pair<String, String>? =
+    override fun imageRequest(itemId: String): Pair<String, Map<String, String>>? =
         if (!isConfigured) null
-        else "$server/Items/$itemId/Images/Primary?maxWidth=400&quality=90" to "MediaBrowser Token=\"$token\""
+        else "$server/Items/$itemId/Images/Primary?maxWidth=400&quality=90" to mapOf("Authorization" to "MediaBrowser Token=\"$token\"")
 }

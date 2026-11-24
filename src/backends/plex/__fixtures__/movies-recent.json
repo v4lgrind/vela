@@ -1,0 +1,360 @@
+{
+  "MediaContainer": {
+    "size": 3,
+    "totalSize": 100,
+    "offset": 0,
+    "allowSync": true,
+    "art": "/:/resources/movie-fanart.jpg",
+    "identifier": "com.plexapp.plugins.library",
+    "librarySectionID": 1,
+    "librarySectionTitle": "librarySectionTitle 1",
+    "librarySectionUUID": "7adb1ea63bd5427fb625687e",
+    "mediaTagPrefix": "/system/bundle/media/flags/",
+    "mediaTagVersion": 1792751798,
+    "thumb": "/:/resources/movie.png",
+    "title1": "title1 1",
+    "title2": "title2 4",
+    "viewGroup": "movie",
+    "viewMode": 65592,
+    "Metadata": [
+      {
+        "ratingKey": "79416",
+        "key": "/library/metadata/79416",
+        "guid": "plex://item/c2a551375711",
+        "slug": "slug 11",
+        "studio": "studio 12",
+        "type": "movie",
+        "title": "title 143",
+        "contentRating": "fr/Tous publics",
+        "summary": "summary 20",
+        "audienceRating": 7.5,
+        "year": 2024,
+        "tagline": "tagline 11",
+        "thumb": "/library/metadata/79416/thumb/1795375751",
+        "art": "/library/metadata/79416/art/1795375751",
+        "duration": 5710528,
+        "originallyAvailableAt": "2024-11-20",
+        "addedAt": 1795375751,
+        "updatedAt": 1795375751,
+        "audienceRatingImage": "imdb://image.rating",
+        "Media": [
+          {
+            "id": 117109,
+            "duration": 5710528,
+            "bitrate": 3374,
+            "width": 1920,
+            "height": 1080,
+            "aspectRatio": 1.78,
+            "audioChannels": 2,
+            "audioCodec": "aac",
+            "videoCodec": "h264",
+            "videoResolution": "1080",
+            "container": "mkv",
+            "videoFrameRate": "PAL",
+            "audioProfile": "lc",
+            "videoProfile": "high",
+            "hasVoiceActivity": false,
+            "Part": [
+              {
+                "id": 122268,
+                "key": "/library/parts/122268/1795375618/file.mkv",
+                "duration": 5710528,
+                "file": "/media/item-21.mkv",
+                "size": 2408697587,
+                "audioProfile": "lc",
+                "container": "mkv",
+                "videoProfile": "high"
+              }
+            ]
+          }
+        ],
+        "Image": [
+          {
+            "alt": "alt 20",
+            "type": "coverPoster",
+            "url": "/library/metadata/79416/thumb/1795375751"
+          },
+          {
+            "alt": "alt 20",
+            "type": "background",
+            "url": "/library/metadata/79416/art/1795375751"
+          }
+        ],
+        "UltraBlurColors": {
+          "topLeft": "4a1f15",
+          "topRight": "110209",
+          "bottomRight": "a13028",
+          "bottomLeft": "31110e"
+        },
+        "Genre": [
+          {
+            "tag": "Drame"
+          },
+          {
+            "tag": "Téléfilm"
+          }
+        ],
+        "Country": [
+          {
+            "tag": "France"
+          }
+        ],
+        "Director": [
+          {
+            "tag": "tag 515"
+          }
+        ],
+        "Writer": [
+          {
+            "tag": "tag 516"
+          },
+          {
+            "tag": "tag 515"
+          }
+        ],
+        "Role": [
+          {
+            "tag": "tag 517"
+          },
+          {
+            "tag": "tag 518"
+          },
+          {
+            "tag": "tag 519"
+          }
+        ]
+      },
+      {
+        "ratingKey": "79399",
+        "key": "/library/metadata/79399",
+        "guid": "plex://item/3b237c6a8bac",
+        "slug": "slug 12",
+        "studio": "studio 13",
+        "type": "movie",
+        "title": "title 144",
+        "contentRating": "fr/12",
+        "contentRatingAge": 17,
+        "summary": "summary 21",
+        "rating": 9.1,
+        "audienceRating": 6.4,
+        "year": 2026,
+        "tagline": "tagline 12",
+        "thumb": "/library/metadata/79399/thumb/1795074027",
+        "art": "/library/metadata/79399/art/1795074027",
+        "duration": 5421856,
+        "originallyAvailableAt": "2026-07-29",
+        "addedAt": 1795074026,
+        "updatedAt": 1795074027,
+        "audienceRatingImage": "rottentomatoes://image.rating.upright",
+        "primaryExtraKey": "/library/metadata/79400",
+        "ratingImage": "rottentomatoes://image.rating.ripe",
+        "Media": [
+          {
+            "id": 117073,
+            "duration": 5421856,
+            "bitrate": 10791,
+            "width": 1920,
+            "height": 1040,
+            "aspectRatio": 1.85,
+            "audioChannels": 6,
+            "audioCodec": "eac3",
+            "videoCodec": "h264",
+            "videoResolution": "1080",
+            "container": "mkv",
+            "videoFrameRate": "24p",
+            "videoProfile": "high",
+            "hasVoiceActivity": false,
+            "Part": [
+              {
+                "id": 122232,
+                "key": "/library/parts/122232/1795073902/file.mkv",
+                "duration": 5421856,
+                "file": "/media/item-22.mkv",
+                "size": 7315557935,
+                "container": "mkv",
+                "videoProfile": "high"
+              }
+            ]
+          }
+        ],
+        "Image": [
+          {
+            "alt": "alt 21",
+            "type": "coverPoster",
+            "url": "/library/metadata/79399/thumb/1795074027"
+          },
+          {
+            "alt": "alt 21",
+            "type": "background",
+            "url": "/library/metadata/79399/art/1795074027"
+          },
+          {
+            "alt": "alt 21",
+            "type": "backgroundSquare",
+            "url": "/library/metadata/79399/squareArt/1795074027"
+          }
+        ],
+        "UltraBlurColors": {
+          "topLeft": "55003b",
+          "topRight": "16193d",
+          "bottomRight": "451854",
+          "bottomLeft": "7a0553"
+        },
+        "Genre": [
+          {
+            "tag": "Comédie"
+          },
+          {
+            "tag": "Romance"
+          }
+        ],
+        "Country": [
+          {
+            "tag": "United States of America"
+          }
+        ],
+        "Director": [
+          {
+            "tag": "tag 520"
+          }
+        ],
+        "Writer": [
+          {
+            "tag": "tag 521"
+          },
+          {
+            "tag": "tag 520"
+          }
+        ],
+        "Role": [
+          {
+            "tag": "tag 522"
+          },
+          {
+            "tag": "tag 523"
+          },
+          {
+            "tag": "tag 524"
+          }
+        ]
+      },
+      {
+        "ratingKey": "79372",
+        "key": "/library/metadata/79372",
+        "guid": "plex://item/5fc161a2ceee",
+        "slug": "slug 13",
+        "studio": "studio 14",
+        "type": "movie",
+        "title": "title 145",
+        "contentRating": "fr/12",
+        "contentRatingAge": 13,
+        "summary": "summary 22",
+        "rating": 4.2,
+        "audienceRating": 7.8,
+        "year": 2026,
+        "tagline": "tagline 13",
+        "thumb": "/library/metadata/79372/thumb/1795157506",
+        "art": "/library/metadata/79372/art/1795157506",
+        "duration": 7157478,
+        "originallyAvailableAt": "2026-10-14",
+        "addedAt": 1794477248,
+        "updatedAt": 1795157506,
+        "audienceRatingImage": "rottentomatoes://image.rating.upright",
+        "primaryExtraKey": "/library/metadata/79373",
+        "ratingImage": "rottentomatoes://image.rating.rotten",
+        "Media": [
+          {
+            "id": 116963,
+            "duration": 7157478,
+            "bitrate": 5506,
+            "width": 1920,
+            "height": 1012,
+            "aspectRatio": 1.85,
+            "audioChannels": 2,
+            "audioCodec": "ac3",
+            "videoCodec": "h264",
+            "videoResolution": "1080",
+            "container": "mkv",
+            "videoFrameRate": "24p",
+            "videoProfile": "high",
+            "hasVoiceActivity": false,
+            "Part": [
+              {
+                "id": 122122,
+                "key": "/library/parts/122122/1794477206/file.mkv",
+                "duration": 7157478,
+                "file": "/media/item-23.mkv",
+                "size": 4927340541,
+                "container": "mkv",
+                "videoProfile": "high"
+              }
+            ]
+          }
+        ],
+        "Image": [
+          {
+            "alt": "alt 22",
+            "type": "coverPoster",
+            "url": "/library/metadata/79372/thumb/1795157506"
+          },
+          {
+            "alt": "alt 22",
+            "type": "background",
+            "url": "/library/metadata/79372/art/1795157506"
+          },
+          {
+            "alt": "alt 22",
+            "type": "backgroundSquare",
+            "url": "/library/metadata/79372/squareArt/1795157506"
+          }
+        ],
+        "UltraBlurColors": {
+          "topLeft": "5c0303",
+          "topRight": "a61f0f",
+          "bottomRight": "5d130c",
+          "bottomLeft": "aa1709"
+        },
+        "Genre": [
+          {
+            "tag": "Action"
+          },
+          {
+            "tag": "Fantastique"
+          }
+        ],
+        "Country": [
+          {
+            "tag": "Japan"
+          },
+          {
+            "tag": "United States of America"
+          }
+        ],
+        "Director": [
+          {
+            "tag": "tag 525"
+          }
+        ],
+        "Writer": [
+          {
+            "tag": "tag 526"
+          },
+          {
+            "tag": "tag 527"
+          }
+        ],
+        "Role": [
+          {
+            "tag": "tag 430"
+          },
+          {
+            "tag": "tag 528"
+          },
+          {
+            "tag": "tag 529"
+          }
+        ]
+      }
+    ]
+  }
+}

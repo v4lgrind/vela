@@ -4,12 +4,11 @@ import { useRouter } from 'vue-router';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { usePlatform } from '@/composables/usePlatform';
 import { usePreferencesStore } from '@/store/preferences-store';
-import { offlineDatabase } from '@/services/offlineDatabase';
+import { offlineDatabase, type DownloadedMedia } from '@/services/offlineDatabase';
 import { NativeVideo } from '@/plugins/NativeVideoPlugin';
 import { debugLog } from '@/utils/debugLog';
 import { logger } from '@/utils/logger';
 import { languageMatches } from '@/utils/language';
-import type { IntroSegment } from '@/types/jellyfin';
 import type { PlayerSession } from './usePlayerSession';
 import type { SkipIntro } from './useSkipIntro';
 
@@ -17,7 +16,7 @@ import type { SkipIntro } from './useSkipIntro';
  * Offline playback path: plays a downloaded file with zero network calls.
  * Native uses ExoPlayer on the raw file:// URI; web reads the file from the
  * Capacitor Filesystem into a blob URL. Watch progress is saved locally to
- * IndexedDB and synced back to Jellyfin later by the sync service.
+ * IndexedDB and synced back to the server later by the sync service.
  */
 export function useOfflinePlayer(
     session: PlayerSession,
@@ -54,7 +53,7 @@ export function useOfflinePlayer(
         });
     }
 
-    async function initOfflinePlayer(cachedDownload: any, resumeSeconds?: number, itemTitle?: string, skipAudioGroupIndex?: number) {
+    async function initOfflinePlayer(cachedDownload: DownloadedMedia, resumeSeconds?: number, itemTitle?: string, skipAudioGroupIndex?: number) {
         isOfflinePlayback.value = true;
         isLoading.value = true;
         try {
@@ -102,11 +101,9 @@ export function useOfflinePlayer(
                 let lastGoodPositionSec = resumeSeconds || 0;
                 let restoringSubtitle = false;
 
-                // Fallback duration from cached Jellyfin metadata — transcoded MKV containers
+                // Fallback duration from the stored item — transcoded MKV containers
                 // may not have accurate duration headers, causing ExoPlayer to report 0.
-                const cachedDurationMs = cachedDownload.jellyfinItem?.RunTimeTicks
-                  ? Math.floor(cachedDownload.jellyfinItem.RunTimeTicks / 10_000)
-                  : 0;
+                const cachedDurationMs = Math.floor(cachedDownload.item.durationMs ?? 0);
 
                 await NativeVideo.addListener('progress', (data) => {
                     currentTime.value = data.positionMs / 1000;
@@ -153,18 +150,18 @@ export function useOfflinePlayer(
                         const nativeAudio: any[] = parsed.audioTracks ?? [];
                         const nativeSubtitle: any[] = parsed.subtitleTracks ?? [];
 
-                        // Enrich ExoPlayer track info with cached Jellyfin metadata —
+                        // Enrich ExoPlayer track info with the stored item's streams —
                         // transcoded MKV containers may lack proper language tags.
-                        const jellyfinStreams: any[] = cachedDownload.jellyfinItem?.MediaStreams || [];
-                        const jfAudioStreams = jellyfinStreams.filter((s: any) => s.Type === 'Audio');
-                        const jfSubStreams = jellyfinStreams.filter((s: any) => s.Type === 'Subtitle');
+                        const storedVersion = 'versions' in cachedDownload.item ? cachedDownload.item.versions[0] : undefined;
+                        const jfAudioStreams = storedVersion?.audio ?? [];
+                        const jfSubStreams = storedVersion?.subtitles ?? [];
 
                         // Populate audio list from embedded tracks (always DirectPlay offline)
                         if (nativeAudio.length > 0) {
                             audioList.value = nativeAudio.map((t: any, i: number) => {
                                 const jf = jfAudioStreams[i];
-                                const lang = t.language && t.language !== 'und' ? t.language : (jf?.Language || 'und');
-                                const label = jf?.DisplayTitle
+                                const lang = t.language && t.language !== 'und' ? t.language : (jf?.language || 'und');
+                                const label = jf?.title
                                   || `${lang.toUpperCase()} ${t.channelCount > 0 ? `(${t.channelCount}ch)` : ''} ${t.codec ? `- ${t.codec.toUpperCase()}` : ''}`.trim();
                                 return { index: t.groupIndex, language: lang, label };
                             });
@@ -190,8 +187,8 @@ export function useOfflinePlayer(
                         // Enrich subtitle labels with Jellyfin metadata
                         const enrichedSubs = nativeSubtitle.map((t: any, i: number) => {
                             const jf = jfSubStreams[i];
-                            const lang = t.language && t.language !== 'und' ? t.language : (jf?.Language || 'und');
-                            const label = jf?.DisplayTitle || t.label || lang;
+                            const lang = t.language && t.language !== 'und' ? t.language : (jf?.language || 'und');
+                            const label = jf?.title || t.label || lang;
                             return { ...t, language: lang, label };
                         });
 
@@ -278,7 +275,7 @@ export function useOfflinePlayer(
 
                 await NativeVideo.start({
                     url: playUrl,
-                    authHeader: '',
+                    headers: {},
                     startPositionMs,
                     title: itemTitle || '',
                     playMethod: 'DirectPlay',
@@ -290,20 +287,16 @@ export function useOfflinePlayer(
                     srtFilePath: offlineSrtPath,
                 });
 
-                // Apply stored intro/outro segments so skip-intro works offline
-                if (cachedDownload.introSegments?.length) {
-                    const intro = cachedDownload.introSegments.find((s: IntroSegment) => s.Type === 'Intro');
-                    if (intro) {
-                        NativeVideo.setIntroTimestamps({
-                            introStartMs: Math.floor(intro.StartTicks / 10_000),
-                            introEndMs: Math.floor(intro.EndTicks / 10_000),
-                        }).catch(() => {});
-                    }
-                    const outro = cachedDownload.introSegments.find((s: IntroSegment) => s.Type === 'Outro');
-                    if (outro) {
-                        skipIntro.creditsStartMs.value = Math.floor(outro.StartTicks / 10_000);
-                    }
+                // Apply stored intro/credits markers so skip-intro works offline
+                const intro = cachedDownload.markers.find((m) => m.kind === 'intro');
+                if (intro) {
+                    NativeVideo.setIntroTimestamps({
+                        introStartMs: Math.floor(intro.startMs),
+                        introEndMs: Math.floor(intro.endMs),
+                    }).catch(() => {});
                 }
+                const credits = cachedDownload.markers.find((m) => m.kind === 'credits');
+                if (credits) skipIntro.creditsStartMs.value = Math.floor(credits.startMs);
                 // isLoading cleared by tracksReady listener above
             } else {
                 const video = videoEl.value;

@@ -43,6 +43,16 @@ export function formatTicksDuration(ticks?: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
+/** "m:ss" for a duration in ms (domain unit). */
+export function formatMsDuration(ms?: number): string {
+  return ms ? formatTicksDuration(ms * 10_000) : '';
+}
+
+/** Human duration ("1 h 32 min") for ms (domain unit). */
+export function formatMsHuman(ms?: number): string | null {
+  return ms ? formatDuration(Math.floor(ms / 1000)) : null;
+}
+
 export function formatTicksHuman(ticks?: number): string | null {
   if (!ticks) return null;
   return formatDuration(Math.floor(ticks / 10_000_000));

@@ -1,0 +1,2530 @@
+{
+  "MediaContainer": {
+    "size": 8,
+    "allowSync": true,
+    "identifier": "com.plexapp.plugins.library",
+    "Metadata": [
+      {
+        "ratingKey": "79367",
+        "key": "/library/metadata/79367",
+        "parentRatingKey": "79366",
+        "grandparentRatingKey": "53756",
+        "guid": "plex://item/80de8f8852f4",
+        "parentGuid": "plex://item/410ab150ecf1",
+        "grandparentGuid": "plex://item/51edb5cd9e35",
+        "grandparentSlug": "grandparentSlug 5",
+        "type": "episode",
+        "title": "title 19",
+        "titleSort": "titleSort 4",
+        "grandparentKey": "/library/metadata/53756",
+        "parentKey": "/library/metadata/79366",
+        "librarySectionTitle": "librarySectionTitle 3",
+        "librarySectionID": 2,
+        "librarySectionKey": "/library/sections/2",
+        "grandparentTitle": "grandparentTitle 5",
+        "parentTitle": "parentTitle 3",
+        "originalTitle": "originalTitle 6",
+        "contentRating": "fr/12",
+        "summary": "summary 8",
+        "index": 1,
+        "parentIndex": 3,
+        "audienceRating": 6.2,
+        "lastViewedAt": 1794390611,
+        "year": 2026,
+        "thumb": "/library/metadata/79367/thumb/1795320806",
+        "art": "/library/metadata/53756/art/1795320834",
+        "parentThumb": "/library/metadata/79366/thumb/1795257889",
+        "grandparentThumb": "/library/metadata/53756/thumb/1795320834",
+        "grandparentArt": "/library/metadata/53756/art/1795320834",
+        "grandparentTheme": "/library/metadata/53756/theme/1795320834",
+        "duration": 4413504,
+        "originallyAvailableAt": "2026-11-11",
+        "addedAt": 1794390611,
+        "updatedAt": 1795320806,
+        "audienceRatingImage": "themoviedb://image.rating",
+        "Media": [
+          {
+            "id": 116958,
+            "duration": 4413504,
+            "bitrate": 9261,
+            "width": 1920,
+            "height": 800,
+            "aspectRatio": 2.35,
+            "audioChannels": 6,
+            "audioCodec": "eac3",
+            "videoCodec": "h264",
+            "videoResolution": "1080",
+            "container": "mkv",
+            "videoFrameRate": "24p",
+            "videoProfile": "high",
+            "hasVoiceActivity": false,
+            "Part": [
+              {
+                "id": 122117,
+                "key": "/library/parts/122117/1794385315/file.mkv",
+                "duration": 4413504,
+                "file": "/media/item-8.mkv",
+                "size": 5110542801,
+                "container": "mkv",
+                "videoProfile": "high",
+                "Stream": [
+                  {
+                    "id": 416317,
+                    "streamType": 1,
+                    "default": true,
+                    "codec": "h264",
+                    "index": 0,
+                    "bitrate": 7405,
+                    "language": "English",
+                    "languageTag": "en",
+                    "languageCode": "eng",
+                    "bitDepth": 8,
+                    "chromaLocation": "left",
+                    "chromaSubsampling": "4:2:0",
+                    "codedHeight": 800,
+                    "codedWidth": 1920,
+                    "colorPrimaries": "bt709",
+                    "colorRange": "tv",
+                    "colorSpace": "bt709",
+                    "colorTrc": "bt709",
+                    "frameRate": 24.0,
+                    "hasScalingMatrix": false,
+                    "height": 800,
+                    "level": 40,
+                    "original": true,
+                    "profile": "high",
+                    "refFrames": 4,
+                    "scanType": "progressive",
+                    "width": 1920,
+                    "displayTitle": "1080p",
+                    "extendedDisplayTitle": "1080p"
+                  },
+                  {
+                    "id": 416318,
+                    "streamType": 2,
+                    "canNormalizeLoudness": false,
+                    "default": true,
+                    "codec": "eac3",
+                    "index": 1,
+                    "channels": 6,
+                    "bitrate": 640,
+                    "language": "Français",
+                    "languageTag": "fr-FR",
+                    "languageCode": "fra",
+                    "audioChannelLayout": "5.1(side)",
+                    "dub": true,
+                    "samplingRate": 48000,
+                    "title": "title 4",
+                    "displayTitle": "Français (EAC3 5.1)",
+                    "extendedDisplayTitle": "Français (EAC3 5.1)"
+                  },
+                  {
+                    "id": 416319,
+                    "streamType": 2,
+                    "canNormalizeLoudness": false,
+                    "codec": "eac3",
+                    "index": 2,
+                    "channels": 6,
+                    "bitrate": 640,
+                    "language": "Français (Canada)",
+                    "languageTag": "fr-CA",
+                    "languageCode": "fra",
+                    "audioChannelLayout": "5.1(side)",
+                    "dub": true,
+                    "samplingRate": 48000,
+                    "title": "title 20",
+                    "displayTitle": "Français (Canada) (EAC3 5.1)",
+                    "extendedDisplayTitle": "Français (Canada) (EAC3 5.1)"
+                  },
+                  {
+                    "id": 416320,
+                    "streamType": 2,
+                    "canNormalizeLoudness": false,
+                    "selected": true,
+                    "codec": "eac3",
+                    "index": 3,
+                    "channels": 6,
+                    "bitrate": 576,
+                    "language": "English",
+                    "languageTag": "en-US",
+                    "languageCode": "eng",
+                    "audioChannelLayout": "5.1(side)",
+                    "original": true,
+                    "profile": "dolby digital plus + dolby atmos",
+                    "samplingRate": 48000,
+                    "title": "title 21",
+                    "displayTitle": "English (EAC3 5.1 + Atmos)",
+                    "extendedDisplayTitle": "English (EAC3 5.1 + Atmos)"
+                  },
+                  {
+                    "id": 416321,
+                    "streamType": 3,
+                    "canAutoSync": false,
+                    "default": true,
+                    "codec": "srt",
+                    "index": 4,
+                    "bitrate": 0,
+                    "language": "Français",
+                    "languageTag": "fr-FR",
+                    "languageCode": "fra",
+                    "dub": true,
+                    "title": "title 4",
+                    "displayTitle": "Français",
+                    "extendedDisplayTitle": "Français"
+                  },
+                  {
+                    "id": 416322,
+                    "streamType": 3,
+                    "canAutoSync": false,
+                    "forced": true,
+                    "codec": "srt",
+                    "index": 5,
+                    "language": "Français",
+                    "languageTag": "fr-FR",
+                    "languageCode": "fra",
+                    "dub": true,
+                    "title": "title 22",
+                    "displayTitle": "Français Forced",
+                    "extendedDisplayTitle": "Français Forced"
+                  },
+                  {
+                    "id": 416323,
+                    "streamType": 3,
+                    "canAutoSync": false,
+                    "codec": "srt",
+                    "index": 6,
+                    "bitrate": 0,
+                    "language": "Français (Canada)",
+                    "languageTag": "fr-CA",
+                    "languageCode": "fra",
+                    "dub": true,
+                    "title": "title 20",
+                    "displayTitle": "Français (Canada)",
+                    "extendedDisplayTitle": "Français (Canada)"
+                  },
+                  {
+                    "id": 416324,
+                    "streamType": 3,
+                    "canAutoSync": false,
+                    "forced": true,
+                    "codec": "srt",
+                    "index": 7,
+                    "language": "Français (Canada)",
+                    "languageTag": "fr-CA",
+                    "languageCode": "fra",
+                    "dub": true,
+                    "title": "title 23",
+                    "displayTitle": "Français (Canada) Forced",
+                    "extendedDisplayTitle": "Français (Canada) Forced"
+                  },
+                  {
+                    "id": 416325,
+                    "streamType": 3,
+                    "canAutoSync": false,
+                    "selected": true,
+                    "codec": "srt",
+                    "index": 8,
+                    "bitrate": 0,
+                    "language": "English",
+                    "languageTag": "en-US",
+                    "languageCode": "eng",
+                    "dub": true,
+                    "hearingImpaired": true,
+                    "title": "title 24",
+                    "displayTitle": "English SDH",
+                    "extendedDisplayTitle": "English SDH"
+                  },
+                  {
+                    "id": 416326,
+                    "streamType": 3,
+                    "canAutoSync": false,
+                    "forced": true,
+                    "codec": "srt",
+                    "index": 9,
+                    "language": "English",
+                    "languageTag": "en-US",
+                    "languageCode": "eng",
+                    "dub": true,
+                    "title": "title 25",
+                    "displayTitle": "English Forced",
+                    "extendedDisplayTitle": "English Forced"
+                  },
+                  {
+                    "id": 416327,
+                    "streamType": 3,
+                    "canAutoSync": false,
+                    "codec": "srt",
+                    "index": 10,
+                    "bitrate": 0,
+                    "language": "English",
+                    "languageTag": "en-US",
+                    "languageCode": "eng",
+                    "dub": true,
+                    "title": "title 21",
+                    "displayTitle": "English",
+                    "extendedDisplayTitle": "English"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "Image": [
+          {
+            "alt": "alt 7",
+            "type": "coverPoster",
+            "url": "/library/metadata/53756/thumb/1795320834"
+          },
+          {
+            "alt": "alt 7",
+            "type": "snapshot",
+            "url": "/library/metadata/79367/thumb/1795320806"
+          },
+          {
+            "alt": "alt 7",
+            "type": "background",
+            "url": "/library/metadata/53756/art/1795320834"
+          },
+          {
+            "alt": "alt 7",
+            "type": "clearLogo",
+            "url": "/library/metadata/53756/clearLogo/1795320834"
+          },
+          {
+            "alt": "alt 7",
+            "type": "backgroundSquare",
+            "url": "/library/metadata/53756/squareArt/1795320834"
+          }
+        ],
+        "UltraBlurColors": {
+          "topLeft": "580e01",
+          "topRight": "491c0c",
+          "bottomRight": "59250f",
+          "bottomLeft": "813416"
+        },
+        "Guid": [
+          {
+            "id": "plex://item/dde8f23fd441"
+          },
+          {
+            "id": "plex://item/c23f713a4c11"
+          },
+          {
+            "id": "plex://item/110bcd4a88b2"
+          }
+        ],
+        "Rating": [
+          {
+            "image": "imdb://image.rating",
+            "value": 7.2,
+            "type": "audience"
+          },
+          {
+            "image": "themoviedb://image.rating",
+            "value": 6.2,
+            "type": "audience"
+          }
+        ],
+        "Director": [
+          {
+            "id": 82444,
+            "filter": "director=82444",
+            "tag": "tag 179",
+            "tagKey": "5d776890431c830024c0f3a6",
+            "thumb": "https://example.invalid/image.jpg"
+          }
+        ],
+        "Writer": [
+          {
+            "id": 65137,
+            "filter": "writer=65137",
+            "tag": "tag 180",
+            "tagKey": "5dcfc217d2e47f001fb3be6d",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 65138,
+            "filter": "writer=65138",
+            "tag": "tag 181",
+            "tagKey": "5d776eebfb0d55001f5d2e9a",
+            "thumb": "https://example.invalid/image.jpg"
+          }
+        ],
+        "Role": [
+          {
+            "id": 78831,
+            "filter": "actor=78831",
+            "tag": "tag 182",
+            "tagKey": "5d77704a35102a0020ed6494",
+            "role": "role 129",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 78823,
+            "filter": "actor=78823",
+            "tag": "tag 183",
+            "tagKey": "5d77689d07c4a5001e67a565",
+            "role": "role 130",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 56371,
+            "filter": "actor=56371",
+            "tag": "tag 184",
+            "tagKey": "5d7768c796b655001fdc17e1",
+            "role": "role 131",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 78834,
+            "filter": "actor=78834",
+            "tag": "tag 185",
+            "tagKey": "5d776a7cfb0d55001f54769a",
+            "role": "role 132",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 133232,
+            "filter": "actor=133232",
+            "tag": "tag 186",
+            "tagKey": "5d777038fb0d55001f5eb223",
+            "role": "role 133",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 78822,
+            "filter": "actor=78822",
+            "tag": "tag 187",
+            "tagKey": "5f4065d0cae2c60042f8a10d",
+            "role": "role 134",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 143493,
+            "filter": "actor=143493",
+            "tag": "tag 188",
+            "tagKey": "5d77698d594b2b001e6a3b84",
+            "role": "role 135",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 78824,
+            "filter": "actor=78824",
+            "tag": "tag 189",
+            "tagKey": "5e23e675ca12e4003f90ae93",
+            "role": "role 136",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 78836,
+            "filter": "actor=78836",
+            "tag": "tag 190",
+            "tagKey": "5d77696dfb0d55001f52601d",
+            "role": "role 137",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 4249,
+            "filter": "actor=4249",
+            "tag": "tag 191",
+            "tagKey": "5d7768334de0ee001fccb11b",
+            "role": "role 138",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 13005,
+            "filter": "actor=13005",
+            "tag": "tag 192",
+            "tagKey": "5d77682e8a7581001f12ca7c",
+            "role": "role 139",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 78845,
+            "filter": "actor=78845",
+            "tag": "tag 193",
+            "tagKey": "5d77686251dd69001fe0b426",
+            "role": "role 140",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 6442,
+            "filter": "actor=6442",
+            "tag": "tag 194",
+            "tagKey": "5d7768243c3c2a001fbca938",
+            "role": "role 141",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 14173,
+            "filter": "actor=14173",
+            "tag": "tag 195",
+            "tagKey": "5d77682c54c0f0001f3025b8",
+            "role": "role 142",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 81415,
+            "filter": "actor=81415",
+            "tag": "tag 196",
+            "tagKey": "5f3feb0658b26e00425dae86",
+            "role": "role 143",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 9289,
+            "filter": "actor=9289",
+            "tag": "tag 197",
+            "tagKey": "5d776839151a60001f24ea00",
+            "role": "role 144",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 216934,
+            "filter": "actor=216934",
+            "tag": "tag 198",
+            "tagKey": "5d7769b696b655001fdd73a8",
+            "role": "role 145",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 250553,
+            "filter": "actor=250553",
+            "tag": "tag 199",
+            "tagKey": "693716210045165212cd03f2",
+            "role": "role 146"
+          },
+          {
+            "id": 250554,
+            "filter": "actor=250554",
+            "tag": "tag 200",
+            "tagKey": "6756dcb4b6b4b5eed6e74bd1",
+            "role": "role 147"
+          },
+          {
+            "id": 250555,
+            "filter": "actor=250555",
+            "tag": "tag 201",
+            "tagKey": "5f40662ffea1a1003fa72c81",
+            "role": "role 148"
+          },
+          {
+            "id": 250556,
+            "filter": "actor=250556",
+            "tag": "tag 202",
+            "tagKey": "696cd6e76447c3feda1eaf3c",
+            "role": "role 149"
+          },
+          {
+            "id": 250557,
+            "filter": "actor=250557",
+            "tag": "tag 203",
+            "tagKey": "5d9c08dbffd9ef001e99bad6",
+            "role": "role 150",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 119299,
+            "filter": "actor=119299",
+            "tag": "tag 204",
+            "tagKey": "5d7770799ab544002153579e",
+            "role": "role 149",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 250558,
+            "filter": "actor=250558",
+            "tag": "tag 205",
+            "tagKey": "5eb8f22498a9740039448785",
+            "role": "role 149",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 250559,
+            "filter": "actor=250559",
+            "tag": "tag 206",
+            "tagKey": "6a8aab1ce2d802067a9b954a",
+            "role": "role 149"
+          },
+          {
+            "id": 250560,
+            "filter": "actor=250560",
+            "tag": "tag 207",
+            "tagKey": "5e35eccbb1fd31003ca3e8c2",
+            "role": "role 149",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 96689,
+            "filter": "actor=96689",
+            "tag": "tag 208",
+            "tagKey": "5d776bd6594b2b001e6e4c4a",
+            "role": "role 151",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 241235,
+            "filter": "actor=241235",
+            "tag": "tag 209",
+            "tagKey": "5d776d87f617c90020189a36",
+            "role": "role 152",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 119314,
+            "filter": "actor=119314",
+            "tag": "tag 210",
+            "tagKey": "64c25cc5a71c4764eb6362c2",
+            "role": "role 149"
+          },
+          {
+            "id": 250561,
+            "filter": "actor=250561",
+            "tag": "tag 211",
+            "tagKey": "689230f208da67e15394ce5e",
+            "role": "role 153"
+          },
+          {
+            "id": 238349,
+            "filter": "actor=238349",
+            "tag": "tag 212",
+            "tagKey": "5f401b0002101b0040f404c6",
+            "role": "role 154",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 146225,
+            "filter": "actor=146225",
+            "tag": "tag 213",
+            "tagKey": "5e165701cd0850003b77e981",
+            "role": "role 155",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 3468,
+            "filter": "actor=3468",
+            "tag": "tag 214",
+            "tagKey": "5d776824103a2d001f563abb",
+            "role": "role 156",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 250562,
+            "filter": "actor=250562",
+            "tag": "tag 215",
+            "tagKey": "5f404e6652f2000041562194",
+            "role": "role 157"
+          },
+          {
+            "id": 250563,
+            "filter": "actor=250563",
+            "tag": "tag 216",
+            "tagKey": "6a0c231784ce675343aa3ea6",
+            "role": "role 158",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 167341,
+            "filter": "actor=167341",
+            "tag": "tag 217",
+            "tagKey": "5d776a9647dd6e001f6d489f",
+            "role": "role 159",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 240875,
+            "filter": "actor=240875",
+            "tag": "tag 218",
+            "tagKey": "6a7b0f355abaf6ea51501b15",
+            "role": "role 160"
+          },
+          {
+            "id": 173091,
+            "filter": "actor=173091",
+            "tag": "tag 219",
+            "tagKey": "5f3ffe355a76a80042d20ac8",
+            "role": "role 149",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 250564,
+            "filter": "actor=250564",
+            "tag": "tag 220",
+            "tagKey": "68f901eb973404a9e5f02976",
+            "role": "role 149"
+          },
+          {
+            "id": 250565,
+            "filter": "actor=250565",
+            "tag": "tag 221",
+            "tagKey": "629f5f640af5041f9c41217d",
+            "role": "role 161"
+          },
+          {
+            "id": 106534,
+            "filter": "actor=106534",
+            "tag": "tag 222",
+            "tagKey": "5e16537e1493cd003f0fb866",
+            "role": "role 162",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 82035,
+            "filter": "actor=82035",
+            "tag": "tag 223",
+            "tagKey": "5d7768286f4521001ea99445",
+            "role": "role 163",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 227900,
+            "filter": "actor=227900",
+            "tag": "tag 224",
+            "tagKey": "5e163a67ef1040003f2506c7",
+            "role": "role 164"
+          },
+          {
+            "id": 250566,
+            "filter": "actor=250566",
+            "tag": "tag 225",
+            "tagKey": "615c5eeedcafa2bcb703e88b",
+            "role": "role 165"
+          },
+          {
+            "id": 144182,
+            "filter": "actor=144182",
+            "tag": "tag 226",
+            "tagKey": "5d776da0ad5437001f7db3aa",
+            "role": "role 166",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 101763,
+            "filter": "actor=101763",
+            "tag": "tag 227",
+            "tagKey": "5ee74259d3999f0042022607",
+            "role": "role 149",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 81103,
+            "filter": "actor=81103",
+            "tag": "tag 228",
+            "tagKey": "5d77682c7228e5001f1dd6bc",
+            "role": "role 167",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 241228,
+            "filter": "actor=241228",
+            "tag": "tag 229",
+            "tagKey": "6356484bce88a4bd49df76b6",
+            "role": "role 168",
+            "thumb": "https://example.invalid/image.jpg"
+          }
+        ],
+        "Producer": [
+          {
+            "id": 250258,
+            "filter": "producer=250258",
+            "tag": "tag 230",
+            "tagKey": "5d7768fd96b655001fdc75c4"
+          }
+        ]
+      },
+      {
+        "ratingKey": "68359",
+        "key": "/library/metadata/68359",
+        "parentRatingKey": "68354",
+        "grandparentRatingKey": "68353",
+        "guid": "plex://item/02dc9781ddbf",
+        "parentGuid": "plex://item/ba61a3b7e2ec",
+        "grandparentGuid": "plex://item/e7219d681af5",
+        "grandparentSlug": "grandparentSlug 2",
+        "studio": "studio 3",
+        "type": "episode",
+        "title": "title 3",
+        "grandparentKey": "/library/metadata/68353",
+        "parentKey": "/library/metadata/68354",
+        "librarySectionTitle": "librarySectionTitle 3",
+        "librarySectionID": 2,
+        "librarySectionKey": "/library/sections/2",
+        "grandparentTitle": "grandparentTitle 2",
+        "parentTitle": "parentTitle 2",
+        "originalTitle": "originalTitle 2",
+        "contentRating": "fr/12",
+        "summary": "summary 3",
+        "index": 1,
+        "parentIndex": 1,
+        "audienceRating": 8.4,
+        "viewOffset": 2579531,
+        "lastViewedAt": 1792483223,
+        "year": 2025,
+        "thumb": "/library/metadata/68359/thumb/1794718518",
+        "art": "/library/metadata/68353/art/1747788851",
+        "parentThumb": "/library/metadata/68354/thumb/1773558112",
+        "grandparentThumb": "/library/metadata/68353/thumb/1747788851",
+        "grandparentArt": "/library/metadata/68353/art/1747788851",
+        "duration": 3603040,
+        "originallyAvailableAt": "2025-03-30",
+        "addedAt": 1747788851,
+        "updatedAt": 1794718518,
+        "audienceRatingImage": "themoviedb://image.rating",
+        "chapterSource": "media",
+        "Media": [
+          {
+            "id": 103466,
+            "duration": 3603040,
+            "bitrate": 8772,
+            "width": 1920,
+            "height": 1080,
+            "aspectRatio": 1.78,
+            "audioChannels": 2,
+            "audioCodec": "eac3",
+            "videoCodec": "h264",
+            "videoResolution": "1080",
+            "container": "mkv",
+            "videoFrameRate": "24p",
+            "videoProfile": "high",
+            "hasVoiceActivity": false,
+            "Part": [
+              {
+                "id": 108625,
+                "key": "/library/parts/108625/1747788744/file.mkv",
+                "duration": 3603040,
+                "file": "/media/item-2.mkv",
+                "size": 3950854451,
+                "container": "mkv",
+                "videoProfile": "high"
+              }
+            ]
+          }
+        ],
+        "Image": [
+          {
+            "alt": "alt 2",
+            "type": "coverPoster",
+            "url": "/library/metadata/68353/thumb/1747788851"
+          },
+          {
+            "alt": "alt 2",
+            "type": "snapshot",
+            "url": "/library/metadata/68359/thumb/1794718518"
+          },
+          {
+            "alt": "alt 2",
+            "type": "background",
+            "url": "/library/metadata/68353/art/1747788851"
+          },
+          {
+            "alt": "alt 2",
+            "type": "clearLogo",
+            "url": "/library/metadata/68353/clearLogo/1747788851"
+          },
+          {
+            "alt": "alt 2",
+            "type": "backgroundSquare",
+            "url": "/library/metadata/68353/squareArt/1747788851"
+          }
+        ],
+        "UltraBlurColors": {
+          "topLeft": "1c2520",
+          "topRight": "334244",
+          "bottomRight": "0d1411",
+          "bottomLeft": "070314"
+        },
+        "Director": [
+          {
+            "tag": "tag 55"
+          }
+        ],
+        "Writer": [
+          {
+            "tag": "tag 56"
+          },
+          {
+            "tag": "tag 57"
+          }
+        ],
+        "Role": [
+          {
+            "tag": "tag 58"
+          },
+          {
+            "tag": "tag 59"
+          },
+          {
+            "tag": "tag 60"
+          }
+        ]
+      },
+      {
+        "ratingKey": "78361",
+        "key": "/library/metadata/78361",
+        "parentRatingKey": "78360",
+        "grandparentRatingKey": "71566",
+        "guid": "plex://item/937398fde856",
+        "parentGuid": "plex://item/60094f607e96",
+        "grandparentGuid": "plex://item/158f05217b43",
+        "grandparentSlug": "grandparentSlug 6",
+        "type": "episode",
+        "title": "title 26",
+        "grandparentKey": "/library/metadata/71566",
+        "parentKey": "/library/metadata/78360",
+        "librarySectionTitle": "librarySectionTitle 2",
+        "librarySectionID": 3,
+        "librarySectionKey": "/library/sections/3",
+        "grandparentTitle": "grandparentTitle 6",
+        "parentTitle": "parentTitle 4",
+        "originalTitle": "originalTitle 7",
+        "contentRating": "fr/16",
+        "summary": "summary 9",
+        "index": 1,
+        "parentIndex": 2,
+        "audienceRating": 7.2,
+        "lastViewedAt": 1792482061,
+        "year": 2026,
+        "thumb": "/library/metadata/78361/thumb/1793007307",
+        "art": "/library/metadata/71566/art/1793007308",
+        "parentThumb": "/library/metadata/78360/thumb/1792668615",
+        "grandparentThumb": "/library/metadata/71566/thumb/1793007308",
+        "grandparentArt": "/library/metadata/71566/art/1793007308",
+        "grandparentTheme": "/library/metadata/71566/theme/1793007308",
+        "duration": 1708351,
+        "originallyAvailableAt": "2026-10-20",
+        "addedAt": 1792482061,
+        "updatedAt": 1793007307,
+        "audienceRatingImage": "themoviedb://image.rating",
+        "chapterSource": "media",
+        "Media": [
+          {
+            "id": 115949,
+            "duration": 1708351,
+            "bitrate": 3738,
+            "width": 1920,
+            "height": 1080,
+            "aspectRatio": 1.78,
+            "audioChannels": 6,
+            "audioCodec": "eac3",
+            "videoCodec": "av1",
+            "videoResolution": "1080",
+            "container": "mkv",
+            "videoFrameRate": "24p",
+            "videoProfile": "main",
+            "hasVoiceActivity": false,
+            "Part": [
+              {
+                "id": 121108,
+                "key": "/library/parts/121108/1792481774/file.mkv",
+                "duration": 1708351,
+                "file": "/media/item-9.mkv",
+                "size": 798896612,
+                "container": "mkv",
+                "videoProfile": "main",
+                "Stream": [
+                  {
+                    "id": 413721,
+                    "streamType": 1,
+                    "default": true,
+                    "codec": "av1",
+                    "index": 0,
+                    "bitrate": 1178,
+                    "language": "日本語",
+                    "languageTag": "ja",
+                    "languageCode": "jpn",
+                    "bitDepth": 10,
+                    "chromaSubsampling": "4:2:0",
+                    "codedHeight": 1080,
+                    "codedWidth": 1920,
+                    "colorRange": "tv",
+                    "frameRate": 23.976,
+                    "height": 1080,
+                    "level": 8,
+                    "profile": "main",
+                    "refFrames": 1,
+                    "width": 1920,
+                    "displayTitle": "1080p",
+                    "extendedDisplayTitle": "1080p"
+                  },
+                  {
+                    "id": 413722,
+                    "streamType": 2,
+                    "canNormalizeLoudness": false,
+                    "default": true,
+                    "codec": "eac3",
+                    "index": 1,
+                    "channels": 6,
+                    "bitrate": 640,
+                    "language": "Français",
+                    "languageTag": "fr",
+                    "languageCode": "fra",
+                    "audioChannelLayout": "5.1(side)",
+                    "samplingRate": 48000,
+                    "title": "title 27",
+                    "displayTitle": "Français (EAC3 5.1)",
+                    "extendedDisplayTitle": "Français (EAC3 5.1)"
+                  },
+                  {
+                    "id": 413723,
+                    "streamType": 2,
+                    "canNormalizeLoudness": false,
+                    "codec": "eac3",
+                    "index": 2,
+                    "channels": 6,
+                    "bitrate": 640,
+                    "language": "日本語",
+                    "languageTag": "ja",
+                    "languageCode": "jpn",
+                    "audioChannelLayout": "5.1(side)",
+                    "samplingRate": 48000,
+                    "title": "title 28",
+                    "displayTitle": "日本語 (EAC3 5.1)",
+                    "extendedDisplayTitle": "日本語 (EAC3 5.1)"
+                  },
+                  {
+                    "id": 413724,
+                    "streamType": 2,
+                    "canNormalizeLoudness": false,
+                    "selected": true,
+                    "codec": "eac3",
+                    "index": 3,
+                    "channels": 6,
+                    "bitrate": 640,
+                    "language": "English",
+                    "languageTag": "en",
+                    "languageCode": "eng",
+                    "audioChannelLayout": "5.1(side)",
+                    "samplingRate": 48000,
+                    "title": "title 5",
+                    "displayTitle": "English (EAC3 5.1)",
+                    "extendedDisplayTitle": "English (EAC3 5.1)"
+                  },
+                  {
+                    "id": 413725,
+                    "streamType": 2,
+                    "canNormalizeLoudness": false,
+                    "codec": "eac3",
+                    "index": 4,
+                    "channels": 6,
+                    "bitrate": 640,
+                    "language": "Français",
+                    "languageTag": "fr",
+                    "languageCode": "fra",
+                    "audioChannelLayout": "5.1(side)",
+                    "samplingRate": 48000,
+                    "title": "title 29",
+                    "displayTitle": "Français (EAC3 5.1)",
+                    "extendedDisplayTitle": "Français (EAC3 5.1)"
+                  },
+                  {
+                    "id": 413726,
+                    "streamType": 3,
+                    "canAutoSync": false,
+                    "default": true,
+                    "forced": true,
+                    "codec": "srt",
+                    "index": 5,
+                    "language": "Français",
+                    "languageTag": "fr",
+                    "languageCode": "fra",
+                    "title": "title 30",
+                    "displayTitle": "Français Forced",
+                    "extendedDisplayTitle": "Français Forced"
+                  },
+                  {
+                    "id": 413727,
+                    "streamType": 3,
+                    "canAutoSync": false,
+                    "codec": "srt",
+                    "index": 6,
+                    "bitrate": 0,
+                    "language": "Français",
+                    "languageTag": "fr",
+                    "languageCode": "fra",
+                    "title": "title 27",
+                    "displayTitle": "Français",
+                    "extendedDisplayTitle": "Français"
+                  },
+                  {
+                    "id": 413728,
+                    "streamType": 3,
+                    "canAutoSync": false,
+                    "codec": "srt",
+                    "index": 7,
+                    "bitrate": 0,
+                    "language": "Français",
+                    "languageTag": "fr",
+                    "languageCode": "fra",
+                    "title": "title 31",
+                    "displayTitle": "Français",
+                    "extendedDisplayTitle": "Français"
+                  },
+                  {
+                    "id": 413729,
+                    "streamType": 3,
+                    "canAutoSync": false,
+                    "selected": true,
+                    "codec": "srt",
+                    "index": 8,
+                    "bitrate": 0,
+                    "language": "English",
+                    "languageTag": "en",
+                    "languageCode": "eng",
+                    "title": "title 5",
+                    "displayTitle": "English",
+                    "extendedDisplayTitle": "English"
+                  },
+                  {
+                    "id": 413730,
+                    "streamType": 3,
+                    "canAutoSync": false,
+                    "codec": "srt",
+                    "index": 9,
+                    "bitrate": 0,
+                    "language": "English",
+                    "languageTag": "en",
+                    "languageCode": "eng",
+                    "title": "title 32",
+                    "displayTitle": "English",
+                    "extendedDisplayTitle": "English"
+                  },
+                  {
+                    "id": 413731,
+                    "streamType": 3,
+                    "canAutoSync": false,
+                    "codec": "srt",
+                    "index": 10,
+                    "bitrate": 0,
+                    "language": "English",
+                    "languageTag": "en",
+                    "languageCode": "eng",
+                    "title": "title 33",
+                    "displayTitle": "English",
+                    "extendedDisplayTitle": "English"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "Image": [
+          {
+            "alt": "alt 8",
+            "type": "coverPoster",
+            "url": "/library/metadata/71566/thumb/1793007308"
+          },
+          {
+            "alt": "alt 8",
+            "type": "snapshot",
+            "url": "/library/metadata/78361/thumb/1793007307"
+          },
+          {
+            "alt": "alt 8",
+            "type": "background",
+            "url": "/library/metadata/71566/art/1793007308"
+          },
+          {
+            "alt": "alt 8",
+            "type": "backgroundSquare",
+            "url": "/library/metadata/71566/squareArt/1793007308"
+          }
+        ],
+        "UltraBlurColors": {
+          "topLeft": "122d1e",
+          "topRight": "215037",
+          "bottomRight": "216313",
+          "bottomLeft": "2e6d41"
+        },
+        "Guid": [
+          {
+            "id": "plex://item/e3583f7249f1"
+          },
+          {
+            "id": "plex://item/86e7d4456f71"
+          },
+          {
+            "id": "plex://item/f9c442a28741"
+          }
+        ],
+        "Rating": [
+          {
+            "image": "imdb://image.rating",
+            "value": 8.0,
+            "type": "audience"
+          },
+          {
+            "image": "themoviedb://image.rating",
+            "value": 7.2,
+            "type": "audience"
+          }
+        ],
+        "Director": [
+          {
+            "id": 246843,
+            "filter": "director=246843",
+            "tag": "tag 231",
+            "tagKey": "6a9d562f56dfd24444e5798b"
+          }
+        ],
+        "Writer": [
+          {
+            "id": 246811,
+            "filter": "writer=246811",
+            "tag": "tag 232",
+            "tagKey": "5f4049f004a8650040a38762",
+            "thumb": "https://example.invalid/image.jpg"
+          }
+        ],
+        "Role": [
+          {
+            "id": 40638,
+            "filter": "actor=40638",
+            "tag": "tag 233",
+            "tagKey": "5d7768f096b655001fdc599c",
+            "role": "role 169",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 245848,
+            "filter": "actor=245848",
+            "tag": "tag 234",
+            "tagKey": "65ddccd55b67c8d077d87e10",
+            "role": "role 170",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 7773,
+            "filter": "actor=7773",
+            "tag": "tag 235",
+            "tagKey": "5d776cbe9ab544002151a373",
+            "role": "role 171",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 40322,
+            "filter": "actor=40322",
+            "tag": "tag 236",
+            "tagKey": "5d776d55fb0d55001f59d7cd",
+            "role": "role 172",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 248486,
+            "filter": "actor=248486",
+            "tag": "tag 237",
+            "tagKey": "68754a6d82384c9730c80796",
+            "role": "role 173",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 248487,
+            "filter": "actor=248487",
+            "tag": "tag 238",
+            "tagKey": "6ad8a9bb3629cbf6bceeacba",
+            "role": "role 174",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 27154,
+            "filter": "actor=27154",
+            "tag": "tag 239",
+            "tagKey": "5d77682a4de0ee001fcc9568",
+            "role": "role 175",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 40594,
+            "filter": "actor=40594",
+            "tag": "tag 240",
+            "tagKey": "5d9c090e08fddd001f2a6a9e",
+            "role": "role 176",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 248488,
+            "filter": "actor=248488",
+            "tag": "tag 241",
+            "tagKey": "5f4054e7bf3e560040c0146b",
+            "role": "role 177",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 166478,
+            "filter": "actor=166478",
+            "tag": "tag 242",
+            "tagKey": "5f4071af03883a0040bdaa06",
+            "role": "role 177",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 146538,
+            "filter": "actor=146538",
+            "tag": "tag 243",
+            "tagKey": "5e6a37ee874db7003e300c6d",
+            "role": "role 178",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 248489,
+            "filter": "actor=248489",
+            "tag": "tag 244",
+            "tagKey": "5f404a8102101b0040f8feac",
+            "role": "role 179",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 248490,
+            "filter": "actor=248490",
+            "tag": "tag 245",
+            "tagKey": "5f3ffd811ae710004101f491",
+            "role": "role 180",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 248491,
+            "filter": "actor=248491",
+            "tag": "tag 246",
+            "tagKey": "5f4014c702101b0040f3781b",
+            "role": "role 181",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 166625,
+            "filter": "actor=166625",
+            "tag": "tag 247",
+            "tagKey": "6406f46fd723442dd8fdd2f0",
+            "role": "role 182",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 93772,
+            "filter": "actor=93772",
+            "tag": "tag 248",
+            "tagKey": "5f3fd67c04a8650040989a77",
+            "role": "role 182",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 146757,
+            "filter": "actor=146757",
+            "tag": "tag 249",
+            "tagKey": "5f4061455a76a80042dd609b",
+            "role": "role 182",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 248492,
+            "filter": "actor=248492",
+            "tag": "tag 250",
+            "tagKey": "5d776a4296b655001fde8a51",
+            "role": "role 183",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 248493,
+            "filter": "actor=248493",
+            "tag": "tag 251",
+            "tagKey": "681f6b5154b6a0f93d6f55df",
+            "role": "role 183",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 32117,
+            "filter": "actor=32117",
+            "tag": "tag 252",
+            "tagKey": "5e17bfb329246b0040052eb8",
+            "role": "role 183",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 146002,
+            "filter": "actor=146002",
+            "tag": "tag 253",
+            "tagKey": "5f3fd7de03883a0040ac8bbb",
+            "role": "role 183",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 93597,
+            "filter": "actor=93597",
+            "tag": "tag 254",
+            "tagKey": "5f3fe8c7c63b480040d983ce",
+            "role": "role 184",
+            "thumb": "https://example.invalid/image.jpg"
+          }
+        ],
+        "Producer": [
+          {
+            "id": 209806,
+            "filter": "producer=209806",
+            "tag": "tag 232",
+            "tagKey": "5f4049f004a8650040a38762",
+            "thumb": "https://example.invalid/image.jpg"
+          }
+        ]
+      },
+      {
+        "ratingKey": "76914",
+        "key": "/library/metadata/76914",
+        "parentRatingKey": "76910",
+        "grandparentRatingKey": "76879",
+        "guid": "plex://item/bf20923ff8f7",
+        "parentGuid": "plex://item/52f36c00bb7c",
+        "grandparentGuid": "plex://item/0809b5b675ae",
+        "type": "episode",
+        "title": "title 34",
+        "grandparentKey": "/library/metadata/76879",
+        "parentKey": "/library/metadata/76910",
+        "librarySectionTitle": "librarySectionTitle 5",
+        "librarySectionID": 12,
+        "librarySectionKey": "/library/sections/12",
+        "grandparentTitle": "grandparentTitle 7",
+        "parentTitle": "parentTitle 5",
+        "originalTitle": "originalTitle 8",
+        "summary": "summary 10",
+        "index": 26,
+        "parentIndex": 4,
+        "lastViewedAt": 1791840607,
+        "year": 2021,
+        "thumb": "/library/metadata/76914/thumb/1785916754",
+        "art": "/library/metadata/76910/art/1785916753",
+        "parentThumb": "/library/metadata/76910/thumb/1785916753",
+        "grandparentThumb": "/library/metadata/76879/thumb/1765363405",
+        "grandparentArt": "/library/metadata/76879/art/1765363405",
+        "grandparentTheme": "/library/metadata/76879/theme/1765363405",
+        "duration": 4001067,
+        "originallyAvailableAt": "2021-07-06",
+        "addedAt": 1765365938,
+        "updatedAt": 1785916754,
+        "chapterSource": "media",
+        "Media": [
+          {
+            "id": 113985,
+            "duration": 4001067,
+            "bitrate": 3786,
+            "width": 1920,
+            "height": 1080,
+            "aspectRatio": 1.78,
+            "audioChannels": 2,
+            "audioCodec": "aac",
+            "videoCodec": "h264",
+            "videoResolution": "1080",
+            "container": "mkv",
+            "videoFrameRate": "24p",
+            "audioProfile": "lc",
+            "videoProfile": "high",
+            "hasVoiceActivity": false,
+            "Part": [
+              {
+                "id": 119144,
+                "key": "/library/parts/119144/1765365938/file.mkv",
+                "duration": 4001067,
+                "file": "/media/item-10.mkv",
+                "size": 1893655673,
+                "audioProfile": "lc",
+                "container": "mkv",
+                "videoProfile": "high",
+                "Stream": [
+                  {
+                    "id": 408001,
+                    "streamType": 1,
+                    "default": true,
+                    "codec": "h264",
+                    "index": 0,
+                    "bitrate": 3786,
+                    "language": "English",
+                    "languageTag": "en",
+                    "languageCode": "eng",
+                    "bitDepth": 8,
+                    "chromaLocation": "left",
+                    "chromaSubsampling": "4:2:0",
+                    "codedHeight": 1088,
+                    "codedWidth": 1920,
+                    "frameRate": 23.976,
+                    "hasScalingMatrix": false,
+                    "height": 1080,
+                    "level": 41,
+                    "profile": "high",
+                    "refFrames": 4,
+                    "scanType": "progressive",
+                    "width": 1920,
+                    "displayTitle": "1080p",
+                    "extendedDisplayTitle": "1080p"
+                  },
+                  {
+                    "id": 408002,
+                    "streamType": 2,
+                    "canNormalizeLoudness": false,
+                    "selected": true,
+                    "default": true,
+                    "codec": "aac",
+                    "index": 1,
+                    "channels": 2,
+                    "language": "日本語",
+                    "languageTag": "ja",
+                    "languageCode": "jpn",
+                    "audioChannelLayout": "stereo",
+                    "profile": "lc",
+                    "samplingRate": 48000,
+                    "title": "title 35",
+                    "displayTitle": "日本語 (AAC Stereo)",
+                    "extendedDisplayTitle": "日本語 (AAC Stereo)"
+                  },
+                  {
+                    "id": 408003,
+                    "streamType": 2,
+                    "canNormalizeLoudness": false,
+                    "codec": "aac",
+                    "index": 2,
+                    "channels": 2,
+                    "language": "Français",
+                    "languageTag": "fr",
+                    "languageCode": "fra",
+                    "audioChannelLayout": "stereo",
+                    "profile": "lc",
+                    "samplingRate": 48000,
+                    "title": "title 36",
+                    "displayTitle": "Français (AAC Stereo)",
+                    "extendedDisplayTitle": "Français (AAC Stereo)"
+                  },
+                  {
+                    "id": 408004,
+                    "streamType": 3,
+                    "canAutoSync": false,
+                    "selected": true,
+                    "default": true,
+                    "codec": "ass",
+                    "index": 3,
+                    "language": "日本語",
+                    "languageTag": "ja",
+                    "languageCode": "jpn",
+                    "title": "title 37",
+                    "displayTitle": "日本語",
+                    "extendedDisplayTitle": "日本語"
+                  },
+                  {
+                    "id": 408005,
+                    "streamType": 3,
+                    "canAutoSync": false,
+                    "codec": "ass",
+                    "index": 4,
+                    "language": "Français",
+                    "languageTag": "fr",
+                    "languageCode": "fra",
+                    "title": "title 38",
+                    "displayTitle": "Français",
+                    "extendedDisplayTitle": "Français"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "Image": [
+          {
+            "alt": "alt 9",
+            "type": "coverPoster",
+            "url": "/library/metadata/76879/thumb/1765363405"
+          },
+          {
+            "alt": "alt 9",
+            "type": "snapshot",
+            "url": "/library/metadata/76914/thumb/1785916754"
+          },
+          {
+            "alt": "alt 9",
+            "type": "background",
+            "url": "/library/metadata/76910/art/1785916753"
+          },
+          {
+            "alt": "alt 9",
+            "type": "clearLogo",
+            "url": "/library/metadata/76879/clearLogo/1765363405"
+          }
+        ],
+        "UltraBlurColors": {
+          "topLeft": "0e1840",
+          "topRight": "235b96",
+          "bottomRight": "4c6824",
+          "bottomLeft": "183c53"
+        },
+        "Guid": [
+          {
+            "id": "plex://item/e67cb76c76f8"
+          }
+        ]
+      },
+      {
+        "ratingKey": "76334",
+        "key": "/library/metadata/76334",
+        "parentRatingKey": "76324",
+        "grandparentRatingKey": "76323",
+        "guid": "plex://item/0ae9b29c6150",
+        "parentGuid": "plex://item/3de00a03fdff",
+        "grandparentGuid": "plex://item/abb9c519af91",
+        "grandparentSlug": "grandparentSlug 3",
+        "studio": "studio 5",
+        "type": "episode",
+        "title": "title 8",
+        "titleSort": "titleSort 2",
+        "grandparentKey": "/library/metadata/76323",
+        "parentKey": "/library/metadata/76324",
+        "librarySectionTitle": "librarySectionTitle 3",
+        "librarySectionID": 2,
+        "librarySectionKey": "/library/sections/2",
+        "grandparentTitle": "grandparentTitle 3",
+        "parentTitle": "parentTitle 2",
+        "originalTitle": "originalTitle 3",
+        "contentRating": "fr/12",
+        "summary": "summary 4",
+        "index": 7,
+        "parentIndex": 1,
+        "audienceRating": 7.5,
+        "viewOffset": 563515,
+        "lastViewedAt": 1791284503,
+        "year": 2022,
+        "thumb": "/library/metadata/76334/thumb/1789101073",
+        "art": "/library/metadata/76323/art/1782723864",
+        "parentThumb": "/library/metadata/76324/thumb/1782723854",
+        "grandparentThumb": "/library/metadata/76323/thumb/1782723864",
+        "grandparentArt": "/library/metadata/76323/art/1782723864",
+        "grandparentTheme": "/library/metadata/76323/theme/1782723864",
+        "duration": 3382528,
+        "originallyAvailableAt": "2022-09-08",
+        "addedAt": 1782723864,
+        "updatedAt": 1789101073,
+        "audienceRatingImage": "themoviedb://image.rating",
+        "Media": [
+          {
+            "id": 113096,
+            "duration": 3382528,
+            "bitrate": 2162,
+            "width": 1920,
+            "height": 1080,
+            "aspectRatio": 1.78,
+            "audioChannels": 6,
+            "audioCodec": "eac3",
+            "videoCodec": "hevc",
+            "videoResolution": "1080",
+            "container": "mkv",
+            "videoFrameRate": "24p",
+            "videoProfile": "main",
+            "hasVoiceActivity": false,
+            "Part": [
+              {
+                "id": 118255,
+                "key": "/library/parts/118255/1782723817/file.mkv",
+                "duration": 3382528,
+                "file": "/media/item-3.mkv",
+                "size": 914076142,
+                "container": "mkv",
+                "videoProfile": "main"
+              }
+            ]
+          }
+        ],
+        "Image": [
+          {
+            "alt": "alt 3",
+            "type": "coverPoster",
+            "url": "/library/metadata/76323/thumb/1782723864"
+          },
+          {
+            "alt": "alt 3",
+            "type": "snapshot",
+            "url": "/library/metadata/76334/thumb/1789101073"
+          },
+          {
+            "alt": "alt 3",
+            "type": "background",
+            "url": "/library/metadata/76323/art/1782723864"
+          },
+          {
+            "alt": "alt 3",
+            "type": "clearLogo",
+            "url": "/library/metadata/76323/clearLogo/1782723864"
+          },
+          {
+            "alt": "alt 3",
+            "type": "backgroundSquare",
+            "url": "/library/metadata/76323/squareArt/1782723864"
+          }
+        ],
+        "UltraBlurColors": {
+          "topLeft": "462403",
+          "topRight": "1e1c1c",
+          "bottomRight": "2f332e",
+          "bottomLeft": "90423b"
+        },
+        "Director": [
+          {
+            "tag": "tag 116"
+          }
+        ],
+        "Writer": [
+          {
+            "tag": "tag 117"
+          }
+        ],
+        "Role": [
+          {
+            "tag": "tag 118"
+          },
+          {
+            "tag": "tag 119"
+          },
+          {
+            "tag": "tag 120"
+          }
+        ]
+      },
+      {
+        "ratingKey": "77163",
+        "key": "/library/metadata/77163",
+        "parentRatingKey": "77162",
+        "grandparentRatingKey": "77088",
+        "guid": "plex://item/9bbe70f27047",
+        "parentGuid": "plex://item/5943bced7248",
+        "grandparentGuid": "plex://item/81684f586042",
+        "grandparentSlug": "grandparentSlug 4",
+        "studio": "studio 6",
+        "type": "episode",
+        "title": "title 15",
+        "titleSort": "titleSort 3",
+        "grandparentKey": "/library/metadata/77088",
+        "parentKey": "/library/metadata/77162",
+        "librarySectionTitle": "librarySectionTitle 3",
+        "librarySectionID": 2,
+        "librarySectionKey": "/library/sections/2",
+        "grandparentTitle": "grandparentTitle 4",
+        "parentTitle": "parentTitle 3",
+        "originalTitle": "originalTitle 4",
+        "contentRating": "TV-MA",
+        "summary": "summary 5",
+        "index": 1,
+        "parentIndex": 3,
+        "viewOffset": 2275148,
+        "lastViewedAt": 1790366454,
+        "year": 2025,
+        "thumb": "/library/metadata/77163/thumb/1787720151",
+        "art": "/library/metadata/77088/art/1787637298",
+        "parentThumb": "/library/metadata/77162/thumb/1787637299",
+        "grandparentThumb": "/library/metadata/77088/thumb/1787637298",
+        "grandparentArt": "/library/metadata/77088/art/1787637298",
+        "grandparentTheme": "/library/metadata/77088/theme/1787637298",
+        "duration": 3230080,
+        "originallyAvailableAt": "2025-10-03",
+        "addedAt": 1787637298,
+        "updatedAt": 1787720151,
+        "chapterSource": "media",
+        "Media": [
+          {
+            "id": 114388,
+            "duration": 3230080,
+            "bitrate": 2884,
+            "width": 1920,
+            "height": 1080,
+            "aspectRatio": 1.78,
+            "audioChannels": 6,
+            "audioCodec": "eac3",
+            "videoCodec": "hevc",
+            "videoResolution": "1080",
+            "container": "mkv",
+            "videoFrameRate": "24p",
+            "audioProfile": "dolby digital plus + dolby atmos",
+            "videoProfile": "main 10",
+            "hasVoiceActivity": false,
+            "Part": [
+              {
+                "id": 119547,
+                "key": "/library/parts/119547/1787174527/file.mkv",
+                "duration": 3230080,
+                "file": "/media/item-4.mkv",
+                "size": 1164388360,
+                "audioProfile": "dolby digital plus + dolby atmos",
+                "container": "mkv",
+                "videoProfile": "main 10"
+              }
+            ]
+          }
+        ],
+        "Image": [
+          {
+            "alt": "alt 4",
+            "type": "coverPoster",
+            "url": "/library/metadata/77088/thumb/1787637298"
+          },
+          {
+            "alt": "alt 4",
+            "type": "snapshot",
+            "url": "/library/metadata/77163/thumb/1787720151"
+          },
+          {
+            "alt": "alt 4",
+            "type": "background",
+            "url": "/library/metadata/77088/art/1787637298"
+          },
+          {
+            "alt": "alt 4",
+            "type": "clearLogo",
+            "url": "/library/metadata/77088/clearLogo/1787637298"
+          },
+          {
+            "alt": "alt 4",
+            "type": "backgroundSquare",
+            "url": "/library/metadata/77088/squareArt/1787637298"
+          }
+        ],
+        "UltraBlurColors": {
+          "topLeft": "262d31",
+          "topRight": "0a2330",
+          "bottomRight": "0a1b31",
+          "bottomLeft": "1f2325"
+        },
+        "Director": [
+          {
+            "tag": "tag 131"
+          }
+        ],
+        "Writer": [
+          {
+            "tag": "tag 132"
+          }
+        ],
+        "Role": [
+          {
+            "tag": "tag 133"
+          },
+          {
+            "tag": "tag 134"
+          },
+          {
+            "tag": "tag 135"
+          }
+        ]
+      },
+      {
+        "ratingKey": "77559",
+        "key": "/library/metadata/77559",
+        "parentRatingKey": "77558",
+        "grandparentRatingKey": "53526",
+        "guid": "plex://item/0649be9e9f53",
+        "parentGuid": "plex://item/a65ef55f2616",
+        "grandparentGuid": "plex://item/a11d5fb18fa4",
+        "grandparentSlug": "grandparentSlug 7",
+        "type": "episode",
+        "title": "title 39",
+        "titleSort": "titleSort 5",
+        "grandparentKey": "/library/metadata/53526",
+        "parentKey": "/library/metadata/77558",
+        "librarySectionTitle": "librarySectionTitle 3",
+        "librarySectionID": 2,
+        "librarySectionKey": "/library/sections/2",
+        "grandparentTitle": "grandparentTitle 8",
+        "parentTitle": "parentTitle 6",
+        "originalTitle": "originalTitle 9",
+        "contentRating": "fr/16",
+        "summary": "summary 11",
+        "index": 1,
+        "parentIndex": 7,
+        "lastViewedAt": 1788597068,
+        "year": 2026,
+        "thumb": "/library/metadata/77559/thumb/1789099501",
+        "art": "/library/metadata/53526/art/1794306285",
+        "parentThumb": "/library/metadata/77558/thumb/1788866915",
+        "grandparentThumb": "/library/metadata/53526/thumb/1794306285",
+        "grandparentArt": "/library/metadata/53526/art/1794306285",
+        "grandparentTheme": "/library/metadata/53526/theme/1794306285",
+        "duration": 3445240,
+        "originallyAvailableAt": "2026-09-04",
+        "addedAt": 1788597068,
+        "updatedAt": 1789099501,
+        "Media": [
+          {
+            "id": 114812,
+            "duration": 3445240,
+            "bitrate": 2419,
+            "width": 1920,
+            "height": 1080,
+            "aspectRatio": 1.78,
+            "audioChannels": 6,
+            "audioCodec": "eac3",
+            "videoCodec": "hevc",
+            "videoResolution": "1080",
+            "container": "mkv",
+            "videoFrameRate": "PAL",
+            "videoProfile": "main 10",
+            "hasVoiceActivity": false,
+            "Part": [
+              {
+                "id": 119971,
+                "key": "/library/parts/119971/1788597049/file.mkv",
+                "duration": 3445240,
+                "file": "/media/item-11.mkv",
+                "size": 1041819786,
+                "container": "mkv",
+                "videoProfile": "main 10",
+                "Stream": [
+                  {
+                    "id": 410438,
+                    "streamType": 1,
+                    "default": true,
+                    "codec": "hevc",
+                    "index": 0,
+                    "bitrate": 1779,
+                    "language": "English",
+                    "languageTag": "en",
+                    "languageCode": "eng",
+                    "bitDepth": 10,
+                    "chromaLocation": "left",
+                    "chromaSubsampling": "4:2:0",
+                    "codedHeight": 1088,
+                    "codedWidth": 1920,
+                    "colorPrimaries": "bt709",
+                    "colorRange": "tv",
+                    "colorSpace": "bt709",
+                    "colorTrc": "bt709",
+                    "frameRate": 25.0,
+                    "height": 1080,
+                    "level": 120,
+                    "original": true,
+                    "profile": "main 10",
+                    "refFrames": 1,
+                    "width": 1920,
+                    "displayTitle": "1080p",
+                    "extendedDisplayTitle": "1080p"
+                  },
+                  {
+                    "id": 410439,
+                    "streamType": 2,
+                    "canNormalizeLoudness": false,
+                    "selected": true,
+                    "default": true,
+                    "codec": "eac3",
+                    "index": 1,
+                    "channels": 6,
+                    "bitrate": 640,
+                    "language": "English",
+                    "languageTag": "en",
+                    "languageCode": "eng",
+                    "audioChannelLayout": "5.1(side)",
+                    "original": true,
+                    "samplingRate": 48000,
+                    "title": "title 40",
+                    "displayTitle": "English (EAC3 5.1)",
+                    "extendedDisplayTitle": "English (EAC3 5.1)"
+                  },
+                  {
+                    "id": 410440,
+                    "streamType": 3,
+                    "canAutoSync": false,
+                    "selected": true,
+                    "default": true,
+                    "codec": "srt",
+                    "index": 2,
+                    "bitrate": 0,
+                    "language": "Français",
+                    "languageTag": "fr-FR",
+                    "languageCode": "fra",
+                    "title": "title 36",
+                    "displayTitle": "Français",
+                    "extendedDisplayTitle": "Français"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "Image": [
+          {
+            "alt": "alt 10",
+            "type": "coverPoster",
+            "url": "/library/metadata/53526/thumb/1794306285"
+          },
+          {
+            "alt": "alt 10",
+            "type": "snapshot",
+            "url": "/library/metadata/77559/thumb/1789099501"
+          },
+          {
+            "alt": "alt 10",
+            "type": "background",
+            "url": "/library/metadata/53526/art/1794306285"
+          },
+          {
+            "alt": "alt 10",
+            "type": "clearLogo",
+            "url": "/library/metadata/53526/clearLogo/1794306285"
+          },
+          {
+            "alt": "alt 10",
+            "type": "backgroundSquare",
+            "url": "/library/metadata/53526/squareArt/1794306285"
+          }
+        ],
+        "UltraBlurColors": {
+          "topLeft": "27302e",
+          "topRight": "2e6289",
+          "bottomRight": "641822",
+          "bottomLeft": "1e2321"
+        },
+        "Guid": [
+          {
+            "id": "plex://item/79a0108f4da9"
+          }
+        ]
+      },
+      {
+        "ratingKey": "76701",
+        "key": "/library/metadata/76701",
+        "parentRatingKey": "76700",
+        "grandparentRatingKey": "51880",
+        "guid": "plex://item/7869b47e388d",
+        "parentGuid": "plex://item/7053600eac53",
+        "grandparentGuid": "plex://item/1f093248ebd9",
+        "grandparentSlug": "grandparentSlug 8",
+        "type": "episode",
+        "title": "title 41",
+        "grandparentKey": "/library/metadata/51880",
+        "parentKey": "/library/metadata/76700",
+        "librarySectionTitle": "librarySectionTitle 3",
+        "librarySectionID": 2,
+        "librarySectionKey": "/library/sections/2",
+        "grandparentTitle": "grandparentTitle 9",
+        "parentTitle": "parentTitle 5",
+        "originalTitle": "originalTitle 10",
+        "contentRating": "fr/12",
+        "summary": "summary 12",
+        "index": 1,
+        "parentIndex": 4,
+        "audienceRating": 7.3,
+        "lastViewedAt": 1785893227,
+        "year": 2026,
+        "thumb": "/library/metadata/76701/thumb/1791627735",
+        "art": "/library/metadata/51880/art/1794480791",
+        "parentThumb": "/library/metadata/76700/thumb/1786500249",
+        "grandparentThumb": "/library/metadata/51880/thumb/1794480791",
+        "grandparentArt": "/library/metadata/51880/art/1794480791",
+        "grandparentTheme": "/library/metadata/51880/theme/1794480791",
+        "duration": 2596672,
+        "originallyAvailableAt": "2026-08-04",
+        "addedAt": 1785893227,
+        "updatedAt": 1791627735,
+        "audienceRatingImage": "themoviedb://image.rating",
+        "Media": [
+          {
+            "id": 113777,
+            "duration": 2596672,
+            "bitrate": 8686,
+            "width": 1920,
+            "height": 960,
+            "aspectRatio": 1.85,
+            "audioChannels": 6,
+            "audioCodec": "eac3",
+            "videoCodec": "h264",
+            "videoResolution": "1080",
+            "container": "mkv",
+            "videoFrameRate": "24p",
+            "videoProfile": "high",
+            "hasVoiceActivity": false,
+            "Part": [
+              {
+                "id": 118936,
+                "key": "/library/parts/118936/1785893204/file.mkv",
+                "duration": 2596672,
+                "file": "/media/item-12.mkv",
+                "size": 2819295596,
+                "container": "mkv",
+                "videoProfile": "high",
+                "Stream": [
+                  {
+                    "id": 407126,
+                    "streamType": 1,
+                    "default": true,
+                    "codec": "h264",
+                    "index": 0,
+                    "bitrate": 7406,
+                    "language": "English",
+                    "languageTag": "en",
+                    "languageCode": "eng",
+                    "bitDepth": 8,
+                    "chromaLocation": "left",
+                    "chromaSubsampling": "4:2:0",
+                    "codedHeight": 960,
+                    "codedWidth": 1920,
+                    "colorPrimaries": "bt709",
+                    "colorRange": "tv",
+                    "colorSpace": "bt709",
+                    "colorTrc": "bt709",
+                    "frameRate": 23.976,
+                    "hasScalingMatrix": false,
+                    "height": 960,
+                    "level": 40,
+                    "profile": "high",
+                    "refFrames": 4,
+                    "scanType": "progressive",
+                    "width": 1920,
+                    "displayTitle": "1080p",
+                    "extendedDisplayTitle": "1080p"
+                  },
+                  {
+                    "id": 407127,
+                    "streamType": 2,
+                    "canNormalizeLoudness": false,
+                    "selected": true,
+                    "codec": "eac3",
+                    "index": 1,
+                    "channels": 6,
+                    "bitrate": 640,
+                    "language": "English",
+                    "languageTag": "en",
+                    "languageCode": "eng",
+                    "audioChannelLayout": "5.1(side)",
+                    "samplingRate": 48000,
+                    "title": "title 42",
+                    "displayTitle": "English (EAC3 5.1)",
+                    "extendedDisplayTitle": "English (EAC3 5.1)"
+                  },
+                  {
+                    "id": 407128,
+                    "streamType": 2,
+                    "canNormalizeLoudness": false,
+                    "default": true,
+                    "codec": "eac3",
+                    "index": 2,
+                    "channels": 6,
+                    "bitrate": 640,
+                    "language": "Français",
+                    "languageTag": "fr-FR",
+                    "languageCode": "fra",
+                    "audioChannelLayout": "5.1(side)",
+                    "samplingRate": 48000,
+                    "title": "title 43",
+                    "displayTitle": "Français (EAC3 5.1)",
+                    "extendedDisplayTitle": "Français (EAC3 5.1)"
+                  },
+                  {
+                    "id": 407129,
+                    "streamType": 3,
+                    "canAutoSync": false,
+                    "default": true,
+                    "forced": true,
+                    "codec": "srt",
+                    "index": 3,
+                    "bitrate": 0,
+                    "language": "Français",
+                    "languageTag": "fr-FR",
+                    "languageCode": "fra",
+                    "title": "title 44",
+                    "displayTitle": "Français Forced",
+                    "extendedDisplayTitle": "Français Forced"
+                  },
+                  {
+                    "id": 407130,
+                    "streamType": 3,
+                    "canAutoSync": false,
+                    "codec": "srt",
+                    "index": 4,
+                    "bitrate": 0,
+                    "language": "Français",
+                    "languageTag": "fr-FR",
+                    "languageCode": "fra",
+                    "title": "title 45",
+                    "displayTitle": "Français",
+                    "extendedDisplayTitle": "Français"
+                  },
+                  {
+                    "id": 407131,
+                    "streamType": 3,
+                    "canAutoSync": false,
+                    "codec": "srt",
+                    "index": 5,
+                    "bitrate": 0,
+                    "language": "Français",
+                    "languageTag": "fr-FR",
+                    "languageCode": "fra",
+                    "hearingImpaired": true,
+                    "title": "title 14",
+                    "displayTitle": "Français SDH",
+                    "extendedDisplayTitle": "Français SDH"
+                  },
+                  {
+                    "id": 407132,
+                    "streamType": 3,
+                    "canAutoSync": false,
+                    "selected": true,
+                    "codec": "srt",
+                    "index": 6,
+                    "bitrate": 0,
+                    "language": "English",
+                    "languageTag": "en",
+                    "languageCode": "eng",
+                    "hearingImpaired": true,
+                    "title": "title 14",
+                    "displayTitle": "English SDH",
+                    "extendedDisplayTitle": "English SDH"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "Image": [
+          {
+            "alt": "alt 11",
+            "type": "coverPoster",
+            "url": "/library/metadata/51880/thumb/1794480791"
+          },
+          {
+            "alt": "alt 11",
+            "type": "snapshot",
+            "url": "/library/metadata/76701/thumb/1791627735"
+          },
+          {
+            "alt": "alt 11",
+            "type": "background",
+            "url": "/library/metadata/51880/art/1794480791"
+          },
+          {
+            "alt": "alt 11",
+            "type": "backgroundSquare",
+            "url": "/library/metadata/51880/squareArt/1794480791"
+          }
+        ],
+        "UltraBlurColors": {
+          "topLeft": "47220e",
+          "topRight": "8e4630",
+          "bottomRight": "864d26",
+          "bottomLeft": "9a3625"
+        },
+        "Guid": [
+          {
+            "id": "plex://item/35de8dd09851"
+          },
+          {
+            "id": "plex://item/d33e5d4f88f9"
+          },
+          {
+            "id": "plex://item/922e427b23c8"
+          }
+        ],
+        "Rating": [
+          {
+            "image": "imdb://image.rating",
+            "value": 7.5,
+            "type": "audience"
+          },
+          {
+            "image": "themoviedb://image.rating",
+            "value": 7.3,
+            "type": "audience"
+          }
+        ],
+        "Director": [
+          {
+            "id": 35119,
+            "filter": "director=35119",
+            "tag": "tag 255",
+            "tagKey": "5d77683ae6d55c002040e156",
+            "thumb": "https://example.invalid/image.jpg"
+          }
+        ],
+        "Writer": [
+          {
+            "id": 35151,
+            "filter": "writer=35151",
+            "tag": "tag 256",
+            "tagKey": "5e16354954420c003c21361d"
+          }
+        ],
+        "Role": [
+          {
+            "id": 6998,
+            "filter": "actor=6998",
+            "tag": "tag 257",
+            "tagKey": "5d776832151a60001f24d33b",
+            "role": "role 185",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 35099,
+            "filter": "actor=35099",
+            "tag": "tag 258",
+            "tagKey": "5d7768ca0ea56a001e2aa449",
+            "role": "role 186",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 35100,
+            "filter": "actor=35100",
+            "tag": "tag 259",
+            "tagKey": "5d7768253c3c2a001fbca9d2",
+            "role": "role 187",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 35101,
+            "filter": "actor=35101",
+            "tag": "tag 260",
+            "tagKey": "5d77682bf54112001f5bc4d3",
+            "role": "role 188",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 31323,
+            "filter": "actor=31323",
+            "tag": "tag 261",
+            "tagKey": "5d77695e9ab54400214f0e66",
+            "role": "role 189",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 16560,
+            "filter": "actor=16560",
+            "tag": "tag 262",
+            "tagKey": "5d7768254de0ee001fcc8152",
+            "role": "role 190",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 239781,
+            "filter": "actor=239781",
+            "tag": "tag 263",
+            "tagKey": "5d776cb7ad5437001f7c713a",
+            "role": "role 191",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 240945,
+            "filter": "actor=240945",
+            "tag": "tag 264",
+            "tagKey": "6a7db22e83cea655aadf5de5",
+            "role": "role 192"
+          },
+          {
+            "id": 185535,
+            "filter": "actor=185535",
+            "tag": "tag 265",
+            "tagKey": "5d777061594b2b001e749ecc",
+            "role": "role 193",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 227966,
+            "filter": "actor=227966",
+            "tag": "tag 266",
+            "tagKey": "5f3fbf111ae7100041fc7d49",
+            "role": "role 194",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 226681,
+            "filter": "actor=226681",
+            "tag": "tag 267",
+            "tagKey": "5ef73e6ad5e665003f5db066",
+            "role": "role 195",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 81073,
+            "filter": "actor=81073",
+            "tag": "tag 268",
+            "tagKey": "5d776a53ad5437001f779fbb",
+            "role": "role 196",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 35603,
+            "filter": "actor=35603",
+            "tag": "tag 269",
+            "tagKey": "5d7768348718ba001e3144ac",
+            "role": "role 197",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 101847,
+            "filter": "actor=101847",
+            "tag": "tag 270",
+            "tagKey": "5d77683c999c64001ec30a34",
+            "role": "role 198",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 17045,
+            "filter": "actor=17045",
+            "tag": "tag 271",
+            "tagKey": "5d7768274de0ee001fcc8959",
+            "role": "role 199",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 92777,
+            "filter": "actor=92777",
+            "tag": "tag 272",
+            "tagKey": "5ff88d268979ca002b92ef8c",
+            "role": "role 200",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 129935,
+            "filter": "actor=129935",
+            "tag": "tag 273",
+            "tagKey": "5d776828a091de001f2e641f",
+            "role": "role 201",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 240822,
+            "filter": "actor=240822",
+            "tag": "tag 274",
+            "tagKey": "5d776857eb5d26001f1e70a1",
+            "role": "role 202",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 240823,
+            "filter": "actor=240823",
+            "tag": "tag 275",
+            "tagKey": "5e1625cf189bf7003fe3b96d",
+            "role": "role 203",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 240824,
+            "filter": "actor=240824",
+            "tag": "tag 276",
+            "tagKey": "5d776a4e7a53e9001e701051",
+            "role": "role 204",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 183284,
+            "filter": "actor=183284",
+            "tag": "tag 277",
+            "tagKey": "5f3fa57b52f200004146bf1b",
+            "role": "role 205",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 240825,
+            "filter": "actor=240825",
+            "tag": "tag 278",
+            "tagKey": "66e04e8ada387cb7e6a609c5",
+            "role": "role 206"
+          },
+          {
+            "id": 143911,
+            "filter": "actor=143911",
+            "tag": "tag 279",
+            "tagKey": "5d776b8651dd69001fe311f0",
+            "role": "role 207",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 240826,
+            "filter": "actor=240826",
+            "tag": "tag 280",
+            "tagKey": "663356257ed078073e47c856",
+            "role": "role 208"
+          },
+          {
+            "id": 240827,
+            "filter": "actor=240827",
+            "tag": "tag 281",
+            "tagKey": "6a73263e76da1ad4f69fb15a",
+            "role": "role 209"
+          },
+          {
+            "id": 240828,
+            "filter": "actor=240828",
+            "tag": "tag 282",
+            "tagKey": "5d776bfa23d5a3001f5161b1",
+            "role": "role 210",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 240829,
+            "filter": "actor=240829",
+            "tag": "tag 283",
+            "tagKey": "6a73264076da1ad4f69fb180",
+            "role": "role 211"
+          },
+          {
+            "id": 240830,
+            "filter": "actor=240830",
+            "tag": "tag 284",
+            "tagKey": "5f3a3df48aa044003fa99154",
+            "role": "role 58"
+          },
+          {
+            "id": 240831,
+            "filter": "actor=240831",
+            "tag": "tag 285",
+            "tagKey": "5d77690c7a53e9001e6dff42",
+            "role": "role 212",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 240832,
+            "filter": "actor=240832",
+            "tag": "tag 286",
+            "tagKey": "6a0beb473fd5a7c5f93305a7",
+            "role": "role 213",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 240833,
+            "filter": "actor=240833",
+            "tag": "tag 287",
+            "tagKey": "5d776b3c51dd69001fe2ddd7",
+            "role": "role 214",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 240834,
+            "filter": "actor=240834",
+            "tag": "tag 288",
+            "tagKey": "6a732640c62f8d2f81cdaaf4",
+            "role": "role 215"
+          },
+          {
+            "id": 240835,
+            "filter": "actor=240835",
+            "tag": "tag 289",
+            "tagKey": "5f3fbc0704a865004096332a",
+            "role": "role 216"
+          },
+          {
+            "id": 240836,
+            "filter": "actor=240836",
+            "tag": "tag 290",
+            "tagKey": "5d7768548718ba001e318e77",
+            "role": "role 217"
+          },
+          {
+            "id": 240837,
+            "filter": "actor=240837",
+            "tag": "tag 291",
+            "tagKey": "6a73264176acf793c84e7cd4",
+            "role": "role 218"
+          },
+          {
+            "id": 240838,
+            "filter": "actor=240838",
+            "tag": "tag 292",
+            "tagKey": "6a73263ffae992ff6c34966e",
+            "role": "role 219"
+          }
+        ],
+        "Producer": [
+          {
+            "id": 240839,
+            "filter": "producer=240839",
+            "tag": "tag 293",
+            "tagKey": "5d77684f61141d001fb1851f"
+          }
+        ]
+      }
+    ]
+  }
+}

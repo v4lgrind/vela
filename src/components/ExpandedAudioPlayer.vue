@@ -141,19 +141,21 @@ import { useI18n } from 'vue-i18n';
 import { ref, computed, watch } from 'vue';
 import { useRetryWhileFailed } from '@/composables/useRetryWhileFailed';
 import { useAudioPlayerStore } from '@/store/audio-player-store';
-import { useJellyfinStore } from '@/store/jellyfin-store';
+import { useImageUrl } from '@/composables/useBackend';
+import { useSessionStore } from '@/store/session-store';
 import { formatTime } from '@/utils/helpers';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { audioPlayerService } from '@/services/audioPlayerService';
 import AirPlayDialog from '@/components/AirPlayDialog.vue';
 import AudioLyrics from '@/components/AudioLyrics.vue';
-import { toLyricLines, type Lyrics } from '@/utils/lyrics';
+import type { Lyrics } from '@/domain';
 import { Airplay, Cast, ChevronDown, GripVertical, ListMusic, MicVocal, SkipBack, SkipForward, Play, Pause, Repeat, Repeat1, Shuffle, Volume2, Volume1, VolumeX, X } from 'lucide-vue-next';
 
 const { t } = useI18n();
 const audioStore = useAudioPlayerStore();
-const jellyfinStore = useJellyfinStore();
+const session = useSessionStore();
+const imageUrl = useImageUrl();
 
 const showQueue = ref(false);
 const showAirPlay = ref(false);
@@ -163,7 +165,7 @@ const currentTrack = computed(() => audioStore.currentTrack);
 const albumArtUrl = computed(() => {
   const track = currentTrack.value;
   if (!track) return '';
-  return jellyfinStore.getImageUrl(track.albumId || track.id, 'Primary', 560, 560);
+  return imageUrl(track.artwork, { width: 560, height: 560 });
 });
 
 // A cover that failed to load (network cut while locked) is fetched again.
@@ -183,10 +185,12 @@ watch(() => currentTrack.value?.id, async (id) => {
   lyrics.value = null;
   if (!id) return;
   try {
-    const dto = await jellyfinStore.fetchLyrics(id);
-    if (currentTrack.value?.id === id) lyrics.value = toLyricLines(dto);
+    const backend = session.backend;
+    if (!backend?.capabilities.lyrics) return;
+    const found = await backend.music.lyrics(id);
+    if (currentTrack.value?.id === id) lyrics.value = found;
   } catch {
-    // 404: no lyrics for this track (or offline).
+    // Offline, or the server could not be reached.
   }
 }, { immediate: true });
 

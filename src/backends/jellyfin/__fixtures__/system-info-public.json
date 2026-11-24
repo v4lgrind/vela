@@ -1,0 +1,7 @@
+{
+    "ServerName": "Maison",
+    "Version": "10.11.0",
+    "Id": "srv1",
+    "ProductName": "Jellyfin Server",
+    "StartupWizardCompleted": true
+}

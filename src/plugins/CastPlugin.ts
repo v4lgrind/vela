@@ -8,7 +8,8 @@ export type CastState =
 
 export interface CastPlugin {
   initialize(): Promise<void>;
-  showPicker(): Promise<void>;
+  /** `receiver: 'default'` lists Default Media Receiver devices (Plex); Jellyfin's receiver otherwise. */
+  showPicker(options?: { receiver?: 'jellyfin' | 'default' }): Promise<void>;
   castMedia(options: {
     itemId: string;
     serverUrl: string;
@@ -16,6 +17,7 @@ export interface CastPlugin {
     startPositionTicks: number;
     title?: string;
   }): Promise<void>;
+  castUrl(options: { url: string; contentType: string; title?: string; imageUrl?: string; startPositionMs?: number }): Promise<void>;
   stopCasting(): Promise<void>;
   getState(): Promise<{ state: CastState }>;
   addListener(

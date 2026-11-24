@@ -1,0 +1,421 @@
+{
+  "MediaContainer": {
+    "size": 1,
+    "allowSync": true,
+    "identifier": "com.plexapp.plugins.library",
+    "librarySectionID": 2,
+    "librarySectionTitle": "librarySectionTitle 3",
+    "librarySectionUUID": "70c8e2f5ea46a9971bdaa686",
+    "mediaTagPrefix": "/system/bundle/media/flags/",
+    "mediaTagVersion": 1792751798,
+    "Metadata": [
+      {
+        "ratingKey": "76334",
+        "key": "/library/metadata/76334",
+        "parentRatingKey": "76324",
+        "grandparentRatingKey": "76323",
+        "guid": "plex://item/0ae9b29c6150",
+        "parentGuid": "plex://item/3de00a03fdff",
+        "grandparentGuid": "plex://item/abb9c519af91",
+        "grandparentSlug": "grandparentSlug 3",
+        "type": "episode",
+        "title": "title 8",
+        "titleSort": "titleSort 2",
+        "grandparentKey": "/library/metadata/76323",
+        "parentKey": "/library/metadata/76324",
+        "librarySectionTitle": "librarySectionTitle 3",
+        "librarySectionID": 2,
+        "librarySectionKey": "/library/sections/2",
+        "grandparentTitle": "grandparentTitle 3",
+        "parentTitle": "parentTitle 2",
+        "originalTitle": "originalTitle 3",
+        "contentRating": "fr/12",
+        "summary": "summary 4",
+        "index": 7,
+        "parentIndex": 1,
+        "audienceRating": 7.5,
+        "viewOffset": 563515,
+        "lastViewedAt": 1791284503,
+        "year": 2022,
+        "thumb": "/library/metadata/76334/thumb/1789101073",
+        "art": "/library/metadata/76323/art/1793424965",
+        "parentThumb": "/library/metadata/76324/thumb/1782723854",
+        "grandparentThumb": "/library/metadata/76323/thumb/1793424965",
+        "grandparentArt": "/library/metadata/76323/art/1793424965",
+        "grandparentTheme": "/library/metadata/76323/theme/1793424965",
+        "duration": 3382528,
+        "originallyAvailableAt": "2022-09-08",
+        "addedAt": 1782723864,
+        "updatedAt": 1789101073,
+        "audienceRatingImage": "themoviedb://image.rating",
+        "Media": [
+          {
+            "id": 113096,
+            "duration": 3382528,
+            "bitrate": 2162,
+            "width": 1920,
+            "height": 1080,
+            "aspectRatio": 1.78,
+            "audioChannels": 6,
+            "audioCodec": "eac3",
+            "videoCodec": "hevc",
+            "videoResolution": "1080",
+            "container": "mkv",
+            "videoFrameRate": "24p",
+            "videoProfile": "main",
+            "hasVoiceActivity": false,
+            "Part": [
+              {
+                "id": 118255,
+                "key": "/library/parts/118255/1782723817/file.mkv",
+                "duration": 3382528,
+                "file": "/media/item-3.mkv",
+                "size": 914076142,
+                "container": "mkv",
+                "videoProfile": "main",
+                "Stream": [
+                  {
+                    "id": 404950,
+                    "streamType": 1,
+                    "default": true,
+                    "codec": "hevc",
+                    "index": 0,
+                    "bitrate": 882,
+                    "language": "English",
+                    "languageTag": "en",
+                    "languageCode": "eng",
+                    "bitDepth": 8,
+                    "chromaLocation": "left",
+                    "chromaSubsampling": "4:2:0",
+                    "codedHeight": 1080,
+                    "codedWidth": 1920,
+                    "colorPrimaries": "bt709",
+                    "colorRange": "tv",
+                    "colorSpace": "bt709",
+                    "colorTrc": "bt709",
+                    "frameRate": 23.976,
+                    "height": 1080,
+                    "level": 120,
+                    "profile": "main",
+                    "refFrames": 1,
+                    "width": 1920,
+                    "displayTitle": "1080p",
+                    "extendedDisplayTitle": "1080p"
+                  },
+                  {
+                    "id": 404951,
+                    "streamType": 2,
+                    "canNormalizeLoudness": false,
+                    "default": true,
+                    "codec": "eac3",
+                    "index": 1,
+                    "channels": 6,
+                    "bitrate": 640,
+                    "language": "Français",
+                    "languageTag": "fr-FR",
+                    "languageCode": "fra",
+                    "audioChannelLayout": "5.1(side)",
+                    "samplingRate": 48000,
+                    "title": "title 9",
+                    "displayTitle": "Français (EAC3 5.1)",
+                    "extendedDisplayTitle": "Français (EAC3 5.1)"
+                  },
+                  {
+                    "id": 404952,
+                    "streamType": 2,
+                    "canNormalizeLoudness": false,
+                    "selected": true,
+                    "codec": "eac3",
+                    "index": 2,
+                    "channels": 6,
+                    "bitrate": 640,
+                    "language": "English",
+                    "languageTag": "en-US",
+                    "languageCode": "eng",
+                    "audioChannelLayout": "5.1(side)",
+                    "samplingRate": 48000,
+                    "displayTitle": "English (EAC3 5.1)",
+                    "extendedDisplayTitle": "English (EAC3 5.1)"
+                  },
+                  {
+                    "id": 404953,
+                    "streamType": 3,
+                    "canAutoSync": false,
+                    "default": true,
+                    "forced": true,
+                    "codec": "srt",
+                    "index": 3,
+                    "language": "Français",
+                    "languageTag": "fr-FR",
+                    "languageCode": "fra",
+                    "title": "title 10",
+                    "displayTitle": "Français Forced",
+                    "extendedDisplayTitle": "Français Forced"
+                  },
+                  {
+                    "id": 404954,
+                    "streamType": 3,
+                    "canAutoSync": false,
+                    "codec": "srt",
+                    "index": 4,
+                    "bitrate": 0,
+                    "language": "Français",
+                    "languageTag": "fr-FR",
+                    "languageCode": "fra",
+                    "hearingImpaired": true,
+                    "title": "title 11",
+                    "displayTitle": "Français SDH",
+                    "extendedDisplayTitle": "Français SDH"
+                  },
+                  {
+                    "id": 404955,
+                    "streamType": 3,
+                    "canAutoSync": false,
+                    "forced": true,
+                    "codec": "srt",
+                    "index": 5,
+                    "language": "Français (Canada)",
+                    "languageTag": "fr-CA",
+                    "languageCode": "fra",
+                    "title": "title 12",
+                    "displayTitle": "Français (Canada) Forced",
+                    "extendedDisplayTitle": "Français (Canada) Forced"
+                  },
+                  {
+                    "id": 404956,
+                    "streamType": 3,
+                    "canAutoSync": false,
+                    "codec": "srt",
+                    "index": 6,
+                    "bitrate": 0,
+                    "language": "Français (Canada)",
+                    "languageTag": "fr-CA",
+                    "languageCode": "fra",
+                    "hearingImpaired": true,
+                    "title": "title 13",
+                    "displayTitle": "Français (Canada) SDH",
+                    "extendedDisplayTitle": "Français (Canada) SDH"
+                  },
+                  {
+                    "id": 404957,
+                    "streamType": 3,
+                    "canAutoSync": false,
+                    "selected": true,
+                    "codec": "srt",
+                    "index": 7,
+                    "bitrate": 0,
+                    "language": "English",
+                    "languageTag": "en-US",
+                    "languageCode": "eng",
+                    "hearingImpaired": true,
+                    "title": "title 14",
+                    "displayTitle": "English SDH",
+                    "extendedDisplayTitle": "English SDH"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "Image": [
+          {
+            "alt": "alt 3",
+            "type": "coverPoster",
+            "url": "/library/metadata/76323/thumb/1793424965"
+          },
+          {
+            "alt": "alt 3",
+            "type": "snapshot",
+            "url": "/library/metadata/76334/thumb/1789101073"
+          },
+          {
+            "alt": "alt 3",
+            "type": "background",
+            "url": "/library/metadata/76323/art/1793424965"
+          },
+          {
+            "alt": "alt 3",
+            "type": "clearLogo",
+            "url": "/library/metadata/76323/clearLogo/1793424965"
+          },
+          {
+            "alt": "alt 3",
+            "type": "backgroundSquare",
+            "url": "/library/metadata/76323/squareArt/1793424965"
+          }
+        ],
+        "UltraBlurColors": {
+          "topLeft": "462403",
+          "topRight": "1e1c1c",
+          "bottomRight": "2f332e",
+          "bottomLeft": "90423b"
+        },
+        "Guid": [
+          {
+            "id": "plex://item/b47b12f302c7"
+          },
+          {
+            "id": "plex://item/bf5db7f46e31"
+          },
+          {
+            "id": "plex://item/7c66bdb91275"
+          }
+        ],
+        "Rating": [
+          {
+            "image": "imdb://image.rating",
+            "value": 7.6,
+            "type": "audience"
+          },
+          {
+            "image": "themoviedb://image.rating",
+            "value": 7.5,
+            "type": "audience"
+          }
+        ],
+        "Director": [
+          {
+            "id": 48360,
+            "filter": "director=48360",
+            "tag": "tag 116",
+            "tagKey": "5dcd3781ddb8cb001e1e0690",
+            "thumb": "https://example.invalid/image.jpg"
+          }
+        ],
+        "Writer": [
+          {
+            "id": 237423,
+            "filter": "writer=237423",
+            "tag": "tag 117",
+            "tagKey": "5d776877103a2d001f572671",
+            "thumb": "https://example.invalid/image.jpg"
+          }
+        ],
+        "Role": [
+          {
+            "id": 10693,
+            "filter": "actor=10693",
+            "tag": "tag 118",
+            "tagKey": "5d776829999c64001ec2cf14",
+            "role": "role 89",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 19009,
+            "filter": "actor=19009",
+            "tag": "tag 119",
+            "tagKey": "5d7768262ec6b5001f6ba379",
+            "role": "role 90",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 237386,
+            "filter": "actor=237386",
+            "tag": "tag 120",
+            "tagKey": "5d776b3c23d5a3001f50e293",
+            "role": "role 91",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 10116,
+            "filter": "actor=10116",
+            "tag": "tag 121",
+            "tagKey": "5d776838880197001ec94159",
+            "role": "role 92",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 100277,
+            "filter": "actor=100277",
+            "tag": "tag 122",
+            "tagKey": "5d7768b72d18a4001ff10f2b",
+            "role": "role 93",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 10451,
+            "filter": "actor=10451",
+            "tag": "tag 123",
+            "tagKey": "5d77683261141d001fb14e5a",
+            "role": "role 94",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 5546,
+            "filter": "actor=5546",
+            "tag": "tag 124",
+            "tagKey": "5d776829151a60001f24b11b",
+            "role": "role 95",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 237387,
+            "filter": "actor=237387",
+            "tag": "tag 125",
+            "tagKey": "5d77687d7a53e9001e6d07c5",
+            "role": "role 96",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 237388,
+            "filter": "actor=237388",
+            "tag": "tag 126",
+            "tagKey": "5d77682ceb5d26001f1dee4b",
+            "role": "role 97",
+            "thumb": "https://example.invalid/image.jpg"
+          },
+          {
+            "id": 237389,
+            "filter": "actor=237389",
+            "tag": "tag 127",
+            "tagKey": "5d77683e5af944001f1fbbe8",
+            "role": "role 98",
+            "thumb": "https://example.invalid/image.jpg"
+          }
+        ],
+        "Producer": [
+          {
+            "id": 237404,
+            "filter": "producer=237404",
+            "tag": "tag 128",
+            "tagKey": "5d776d42f617c90020187b1e"
+          },
+          {
+            "id": 237405,
+            "filter": "producer=237405",
+            "tag": "tag 129",
+            "tagKey": "5d9c086fe9d5a1001f4da175"
+          },
+          {
+            "id": 237406,
+            "filter": "producer=237406",
+            "tag": "tag 130",
+            "tagKey": "5d776a847a53e9001e707864"
+          }
+        ],
+        "Marker": [
+          {
+            "final": true,
+            "id": 69208,
+            "type": "credits",
+            "startTimeOffset": 3188275,
+            "endTimeOffset": 3382528,
+            "Attributes": {
+              "id": 69208,
+              "version": 4
+            }
+          },
+          {
+            "id": 69208,
+            "type": "intro",
+            "startTimeOffset": 118600,
+            "endTimeOffset": 206340,
+            "Attributes": {
+              "id": 69208
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

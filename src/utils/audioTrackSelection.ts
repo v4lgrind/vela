@@ -1,41 +1,36 @@
-import { CODEC_MIME_MAP, isAudioStreamSupported } from '@/utils/codecDetection';
+import { CODEC_MIME, isAudioCodecSupported } from '@/domain';
+import type { AudioStream, DeviceCapabilities } from '@/domain';
 import { languageMatches } from '@/utils/language';
 
-import type { NativeDeviceCapabilities } from '@/plugins/NativeVideoPlugin';
-import type { MediaStream } from '@/types/jellyfin';
-
-type AudioStream = Pick<
-  MediaStream,
-  'Index' | 'Codec' | 'Profile' | 'Language' | 'DisplayTitle' | 'IsDefault' | 'Channels'
->;
+type Candidate = Pick<AudioStream, 'id' | 'codec' | 'profile' | 'language' | 'title' | 'isDefault' | 'channels'>;
 
 // 2 = platform MediaCodec decoder, 1 = packaged FFmpeg only, 0 = needs a server transcode.
-function decodeRank(stream: AudioStream, capabilities: NativeDeviceCapabilities): number {
-  if (!isAudioStreamSupported(stream, capabilities)) return 0;
-  const mime = CODEC_MIME_MAP[stream.Codec?.toLowerCase() || ''];
-  return capabilities.platformAudioCodecs.includes(mime) ? 2 : 1;
+function decodeRank(stream: Candidate, device: DeviceCapabilities): number {
+  if (!isAudioCodecSupported(stream.codec, stream.profile, device)) return 0;
+  const mime = CODEC_MIME[stream.codec?.toLowerCase() || ''];
+  return device.platformAudioCodecs.includes(mime) ? 2 : 1;
 }
 
 // E-AC3 JOC is only rendered as Atmos by a platform decoder that declares it.
-function keepsAtmos(stream: AudioStream, capabilities: NativeDeviceCapabilities): boolean {
-  const profile = stream.Profile?.toLowerCase() || '';
-  return stream.Codec?.toLowerCase() === 'eac3'
+function keepsAtmos(stream: Candidate, device: DeviceCapabilities): boolean {
+  const profile = stream.profile?.toLowerCase() || '';
+  return stream.codec?.toLowerCase() === 'eac3'
     && (profile.includes('atmos') || profile.includes('joc'))
-    && capabilities.platformAudioCodecs.includes('audio/eac3-joc');
+    && device.platformAudioCodecs.includes('audio/eac3-joc');
 }
 
-function isCommentary(stream: AudioStream): boolean {
-  return /comment/i.test(stream.DisplayTitle || '');
+function isCommentary(stream: Candidate): boolean {
+  return /comment/i.test(stream.title || '');
 }
 
-function bestPlayableStream<T extends AudioStream>(streams: T[], capabilities: NativeDeviceCapabilities): T {
-  const mainTracks = streams.filter(stream => !isCommentary(stream));
+function bestPlayableStream<T extends Candidate>(streams: T[], device: DeviceCapabilities): T {
+  const mainTracks = streams.filter((stream) => !isCommentary(stream));
   const pool = mainTracks.length > 0 ? mainTracks : streams;
   const scoreOf = (stream: T) => [
-    decodeRank(stream, capabilities),
-    keepsAtmos(stream, capabilities) ? 1 : 0,
-    stream.Channels || 0,
-    stream.IsDefault ? 1 : 0,
+    decodeRank(stream, device),
+    keepsAtmos(stream, device) ? 1 : 0,
+    stream.channels || 0,
+    stream.isDefault ? 1 : 0,
   ];
   // Array.prototype.sort is stable, so equal scores keep file order.
   return [...pool].sort((a, b) => {
@@ -55,33 +50,31 @@ function bestPlayableStream<T extends AudioStream>(streams: T[], capabilities: N
  * capabilities the first language match is kept. With no language match the
  * default-flagged track, then the first track, is used.
  */
-export function pickPreferredAudioStream<T extends AudioStream>(
+export function pickPreferredAudioStream<T extends Candidate>(
   streams: T[],
   preferredLanguages: Array<string | null | undefined>,
-  capabilities: NativeDeviceCapabilities,
+  device: DeviceCapabilities,
 ): T | undefined {
   for (const language of preferredLanguages) {
     if (!language) continue;
-    const matches = streams.filter(stream => languageMatches(language, stream.Language || ''));
+    const matches = streams.filter((stream) => languageMatches(language, stream.language || ''));
     if (matches.length === 0) continue;
-    return capabilities.androidApi > 0 ? bestPlayableStream(matches, capabilities) : matches[0];
+    return device.isKnown ? bestPlayableStream(matches, device) : matches[0];
   }
-  return streams.find(stream => stream.IsDefault) || streams[0];
+  return streams.find((stream) => stream.isDefault) || streams[0];
 }
 
 /**
- * ExoPlayer audio group for a Jellyfin audio stream. Both list a file's audio
+ * ExoPlayer audio group for a server audio stream. Both list a file's audio
  * tracks in container order, so the stream's position maps to the group's
  * position. Returns undefined rather than guessing when the lists differ.
  */
 export function nativeAudioGroupFor(
-  jellyfinAudioStreams: Array<Pick<MediaStream, 'Index'>>,
+  serverAudioStreams: Array<Pick<AudioStream, 'id'>>,
   nativeAudioGroups: Array<{ groupIndex: number }>,
-  jellyfinIndex: number | undefined,
+  streamId: string | undefined,
 ): number | undefined {
-  if (jellyfinIndex === undefined || jellyfinAudioStreams.length !== nativeAudioGroups.length) {
-    return undefined;
-  }
-  const position = jellyfinAudioStreams.findIndex(stream => stream.Index === jellyfinIndex);
+  if (streamId === undefined || serverAudioStreams.length !== nativeAudioGroups.length) return undefined;
+  const position = serverAudioStreams.findIndex((stream) => stream.id === streamId);
   return position >= 0 ? nativeAudioGroups[position].groupIndex : undefined;
 }

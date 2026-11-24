@@ -1,72 +1,52 @@
 import { defineStore } from 'pinia';
 
-const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+import type { MediaItem } from '@/domain';
 
-/**
- * Lightweight cache for Series and Season item metadata.
- * Populated when episodes are downloaded so that their parent
- * Series/Season detail pages work without a network connection.
- *
- * Only stores the fields needed to render the detail page —
- * keeps localStorage usage small (≈2–5 KB per entry).
- */
-export interface CachedItem {
-  Id: string;
-  Name: string;
-  _cachedAt?: number;
-  Type: string;
-  Overview?: string;
-  Genres?: string[];
-  ProductionYear?: number;
-  CommunityRating?: number;
-  ImageTags?: Record<string, string>;
-  BackdropImageTags?: string[];
-  SeriesId?: string;
-  SeriesName?: string;
-  IndexNumber?: number;
-  Studios?: Array<{ Name: string }>;
-  People?: Array<{ Id?: string; Name: string; Role?: string; Type?: string; PrimaryImageTag?: string }>;
+import { useSessionStore } from './session-store';
+
+const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+const MAX_CREDITS = 20;
+
+/** Entries written before the multi-backend model hold a Jellyfin DTO subset (`Id`, `Name`, …). */
+interface LegacyEntry { Id: string; _cachedAt?: number; [field: string]: unknown }
+interface CachedEntry { item: MediaItem; cachedAt: number }
+
+function isLegacy(entry: CachedEntry | LegacyEntry): entry is LegacyEntry {
+  return 'Id' in entry;
 }
 
+/**
+ * Lightweight cache for parent items (series, seasons) of downloads, so their
+ * detail pages work without a network connection. Credits are capped to keep
+ * localStorage small.
+ */
 export const useMetadataCacheStore = defineStore('metadataCache', {
   state: () => ({
-    cache: {} as Record<string, CachedItem>,
+    cache: {} as Record<string, CachedEntry | LegacyEntry>,
   }),
 
   persist: true,
 
   actions: {
-    set(item: any) {
-      if (!item?.Id) return;
-      // Only persist what the detail page actually needs
-      const slim: CachedItem = {
-        Id: item.Id,
-        Name: item.Name,
-        Type: item.Type,
-        Overview: item.Overview,
-        Genres: item.Genres,
-        ProductionYear: item.ProductionYear,
-        CommunityRating: item.CommunityRating,
-        ImageTags: item.ImageTags,
-        BackdropImageTags: item.BackdropImageTags,
-        SeriesId: item.SeriesId,
-        SeriesName: item.SeriesName,
-        IndexNumber: item.IndexNumber,
-        Studios: item.Studios?.map((s: any) => ({ Name: s.Name })),
-        People: item.People?.slice(0, 20), // cap cast list size
-      };
-      slim._cachedAt = Date.now();
-      this.cache[item.Id] = slim;
+    set(item: MediaItem | null | undefined) {
+      if (!item?.id) return;
+      const slim = 'credits' in item ? { ...item, credits: item.credits.slice(0, MAX_CREDITS) } : item;
+      this.cache[item.id] = { item: slim as MediaItem, cachedAt: Date.now() };
     },
 
-    get(id: string, allowExpired = false): CachedItem | null {
+    get(id: string, allowExpired = false): MediaItem | null {
       const entry = this.cache[id];
       if (!entry) return null;
-      if (!allowExpired && entry._cachedAt && Date.now() - entry._cachedAt > CACHE_TTL_MS) {
+      const cachedAt = isLegacy(entry) ? entry._cachedAt ?? 0 : entry.cachedAt;
+      if (!allowExpired && cachedAt && Date.now() - cachedAt > CACHE_TTL_MS) {
         delete this.cache[id];
         return null;
       }
-      return entry;
+      if (!isLegacy(entry)) return entry.item;
+      // Decoded once, then kept in the current format.
+      const item = useSessionStore().decodeStoredItem(entry);
+      this.cache[id] = { item, cachedAt };
+      return item;
     },
 
     has(id: string): boolean {
@@ -77,9 +57,8 @@ export const useMetadataCacheStore = defineStore('metadataCache', {
       const now = Date.now();
       for (const id in this.cache) {
         const entry = this.cache[id];
-        if (entry._cachedAt && now - entry._cachedAt > CACHE_TTL_MS) {
-          delete this.cache[id];
-        }
+        const cachedAt = isLegacy(entry) ? entry._cachedAt ?? 0 : entry.cachedAt;
+        if (cachedAt && now - cachedAt > CACHE_TTL_MS) delete this.cache[id];
       }
     },
   },

@@ -49,22 +49,22 @@
       <!-- Grid -->
       <ul v-else class="list-none px-gutter py-4 md:px-gutter-wide m-0 grid grid-cols-3 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(140px,1fr))] sm:gap-4"
         style="padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px))">
-        <li v-for="item in filteredResults" :key="item.Id" class="cursor-pointer" @click="goToItem(item)">
+        <li v-for="item in filteredResults" :key="item.id" class="cursor-pointer" @click="goToItem(item)">
           <!-- Poster -->
           <div class="relative w-full overflow-hidden bg-surface shadow-lg active:opacity-80 transition-opacity"
             :class="posterShape(item)">
             <LazyImg
               :src="itemImageUrl(item)"
-              :alt="item.Name"
-              :item-type="item.Type"
+              :alt="item.title"
+              :kind="item.kind"
               class="w-full h-full object-cover block"
             />
             <!-- Download badge -->
-            <div v-if="offlineStore.isItemDownloaded(item.Id)"
+            <div v-if="offlineStore.isItemDownloaded(item.id)"
               class="absolute top-1.5 left-1.5 size-5 rounded-full bg-accent-purple/85 flex items-center justify-center shadow pointer-events-none">
               <DownloadIcon class="size-[11px] text-accent-ink" />
             </div>
-            <div v-else-if="downloadStore.isDownloading(item.Id)"
+            <div v-else-if="downloadStore.isDownloading(item.id)"
               class="absolute top-1.5 left-1.5 size-5 rounded-full bg-accent-purple/85 flex items-center justify-center shadow pointer-events-none animate-pulse">
               <Loader2 class="size-[11px] text-accent-ink animate-spin" />
             </div>
@@ -72,35 +72,35 @@
             <button
               v-if="!isMusic(item)"
               @click.stop="toggleWatched(item)"
-              :disabled="watchingId === item.Id"
-              :aria-label="item.UserData?.Played ? t('common.markUnwatched') : t('common.markWatched')"
+              :disabled="watchingId === item.id"
+              :aria-label="item.user.played ? t('common.markUnwatched') : t('common.markWatched')"
               class="absolute top-1 right-1 size-9 rounded-full flex items-center justify-center shadow transition-all active:scale-95 disabled:opacity-60"
-              :class="item.UserData?.Played ? 'bg-accent-purple text-accent-ink' : 'bg-black/50 text-white/60 hover:bg-black/75 hover:text-white'">
-              <Loader2 v-if="watchingId === item.Id" class="size-3.5 animate-spin" />
+              :class="item.user.played ? 'bg-accent-purple text-accent-ink' : 'bg-black/50 text-white/60 hover:bg-black/75 hover:text-white'">
+              <Loader2 v-if="watchingId === item.id" class="size-3.5 animate-spin" />
               <Check v-else class="size-3.5" :stroke-width="3" />
             </button>
             <!-- Song: tap plays -->
-            <div v-if="item.Type === 'Audio'"
+            <div v-if="item.kind === 'track'"
               class="absolute bottom-1.5 right-1.5 size-7 rounded-full bg-black/60 flex items-center justify-center pointer-events-none">
               <Play class="size-3.5 text-white fill-current" />
             </div>
             <!-- Episode label -->
-            <div v-if="item.Type === 'Episode' && (item.ParentIndexNumber || item.IndexNumber)"
+            <div v-if="item.kind === 'episode' && (item.seasonNumber || item.episodeNumber)"
               class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-2 py-1.5">
               <p class="text-white text-xs font-semibold">
-                S{{ item.ParentIndexNumber }}E{{ item.IndexNumber }}
+                S{{ item.seasonNumber }}E{{ item.episodeNumber }}
               </p>
             </div>
           </div>
           <!-- Info -->
           <div class="mt-1.5 px-0.5">
-            <p class="text-xs font-medium text-text-heading line-clamp-2 leading-tight" :title="item.Name">{{ item.Name }}</p>
-            <p v-if="item.Type === 'Episode' && item.SeriesName"
-              class="text-[10.5px] text-text-muted mt-0.5 truncate">{{ item.SeriesName }}</p>
-            <p v-else-if="(item.Type === 'Audio' || item.Type === 'MusicAlbum') && artistOf(item)"
+            <p class="text-xs font-medium text-text-heading line-clamp-2 leading-tight" :title="item.title">{{ item.title }}</p>
+            <p v-if="item.kind === 'episode' && item.seriesTitle"
+              class="text-[10.5px] text-text-muted mt-0.5 truncate">{{ item.seriesTitle }}</p>
+            <p v-else-if="artistOf(item)"
               class="text-[10.5px] text-text-muted mt-0.5 truncate">{{ artistOf(item) }}</p>
-            <p v-else-if="item.ProductionYear"
-              class="text-[10.5px] text-text-muted mt-0.5">{{ item.ProductionYear }}</p>
+            <p v-else-if="item.year"
+              class="text-[10.5px] text-text-muted mt-0.5">{{ item.year }}</p>
           </div>
         </li>
       </ul>
@@ -115,108 +115,104 @@ import { useRoute, useRouter } from 'vue-router';
 import { EmptyState } from '@/components/layout';
 import { Button } from '@/components/ui/button';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { useJellyfinStore } from '@/store/jellyfin-store';
+import type { ItemKind, MediaItem, Track } from '@/domain';
+import { useBackend, useImageUrl } from '@/composables/useBackend';
 import LazyImg from '@/components/LazyImg.vue';
 import { Download as DownloadIcon, Loader2, Play, Search, Check } from 'lucide-vue-next';
 import { useOfflineStore } from '@/store/offline-store';
 import { useDownloadStore } from '@/store/download-store';
 import { useToast } from '@/composables/useToast';
 import { useAudioPlayerStore } from '@/store/audio-player-store';
-import { toAudioTrack } from '@/utils/audioTrack';
+import { trackToAudioTrack } from '@/utils/audioTrack';
 
 const route = useRoute();
 const offlineStore = useOfflineStore();
 const downloadStore = useDownloadStore();
 const { t } = useI18n();
 const router = useRouter();
-const store = useJellyfinStore();
+const backend = useBackend();
+const imageUrl = useImageUrl();
 const { showError } = useToast();
 const audioStore = useAudioPlayerStore();
 
 const inputEl = ref<HTMLInputElement | null>(null);
 const searchQuery = ref((route.query.q as string) || '');
-const results = ref<any[]>([]);
+const results = ref<MediaItem[]>([]);
 const isSearching = ref(false);
 const watchingId = ref<string | null>(null);
 
-async function toggleWatched(item: any) {
+async function toggleWatched(item: MediaItem) {
   if (watchingId.value) return;
-  watchingId.value = item.Id;
+  watchingId.value = item.id;
   try {
-    if (item.UserData?.Played) {
-      await store.markUnplayed(item.Id);
-      if (item.UserData) item.UserData.Played = false;
-    } else {
-      await store.markPlayed(item.Id);
-      if (!item.UserData) item.UserData = {};
-      item.UserData.Played = true;
-    }
+    const played = !item.user.played;
+    await backend.value.userData.setPlayed(item.id, played);
+    item.user.played = played;
   } finally {
     watchingId.value = null;
   }
 }
-type SearchType = 'Movie' | 'Series' | 'Episode' | 'MusicArtist' | 'MusicAlbum' | 'Audio';
-const SEARCH_TYPES: SearchType[] = ['Movie', 'Series', 'Episode', 'MusicArtist', 'MusicAlbum', 'Audio'];
-const MUSIC_TYPES = new Set(['MusicArtist', 'MusicAlbum', 'Audio']);
-const activeTab = ref<'all' | SearchType>('all');
+
+type SearchKind = Extract<ItemKind, 'movie' | 'series' | 'episode' | 'artist' | 'album' | 'track'>;
+const SEARCH_KINDS: SearchKind[] = ['movie', 'series', 'episode', 'artist', 'album', 'track'];
+const MUSIC_KINDS = new Set<ItemKind>(['artist', 'album', 'track']);
+const SEARCH_LIMIT = 200;
+
+const activeTab = ref<'all' | SearchKind>('all');
 let debounceId: number | undefined;
 
 const tabs = [
   { value: 'all' as const,     label: 'search.tabs.all' },
-  { value: 'Movie' as const,   label: 'search.tabs.movies' },
-  { value: 'Series' as const,  label: 'search.tabs.shows' },
-  { value: 'Episode' as const, label: 'search.tabs.episodes' },
-  { value: 'MusicArtist' as const, label: 'search.tabs.artists' },
-  { value: 'MusicAlbum' as const, label: 'search.tabs.albums' },
-  { value: 'Audio' as const, label: 'search.tabs.songs' },
+  { value: 'movie' as const,   label: 'search.tabs.movies' },
+  { value: 'series' as const,  label: 'search.tabs.shows' },
+  { value: 'episode' as const, label: 'search.tabs.episodes' },
+  { value: 'artist' as const,  label: 'search.tabs.artists' },
+  { value: 'album' as const,   label: 'search.tabs.albums' },
+  { value: 'track' as const,   label: 'search.tabs.songs' },
 ];
 
-function isMusic(item: any) {
-  return MUSIC_TYPES.has(item.Type);
+function isMusic(item: MediaItem) {
+  return MUSIC_KINDS.has(item.kind);
 }
 
-function posterShape(item: any) {
-  if (item.Type === 'Episode') return 'aspect-video rounded-xl';
-  if (item.Type === 'MusicArtist') return 'aspect-square rounded-full';
+function posterShape(item: MediaItem) {
+  if (item.kind === 'episode') return 'aspect-video rounded-xl';
+  if (item.kind === 'artist') return 'aspect-square rounded-full';
   if (isMusic(item)) return 'aspect-square rounded-xl';
   return 'aspect-[2/3] rounded-xl';
 }
 
-function artistOf(item: any): string {
-  return item.AlbumArtist || item.Artists?.join(', ') || '';
+function artistOf(item: MediaItem): string {
+  if (item.kind === 'track') return item.albumArtist || item.artists.map((a) => a.name).join(', ');
+  if (item.kind === 'album') return item.artists.map((a) => a.name).join(', ');
+  return '';
 }
 
 const filteredResults = computed(() => {
   if (activeTab.value === 'all') return results.value;
-  return results.value.filter(r => r.Type === activeTab.value);
+  return results.value.filter(r => r.kind === activeTab.value);
 });
 
-function tabCount(type: string) {
-  return results.value.filter(r => r.Type === type).length;
+function tabCount(kind: string) {
+  return results.value.filter(r => r.kind === kind).length;
 }
 
-function itemImageUrl(item: any): string {
-  if (item.Type === 'Episode') {
-    return store.getImageUrl(item.Id, 'Primary', 400, 225) ||
-      store.getImageUrl(item.SeriesId, 'Primary', 130, 195) || '';
-  }
-  if (isMusic(item)) {
-    // Songs rarely have their own image: fall back to the album cover.
-    const id = item.Type === 'Audio' && !item.ImageTags?.Primary ? item.AlbumId : item.Id;
-    return id ? store.getImageUrl(id, 'Primary', 200, 200) : '';
-  }
-  return store.getImageUrl(item.Id, 'Primary', 130, 195) || '';
+/** Episodes show their still (series poster as fallback); songs use the album cover. */
+function itemImageUrl(item: MediaItem): string {
+  if (item.kind === 'episode') return imageUrl(item.images.thumb ?? item.images.poster, { width: 400, height: 225 });
+  if (isMusic(item)) return imageUrl(item.images.poster, { width: 200, height: 200 });
+  return imageUrl(item.images.poster, { width: 130, height: 195 });
 }
 
-function goToItem(item: any) {
-  if (item.Type === 'Audio') {
+function goToItem(item: MediaItem) {
+  if (item.kind === 'track') {
     // Same as the library's Songs list: the matching songs become the queue.
-    const songs = results.value.filter((r) => r.Type === 'Audio');
-    audioStore.playAlbum(songs.map((song) => toAudioTrack(song)), songs.indexOf(item));
-  } else if (item.Type === 'Episode') {
-    router.push({ name: 'Player', params: { id: item.Id } });
+    const songs = results.value.filter((r): r is Track => r.kind === 'track');
+    audioStore.playAlbum(songs.map((song) => trackToAudioTrack(song)), songs.indexOf(item));
+  } else if (item.kind === 'episode') {
+    router.push({ name: 'Player', params: { id: item.id } });
   } else {
-    router.push({ name: 'ItemDetails', params: { id: item.Id } });
+    router.push({ name: 'ItemDetails', params: { id: item.id } });
   }
 }
 
@@ -224,11 +220,7 @@ async function doSearch(term: string) {
   if (!term.trim()) { results.value = []; return; }
   isSearching.value = true;
   try {
-    results.value = await store.searchItems({
-      searchTerm: term,
-      limit: 200,
-      includeItemTypes: SEARCH_TYPES,
-    });
+    results.value = await backend.value.catalog.search({ term, limit: SEARCH_LIMIT, kinds: SEARCH_KINDS });
   } catch {
     results.value = [];
     showError(t('search.failed'));

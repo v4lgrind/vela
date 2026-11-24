@@ -1,0 +1,50 @@
+{
+    "PlaySessionId": "ps1",
+    "MediaSources": [
+        {
+            "Id": "mov00003500000000000000000000000",
+            "Container": "mp4",
+            "Protocol": "File",
+            "Size": 969201,
+            "Bitrate": 900000,
+            "RunTimeTicks": 100000000,
+            "SupportsDirectPlay": true,
+            "SupportsDirectStream": true,
+            "SupportsTranscoding": false,
+            "MediaStreams": [
+                {
+                    "Type": "Video",
+                    "Codec": "h264",
+                    "Width": 1280,
+                    "Height": 720,
+                    "Profile": "Main",
+                    "Index": 0,
+                    "IsDefault": true,
+                    "DisplayTitle": "720p H264",
+                    "BitRate": 800000
+                },
+                {
+                    "Type": "Audio",
+                    "Codec": "aac",
+                    "Channels": 2,
+                    "Language": "fre",
+                    "DisplayTitle": "Français - AAC - Stéréo",
+                    "Index": 1,
+                    "IsDefault": true
+                },
+                {
+                    "Type": "Subtitle",
+                    "Codec": "subrip",
+                    "Language": "fre",
+                    "DisplayTitle": "Français - SUBRIP",
+                    "Index": 2,
+                    "IsExternal": true,
+                    "IsTextSubtitleStream": true,
+                    "DeliveryMethod": "External",
+                    "DeliveryUrl": "/Videos/mov00003500000000000000000000000/mov00003500000000000000000000000/Subtitles/2/0/Stream.srt"
+                }
+            ],
+            "DefaultAudioStreamIndex": 1
+        }
+    ]
+}

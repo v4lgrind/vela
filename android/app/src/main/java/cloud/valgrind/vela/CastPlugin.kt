@@ -90,10 +90,12 @@ class CastPlugin : Plugin() {
                     call.reject("Cast not initialized")
                     return@runOnUiThread
                 }
-                // The music cast button may have switched the receiver.
-                castContext?.setReceiverApplicationId(JELLYFIN_RECEIVER_ID)
+                // "jellyfin": Jellyfin's receiver app; "default": the Default Media Receiver (Plex).
+                // The music cast button may have switched the receiver meanwhile.
+                val receiverId = if (call.getString("receiver") == "default") DEFAULT_MEDIA_RECEIVER_ID else JELLYFIN_RECEIVER_ID
+                castContext?.setReceiverApplicationId(receiverId)
                 val selector = androidx.mediarouter.media.MediaRouteSelector.Builder()
-                    .addControlCategory(CastMediaControlIntent.categoryForCast(JELLYFIN_RECEIVER_ID))
+                    .addControlCategory(CastMediaControlIntent.categoryForCast(receiverId))
                     .build()
                 val dialog = androidx.mediarouter.app.MediaRouteChooserDialog(activity)
                 dialog.routeSelector = selector
@@ -143,6 +145,40 @@ class CastPlugin : Plugin() {
                     .setAutoplay(true)
                     .build()
 
+                remoteMediaClient.load(loadRequest)
+                call.resolve()
+            } catch (e: Exception) {
+                call.reject("Cast failed: ${e.message}")
+            }
+        }
+    }
+
+    /** Default Media Receiver: a stream URL that carries its own credentials (Plex). */
+    @PluginMethod
+    fun castUrl(call: PluginCall) {
+        val url = call.getString("url") ?: run { call.reject("url required"); return }
+        val contentType = call.getString("contentType") ?: "video/mp4"
+        val title = call.getString("title") ?: ""
+        val imageUrl = call.getString("imageUrl")
+        val startPositionMs = call.data.optLong("startPositionMs", 0L)
+        activity.runOnUiThread {
+            try {
+                val remoteMediaClient = castContext?.sessionManager?.currentCastSession?.remoteMediaClient
+                    ?: run { call.reject("No active Cast session"); return@runOnUiThread }
+                val metadata = MediaMetadata(MediaMetadata.MEDIA_TYPE_MOVIE).apply {
+                    putString(MediaMetadata.KEY_TITLE, title)
+                    imageUrl?.let { addImage(com.google.android.gms.common.images.WebImage(android.net.Uri.parse(it))) }
+                }
+                val mediaInfo = MediaInfo.Builder(url)
+                    .setStreamType(MediaInfo.STREAM_TYPE_BUFFERED)
+                    .setContentType(contentType)
+                    .setMetadata(metadata)
+                    .build()
+                val loadRequest = MediaLoadRequestData.Builder()
+                    .setMediaInfo(mediaInfo)
+                    .setCurrentTime(startPositionMs)
+                    .setAutoplay(true)
+                    .build()
                 remoteMediaClient.load(loadRequest)
                 call.resolve()
             } catch (e: Exception) {

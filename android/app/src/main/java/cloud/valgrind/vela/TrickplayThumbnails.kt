@@ -19,7 +19,7 @@ import java.util.concurrent.Executors
  * [Info.intervalMs]. Sheets are downloaded on demand and the requested tile
  * is cut out with a region decoder, so a full sheet is never decoded.
  */
-class TrickplayThumbnails(private val info: Info, private val authHeader: String) {
+class TrickplayThumbnails(private val info: Info, private val headers: Map<String, String>) : SeekPreviews {
 
     data class Info(
         /** Sheet URL with `{index}` in place of the sheet number. */
@@ -55,7 +55,7 @@ class TrickplayThumbnails(private val info: Info, private val authHeader: String
         }
     }
 
-    val aspectRatio: Float get() = info.height.toFloat() / info.width
+    override val aspectRatio: Float get() = info.height.toFloat() / info.width
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private val executor = Executors.newSingleThreadExecutor()
@@ -69,7 +69,7 @@ class TrickplayThumbnails(private val info: Info, private val authHeader: String
     @Volatile private var wanted = -1
 
     /** Main thread. [onReady] runs on the main thread with the thumbnail at [positionMs]. */
-    fun load(positionMs: Long, onReady: (Bitmap) -> Unit) {
+    override fun load(positionMs: Long, onReady: (Bitmap) -> Unit) {
         val index = (positionMs / info.intervalMs).toInt().coerceIn(0, info.thumbnailCount - 1)
         if (index == wanted) return
         wanted = index
@@ -81,11 +81,11 @@ class TrickplayThumbnails(private val info: Info, private val authHeader: String
     }
 
     /** Drops the pending request, e.g. when the preview is hidden. */
-    fun cancel() {
+    override fun cancel() {
         wanted = -1
     }
 
-    fun release() {
+    override fun release() {
         cancel()
         executor.shutdownNow()
         sheets.evictAll()
@@ -110,7 +110,7 @@ class TrickplayThumbnails(private val info: Info, private val authHeader: String
     @Suppress("DEPRECATION")
     private fun fetchSheet(sheet: Int): BitmapRegionDecoder? = try {
         val conn = URL(info.urlTemplate.replace("{index}", sheet.toString())).openConnection() as HttpURLConnection
-        conn.setRequestProperty("Authorization", authHeader)
+        headers.forEach { (name, value) -> conn.setRequestProperty(name, value) }
         conn.connectTimeout = 5000
         conn.readTimeout = 10000
         try {

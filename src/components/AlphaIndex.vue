@@ -1,12 +1,13 @@
 <template>
-  <!-- 44px-wide strip: drag a finger along it, the letter under the finger is applied on release. -->
+  <!-- 44px-wide strip: drag a finger along it, the letter under the finger is applied on release.
+       It ends above the nav bar and the mini player (--shell-bottom, set by App.vue). -->
   <div
     ref="strip"
     :aria-label="t('library.alphaIndex')"
     role="group"
     class="fixed right-0 z-10 flex w-11 touch-none select-none flex-col items-center justify-between py-2
-           top-[calc(var(--sat,env(safe-area-inset-top,0px))+140px)]
-           bottom-[calc(var(--sab,env(safe-area-inset-bottom,0px))+110px)]"
+           top-[calc(var(--sat,env(safe-area-inset-top,0px))+140px)]"
+    :style="{ bottom: 'calc(var(--shell-bottom, 0px) + 24px)' }"
     @pointerdown="onDown"
     @pointermove="onMove"
     @pointerup="onUp"

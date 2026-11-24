@@ -1,0 +1,1087 @@
+{
+    "Items": [
+        {
+            "Id": "epi00008700000000000000000000000",
+            "Name": "Arrivée",
+            "Type": "Episode",
+            "IndexNumber": 1,
+            "ParentIndexNumber": 1,
+            "ParentId": "sea00008600000000000000000000000",
+            "SeasonId": "sea00008600000000000000000000000",
+            "SeasonName": "Saison 1",
+            "SeriesId": "ser00008500000000000000000000000",
+            "SeriesName": "Cold Signal",
+            "Overview": "Une tempête isole le port pendant trois jours. Ines profite de la coupure pour fouiller les archives du phare, où elle trouve un carnet qui n’aurait jamais dû survivre.",
+            "RunTimeTicks": 26400000000,
+            "CommunityRating": 7,
+            "PremiereDate": "2023-01-12T00:00:00Z",
+            "ImageTags": {
+                "Primary": "t"
+            },
+            "ParentBackdropItemId": "ser00008500000000000000000000000",
+            "ParentBackdropImageTags": [
+                "b"
+            ],
+            "SeriesPrimaryImageTag": "t",
+            "MediaSources": [
+                {
+                    "Id": "epi00008700000000000000000000000",
+                    "Name": "Version 4K",
+                    "Container": "mkv",
+                    "Size": 18400000000,
+                    "Bitrate": 24500000,
+                    "MediaStreams": [
+                        {
+                            "Type": "Video",
+                            "Codec": "hevc",
+                            "Width": 3840,
+                            "Height": 2160,
+                            "Profile": "Main 10",
+                            "VideoRange": "HDR",
+                            "VideoRangeType": "HDR10",
+                            "BitRate": 24000000,
+                            "Index": 0,
+                            "IsDefault": true,
+                            "DisplayTitle": "4K HEVC HDR10"
+                        },
+                        {
+                            "Type": "Audio",
+                            "Codec": "eac3",
+                            "Channels": 6,
+                            "ChannelLayout": "5.1",
+                            "Language": "fre",
+                            "DisplayTitle": "Français - Dolby Digital+ - 5.1 - Par défaut",
+                            "Index": 1,
+                            "IsDefault": true
+                        },
+                        {
+                            "Type": "Audio",
+                            "Codec": "aac",
+                            "Channels": 2,
+                            "Language": "eng",
+                            "DisplayTitle": "English - AAC - Stéréo",
+                            "Index": 2
+                        },
+                        {
+                            "Type": "Subtitle",
+                            "Codec": "subrip",
+                            "Language": "fre",
+                            "DisplayTitle": "Français - SUBRIP",
+                            "Index": 3,
+                            "IsExternal": false
+                        },
+                        {
+                            "Type": "Subtitle",
+                            "Codec": "pgssub",
+                            "Language": "eng",
+                            "DisplayTitle": "English - PGS",
+                            "Index": 4
+                        }
+                    ],
+                    "Path": "/media/x.mkv",
+                    "SupportsDirectPlay": true
+                }
+            ],
+            "MediaStreams": [
+                {
+                    "Type": "Video",
+                    "Codec": "hevc",
+                    "Width": 3840,
+                    "Height": 2160,
+                    "Profile": "Main 10",
+                    "VideoRange": "HDR",
+                    "VideoRangeType": "HDR10",
+                    "BitRate": 24000000,
+                    "Index": 0,
+                    "IsDefault": true,
+                    "DisplayTitle": "4K HEVC HDR10"
+                },
+                {
+                    "Type": "Audio",
+                    "Codec": "eac3",
+                    "Channels": 6,
+                    "ChannelLayout": "5.1",
+                    "Language": "fre",
+                    "DisplayTitle": "Français - Dolby Digital+ - 5.1 - Par défaut",
+                    "Index": 1,
+                    "IsDefault": true
+                },
+                {
+                    "Type": "Audio",
+                    "Codec": "aac",
+                    "Channels": 2,
+                    "Language": "eng",
+                    "DisplayTitle": "English - AAC - Stéréo",
+                    "Index": 2
+                },
+                {
+                    "Type": "Subtitle",
+                    "Codec": "subrip",
+                    "Language": "fre",
+                    "DisplayTitle": "Français - SUBRIP",
+                    "Index": 3,
+                    "IsExternal": false
+                },
+                {
+                    "Type": "Subtitle",
+                    "Codec": "pgssub",
+                    "Language": "eng",
+                    "DisplayTitle": "English - PGS",
+                    "Index": 4
+                }
+            ],
+            "UserData": {
+                "Played": true,
+                "PlaybackPositionTicks": 0
+            }
+        },
+        {
+            "Id": "epi00008800000000000000000000000",
+            "Name": "La marée basse",
+            "Type": "Episode",
+            "IndexNumber": 2,
+            "ParentIndexNumber": 1,
+            "ParentId": "sea00008600000000000000000000000",
+            "SeasonId": "sea00008600000000000000000000000",
+            "SeasonName": "Saison 1",
+            "SeriesId": "ser00008500000000000000000000000",
+            "SeriesName": "Cold Signal",
+            "Overview": "Une tempête isole le port pendant trois jours. Ines profite de la coupure pour fouiller les archives du phare, où elle trouve un carnet qui n’aurait jamais dû survivre.",
+            "RunTimeTicks": 27000000000,
+            "CommunityRating": 7.2,
+            "PremiereDate": "2023-02-12T00:00:00Z",
+            "ImageTags": {
+                "Primary": "t"
+            },
+            "ParentBackdropItemId": "ser00008500000000000000000000000",
+            "ParentBackdropImageTags": [
+                "b"
+            ],
+            "SeriesPrimaryImageTag": "t",
+            "MediaSources": [
+                {
+                    "Id": "epi00008800000000000000000000000",
+                    "Name": "Version 4K",
+                    "Container": "mkv",
+                    "Size": 18400000000,
+                    "Bitrate": 24500000,
+                    "MediaStreams": [
+                        {
+                            "Type": "Video",
+                            "Codec": "hevc",
+                            "Width": 3840,
+                            "Height": 2160,
+                            "Profile": "Main 10",
+                            "VideoRange": "HDR",
+                            "VideoRangeType": "HDR10",
+                            "BitRate": 24000000,
+                            "Index": 0,
+                            "IsDefault": true,
+                            "DisplayTitle": "4K HEVC HDR10"
+                        },
+                        {
+                            "Type": "Audio",
+                            "Codec": "eac3",
+                            "Channels": 6,
+                            "ChannelLayout": "5.1",
+                            "Language": "fre",
+                            "DisplayTitle": "Français - Dolby Digital+ - 5.1 - Par défaut",
+                            "Index": 1,
+                            "IsDefault": true
+                        },
+                        {
+                            "Type": "Audio",
+                            "Codec": "aac",
+                            "Channels": 2,
+                            "Language": "eng",
+                            "DisplayTitle": "English - AAC - Stéréo",
+                            "Index": 2
+                        },
+                        {
+                            "Type": "Subtitle",
+                            "Codec": "subrip",
+                            "Language": "fre",
+                            "DisplayTitle": "Français - SUBRIP",
+                            "Index": 3,
+                            "IsExternal": false
+                        },
+                        {
+                            "Type": "Subtitle",
+                            "Codec": "pgssub",
+                            "Language": "eng",
+                            "DisplayTitle": "English - PGS",
+                            "Index": 4
+                        }
+                    ],
+                    "Path": "/media/x.mkv",
+                    "SupportsDirectPlay": true
+                }
+            ],
+            "MediaStreams": [
+                {
+                    "Type": "Video",
+                    "Codec": "hevc",
+                    "Width": 3840,
+                    "Height": 2160,
+                    "Profile": "Main 10",
+                    "VideoRange": "HDR",
+                    "VideoRangeType": "HDR10",
+                    "BitRate": 24000000,
+                    "Index": 0,
+                    "IsDefault": true,
+                    "DisplayTitle": "4K HEVC HDR10"
+                },
+                {
+                    "Type": "Audio",
+                    "Codec": "eac3",
+                    "Channels": 6,
+                    "ChannelLayout": "5.1",
+                    "Language": "fre",
+                    "DisplayTitle": "Français - Dolby Digital+ - 5.1 - Par défaut",
+                    "Index": 1,
+                    "IsDefault": true
+                },
+                {
+                    "Type": "Audio",
+                    "Codec": "aac",
+                    "Channels": 2,
+                    "Language": "eng",
+                    "DisplayTitle": "English - AAC - Stéréo",
+                    "Index": 2
+                },
+                {
+                    "Type": "Subtitle",
+                    "Codec": "subrip",
+                    "Language": "fre",
+                    "DisplayTitle": "Français - SUBRIP",
+                    "Index": 3,
+                    "IsExternal": false
+                },
+                {
+                    "Type": "Subtitle",
+                    "Codec": "pgssub",
+                    "Language": "eng",
+                    "DisplayTitle": "English - PGS",
+                    "Index": 4
+                }
+            ],
+            "UserData": {
+                "Played": true,
+                "PlaybackPositionTicks": 0
+            }
+        },
+        {
+            "Id": "epi00008900000000000000000000000",
+            "Name": "Ce que dit la radio",
+            "Type": "Episode",
+            "IndexNumber": 3,
+            "ParentIndexNumber": 1,
+            "ParentId": "sea00008600000000000000000000000",
+            "SeasonId": "sea00008600000000000000000000000",
+            "SeasonName": "Saison 1",
+            "SeriesId": "ser00008500000000000000000000000",
+            "SeriesName": "Cold Signal",
+            "Overview": "Une tempête isole le port pendant trois jours. Ines profite de la coupure pour fouiller les archives du phare, où elle trouve un carnet qui n’aurait jamais dû survivre.",
+            "RunTimeTicks": 27600000000,
+            "CommunityRating": 7.4,
+            "PremiereDate": "2023-03-12T00:00:00Z",
+            "ImageTags": {
+                "Primary": "t"
+            },
+            "ParentBackdropItemId": "ser00008500000000000000000000000",
+            "ParentBackdropImageTags": [
+                "b"
+            ],
+            "SeriesPrimaryImageTag": "t",
+            "MediaSources": [
+                {
+                    "Id": "epi00008900000000000000000000000",
+                    "Name": "Version 4K",
+                    "Container": "mkv",
+                    "Size": 18400000000,
+                    "Bitrate": 24500000,
+                    "MediaStreams": [
+                        {
+                            "Type": "Video",
+                            "Codec": "hevc",
+                            "Width": 3840,
+                            "Height": 2160,
+                            "Profile": "Main 10",
+                            "VideoRange": "HDR",
+                            "VideoRangeType": "HDR10",
+                            "BitRate": 24000000,
+                            "Index": 0,
+                            "IsDefault": true,
+                            "DisplayTitle": "4K HEVC HDR10"
+                        },
+                        {
+                            "Type": "Audio",
+                            "Codec": "eac3",
+                            "Channels": 6,
+                            "ChannelLayout": "5.1",
+                            "Language": "fre",
+                            "DisplayTitle": "Français - Dolby Digital+ - 5.1 - Par défaut",
+                            "Index": 1,
+                            "IsDefault": true
+                        },
+                        {
+                            "Type": "Audio",
+                            "Codec": "aac",
+                            "Channels": 2,
+                            "Language": "eng",
+                            "DisplayTitle": "English - AAC - Stéréo",
+                            "Index": 2
+                        },
+                        {
+                            "Type": "Subtitle",
+                            "Codec": "subrip",
+                            "Language": "fre",
+                            "DisplayTitle": "Français - SUBRIP",
+                            "Index": 3,
+                            "IsExternal": false
+                        },
+                        {
+                            "Type": "Subtitle",
+                            "Codec": "pgssub",
+                            "Language": "eng",
+                            "DisplayTitle": "English - PGS",
+                            "Index": 4
+                        }
+                    ],
+                    "Path": "/media/x.mkv",
+                    "SupportsDirectPlay": true
+                }
+            ],
+            "MediaStreams": [
+                {
+                    "Type": "Video",
+                    "Codec": "hevc",
+                    "Width": 3840,
+                    "Height": 2160,
+                    "Profile": "Main 10",
+                    "VideoRange": "HDR",
+                    "VideoRangeType": "HDR10",
+                    "BitRate": 24000000,
+                    "Index": 0,
+                    "IsDefault": true,
+                    "DisplayTitle": "4K HEVC HDR10"
+                },
+                {
+                    "Type": "Audio",
+                    "Codec": "eac3",
+                    "Channels": 6,
+                    "ChannelLayout": "5.1",
+                    "Language": "fre",
+                    "DisplayTitle": "Français - Dolby Digital+ - 5.1 - Par défaut",
+                    "Index": 1,
+                    "IsDefault": true
+                },
+                {
+                    "Type": "Audio",
+                    "Codec": "aac",
+                    "Channels": 2,
+                    "Language": "eng",
+                    "DisplayTitle": "English - AAC - Stéréo",
+                    "Index": 2
+                },
+                {
+                    "Type": "Subtitle",
+                    "Codec": "subrip",
+                    "Language": "fre",
+                    "DisplayTitle": "Français - SUBRIP",
+                    "Index": 3,
+                    "IsExternal": false
+                },
+                {
+                    "Type": "Subtitle",
+                    "Codec": "pgssub",
+                    "Language": "eng",
+                    "DisplayTitle": "English - PGS",
+                    "Index": 4
+                }
+            ],
+            "UserData": {
+                "Played": true,
+                "PlaybackPositionTicks": 0
+            }
+        },
+        {
+            "Id": "epi00009000000000000000000000000",
+            "Name": "Ligne de partage",
+            "Type": "Episode",
+            "IndexNumber": 4,
+            "ParentIndexNumber": 1,
+            "ParentId": "sea00008600000000000000000000000",
+            "SeasonId": "sea00008600000000000000000000000",
+            "SeasonName": "Saison 1",
+            "SeriesId": "ser00008500000000000000000000000",
+            "SeriesName": "Cold Signal",
+            "Overview": "Une tempête isole le port pendant trois jours. Ines profite de la coupure pour fouiller les archives du phare, où elle trouve un carnet qui n’aurait jamais dû survivre.",
+            "RunTimeTicks": 28200000000,
+            "CommunityRating": 7.6,
+            "PremiereDate": "2023-04-12T00:00:00Z",
+            "ImageTags": {
+                "Primary": "t"
+            },
+            "ParentBackdropItemId": "ser00008500000000000000000000000",
+            "ParentBackdropImageTags": [
+                "b"
+            ],
+            "SeriesPrimaryImageTag": "t",
+            "MediaSources": [
+                {
+                    "Id": "epi00009000000000000000000000000",
+                    "Name": "Version 4K",
+                    "Container": "mkv",
+                    "Size": 18400000000,
+                    "Bitrate": 24500000,
+                    "MediaStreams": [
+                        {
+                            "Type": "Video",
+                            "Codec": "hevc",
+                            "Width": 3840,
+                            "Height": 2160,
+                            "Profile": "Main 10",
+                            "VideoRange": "HDR",
+                            "VideoRangeType": "HDR10",
+                            "BitRate": 24000000,
+                            "Index": 0,
+                            "IsDefault": true,
+                            "DisplayTitle": "4K HEVC HDR10"
+                        },
+                        {
+                            "Type": "Audio",
+                            "Codec": "eac3",
+                            "Channels": 6,
+                            "ChannelLayout": "5.1",
+                            "Language": "fre",
+                            "DisplayTitle": "Français - Dolby Digital+ - 5.1 - Par défaut",
+                            "Index": 1,
+                            "IsDefault": true
+                        },
+                        {
+                            "Type": "Audio",
+                            "Codec": "aac",
+                            "Channels": 2,
+                            "Language": "eng",
+                            "DisplayTitle": "English - AAC - Stéréo",
+                            "Index": 2
+                        },
+                        {
+                            "Type": "Subtitle",
+                            "Codec": "subrip",
+                            "Language": "fre",
+                            "DisplayTitle": "Français - SUBRIP",
+                            "Index": 3,
+                            "IsExternal": false
+                        },
+                        {
+                            "Type": "Subtitle",
+                            "Codec": "pgssub",
+                            "Language": "eng",
+                            "DisplayTitle": "English - PGS",
+                            "Index": 4
+                        }
+                    ],
+                    "Path": "/media/x.mkv",
+                    "SupportsDirectPlay": true
+                }
+            ],
+            "MediaStreams": [
+                {
+                    "Type": "Video",
+                    "Codec": "hevc",
+                    "Width": 3840,
+                    "Height": 2160,
+                    "Profile": "Main 10",
+                    "VideoRange": "HDR",
+                    "VideoRangeType": "HDR10",
+                    "BitRate": 24000000,
+                    "Index": 0,
+                    "IsDefault": true,
+                    "DisplayTitle": "4K HEVC HDR10"
+                },
+                {
+                    "Type": "Audio",
+                    "Codec": "eac3",
+                    "Channels": 6,
+                    "ChannelLayout": "5.1",
+                    "Language": "fre",
+                    "DisplayTitle": "Français - Dolby Digital+ - 5.1 - Par défaut",
+                    "Index": 1,
+                    "IsDefault": true
+                },
+                {
+                    "Type": "Audio",
+                    "Codec": "aac",
+                    "Channels": 2,
+                    "Language": "eng",
+                    "DisplayTitle": "English - AAC - Stéréo",
+                    "Index": 2
+                },
+                {
+                    "Type": "Subtitle",
+                    "Codec": "subrip",
+                    "Language": "fre",
+                    "DisplayTitle": "Français - SUBRIP",
+                    "Index": 3,
+                    "IsExternal": false
+                },
+                {
+                    "Type": "Subtitle",
+                    "Codec": "pgssub",
+                    "Language": "eng",
+                    "DisplayTitle": "English - PGS",
+                    "Index": 4
+                }
+            ],
+            "UserData": {
+                "Played": true,
+                "PlaybackPositionTicks": 0
+            }
+        },
+        {
+            "Id": "epi00009100000000000000000000000",
+            "Name": "Le second phare",
+            "Type": "Episode",
+            "IndexNumber": 5,
+            "ParentIndexNumber": 1,
+            "ParentId": "sea00008600000000000000000000000",
+            "SeasonId": "sea00008600000000000000000000000",
+            "SeasonName": "Saison 1",
+            "SeriesId": "ser00008500000000000000000000000",
+            "SeriesName": "Cold Signal",
+            "Overview": "Une tempête isole le port pendant trois jours. Ines profite de la coupure pour fouiller les archives du phare, où elle trouve un carnet qui n’aurait jamais dû survivre.",
+            "RunTimeTicks": 28800000000,
+            "CommunityRating": 7.8,
+            "PremiereDate": "2023-05-12T00:00:00Z",
+            "ImageTags": {
+                "Primary": "t"
+            },
+            "ParentBackdropItemId": "ser00008500000000000000000000000",
+            "ParentBackdropImageTags": [
+                "b"
+            ],
+            "SeriesPrimaryImageTag": "t",
+            "MediaSources": [
+                {
+                    "Id": "epi00009100000000000000000000000",
+                    "Name": "Version 4K",
+                    "Container": "mkv",
+                    "Size": 18400000000,
+                    "Bitrate": 24500000,
+                    "MediaStreams": [
+                        {
+                            "Type": "Video",
+                            "Codec": "hevc",
+                            "Width": 3840,
+                            "Height": 2160,
+                            "Profile": "Main 10",
+                            "VideoRange": "HDR",
+                            "VideoRangeType": "HDR10",
+                            "BitRate": 24000000,
+                            "Index": 0,
+                            "IsDefault": true,
+                            "DisplayTitle": "4K HEVC HDR10"
+                        },
+                        {
+                            "Type": "Audio",
+                            "Codec": "eac3",
+                            "Channels": 6,
+                            "ChannelLayout": "5.1",
+                            "Language": "fre",
+                            "DisplayTitle": "Français - Dolby Digital+ - 5.1 - Par défaut",
+                            "Index": 1,
+                            "IsDefault": true
+                        },
+                        {
+                            "Type": "Audio",
+                            "Codec": "aac",
+                            "Channels": 2,
+                            "Language": "eng",
+                            "DisplayTitle": "English - AAC - Stéréo",
+                            "Index": 2
+                        },
+                        {
+                            "Type": "Subtitle",
+                            "Codec": "subrip",
+                            "Language": "fre",
+                            "DisplayTitle": "Français - SUBRIP",
+                            "Index": 3,
+                            "IsExternal": false
+                        },
+                        {
+                            "Type": "Subtitle",
+                            "Codec": "pgssub",
+                            "Language": "eng",
+                            "DisplayTitle": "English - PGS",
+                            "Index": 4
+                        }
+                    ],
+                    "Path": "/media/x.mkv",
+                    "SupportsDirectPlay": true
+                }
+            ],
+            "MediaStreams": [
+                {
+                    "Type": "Video",
+                    "Codec": "hevc",
+                    "Width": 3840,
+                    "Height": 2160,
+                    "Profile": "Main 10",
+                    "VideoRange": "HDR",
+                    "VideoRangeType": "HDR10",
+                    "BitRate": 24000000,
+                    "Index": 0,
+                    "IsDefault": true,
+                    "DisplayTitle": "4K HEVC HDR10"
+                },
+                {
+                    "Type": "Audio",
+                    "Codec": "eac3",
+                    "Channels": 6,
+                    "ChannelLayout": "5.1",
+                    "Language": "fre",
+                    "DisplayTitle": "Français - Dolby Digital+ - 5.1 - Par défaut",
+                    "Index": 1,
+                    "IsDefault": true
+                },
+                {
+                    "Type": "Audio",
+                    "Codec": "aac",
+                    "Channels": 2,
+                    "Language": "eng",
+                    "DisplayTitle": "English - AAC - Stéréo",
+                    "Index": 2
+                },
+                {
+                    "Type": "Subtitle",
+                    "Codec": "subrip",
+                    "Language": "fre",
+                    "DisplayTitle": "Français - SUBRIP",
+                    "Index": 3,
+                    "IsExternal": false
+                },
+                {
+                    "Type": "Subtitle",
+                    "Codec": "pgssub",
+                    "Language": "eng",
+                    "DisplayTitle": "English - PGS",
+                    "Index": 4
+                }
+            ],
+            "UserData": {
+                "Played": true,
+                "PlaybackPositionTicks": 0
+            }
+        },
+        {
+            "Id": "epi00009200000000000000000000000",
+            "Name": "Contre-courant",
+            "Type": "Episode",
+            "IndexNumber": 6,
+            "ParentIndexNumber": 1,
+            "ParentId": "sea00008600000000000000000000000",
+            "SeasonId": "sea00008600000000000000000000000",
+            "SeasonName": "Saison 1",
+            "SeriesId": "ser00008500000000000000000000000",
+            "SeriesName": "Cold Signal",
+            "Overview": "Une tempête isole le port pendant trois jours. Ines profite de la coupure pour fouiller les archives du phare, où elle trouve un carnet qui n’aurait jamais dû survivre.",
+            "RunTimeTicks": 29400000000,
+            "CommunityRating": 8,
+            "PremiereDate": "2023-06-12T00:00:00Z",
+            "ImageTags": {
+                "Primary": "t"
+            },
+            "ParentBackdropItemId": "ser00008500000000000000000000000",
+            "ParentBackdropImageTags": [
+                "b"
+            ],
+            "SeriesPrimaryImageTag": "t",
+            "MediaSources": [
+                {
+                    "Id": "epi00009200000000000000000000000",
+                    "Name": "Version 4K",
+                    "Container": "mkv",
+                    "Size": 18400000000,
+                    "Bitrate": 24500000,
+                    "MediaStreams": [
+                        {
+                            "Type": "Video",
+                            "Codec": "hevc",
+                            "Width": 3840,
+                            "Height": 2160,
+                            "Profile": "Main 10",
+                            "VideoRange": "HDR",
+                            "VideoRangeType": "HDR10",
+                            "BitRate": 24000000,
+                            "Index": 0,
+                            "IsDefault": true,
+                            "DisplayTitle": "4K HEVC HDR10"
+                        },
+                        {
+                            "Type": "Audio",
+                            "Codec": "eac3",
+                            "Channels": 6,
+                            "ChannelLayout": "5.1",
+                            "Language": "fre",
+                            "DisplayTitle": "Français - Dolby Digital+ - 5.1 - Par défaut",
+                            "Index": 1,
+                            "IsDefault": true
+                        },
+                        {
+                            "Type": "Audio",
+                            "Codec": "aac",
+                            "Channels": 2,
+                            "Language": "eng",
+                            "DisplayTitle": "English - AAC - Stéréo",
+                            "Index": 2
+                        },
+                        {
+                            "Type": "Subtitle",
+                            "Codec": "subrip",
+                            "Language": "fre",
+                            "DisplayTitle": "Français - SUBRIP",
+                            "Index": 3,
+                            "IsExternal": false
+                        },
+                        {
+                            "Type": "Subtitle",
+                            "Codec": "pgssub",
+                            "Language": "eng",
+                            "DisplayTitle": "English - PGS",
+                            "Index": 4
+                        }
+                    ],
+                    "Path": "/media/x.mkv",
+                    "SupportsDirectPlay": true
+                }
+            ],
+            "MediaStreams": [
+                {
+                    "Type": "Video",
+                    "Codec": "hevc",
+                    "Width": 3840,
+                    "Height": 2160,
+                    "Profile": "Main 10",
+                    "VideoRange": "HDR",
+                    "VideoRangeType": "HDR10",
+                    "BitRate": 24000000,
+                    "Index": 0,
+                    "IsDefault": true,
+                    "DisplayTitle": "4K HEVC HDR10"
+                },
+                {
+                    "Type": "Audio",
+                    "Codec": "eac3",
+                    "Channels": 6,
+                    "ChannelLayout": "5.1",
+                    "Language": "fre",
+                    "DisplayTitle": "Français - Dolby Digital+ - 5.1 - Par défaut",
+                    "Index": 1,
+                    "IsDefault": true
+                },
+                {
+                    "Type": "Audio",
+                    "Codec": "aac",
+                    "Channels": 2,
+                    "Language": "eng",
+                    "DisplayTitle": "English - AAC - Stéréo",
+                    "Index": 2
+                },
+                {
+                    "Type": "Subtitle",
+                    "Codec": "subrip",
+                    "Language": "fre",
+                    "DisplayTitle": "Français - SUBRIP",
+                    "Index": 3,
+                    "IsExternal": false
+                },
+                {
+                    "Type": "Subtitle",
+                    "Codec": "pgssub",
+                    "Language": "eng",
+                    "DisplayTitle": "English - PGS",
+                    "Index": 4
+                }
+            ],
+            "UserData": {
+                "Played": false,
+                "PlayedPercentage": 35,
+                "PlaybackPositionTicks": 9000000000
+            }
+        },
+        {
+            "Id": "epi00009300000000000000000000000",
+            "Name": "Sel et cendre",
+            "Type": "Episode",
+            "IndexNumber": 7,
+            "ParentIndexNumber": 1,
+            "ParentId": "sea00008600000000000000000000000",
+            "SeasonId": "sea00008600000000000000000000000",
+            "SeasonName": "Saison 1",
+            "SeriesId": "ser00008500000000000000000000000",
+            "SeriesName": "Cold Signal",
+            "Overview": "Une tempête isole le port pendant trois jours. Ines profite de la coupure pour fouiller les archives du phare, où elle trouve un carnet qui n’aurait jamais dû survivre.",
+            "RunTimeTicks": 30000000000,
+            "CommunityRating": 8.2,
+            "PremiereDate": "2023-07-12T00:00:00Z",
+            "ImageTags": {
+                "Primary": "t"
+            },
+            "ParentBackdropItemId": "ser00008500000000000000000000000",
+            "ParentBackdropImageTags": [
+                "b"
+            ],
+            "SeriesPrimaryImageTag": "t",
+            "MediaSources": [
+                {
+                    "Id": "epi00009300000000000000000000000",
+                    "Name": "Version 4K",
+                    "Container": "mkv",
+                    "Size": 18400000000,
+                    "Bitrate": 24500000,
+                    "MediaStreams": [
+                        {
+                            "Type": "Video",
+                            "Codec": "hevc",
+                            "Width": 3840,
+                            "Height": 2160,
+                            "Profile": "Main 10",
+                            "VideoRange": "HDR",
+                            "VideoRangeType": "HDR10",
+                            "BitRate": 24000000,
+                            "Index": 0,
+                            "IsDefault": true,
+                            "DisplayTitle": "4K HEVC HDR10"
+                        },
+                        {
+                            "Type": "Audio",
+                            "Codec": "eac3",
+                            "Channels": 6,
+                            "ChannelLayout": "5.1",
+                            "Language": "fre",
+                            "DisplayTitle": "Français - Dolby Digital+ - 5.1 - Par défaut",
+                            "Index": 1,
+                            "IsDefault": true
+                        },
+                        {
+                            "Type": "Audio",
+                            "Codec": "aac",
+                            "Channels": 2,
+                            "Language": "eng",
+                            "DisplayTitle": "English - AAC - Stéréo",
+                            "Index": 2
+                        },
+                        {
+                            "Type": "Subtitle",
+                            "Codec": "subrip",
+                            "Language": "fre",
+                            "DisplayTitle": "Français - SUBRIP",
+                            "Index": 3,
+                            "IsExternal": false
+                        },
+                        {
+                            "Type": "Subtitle",
+                            "Codec": "pgssub",
+                            "Language": "eng",
+                            "DisplayTitle": "English - PGS",
+                            "Index": 4
+                        }
+                    ],
+                    "Path": "/media/x.mkv",
+                    "SupportsDirectPlay": true
+                }
+            ],
+            "MediaStreams": [
+                {
+                    "Type": "Video",
+                    "Codec": "hevc",
+                    "Width": 3840,
+                    "Height": 2160,
+                    "Profile": "Main 10",
+                    "VideoRange": "HDR",
+                    "VideoRangeType": "HDR10",
+                    "BitRate": 24000000,
+                    "Index": 0,
+                    "IsDefault": true,
+                    "DisplayTitle": "4K HEVC HDR10"
+                },
+                {
+                    "Type": "Audio",
+                    "Codec": "eac3",
+                    "Channels": 6,
+                    "ChannelLayout": "5.1",
+                    "Language": "fre",
+                    "DisplayTitle": "Français - Dolby Digital+ - 5.1 - Par défaut",
+                    "Index": 1,
+                    "IsDefault": true
+                },
+                {
+                    "Type": "Audio",
+                    "Codec": "aac",
+                    "Channels": 2,
+                    "Language": "eng",
+                    "DisplayTitle": "English - AAC - Stéréo",
+                    "Index": 2
+                },
+                {
+                    "Type": "Subtitle",
+                    "Codec": "subrip",
+                    "Language": "fre",
+                    "DisplayTitle": "Français - SUBRIP",
+                    "Index": 3,
+                    "IsExternal": false
+                },
+                {
+                    "Type": "Subtitle",
+                    "Codec": "pgssub",
+                    "Language": "eng",
+                    "DisplayTitle": "English - PGS",
+                    "Index": 4
+                }
+            ],
+            "UserData": {
+                "Played": false,
+                "PlaybackPositionTicks": 0
+            }
+        },
+        {
+            "Id": "epi00009400000000000000000000000",
+            "Name": "Retour au port",
+            "Type": "Episode",
+            "IndexNumber": 8,
+            "ParentIndexNumber": 1,
+            "ParentId": "sea00008600000000000000000000000",
+            "SeasonId": "sea00008600000000000000000000000",
+            "SeasonName": "Saison 1",
+            "SeriesId": "ser00008500000000000000000000000",
+            "SeriesName": "Cold Signal",
+            "Overview": "Une tempête isole le port pendant trois jours. Ines profite de la coupure pour fouiller les archives du phare, où elle trouve un carnet qui n’aurait jamais dû survivre.",
+            "RunTimeTicks": 30600000000,
+            "CommunityRating": 8.4,
+            "PremiereDate": "2023-08-12T00:00:00Z",
+            "ImageTags": {
+                "Primary": "t"
+            },
+            "ParentBackdropItemId": "ser00008500000000000000000000000",
+            "ParentBackdropImageTags": [
+                "b"
+            ],
+            "SeriesPrimaryImageTag": "t",
+            "MediaSources": [
+                {
+                    "Id": "epi00009400000000000000000000000",
+                    "Name": "Version 4K",
+                    "Container": "mkv",
+                    "Size": 18400000000,
+                    "Bitrate": 24500000,
+                    "MediaStreams": [
+                        {
+                            "Type": "Video",
+                            "Codec": "hevc",
+                            "Width": 3840,
+                            "Height": 2160,
+                            "Profile": "Main 10",
+                            "VideoRange": "HDR",
+                            "VideoRangeType": "HDR10",
+                            "BitRate": 24000000,
+                            "Index": 0,
+                            "IsDefault": true,
+                            "DisplayTitle": "4K HEVC HDR10"
+                        },
+                        {
+                            "Type": "Audio",
+                            "Codec": "eac3",
+                            "Channels": 6,
+                            "ChannelLayout": "5.1",
+                            "Language": "fre",
+                            "DisplayTitle": "Français - Dolby Digital+ - 5.1 - Par défaut",
+                            "Index": 1,
+                            "IsDefault": true
+                        },
+                        {
+                            "Type": "Audio",
+                            "Codec": "aac",
+                            "Channels": 2,
+                            "Language": "eng",
+                            "DisplayTitle": "English - AAC - Stéréo",
+                            "Index": 2
+                        },
+                        {
+                            "Type": "Subtitle",
+                            "Codec": "subrip",
+                            "Language": "fre",
+                            "DisplayTitle": "Français - SUBRIP",
+                            "Index": 3,
+                            "IsExternal": false
+                        },
+                        {
+                            "Type": "Subtitle",
+                            "Codec": "pgssub",
+                            "Language": "eng",
+                            "DisplayTitle": "English - PGS",
+                            "Index": 4
+                        }
+                    ],
+                    "Path": "/media/x.mkv",
+                    "SupportsDirectPlay": true
+                }
+            ],
+            "MediaStreams": [
+                {
+                    "Type": "Video",
+                    "Codec": "hevc",
+                    "Width": 3840,
+                    "Height": 2160,
+                    "Profile": "Main 10",
+                    "VideoRange": "HDR",
+                    "VideoRangeType": "HDR10",
+                    "BitRate": 24000000,
+                    "Index": 0,
+                    "IsDefault": true,
+                    "DisplayTitle": "4K HEVC HDR10"
+                },
+                {
+                    "Type": "Audio",
+                    "Codec": "eac3",
+                    "Channels": 6,
+                    "ChannelLayout": "5.1",
+                    "Language": "fre",
+                    "DisplayTitle": "Français - Dolby Digital+ - 5.1 - Par défaut",
+                    "Index": 1,
+                    "IsDefault": true
+                },
+                {
+                    "Type": "Audio",
+                    "Codec": "aac",
+                    "Channels": 2,
+                    "Language": "eng",
+                    "DisplayTitle": "English - AAC - Stéréo",
+                    "Index": 2
+                },
+                {
+                    "Type": "Subtitle",
+                    "Codec": "subrip",
+                    "Language": "fre",
+                    "DisplayTitle": "Français - SUBRIP",
+                    "Index": 3,
+                    "IsExternal": false
+                },
+                {
+                    "Type": "Subtitle",
+                    "Codec": "pgssub",
+                    "Language": "eng",
+                    "DisplayTitle": "English - PGS",
+                    "Index": 4
+                }
+            ],
+            "UserData": {
+                "Played": false,
+                "PlaybackPositionTicks": 0
+            }
+        }
+    ],
+    "TotalRecordCount": 8,
+    "StartIndex": 0
+}

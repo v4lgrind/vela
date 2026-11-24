@@ -1,5 +1,6 @@
 <template>
-  <div :style="{ marginLeft: shellStyle.marginLeft }">
+  <!-- --shell-bottom: space the nav bar and mini player take, for fixed page parts (A–Z index). -->
+  <div :style="{ marginLeft: shellStyle.marginLeft, '--shell-bottom': shellStyle.paddingBottom ?? '0px' }">
     <!-- Library lists stay alive while an item opened from them is shown, so
          going back keeps their loaded pages and scroll position. -->
     <router-view v-slot="{ Component }">
@@ -23,7 +24,7 @@ import MiniAudioPlayer from "@/components/MiniAudioPlayer.vue";
 import ExpandedAudioPlayer from "@/components/ExpandedAudioPlayer.vue";
 import AppNav from "@/components/AppNav.vue";
 import AppToast from "@/components/ui/toast/AppToast.vue";
-import { useJellyfinStore } from "@/store/jellyfin-store";
+import { useSessionStore } from "@/store/session-store";
 import { useAudioPlayerStore } from "@/store/audio-player-store";
 import { useOfflineStore } from "@/store/offline-store";
 import { usePreferencesStore } from "@/store/preferences-store";
@@ -40,13 +41,19 @@ import { logger } from "@/utils/logger";
 
 const route = useRoute();
 const router = useRouter();
-const store = useJellyfinStore();
+const session = useSessionStore();
 const audioStore = useAudioPlayerStore();
 const offlineStore = useOfflineStore();
 const preferencesStore = usePreferencesStore();
 useDpadNavigation();
 const { isNative } = usePlatform();
-const isAuthenticated = computed(() => store.isAuthenticated);
+const isAuthenticated = computed(() => session.isAuthenticated);
+
+// The audio queue belongs to the account it was started from: signing out,
+// removing it or switching accounts stops it (its tracks cannot load anymore).
+watch(() => session.activeKey, (key, previous) => {
+  if (previous && key !== previous) audioStore.stop();
+});
 
 // Bottom nav: visible on the main authenticated screens. Hidden on the
 // fullscreen player, the login screen, and while the expanded audio player
@@ -117,6 +124,9 @@ onBeforeUnmount(() => {
 onMounted(async () => {
   // Apply persisted theme immediately
   applyTheme(preferencesStore.colorScheme);
+
+  // Plex: pick the server address again when the network changes (home Wi-Fi ↔ mobile).
+  session.watchNetwork();
 
   // Track system preference changes for 'system' mode
   mediaQueryListener = () => {

@@ -1,3 +1,4 @@
+import type { Marker, MediaItem } from '@/domain';
 import { logger } from '@/utils/logger';
 
 /**
@@ -7,8 +8,10 @@ import { logger } from '@/utils/logger';
  * Provides a structured interface for offline content management.
  */
 
+/** A downloaded item as the app uses it: always a domain snapshot and its server. */
 export interface DownloadedMedia {
   itemId: string; // Primary key
+  /** Storage tag kept from the first schema ("Movie" | "Episode" | "MusicAlbum" | "Audio"). */
   type: "Movie" | "Episode" | "MusicAlbum" | "Audio";
   name: string;
   filePath: string;
@@ -23,49 +26,71 @@ export interface DownloadedMedia {
   episodeNumber?: number;
   albumId?: string; // For music tracks
   albumName?: string;
-  libraryId?: string; // Jellyfin library (user view) holding the item; backfilled while online
+  libraryId?: string; // Library holding the item; backfilled while online
 
-  // Cached Jellyfin item for details page
-  jellyfinItem: any; // Full item object
+  /** Server the item was downloaded from (ids are only unique within a server). */
+  serverId: string;
+  /** Domain snapshot for offline pages and playback. */
+  item: MediaItem;
 
   // Sidecar subtitle file for transcoded downloads
   subtitleFilePath?: string;
   subtitleLabel?: string;
   subtitleLanguage?: string;
 
-  // Intro/outro segment timestamps for offline skip-intro support
-  introSegments?: Array<{ Type: string; StartTicks: number; EndTicks: number }>;
+  /** Intro/credits markers for offline skip-intro. */
+  markers: Marker[];
 }
 
 /**
- * Build a DownloadedMedia record from a Jellyfin item, filling in the
- * series/album organization fields for episodes and music tracks.
+ * A record as stored in IndexedDB. Records written before the multi-backend
+ * model only have the Jellyfin DTO and its segments; `normalizeDownload`
+ * (utils/offlineRecords) turns any record into a `DownloadedMedia`.
+ */
+export interface StoredDownload extends Omit<DownloadedMedia, 'serverId' | 'item' | 'markers'> {
+  serverId?: string;
+  item?: MediaItem;
+  markers?: Marker[];
+  /** @deprecated pre-domain records: Jellyfin BaseItemDto, kept until a later release. */
+  jellyfinItem?: any;
+  /** @deprecated pre-domain records: Jellyfin media segments in ticks. */
+  introSegments?: Array<{ Type: string; StartTicks: number; EndTicks: number }>;
+}
+
+const STORAGE_TYPE: Partial<Record<MediaItem['kind'], DownloadedMedia['type']>> = {
+  movie: 'Movie', episode: 'Episode', track: 'Audio', album: 'MusicAlbum',
+};
+
+/**
+ * Build a download record from a domain item, filling in the series/album
+ * organization fields for episodes and music tracks.
  * Shared by the download service and the native-download reconciliation.
  */
 export function buildDownloadedMedia(
-  metadata: any,
+  item: MediaItem,
+  serverId: string,
   filePath: string,
   fileSize: number,
+  markers: Marker[] = [],
 ): DownloadedMedia {
-  const knownTypes: DownloadedMedia["type"][] = ["Movie", "Episode", "MusicAlbum", "Audio"];
   const media: DownloadedMedia = {
-    itemId: metadata.Id,
-    type: knownTypes.includes(metadata.Type) ? metadata.Type : "Movie",
-    name: metadata.Name || "Unknown",
+    itemId: item.id,
+    type: STORAGE_TYPE[item.kind] ?? 'Movie',
+    name: item.title || 'Unknown',
     filePath,
     fileSize,
     downloadDate: Date.now(),
-    jellyfinItem: metadata,
+    serverId,
+    item,
+    markers,
   };
-  if (metadata.Type === "Episode") {
-    media.seriesId = metadata.SeriesId;
-    media.seriesName = metadata.SeriesName;
-    media.seasonId = metadata.SeasonId;
-    media.seasonNumber = metadata.ParentIndexNumber;
-    media.episodeNumber = metadata.IndexNumber;
-  } else if (metadata.Type === "Audio") {
-    media.albumId = metadata.AlbumId;
-    media.albumName = metadata.Album;
+  if (item.kind === 'episode') {
+    Object.assign(media, {
+      seriesId: item.seriesId, seriesName: item.seriesTitle, seasonId: item.seasonId,
+      seasonNumber: item.seasonNumber, episodeNumber: item.episodeNumber,
+    });
+  } else if (item.kind === 'track') {
+    Object.assign(media, { albumId: item.albumId, albumName: item.albumTitle });
   }
   return media;
 }
@@ -77,7 +102,7 @@ export interface WatchProgress {
   percentage: number;
   completed: boolean;
   lastWatched: number; // timestamp
-  synced: boolean; // Synced to Jellyfin?
+  synced: boolean; // Pushed to the server?
 }
 
 class OfflineDatabase {
@@ -168,14 +193,14 @@ class OfflineDatabase {
 
   // ==================== Downloads ====================
 
-  public async addDownload(media: DownloadedMedia): Promise<void> {
+  public async addDownload(media: StoredDownload): Promise<void> {
     const db = await this.ensureDB();
     return new Promise((resolve, reject) => {
       const transaction = db.transaction(["downloads"], "readwrite");
       const store = transaction.objectStore("downloads");
 
       // Plain copy: records taken from the Pinia store carry reactive proxies
-      // (jellyfinItem, introSegments) that IndexedDB cannot clone.
+      // (item, markers) that IndexedDB cannot clone.
       const request = store.put(JSON.parse(JSON.stringify(media)));
 
       request.onsuccess = () => {
@@ -195,7 +220,7 @@ class OfflineDatabase {
    * when the record is gone, so background updates never bring back a
    * download deleted meanwhile.
    */
-  public async patchDownload(itemId: string, patch: Partial<DownloadedMedia>): Promise<boolean> {
+  public async patchDownload(itemId: string, patch: Partial<StoredDownload>): Promise<boolean> {
     const db = await this.ensureDB();
     return new Promise((resolve, reject) => {
       const transaction = db.transaction(["downloads"], "readwrite");
@@ -214,7 +239,7 @@ class OfflineDatabase {
     });
   }
 
-  public async getDownload(itemId: string): Promise<DownloadedMedia | null> {
+  public async getDownload(itemId: string): Promise<StoredDownload | null> {
     const db = await this.ensureDB();
     return new Promise((resolve, reject) => {
       const transaction = db.transaction(["downloads"], "readonly");
@@ -232,7 +257,7 @@ class OfflineDatabase {
     });
   }
 
-  public async getAllDownloads(): Promise<DownloadedMedia[]> {
+  public async getAllDownloads(): Promise<StoredDownload[]> {
     const db = await this.ensureDB();
     return new Promise((resolve, reject) => {
       const transaction = db.transaction(["downloads"], "readonly");
@@ -254,7 +279,7 @@ class OfflineDatabase {
   private async getDownloadsByIndex(
     indexName: "type" | "seriesId" | "seasonId" | "albumId",
     value: string,
-  ): Promise<DownloadedMedia[]> {
+  ): Promise<StoredDownload[]> {
     const db = await this.ensureDB();
     return new Promise((resolve, reject) => {
       const transaction = db.transaction(["downloads"], "readonly");
@@ -274,25 +299,25 @@ class OfflineDatabase {
 
   public async getDownloadsByType(
     type: DownloadedMedia["type"],
-  ): Promise<DownloadedMedia[]> {
+  ): Promise<StoredDownload[]> {
     return this.getDownloadsByIndex("type", type);
   }
 
   public async getDownloadsBySeries(
     seriesId: string,
-  ): Promise<DownloadedMedia[]> {
+  ): Promise<StoredDownload[]> {
     return this.getDownloadsByIndex("seriesId", seriesId);
   }
 
   public async getDownloadsBySeason(
     seasonId: string,
-  ): Promise<DownloadedMedia[]> {
+  ): Promise<StoredDownload[]> {
     return this.getDownloadsByIndex("seasonId", seasonId);
   }
 
   public async getDownloadsByAlbum(
     albumId: string,
-  ): Promise<DownloadedMedia[]> {
+  ): Promise<StoredDownload[]> {
     return this.getDownloadsByIndex("albumId", albumId);
   }
 

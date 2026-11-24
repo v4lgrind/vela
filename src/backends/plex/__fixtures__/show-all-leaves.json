@@ -1,0 +1,377 @@
+{
+  "MediaContainer": {
+    "size": 3,
+    "totalSize": 76,
+    "offset": 0,
+    "allowSync": true,
+    "art": "/library/metadata/20069/art/1793620663",
+    "identifier": "com.plexapp.plugins.library",
+    "key": "20069",
+    "librarySectionID": 3,
+    "librarySectionTitle": "librarySectionTitle 2",
+    "librarySectionUUID": "7d505cfbb185a593354310a4",
+    "mediaTagPrefix": "/system/bundle/media/flags/",
+    "mediaTagVersion": 1792751798,
+    "mixedParents": true,
+    "nocache": true,
+    "parentIndex": 1,
+    "parentTitle": "parentTitle 12",
+    "parentYear": 2004,
+    "theme": "/library/metadata/20069/theme/1793620663",
+    "title1": "title1 4",
+    "title2": "title2 6",
+    "viewGroup": "episode",
+    "viewMode": 65592,
+    "Metadata": [
+      {
+        "ratingKey": "75924",
+        "key": "/library/metadata/75924",
+        "parentRatingKey": "75920",
+        "grandparentRatingKey": "20069",
+        "guid": "plex://item/69e5ce25f684",
+        "parentGuid": "plex://item/9079ae281acb",
+        "grandparentGuid": "plex://item/2f57938f2c0a",
+        "grandparentSlug": "grandparentSlug 1",
+        "studio": "studio 17",
+        "type": "episode",
+        "title": "title 2",
+        "titleSort": "titleSort 1",
+        "grandparentKey": "/library/metadata/20069",
+        "parentKey": "/library/metadata/75920",
+        "grandparentTitle": "grandparentTitle 1",
+        "parentTitle": "parentTitle 1",
+        "originalTitle": "originalTitle 1",
+        "contentRating": "fr/10",
+        "summary": "summary 2",
+        "index": 1,
+        "parentIndex": 1,
+        "audienceRating": 7.8,
+        "year": 2004,
+        "thumb": "/library/metadata/75924/thumb/1785882731",
+        "art": "/library/metadata/20069/art/1779588054",
+        "parentThumb": "/library/metadata/75920/thumb/1779587226",
+        "grandparentThumb": "/library/metadata/20069/thumb/1779588054",
+        "grandparentArt": "/library/metadata/20069/art/1779588054",
+        "grandparentTheme": "/library/metadata/20069/theme/1779588054",
+        "duration": 1471424,
+        "originallyAvailableAt": "2004-10-05",
+        "addedAt": 1779588054,
+        "updatedAt": 1785882731,
+        "audienceRatingImage": "themoviedb://image.rating",
+        "Media": [
+          {
+            "id": 112496,
+            "duration": 1471424,
+            "bitrate": 5960,
+            "width": 1920,
+            "height": 1080,
+            "aspectRatio": 1.78,
+            "audioChannels": 2,
+            "audioCodec": "aac",
+            "videoCodec": "h264",
+            "videoResolution": "1080",
+            "container": "mkv",
+            "videoFrameRate": "24p",
+            "audioProfile": "lc",
+            "videoProfile": "high",
+            "hasVoiceActivity": false,
+            "Part": [
+              {
+                "id": 117655,
+                "key": "/library/parts/117655/1779587986/file.mkv",
+                "duration": 1471424,
+                "file": "/media/item-1.mkv",
+                "size": 1096258577,
+                "audioProfile": "lc",
+                "container": "mkv",
+                "videoProfile": "high"
+              }
+            ]
+          }
+        ],
+        "Image": [
+          {
+            "alt": "alt 1",
+            "type": "coverPoster",
+            "url": "/library/metadata/20069/thumb/1779588054"
+          },
+          {
+            "alt": "alt 1",
+            "type": "snapshot",
+            "url": "/library/metadata/75924/thumb/1785882731"
+          },
+          {
+            "alt": "alt 1",
+            "type": "background",
+            "url": "/library/metadata/20069/art/1779588054"
+          },
+          {
+            "alt": "alt 1",
+            "type": "backgroundSquare",
+            "url": "/library/metadata/20069/squareArt/1779588054"
+          }
+        ],
+        "UltraBlurColors": {
+          "topLeft": "4c1d1d",
+          "topRight": "7d3634",
+          "bottomRight": "511e21",
+          "bottomLeft": "672831"
+        },
+        "Director": [
+          {
+            "tag": "tag 37"
+          }
+        ],
+        "Writer": [
+          {
+            "tag": "tag 38"
+          }
+        ],
+        "Role": [
+          {
+            "tag": "tag 39"
+          },
+          {
+            "tag": "tag 40"
+          },
+          {
+            "tag": "tag 41"
+          }
+        ]
+      },
+      {
+        "ratingKey": "75921",
+        "key": "/library/metadata/75921",
+        "parentRatingKey": "75920",
+        "grandparentRatingKey": "20069",
+        "guid": "plex://item/ee5e16681ca8",
+        "parentGuid": "plex://item/9079ae281acb",
+        "grandparentGuid": "plex://item/2f57938f2c0a",
+        "grandparentSlug": "grandparentSlug 1",
+        "studio": "studio 17",
+        "type": "episode",
+        "title": "title 189",
+        "titleSort": "titleSort 14",
+        "grandparentKey": "/library/metadata/20069",
+        "parentKey": "/library/metadata/75920",
+        "grandparentTitle": "grandparentTitle 1",
+        "parentTitle": "parentTitle 1",
+        "originalTitle": "originalTitle 27",
+        "contentRating": "fr/10",
+        "summary": "summary 49",
+        "index": 14,
+        "parentIndex": 1,
+        "audienceRating": 8.0,
+        "year": 2005,
+        "thumb": "/library/metadata/75921/thumb/1785882731",
+        "art": "/library/metadata/20069/art/1779587226",
+        "parentThumb": "/library/metadata/75920/thumb/1779587226",
+        "grandparentThumb": "/library/metadata/20069/thumb/1779587226",
+        "grandparentArt": "/library/metadata/20069/art/1779587226",
+        "grandparentTheme": "/library/metadata/20069/theme/1779587226",
+        "duration": 1476181,
+        "originallyAvailableAt": "2005-01-11",
+        "addedAt": 1779587226,
+        "updatedAt": 1785882731,
+        "audienceRatingImage": "themoviedb://image.rating",
+        "chapterSource": "media",
+        "Media": [
+          {
+            "id": 112493,
+            "duration": 1476181,
+            "bitrate": 3452,
+            "width": 1920,
+            "height": 1080,
+            "aspectRatio": 1.78,
+            "audioChannels": 2,
+            "audioCodec": "aac",
+            "videoCodec": "h264",
+            "videoResolution": "1080",
+            "container": "mkv",
+            "videoFrameRate": "24p",
+            "audioProfile": "he-aac",
+            "videoProfile": "high",
+            "hasVoiceActivity": false,
+            "Part": [
+              {
+                "id": 117652,
+                "key": "/library/parts/117652/1779587190/file.mkv",
+                "duration": 1476181,
+                "file": "/media/item-37.mkv",
+                "size": 636932603,
+                "audioProfile": "he-aac",
+                "container": "mkv",
+                "videoProfile": "high"
+              }
+            ]
+          }
+        ],
+        "Image": [
+          {
+            "alt": "alt 49",
+            "type": "coverPoster",
+            "url": "/library/metadata/20069/thumb/1779587226"
+          },
+          {
+            "alt": "alt 49",
+            "type": "snapshot",
+            "url": "/library/metadata/75921/thumb/1785882731"
+          },
+          {
+            "alt": "alt 49",
+            "type": "background",
+            "url": "/library/metadata/20069/art/1779587226"
+          },
+          {
+            "alt": "alt 49",
+            "type": "backgroundSquare",
+            "url": "/library/metadata/20069/squareArt/1779587226"
+          }
+        ],
+        "UltraBlurColors": {
+          "topLeft": "023902",
+          "topRight": "470403",
+          "bottomRight": "030403",
+          "bottomLeft": "030310"
+        },
+        "Director": [
+          {
+            "tag": "tag 37"
+          }
+        ],
+        "Writer": [
+          {
+            "tag": "tag 38"
+          }
+        ],
+        "Role": [
+          {
+            "tag": "tag 39"
+          },
+          {
+            "tag": "tag 40"
+          },
+          {
+            "tag": "tag 41"
+          }
+        ]
+      },
+      {
+        "ratingKey": "75922",
+        "key": "/library/metadata/75922",
+        "parentRatingKey": "75920",
+        "grandparentRatingKey": "20069",
+        "guid": "plex://item/7b3a5003f89a",
+        "parentGuid": "plex://item/9079ae281acb",
+        "grandparentGuid": "plex://item/2f57938f2c0a",
+        "grandparentSlug": "grandparentSlug 1",
+        "studio": "studio 17",
+        "type": "episode",
+        "title": "title 190",
+        "grandparentKey": "/library/metadata/20069",
+        "parentKey": "/library/metadata/75920",
+        "grandparentTitle": "grandparentTitle 1",
+        "parentTitle": "parentTitle 1",
+        "originalTitle": "originalTitle 28",
+        "contentRating": "fr/10",
+        "summary": "summary 50",
+        "index": 15,
+        "parentIndex": 1,
+        "audienceRating": 7.6,
+        "year": 2005,
+        "thumb": "/library/metadata/75922/thumb/1785882731",
+        "art": "/library/metadata/20069/art/1779587226",
+        "parentThumb": "/library/metadata/75920/thumb/1779587226",
+        "grandparentThumb": "/library/metadata/20069/thumb/1779587226",
+        "grandparentArt": "/library/metadata/20069/art/1779587226",
+        "grandparentTheme": "/library/metadata/20069/theme/1779587226",
+        "duration": 1475818,
+        "originallyAvailableAt": "2005-01-18",
+        "addedAt": 1779587226,
+        "updatedAt": 1785882731,
+        "audienceRatingImage": "themoviedb://image.rating",
+        "chapterSource": "media",
+        "Media": [
+          {
+            "id": 112494,
+            "duration": 1475818,
+            "bitrate": 2646,
+            "width": 1920,
+            "height": 1080,
+            "aspectRatio": 1.78,
+            "audioChannels": 2,
+            "audioCodec": "aac",
+            "videoCodec": "hevc",
+            "videoResolution": "1080",
+            "container": "mkv",
+            "videoFrameRate": "24p",
+            "audioProfile": "lc",
+            "videoProfile": "main 10",
+            "hasVoiceActivity": false,
+            "Part": [
+              {
+                "id": 117653,
+                "key": "/library/parts/117653/1779587183/file.mkv",
+                "duration": 1475818,
+                "file": "/media/item-38.mkv",
+                "size": 488127439,
+                "audioProfile": "lc",
+                "container": "mkv",
+                "videoProfile": "main 10"
+              }
+            ]
+          }
+        ],
+        "Image": [
+          {
+            "alt": "alt 50",
+            "type": "coverPoster",
+            "url": "/library/metadata/20069/thumb/1779587226"
+          },
+          {
+            "alt": "alt 50",
+            "type": "snapshot",
+            "url": "/library/metadata/75922/thumb/1785882731"
+          },
+          {
+            "alt": "alt 50",
+            "type": "background",
+            "url": "/library/metadata/20069/art/1779587226"
+          },
+          {
+            "alt": "alt 50",
+            "type": "backgroundSquare",
+            "url": "/library/metadata/20069/squareArt/1779587226"
+          }
+        ],
+        "UltraBlurColors": {
+          "topLeft": "103624",
+          "topRight": "336a52",
+          "bottomRight": "1f5e41",
+          "bottomLeft": "315b1e"
+        },
+        "Director": [
+          {
+            "tag": "tag 602"
+          }
+        ],
+        "Writer": [
+          {
+            "tag": "tag 603"
+          }
+        ],
+        "Role": [
+          {
+            "tag": "tag 39"
+          },
+          {
+            "tag": "tag 40"
+          },
+          {
+            "tag": "tag 41"
+          }
+        ]
+      }
+    ]
+  }
+}

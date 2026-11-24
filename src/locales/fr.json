@@ -113,7 +113,8 @@
     "addToQueue": "Ajouter à la file",
     "removeDownload": "Supprimer le téléchargement",
     "cancelDownload": "Annuler le téléchargement",
-    "offlineNoNext": "Pas de connexion, et aucun titre téléchargé à lire ensuite"
+    "offlineNoNext": "Pas de connexion, et aucun titre téléchargé à lire ensuite",
+    "tracksFailing": "Plusieurs morceaux d’affilée n’ont pas pu être lus. Lecture arrêtée."
   },
   "detail": {
     "episodes": "{n} épisode | {n} épisodes",
@@ -263,7 +264,7 @@
     "original": "Originale",
     "connectivity": "Connexion",
     "forceOffline": "Forcer le mode hors ligne",
-    "forceOfflineHint": "Coupe toutes les requêtes vers Jellyfin",
+    "forceOfflineHint": "Coupe toutes les requêtes vers le serveur",
     "diagnostics": "Diagnostic",
     "debugLogs": "Journaux de débogage",
     "debugLogsHint": "Voir et exporter les journaux de lecture",
@@ -288,7 +289,8 @@
       "large": "Grande",
       "xl": "Très grande",
       "huge": "Énorme"
-    }
+    },
+    "switchProfile": "Changer de profil Plex"
   },
   "login": {
     "selectAccount": "Choisissez un compte pour continuer",
@@ -306,11 +308,29 @@
     "quickConnectCode": "Saisissez ce code dans le client web Jellyfin",
     "waitingApproval": "En attente de validation…",
     "failed": "Connexion échouée. Vérifiez vos identifiants.",
-    "qcTimeout": "Quick Connect a expiré. Réessayez.",
+    "qcTimeout": "Le code a expiré. Réessayez.",
     "qcDisabled": "Quick Connect est désactivé. Activez-le dans Jellyfin : Tableau de bord → Avancé → Quick Connect.",
     "qcUnsupported": "Quick Connect n'est pas pris en charge par cette version du serveur.",
     "urlProtocol": "L'adresse du serveur doit commencer par http:// ou https://",
-    "urlInvalid": "Saisissez une adresse de serveur valide (ex. http://192.168.1.10:8096)"
+    "urlInvalid": "Saisissez une adresse de serveur valide (ex. http://192.168.1.10:8096)",
+    "unreachable": "Serveur injoignable. Vérifiez l’adresse et votre connexion.",
+    "serverType": "Type de serveur",
+    "kind": {
+      "jellyfin": "Jellyfin",
+      "plex": "Plex"
+    },
+    "plexIntro": "Connectez-vous avec votre compte Plex, puis choisissez votre profil.",
+    "plexSignIn": "Obtenir un code",
+    "plexLinkHint": "Ouvrez cette page sur n’importe quel appareil et saisissez le code",
+    "chooseProfile": "Qui regarde ?",
+    "pinProtected": "Protégé par un code PIN",
+    "pinFor": "Code PIN de {name}",
+    "wrongPin": "Code PIN incorrect. Réessayez.",
+    "profileRefused": "Ce profil ne peut pas ouvrir le serveur.",
+    "chooseServer": "Choisissez un serveur",
+    "serverOffline": "Hors ligne",
+    "removeAccount": "Retirer {name} ({server})",
+    "confirmRemoveAccount": "Retirer {name} sur {server} de cet appareil ? Il faudra se reconnecter pour l’utiliser. Les téléchargements restent sur l’appareil."
   },
   "logs": {
     "entries": "{n} entrée | {n} entrées",

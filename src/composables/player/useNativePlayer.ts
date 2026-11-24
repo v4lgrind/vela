@@ -1,27 +1,28 @@
 import { i18n } from '@/i18n';
 import { useRouter } from 'vue-router';
-import { useJellyfinStore } from '@/store/jellyfin-store';
 import { usePreferencesStore } from '@/store/preferences-store';
 import { NativeVideo } from '@/plugins/NativeVideoPlugin';
 import { debugLog } from '@/utils/debugLog';
 import { logger } from '@/utils/logger';
 import { languageMatches } from '@/utils/language';
 import { nativeAudioGroupFor } from '@/utils/audioTrackSelection';
-import {
-    canHardwareDecodeVideo,
-    exceedsDeviceDisplay,
-    getDeviceCapabilities,
-    getVideoMime,
-    isAudioStreamSupported,
-} from '@/utils/codecDetection';
+import { exceedsDisplay, isAudioCodecSupported, videoMime } from '@/domain';
+import type { AudioStream, VideoStream } from '@/domain';
+import { canHardwareDecodeVideo, getDeviceCapabilities, toDeviceCapabilities } from '@/utils/codecDetection';
 import type { PlayerSession } from './usePlayerSession';
 import type { StreamInfo } from './useStreamInfo';
 import type { SkipIntro } from './useSkipIntro';
-import type { MediaStream } from '@/types/jellyfin';
+
+/** Media3 MIME types of the sidecar formats servers deliver. */
+const SUBTITLE_MIME: Record<'vtt' | 'srt' | 'ass', string> = {
+    vtt: 'text/vtt',
+    srt: 'application/x-subrip',
+    ass: 'text/x-ssa',
+};
 
 /**
- * Native (Android ExoPlayer) playback path: negotiates the stream with the
- * native device profile, wires all NativeVideo plugin listeners, and handles
+ * Native (Android ExoPlayer) playback path: negotiates the stream for this
+ * device's decoders, wires all NativeVideo plugin listeners, and handles
  * audio-crash / video-decode fallbacks plus native quality switching.
  */
 export function useNativePlayer(
@@ -30,22 +31,21 @@ export function useNativePlayer(
     skipIntro: SkipIntro,
 ) {
     const {
-        itemId, nextEpisodeId, embyAuthHeader,
-        isLoading, currentTime, duration, progressPct, error,
-        playSessionId, mediaSource, hlsUrl, playMethod,
+        backend, itemId, nextEpisodeId, requestHeaders,
+        isLoading, isPlaying, currentTime, duration, progressPct, error,
+        version, hlsUrl, playMethod,
         audioList, selectedAudioIndex, subtitleList, selectedSubtitleIndex,
         activeBurnInSubtitleIndex,
         selectedBitrate, availablePresets, nativeResumeOffsetMs,
         isSwitching, restartInProgress,
         reportPlaybackStart, reportPlaybackProgress, reportPlaybackStopped,
-        deleteActiveEncodings, fetchPlaybackInfo,
-        parseAudioStreams, parseSubtitleStreams, determinePlaybackMethod,
+        deleteActiveEncodings, negotiate, applyPlan,
+        parseAudioStreams, parseSubtitleStreams,
         fetchNextEpisodeForItem,
     } = session;
 
     const router = useRouter();
     const preferencesStore = usePreferencesStore();
-    const jellyfinStore = useJellyfinStore();
 
     let nativeSwitchingQuality = false; // suppress 'stopped' → router.back() during native quality switch
 
@@ -136,26 +136,25 @@ export function useNativePlayer(
         }
     }
 
-    /** Trickplay sheet info for seek-bar thumbnails, when the server generated them. */
-    function buildTrickplayJson(): string | undefined {
-        const item = jellyfinStore.currentItem as any;
-        if (item?.Id !== itemId || !item.Trickplay) return undefined;
-        const sourceId = mediaSource.value?.Id ?? itemId;
-        const byWidth = item.Trickplay[sourceId] ?? Object.values(item.Trickplay)[0];
-        const resolutions = Object.values(byWidth ?? {}) as any[];
-        if (!resolutions.length) return undefined;
-        // The preview is ~200dp wide: the smallest sheet that stays sharp is enough.
-        resolutions.sort((a, b) => a.Width - b.Width);
-        const info = resolutions.find((r) => r.Width >= 300) ?? resolutions[resolutions.length - 1];
-        return JSON.stringify({
-            urlTemplate: `${jellyfinStore.serverUrl}/Videos/${itemId}/Trickplay/${info.Width}/{index}.jpg?MediaSourceId=${sourceId}`,
-            width: info.Width,
-            height: info.Height,
-            tileWidth: info.TileWidth,
-            tileHeight: info.TileHeight,
-            thumbnailCount: info.ThumbnailCount,
-            intervalMs: info.Interval,
-        });
+    /** Seek-bar thumbnails in the native player's JSON shape: tile sheets (Jellyfin) or one BIF file (Plex). */
+    async function buildTrickplayJson(): Promise<string | undefined> {
+        if (!backend?.capabilities.trickplay || !version.value) return undefined;
+        try {
+            const sheets = await backend.playback.trickplay(itemId, version.value.id);
+            if (sheets?.format === 'bif') return JSON.stringify({ format: 'bif', url: sheets.url });
+            if (sheets?.format !== 'tiles') return undefined;
+            return JSON.stringify({
+                urlTemplate: sheets.urlTemplate,
+                width: sheets.thumbnailWidth,
+                height: sheets.thumbnailHeight,
+                tileWidth: sheets.columns,
+                tileHeight: sheets.rows,
+                thumbnailCount: sheets.thumbnailCount,
+                intervalMs: sheets.intervalMs,
+            });
+        } catch {
+            return undefined;
+        }
     }
 
     async function initNativePlayer(
@@ -176,23 +175,18 @@ export function useNativePlayer(
         activeNativeStripHevc = stripHevc;
 
         try {
-            const startTicks = resumeSeconds && resumeSeconds > 0
-                ? Math.floor(resumeSeconds * 10_000_000)
-                : undefined;
-
-            const [data, resolvedNextEpisodeId] = await Promise.all([
-                fetchPlaybackInfo(startTicks, preferredAudioIndex, forceTranscodeVideo, true, transcodeAudio, stripHevc, subtitleStreamIndex),
+            const [nextPlan, resolvedNextEpisodeId] = await Promise.all([
+                negotiate({
+                    native: true, startSeconds: resumeSeconds, audioIndex: preferredAudioIndex,
+                    forceTranscode: forceTranscodeVideo, transcodeAudio, stripHevc, burnInSubtitleIndex: subtitleStreamIndex,
+                }),
                 nextEpisodeId ? Promise.resolve(nextEpisodeId) : fetchNextEpisodeForItem(itemId),
             ]);
-            mediaSource.value = data.MediaSources?.[0];
-            if (!mediaSource.value) throw new Error('No media source available');
-
-            if (data.PlaySessionId) playSessionId.value = data.PlaySessionId;
-            parseAudioStreams(mediaSource.value, preferredAudioIndex);
-            parseSubtitleStreams(mediaSource.value);
+            applyPlan(nextPlan);
+            parseAudioStreams(nextPlan.version, preferredAudioIndex);
+            parseSubtitleStreams(nextPlan.version);
             activeBurnInSubtitleIndex.value = subtitleStreamIndex ?? null;
             selectedSubtitleIndex.value = subtitleStreamIndex ?? null;
-            determinePlaybackMethod(mediaSource.value);
 
             // Pre-seed currentTime so reportPlaybackStart sends the correct resume position.
             // Without this, PositionTicks:0 is sent and Jellyfin immediately overwrites
@@ -220,22 +214,23 @@ export function useNativePlayer(
 
             // Build subtitle tracks for ExoPlayer.
             // For raw DirectPlay, ExoPlayer extracts embedded text tracks from the MKV
-            // container directly — passing sidecar VTTs would create duplicates.
+            // container directly — passing their sidecars would create duplicates;
+            // subtitle files beside the video (Plex) are still passed.
             // For HLS (transcode / direct-stream), embedded subs are not in the HLS
             // manifest, so we pass them as external sidecar tracks.
-            const subtitleTracks = isDirectPlayRaw
-                ? []
-                : subtitleList.value
-                    .filter(s => s.playbackMode === 'external' && s.deliveryUrl)
-                    .map(s => ({
-                        url: s.deliveryUrl!,
-                        lang: s.language,
-                        label: s.label,
-                    }));
+            const subtitleTracks = subtitleList.value
+                .filter(s => s.playbackMode === 'external' && s.deliveryUrl && (!isDirectPlayRaw || s.isExternalFile))
+                .map(s => ({
+                    url: s.deliveryUrl!,
+                    lang: s.language,
+                    label: s.label,
+                    mimeType: SUBTITLE_MIME[s.deliveryFormat ?? 'vtt'],
+                }));
             // Image subtitles (PGS) can't be rendered by ExoPlayer — offer them as
             // burn-in choices the native picker restarts playback to apply.
+            // In raw DirectPlay ExoPlayer already shows the embedded text tracks.
             const burnInSubtitleTracks = subtitleList.value
-                .filter(s => s.playbackMode === 'burn-in')
+                .filter(s => s.playbackMode === 'burn-in' && !(isDirectPlayRaw && s.format === 'text'))
                 .map(s => ({
                     index: s.index,
                     lang: s.language,
@@ -253,6 +248,8 @@ export function useNativePlayer(
 
             // Register event listeners before starting
             await NativeVideo.addListener('progress', (data) => {
+                // Reported to the server as playing / paused (it stayed "paused" before).
+                isPlaying.value = data.isPaused !== true;
                 currentTime.value = (data.positionMs + finalResumeOffsetMs) / 1000;
                 lastGoodPositionSec = currentTime.value;
                 duration.value = data.durationMs / 1000;
@@ -323,11 +320,11 @@ export function useNativePlayer(
                         // Select the exact stream chosen before PlaybackInfo (language first,
                         // then device support). A default-flagged stream is already what
                         // ExoPlayer plays, so it is not re-selected (and not persisted).
-                        const jellyfinAudio = (mediaSource.value?.MediaStreams ?? [])
-                            .filter((s: MediaStream) => s.Type === 'Audio');
-                        const requested = jellyfinAudio.find(s => s.Index === requestedJellyfinAudioIndex);
-                        const requestedGroup = requested && !requested.IsDefault
-                            ? nativeAudioGroupFor(jellyfinAudio, nativeAudio, requestedJellyfinAudioIndex)
+                        const serverAudio = version.value?.audio ?? [];
+                        const requestedId = requestedJellyfinAudioIndex === undefined ? undefined : String(requestedJellyfinAudioIndex);
+                        const requested = serverAudio.find(s => s.id === requestedId);
+                        const requestedGroup = requested && !requested.isDefault
+                            ? nativeAudioGroupFor(serverAudio, nativeAudio, requestedId)
                             : undefined;
                         const preferredAudio =
                             (requestedGroup !== undefined ? nativeAudio.find((t: any) => t.groupIndex === requestedGroup) : null) ||
@@ -423,17 +420,18 @@ export function useNativePlayer(
                 // before this handler fires, or the crash may occur before any progress event.
                 debugLog(`[AudioCrash] >>> audioError EVENT: groupIndex=${data.groupIndex} language="${data.language}" lastGoodPos=${lastGoodPositionSec} currentTime=${currentTime.value} restartInProgress=${restartInProgress.value}`);
                 const savedPosition = lastGoodPositionSec;
-                const audioStreams = (mediaSource.value?.MediaStreams ?? []).filter((s: any) => s.Type === 'Audio');
-                debugLog(`[AudioCrash]   Jellyfin audio streams: ${audioStreams.map((s: any) => `idx=${s.Index} lang="${s.Language}" codec=${s.Codec}`).join(' | ')}`);
+                const audioStreams = version.value?.audio ?? [];
+                debugLog(`[AudioCrash]   server audio streams: ${audioStreams.map((s) => `id=${s.id} lang="${s.language}" codec=${s.codec}`).join(' | ')}`);
+                const indexOf = (stream?: AudioStream) => (stream ? Number(stream.id) : undefined);
                 // ExoPlayer sends 2-letter codes ("en"), Jellyfin uses 3-letter ("eng").
                 // Match by position: groupIndex is 1-based among audio tracks.
                 // groupIndex=-1 means crash before tracks reported — the failing track is
                 // the one requested for this session, so keep it (and its language).
                 const jellyfinIndex = data.groupIndex >= 1
-                    ? (audioStreams[data.groupIndex - 1]?.Index
-                        ?? audioStreams.find((s: any) => s.Language?.startsWith(data.language))?.Index
-                        ?? audioStreams[0]?.Index)
-                    : (requestedJellyfinAudioIndex ?? audioStreams[0]?.Index);
+                    ? (indexOf(audioStreams[data.groupIndex - 1])
+                        ?? indexOf(audioStreams.find((s) => s.language?.startsWith(data.language)))
+                        ?? indexOf(audioStreams[0]))
+                    : (requestedJellyfinAudioIndex ?? indexOf(audioStreams[0]));
                 debugLog(`[AudioCrash]   matched jellyfinIndex=${jellyfinIndex}`);
                 await restartWithAudio(savedPosition, jellyfinIndex, title);
             });
@@ -443,12 +441,11 @@ export function useNativePlayer(
                 debugLog(`[AudioCrash] >>> audioSwitchJellyfin EVENT: jellyfinIndex=${data.jellyfinIndex} lastGoodPos=${lastGoodPositionSec} currentTime=${currentTime.value} restartInProgress=${restartInProgress.value}`);
                 // A user switch (not a crash): let Jellyfin stream-copy the new track
                 // when this device decodes it, e.g. to keep E-AC3 Atmos.
-                const target = (mediaSource.value?.MediaStreams ?? [])
-                    .find((s: MediaStream) => s.Type === 'Audio' && s.Index === data.jellyfinIndex);
-                const capabilities = await getDeviceCapabilities();
+                const target = version.value?.audio.find((s) => Number(s.id) === data.jellyfinIndex);
+                const device = toDeviceCapabilities(await getDeviceCapabilities());
                 const transcodeAudio = !target
-                    || capabilities.androidApi <= 0
-                    || !isAudioStreamSupported(target, capabilities);
+                    || !device.isKnown
+                    || !isAudioCodecSupported(target.codec, target.profile, device);
                 await restartWithAudio(lastGoodPositionSec, data.jellyfinIndex, title, transcodeAudio);
             });
 
@@ -469,9 +466,9 @@ export function useNativePlayer(
             debugLog(`[NativePlayer] calling NativeVideo.start: startPositionMs=${finalStartPositionMs} playMethod=${playMethod.value} subtitleTracks=${subtitleTracks.length} nextEpisodeId=${resolvedNextEpisodeId}`);
             await NativeVideo.start({
                 url: hlsUrl.value,
-                authHeader: embyAuthHeader,
+                headers: requestHeaders.value,
                 startPositionMs: finalStartPositionMs,
-                title: title || (mediaSource.value as any)?.Name || '',
+                title: title || version.value?.name || '',
                 playMethod: playMethod.value,
                 subtitleTracks,
                 burnInSubtitleTracks,
@@ -489,7 +486,7 @@ export function useNativePlayer(
                 nextEpisodeId: resolvedNextEpisodeId,
                 chaptersJson: chapters?.length ? JSON.stringify(chapters) : undefined,
                 creditsStartMs: skipIntro.creditsStartMs.value,
-                trickplayJson: buildTrickplayJson(),
+                trickplayJson: await buildTrickplayJson(),
             });
 
             // Don't clear isLoading here — keep the spinner until tracksReady fires,
@@ -563,59 +560,42 @@ export function useNativePlayer(
      * support required).
      */
     async function detectCodecFallbacks(
-        allStreams: MediaStream[],
-        preferredAudio?: MediaStream,
+        video?: VideoStream,
+        preferredAudio?: AudioStream,
     ): Promise<{ forceTranscodeAudio: boolean; forceTranscodeVideo: boolean; stripHevc: boolean }> {
-        let forceTranscodeAudio = false;
-        let forceTranscodeVideo = false;
-        let stripHevc = false;
-
-        const capabilities = await getDeviceCapabilities();
-        if (capabilities.androidApi <= 0) {
+        const none = { forceTranscodeAudio: false, forceTranscodeVideo: false, stripHevc: false };
+        const native = await getDeviceCapabilities();
+        const device = toDeviceCapabilities(native);
+        if (!device.isKnown) {
             debugLog('[Codec] Device capability probe unavailable; preserving runtime fallback');
-            return { forceTranscodeAudio, forceTranscodeVideo, stripHevc };
+            return none;
         }
-
         debugLog(
-            `[Codec] ${capabilities.manufacturer} ${capabilities.model} API ${capabilities.androidApi} ` +
-            `display=${capabilities.displayWidth}x${capabilities.displayHeight} ` +
-            `video=[${capabilities.hardwareVideoCodecs.join(',')}] ` +
-            `audio=[${capabilities.platformAudioCodecs.join(',')}]`,
+            `[Codec] ${native.manufacturer} ${native.model} API ${native.androidApi} ` +
+            `display=${device.displayWidth}x${device.displayHeight} ` +
+            `video=[${device.hardwareVideoCodecs.join(',')}] audio=[${device.platformAudioCodecs.join(',')}]`,
         );
 
-        if (preferredAudio && !isAudioStreamSupported(preferredAudio, capabilities)) {
-            debugLog(
-                `[Codec] Audio codec "${preferredAudio.Codec}" profile="${preferredAudio.Profile || ''}" ` +
-                'is unsupported by this device; requesting AAC transcode',
-            );
-            forceTranscodeAudio = true;
+        const forceTranscodeAudio = !!preferredAudio && !isAudioCodecSupported(preferredAudio.codec, preferredAudio.profile, device);
+        if (forceTranscodeAudio) {
+            debugLog(`[Codec] Audio codec "${preferredAudio!.codec}" profile="${preferredAudio!.profile || ''}" is unsupported by this device; requesting AAC transcode`);
         }
+        if (!video) return { ...none, forceTranscodeAudio };
 
-        const videoStream = allStreams.find(stream => stream.Type === 'Video');
-        if (videoStream) {
-            const result = await canHardwareDecodeVideo(videoStream);
-            if (!result.supported) {
-                const mime = getVideoMime(videoStream);
-                debugLog(
-                    `[Codec] Video codec "${videoStream.Codec}" profile="${videoStream.Profile || ''}" ` +
-                    `level=${videoStream.Level || 0} ${videoStream.Width || 0}x${videoStream.Height || 0} ` +
-                    `unsupported: ${result.reason}; requesting H.264 transcode`,
-                );
-                forceTranscodeVideo = true;
-                stripHevc = mime === 'video/hevc' || mime === 'video/dolby-vision';
-            } else if (exceedsDeviceDisplay(videoStream, capabilities)) {
-                debugLog(
-                    `[Codec] Source ${videoStream.Width || 0}x${videoStream.Height || 0} exceeds ` +
-                    `display ${capabilities.displayWidth}x${capabilities.displayHeight}; ` +
-                    'requesting a display-sized transcode',
-                );
-                forceTranscodeVideo = true;
-            } else {
-                debugLog(`[Codec] Hardware decoder selected: ${result.decoderName}`);
-            }
+        const result = await canHardwareDecodeVideo(video);
+        if (!result.supported) {
+            const mime = videoMime(video);
+            debugLog(`[Codec] Video codec "${video.codec}" profile="${video.profile || ''}" level=${video.level || 0} ` +
+                `${video.width || 0}x${video.height || 0} unsupported: ${result.reason}; requesting H.264 transcode`);
+            return { forceTranscodeAudio, forceTranscodeVideo: true, stripHevc: mime === 'video/hevc' || mime === 'video/dolby-vision' };
         }
-
-        return { forceTranscodeAudio, forceTranscodeVideo, stripHevc };
+        if (exceedsDisplay(video, device)) {
+            debugLog(`[Codec] Source ${video.width || 0}x${video.height || 0} exceeds display ` +
+                `${device.displayWidth}x${device.displayHeight}; requesting a display-sized transcode`);
+            return { forceTranscodeAudio, forceTranscodeVideo: true, stripHevc: false };
+        }
+        debugLog(`[Codec] Hardware decoder selected: ${result.decoderName}`);
+        return { forceTranscodeAudio, forceTranscodeVideo: false, stripHevc: false };
     }
 
     return {

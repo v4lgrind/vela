@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { MediaItem } from '@/domain';
 
-import { buildOfflineArtworkTargets } from './downloadService';
+import { buildOfflineArtworkTargets, offlineFileName } from './downloadService';
 
 const user = { played: false, playCount: 0, favorite: false };
 const base = { genres: [], studios: [], user, versions: [], credits: [] };
@@ -34,5 +34,24 @@ describe('buildOfflineArtworkTargets', () => {
   it('caches the album cover of a track under the album id', () => {
     const track = { ...base, id: 't', kind: 'track', title: 'T', albumId: 'al', artists: [], albumArtists: [], images: { poster: 'cover' } } as MediaItem;
     expect(buildOfflineArtworkTargets(track)).toContainEqual({ itemId: 'al', imageType: 'Primary', ref: 'cover', maxWidth: 600 });
+  });
+});
+
+describe('offlineFileName', () => {
+  const track = (id: string, trackNumber?: number, discNumber?: number) =>
+    ({ ...base, id, kind: 'track', title: 'Chapitre', artists: [], albumArtists: [], images: {}, trackNumber, discNumber }) as MediaItem;
+
+  it('gives tracks with the same title different files (they used to overwrite each other)', () => {
+    expect(offlineFileName(track('a', 1), 'mp3')).toBe('01 - Chapitre.mp3');
+    expect(offlineFileName(track('b', 2), 'mp3')).toBe('02 - Chapitre.mp3');
+    expect(offlineFileName(track('c', 1, 2), 'mp3')).toBe('2-01 - Chapitre.mp3');
+    expect(offlineFileName(track('d'), 'mp3')).toBe('Chapitre (d).mp3');
+  });
+
+  it('numbers episodes and dates movies', () => {
+    const episode = { ...base, id: 'e', kind: 'episode', title: 'Pilot', seriesId: 's', seriesTitle: 'S', seasonNumber: 1, episodeNumber: 2, images: {} } as MediaItem;
+    expect(offlineFileName(episode, 'mkv')).toBe('S01E02 - Pilot.mkv');
+    const movie = { ...base, id: 'm', kind: 'movie', title: 'Alien: Romulus', year: 2024, images: {} } as MediaItem;
+    expect(offlineFileName(movie, 'mkv')).toBe('Alien- Romulus (2024).mkv');
   });
 });

@@ -96,6 +96,28 @@ const FOLDER_BY_KIND: Partial<Record<MediaItem['kind'], (item: MediaItem, clean:
     ? `Music/${clean(item.albumArtist ?? item.artists[0]?.name, 'Unknown Artist')}/${clean(item.albumTitle, 'Unknown Album')}` : ''),
 };
 
+const pad2 = (n: number) => String(n).padStart(2, '0');
+const unsafeFileChars = (name: string) => name.replace(/[/\\?%*:|"<>]/g, '-');
+
+/**
+ * File name of a download, unique within its folder: items of one album or
+ * season often share a title (audiobook chapters, "Intro"), and same-named
+ * downloads overwrote each other. Numbers keep the folder readable; the item
+ * id is the fallback when there is none.
+ */
+export function offlineFileName(item: MediaItem, extension: string): string {
+  const title = item.title || item.id;
+  let base = `${title} (${item.id})`;
+  if (item.kind === 'track' && item.trackNumber) {
+    base = `${item.discNumber && item.discNumber > 1 ? `${item.discNumber}-` : ''}${pad2(item.trackNumber)} - ${title}`;
+  } else if (item.kind === 'episode' && item.episodeNumber !== undefined) {
+    base = `S${pad2(item.seasonNumber ?? 0)}E${pad2(item.episodeNumber)} - ${title}`;
+  } else if (item.kind === 'movie') {
+    base = item.year ? `${title} (${item.year})` : title;
+  }
+  return unsafeFileChars(`${base}.${extension}`);
+}
+
 class DownloadService {
   private downloads: Map<string, ActiveDownload> = new Map();
   private progressCallbacks: Map<string, (progress: DownloadProgress) => void> = new Map();
@@ -117,7 +139,7 @@ class DownloadService {
       throw new Error(`Download already in progress for ${itemId}`);
     }
 
-    const filename = this.sanitizeFilename(`${item.title || itemId}.${plan.fileExtension}`);
+    const filename = offlineFileName(item, plan.fileExtension);
     const filePath = this.buildFilePath(item, filename);
     const downloadUrl = plan.url;
     const authHeaders = plan.headers;
@@ -424,7 +446,7 @@ class DownloadService {
   }
 
   private sanitizeFilename(filename: string): string {
-    return filename.replace(/[/\\?%*:|"<>]/g, '-');
+    return unsafeFileChars(filename);
   }
 
   private buildFilePath(item: MediaItem, filename: string): string {

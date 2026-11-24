@@ -126,6 +126,27 @@ cd android
 
 **Output:** `android/app/build/outputs/apk/debug/vela.apk`
 
+#### Signing
+
+Published APKs (nightlies and releases) are release builds signed by
+`scripts/sign-android-apk.sh` with the **release key**, rotated from the legacy
+key committed in `android/app/signing.keystore` (APK Signature Scheme v3,
+lineage in `android/signing/lineage.bin`). Android 9+ installs a rotated build
+over a legacy-signed one and keeps its data; afterwards it refuses any APK
+signed only with the legacy key, whose password is public.
+
+- The release key is never committed. CI reads it from the
+  `VELA_SIGNING_KEYSTORE_B64` and `VELA_SIGNING_PASSWORD` secrets.
+- Locally, the script reads `~/.config/vela-signing/signing.env`
+  (`VELA_SIGNING_KEYSTORE`, `VELA_SIGNING_PASSWORD`, `VELA_SIGNING_ALIAS`).
+  `npm run android:build` and `npm run android:release` call it after Gradle;
+  without the key the APK keeps the legacy signature, which installs on the
+  emulator but not over a published build.
+- To sign an APK built another way (Gradle directly, Docker):
+  `scripts/sign-android-apk.sh path/to/vela.apk`.
+- **Losing the release key means no more in-place updates**: keep a backup of
+  `~/.config/vela-signing/` in a password manager.
+
 #### Docker Android Build
 
 With Docker installed, the container installs Node 22, JDK 21 and Android SDK 36.
@@ -160,8 +181,9 @@ docker cp "$container":/workspace/android/app/build/outputs/apk/debug/vela.apk .
 docker rm "$container"
 ```
 
-Rebuild the image after source changes. The APK uses the repository's fixed
-debug-grade signing key; do not use that key for a public production release.
+Rebuild the image after source changes. The APK keeps the legacy signing key:
+sign it with `scripts/sign-android-apk.sh out/vela.apk` before installing it
+over a published build (see [Signing](#signing)).
 
 ### Desktop Development
 

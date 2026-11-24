@@ -3,8 +3,9 @@ name: Release
 # Manual, versioned release. Builds Android, Windows and Linux from the selected
 # commit, then publishes every platform artifact in one GitHub release.
 #
-# The APK remains debug-signed with the committed fixed keystore so it installs
-# over an existing build. Android versionCode and all package versions are
+# The APK is a release build signed with the release key, rotated from the
+# legacy committed keystore so it installs over older builds (see
+# scripts/sign-android-apk.sh). Android versionCode and all package versions are
 # derived from the requested semantic version.
 on:
   workflow_dispatch:
@@ -108,13 +109,22 @@ jobs:
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleRelease
+
+      - name: Sign APK with the release key
+        env:
+          KEYSTORE_B64: ${{ secrets.VELA_SIGNING_KEYSTORE_B64 }}
+          VELA_SIGNING_PASSWORD: ${{ secrets.VELA_SIGNING_PASSWORD }}
+        run: |
+          export VELA_SIGNING_KEYSTORE="$RUNNER_TEMP/vela-release.p12"
+          echo "$KEYSTORE_B64" | base64 -d > "$VELA_SIGNING_KEYSTORE"
+          scripts/sign-android-apk.sh --require android/app/build/outputs/apk/release/vela.apk
 
       - name: Prepare Android release asset
         shell: bash
         run: |
           mkdir -p release-assets
-          cp android/app/build/outputs/apk/debug/vela.apk \
+          cp android/app/build/outputs/apk/release/vela.apk \
              "release-assets/Vela-${{ needs.prepare.outputs.version }}-android.apk"
 
       - name: Upload Android release asset

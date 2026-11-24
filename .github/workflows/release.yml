@@ -89,9 +89,11 @@ jobs:
       - name: Apply Android version
         shell: bash
         run: |
-          sed -i -E "s/versionCode .*/versionCode ${{ needs.prepare.outputs.code }}/" android/app/build.gradle
+          # build.gradle reads ANDROID_VERSION_CODE (its versionCode spans two
+          # lines, so rewriting it with sed broke the Gradle file).
+          echo "ANDROID_VERSION_CODE=${{ needs.prepare.outputs.code }}" >> "$GITHUB_ENV"
           sed -i -E "s/versionName \"[^\"]*\"/versionName \"${{ needs.prepare.outputs.version }}\"/" android/app/build.gradle
-          grep -nE "versionCode|versionName" android/app/build.gradle
+          grep -nE "versionName" android/app/build.gradle
 
       - name: Install dependencies
         run: npm ci

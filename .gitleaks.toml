@@ -1,0 +1,9 @@
+# gitleaks config: default rules plus the known false positives of this repo.
+# Run: gitleaks git --log-opts="--all"
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Plex tagKey values are public tag identifiers, not credentials"
+regexTarget = "line"
+regexes = ['''"tagKey"\s*:''']

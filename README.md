@@ -1,7 +1,7 @@
 # Vela
 
-A modern Jellyfin media client built with Vue 3, Capacitor, and Electron. Android uses
-native playback while Windows and Linux use the shared web player.
+A modern media client for **Jellyfin** and **Plex** servers, built with Vue 3, Capacitor,
+and Electron. Android uses native playback while Windows and Linux use the shared web player.
 
 ## Tech Stack
 
@@ -10,21 +10,26 @@ native playback while Windows and Linux use the shared web player.
 - **Desktop:** Electron (Windows and Linux)
 - **Media Playback:** ExoPlayer (Media3) on Android, HLS.js/Chromium on desktop and web
 - **State Management:** Pinia with persistence
-- **API Client:** Jellyfin SDK
+- **Servers:** Jellyfin (official SDK) and Plex (Plex Media Server and plex.tv APIs),
+  behind Vela's own domain model (see [Architecture](#architecture))
 - **UI Components:** Reka UI (headless) + Lucide icons
 - **Styling:** Tailwind CSS v4
 - **Utilities:** VueUse
 
 ## Features
 
+- 🖥️ Jellyfin and Plex servers, several accounts side by side (switch in one tap, remove from the list)
+- 🔑 Plex sign-in with a plex.tv/link code, Plex Home profiles (with PIN), profile switch from Settings
 - 🎬 Browse and stream Movies, TV Shows, and Music
 - 📱 Native Android app support
 - Windows and Linux desktop packages
 - 💾 Offline playback with cached item metadata, posters, backdrops, parent artwork, and cast portraits
-- 🎵 Background audio playback
+- ⬇️ Downloads in original quality or converted by the server
+- 🎵 Background audio playback, lyrics, playlists, Android Auto
+- 📡 Cast (video and music)
 - 🔍 Search across your media library
 - 📺 Android TV (Leanback) support
-- 🌐 Support for local Jellyfin servers (HTTP cleartext)
+- 🌐 Support for local servers (HTTP cleartext)
 
 Library filters, genre, sort order and page position are remembered per library
 for the current session when opening a title and returning. New pages open at the
@@ -51,6 +56,42 @@ Sources larger than the rotation-normalized display are transcoded even when
 the decoder advertises support, avoiding wasteful and unstable 4K playback on
 smaller screens. Native playback, subtitles, relative scrubbing and direct
 timeline taps were verified on physical Android 14 and Android 17 devices.
+
+## Plex server compatibility
+
+Vela talks to Plex Media Server directly, as a Plex client:
+
+- **Sign-in:** a plex.tv/link code (no password in the app), then the Plex Home
+  profile (PIN when protected) and the server. Requests to the server carry that
+  profile's server token; the plex.tv account token is kept in secure storage so
+  the profile can be switched later without a new code.
+- **Addresses:** every address of the server (LAN, public, relay) is probed in
+  parallel and the LAN wins whenever it answers: going through the public address
+  from home makes the router loop the stream back (NAT loopback), often at a few
+  Mb/s. Vela searches again when the network changes (Wi-Fi ↔ mobile), when the
+  app comes back on screen, and when a request gets no answer.
+- **Video:** Vela decides direct play itself from the device's decoders (Plex's
+  generic profile refuses files whose chosen audio track is not the first one).
+  Otherwise it asks the universal transcoder for HLS with a client profile built
+  from the device codecs: audio switch, quality cap and picture-subtitle burn-in
+  map to Plex parameters. Watch progress goes through `/:/timeline`.
+- **Music:** tracks play their original file (FLAC included, with seeking);
+  the server converts only when a quality cap is set or the format is not
+  playable. Finished tracks are scrobbled (Plex keeps no play count from a
+  music timeline).
+- **Downloads:** the original file, or a Matroska conversion when a quality is
+  chosen. Seek-bar previews need Plex's "Generate video preview thumbnails"
+  setting. Cast uses the Default Media Receiver with a stream URL.
+
+## Architecture
+
+Vela has its own media model in `src/domain` (items, streams, playback intent,
+ports such as `MediaBackend`, `CatalogPort`, `PlaybackPort`). Each server kind is
+a backend in `src/backends/<kind>` that implements those ports; the app reaches
+backends only through `src/backends/registry.ts` and the session store.
+`src/architecture.test.ts` enforces these boundaries (no server SDK outside its
+backend, no backend import from the app). On Android, Android Auto browses a
+native `MusicLibrary` (Jellyfin or Plex) configured by the app.
 
 ## Prerequisites
 
@@ -170,8 +211,8 @@ The GitHub Actions desktop workflow builds both platforms independently.
 
 Offline media is stored in the user-visible `Videos/Vela` folder on Windows,
 `Downloads/Vela` on Linux, and `Documents/Vela` on Android.
-Unsupported offline video formats are requested from Jellyfin as H.264/AAC MP4 files so
-they remain playable on both Windows and Linux.
+Unsupported offline video formats are requested from the server as H.264/AAC files
+(MP4 from Jellyfin, Matroska from Plex) so they remain playable after download.
 
 A download is only marked complete after its full item metadata and local artwork
 have been cached. Opening Downloads while online also backfills these assets for
@@ -194,10 +235,13 @@ adb install android/app/build/outputs/apk/debug/vela.apk
 ```
 vela/
 ├── src/
-│   ├── components/      # Vue components
-│   ├── views/          # Page views
-│   ├── services/       # API services (Jellyfin, downloads, offline DB)
-│   ├── stores/         # Pinia stores
+│   ├── domain/         # Vela's media model and backend ports
+│   ├── backends/       # jellyfin/ and plex/ backends + registry
+│   ├── components/     # Vue components
+│   ├── pages/          # Routed pages
+│   ├── composables/    # Player and UI composables
+│   ├── services/       # Downloads, offline DB, audio player
+│   ├── store/          # Pinia stores (session, libraries, offline…)
 │   └── router/         # Vue Router config
 ├── android/            # Capacitor Android platform
 ├── electron/           # Electron main process, preload, and media backend
@@ -214,7 +258,7 @@ vela/
 - **App ID:** `cloud.valgrind.vela`
 - **App Name:** Vela
 - **Web Directory:** `dist`
-- **Cleartext Traffic:** Enabled (for local HTTP Jellyfin servers)
+- **Cleartext Traffic:** Enabled (for local HTTP servers)
 
 ### Android Permissions
 

@@ -118,6 +118,12 @@
         </div>
       </section>
 
+      <!-- App version and updates (Android: updates come from GitHub releases) -->
+      <section v-if="updateStore.supported" class="mb-7">
+        <p class="settings-label">{{ t('update.section') }}</p>
+        <AppUpdateSettings class="settings-card" />
+      </section>
+
       <!-- Diagnostics -->
       <section class="mb-2">
         <p class="settings-label">{{ t('settings.diagnostics') }}</p>
@@ -143,12 +149,15 @@ import { Switch } from '@/components/ui/switch';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { ChevronRight, LogOut, Server, Palette, MonitorPlay, Music, Users } from 'lucide-vue-next';
 import { usePreferencesStore } from '@/store/preferences-store';
+import { useAppUpdateStore } from '@/store/app-update-store';
+import AppUpdateSettings from '@/components/update/AppUpdateSettings.vue';
 import { useSessionStore } from '@/store/session-store';
 
 const { t } = useI18n();
 const router = useRouter();
 const session = useSessionStore();
 const preferencesStore = usePreferencesStore();
+const updateStore = useAppUpdateStore();
 
 const themeOptions = [
   { value: 'system' as const, label: 'settings.themeAuto' },

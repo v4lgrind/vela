@@ -406,5 +406,30 @@
   "offline": {
     "banner": "Hors ligne · seuls vos téléchargements sont affichés",
     "noDownloads": "Aucun téléchargement"
+  },
+  "update": {
+    "section": "Application",
+    "version": "Version",
+    "check": "Rechercher des mises à jour",
+    "checking": "Recherche…",
+    "upToDate": "À jour",
+    "title": "Mise à jour disponible",
+    "whatsNew": "Nouveautés",
+    "updateTo": "Mettre à jour vers {version}",
+    "install": "Mettre à jour",
+    "installing": "Ouverture de l’installeur…",
+    "retry": "Réessayer",
+    "later": "Plus tard",
+    "cancel": "Annuler",
+    "downloading": "Téléchargement… {percent} %",
+    "permissionHint": "Autorisez Vela à installer des applications, puis revenez dans Vela.",
+    "errors": {
+      "check_failed": "Impossible de vérifier les mises à jour. Vérifiez votre connexion et réessayez.",
+      "download_failed": "Le téléchargement a échoué. Réessayez.",
+      "invalid_apk": "Le fichier téléchargé n’est pas une mise à jour valide de Vela.",
+      "wrong_package": "Le fichier téléchargé n’est pas une mise à jour valide de Vela.",
+      "not_newer": "Cette version est déjà installée.",
+      "insecure_url": "Le lien de téléchargement n’est pas sécurisé : la mise à jour a été bloquée."
+    }
   }
 }

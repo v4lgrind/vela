@@ -406,5 +406,30 @@
   "offline": {
     "banner": "Offline · only your downloads are shown",
     "noDownloads": "No downloads"
+  },
+  "update": {
+    "section": "App",
+    "version": "Version",
+    "check": "Check for updates",
+    "checking": "Checking…",
+    "upToDate": "Up to date",
+    "title": "Update available",
+    "whatsNew": "What's new",
+    "updateTo": "Update to {version}",
+    "install": "Update",
+    "installing": "Opening the installer…",
+    "retry": "Try again",
+    "later": "Later",
+    "cancel": "Cancel",
+    "downloading": "Downloading… {percent}%",
+    "permissionHint": "Allow Vela to install apps, then come back to Vela.",
+    "errors": {
+      "check_failed": "Couldn't check for updates. Check your connection and try again.",
+      "download_failed": "The download failed. Try again.",
+      "invalid_apk": "The downloaded file isn't a valid Vela update.",
+      "wrong_package": "The downloaded file isn't a valid Vela update.",
+      "not_newer": "This version is already installed.",
+      "insecure_url": "The download link isn't secure, so the update was blocked."
+    }
   }
 }

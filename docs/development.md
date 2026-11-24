@@ -162,9 +162,11 @@ docker build -f Dockerfile.android --target apk \
 The default local APK has Android `versionCode` 1. If the phone already has a
 newer build installed, pass a higher code to preserve its app data during the
 update (for example, `--build-arg ANDROID_VERSION_CODE=252` before `--target apk`
-when the installed code is 251). CI builds use the workflow run number plus
-1000, so keep local codes below 1000 to let published releases update a test
-install. Then install without clearing app data:
+when the installed code is 251). CI builds get their code from
+`.github/scripts/android-version.sh`: `MAJOR*1000000 + MINOR*10000 + PATCH*100`
+for a release (v1.5.0 = 1050000), plus the number of commits since that release
+(1–99) for a nightly. Keep local codes below the next release so it can still
+update a test install. Then install without clearing app data:
 
 ```bash
 adb install -r out/vela.apk

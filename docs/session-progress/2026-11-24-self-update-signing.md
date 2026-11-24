@@ -37,6 +37,13 @@ releases, a safe signing key, and an in-app updater.
      (version, check, update with progress).
    - `build.gradle` reads `ANDROID_VERSION_NAME`; `release.yml` passes it.
 
+4. **Nightly versionCodes** — nightlies used run number + 1000 (≈ 1300), below
+   release codes (10400), so a nightly couldn't install over a release.
+   `.github/scripts/android-version.sh` now gives releases
+   `MAJOR*1000000 + MINOR*10000 + PATCH*100` (v1.5.0 = 1050000) and nightlies
+   that code + commits since the release (1–99). All new codes are above the
+   old scheme; `appUpdate.ts` uses the same formula.
+
 ## Verified
 
 - vue-tsc clean, vitest 417/417, JVM test `UpdateApkCheckTest`.
@@ -58,5 +65,3 @@ releases, a safe signing key, and an in-app updater.
   release assets; with a private repo the check gets a 404 and stays silent.
 - Open the PR / merge, then publish a release (e.g. v1.5.0) and check that the
   phone (10402) and the tablet (10400, legacy key) are offered it.
-- Separate issue: nightly versionCodes (run number + 1000 ≈ 1300) are lower than
-  release codes (10400+), so a nightly can't be installed over a release.

@@ -1,7 +1,8 @@
 /**
  * Finds newer Vela releases on GitHub. The Android versionCode of a release is
- * derived from its tag exactly like .github/workflows/release.yml does:
- * MAJOR * 10000 + MINOR * 100 + PATCH (v1.4.0 → 10400).
+ * derived from its tag exactly like .github/scripts/android-version.sh does:
+ * MAJOR * 1000000 + MINOR * 10000 + PATCH * 100 (v1.5.0 → 1050000). Nightlies
+ * add 1–99 to the code of the release they follow.
  */
 
 export const RELEASE_REPO = 'v4lgrind/vela';
@@ -39,7 +40,7 @@ export function versionCodeOf(tag: string): number | null {
   if (!match) return null;
   const [major, minor, patch] = match.slice(1).map(Number);
   if (minor > 99 || patch > 99) return null;
-  return major * 10000 + minor * 100 + patch;
+  return major * 1_000_000 + minor * 10_000 + patch * 100;
 }
 
 /**

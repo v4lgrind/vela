@@ -21,10 +21,14 @@ const respond = (body: unknown, status = 200) =>
   vi.fn(async () => new Response(JSON.stringify(body), { status })) as unknown as typeof fetch;
 
 describe('versionCodeOf', () => {
-  it('matches the release workflow formula', () => {
-    expect(versionCodeOf('v1.4.0')).toBe(10400);
-    expect(versionCodeOf('1.5.12')).toBe(10512);
-    expect(versionCodeOf('v2.0.0')).toBe(20000);
+  it('matches .github/scripts/android-version.sh', () => {
+    expect(versionCodeOf('v1.5.0')).toBe(1_050_000);
+    expect(versionCodeOf('1.5.12')).toBe(1_051_200);
+    expect(versionCodeOf('v2.0.0')).toBe(2_000_000);
+  });
+
+  it('puts every release above the codes of the old scheme (v1.4.0 = 10400)', () => {
+    expect(versionCodeOf('v1.4.1')).toBeGreaterThan(10400);
   });
 
   it('rejects tags that are not plain semver', () => {
@@ -55,7 +59,7 @@ describe('parseRelease', () => {
   it('reads version, code and the Android asset', () => {
     expect(parseRelease(release('1.5.0'))).toMatchObject({
       version: '1.5.0',
-      versionCode: 10500,
+      versionCode: 1_050_000,
       apkUrl: apk('1.5.0').browser_download_url,
       size: 37_264_851,
     });
@@ -74,17 +78,17 @@ describe('parseRelease', () => {
 });
 
 describe('findUpdate', () => {
-  it('returns the latest release when it is newer than the installed build', async () => {
-    const update = await findUpdate(10400, respond(release('1.5.0')));
-    expect(update?.version).toBe('1.5.0');
+  it('offers the latest release to older releases and to nightlies of the previous one', async () => {
+    expect((await findUpdate(10400, respond(release('1.5.0'))))?.version).toBe('1.5.0');
+    expect((await findUpdate(1_040_012, respond(release('1.5.0'))))?.version).toBe('1.5.0');
   });
 
-  it('returns null when the installed build is up to date or newer', async () => {
-    expect(await findUpdate(10500, respond(release('1.5.0')))).toBeNull();
-    expect(await findUpdate(10501, respond(release('1.5.0')))).toBeNull();
+  it('returns null when the installed build is up to date or a later nightly', async () => {
+    expect(await findUpdate(1_050_000, respond(release('1.5.0')))).toBeNull();
+    expect(await findUpdate(1_050_003, respond(release('1.5.0')))).toBeNull();
   });
 
   it('throws on an HTTP error', async () => {
-    await expect(findUpdate(10400, respond({ message: 'Not Found' }, 404))).rejects.toThrow('HTTP 404');
+    await expect(findUpdate(1_040_000, respond({ message: 'Not Found' }, 404))).rejects.toThrow('HTTP 404');
   });
 });

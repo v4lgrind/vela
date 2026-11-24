@@ -34,7 +34,7 @@ vi.mock('@/plugins/AppUpdatePlugin', () => ({
 
 const v150: AvailableUpdate = {
   version: '1.5.0',
-  versionCode: 10500,
+  versionCode: 1_050_000,
   apkUrl: 'https://github.com/v4lgrind/vela/releases/download/v1.5.0/Vela-1.5.0-android.apk',
   size: 1,
   notes: [],

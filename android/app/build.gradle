@@ -8,14 +8,11 @@ android {
         applicationId "cloud.valgrind.vela"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        // Local/Docker builds pass an explicit ANDROID_VERSION_CODE. CI builds
-        // auto-increment from the run number, offset by 1000 so a published
-        // build always supersedes locally installed test builds (which reached
-        // 266 before the offset existed). Falls back to 1.
+        // CI passes ANDROID_VERSION_CODE / ANDROID_VERSION_NAME from
+        // .github/scripts/android-version.sh. Local/Docker builds pass a code
+        // above the build installed on the device, or get 1.
         def explicitVersionCode = System.getenv("ANDROID_VERSION_CODE")
-        def ciRunNumber = System.getenv("GITHUB_RUN_NUMBER")
-        versionCode explicitVersionCode ? explicitVersionCode.toInteger()
-                : ciRunNumber ? ciRunNumber.toInteger() + 1000 : 1
+        versionCode explicitVersionCode ? explicitVersionCode.toInteger() : 1
         // Shown in Settings; the release workflow passes the tag version.
         versionName System.getenv("ANDROID_VERSION_NAME") ?: "0.1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"

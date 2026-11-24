@@ -22,6 +22,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(NativeAudioPlugin.class);
         registerPlugin(CastAudioPlugin.class);
         registerPlugin(AirPlayPlugin.class);
+        registerPlugin(AppUpdatePlugin.class);
         super.onCreate(savedInstanceState);
     }
 

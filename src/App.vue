@@ -14,6 +14,7 @@
   />
   <ExpandedAudioPlayer v-if="isAuthenticated && audioStore.isExpanded" />
   <AppNav v-if="showBottomNav" />
+  <AppUpdatePrompt v-if="isNative" />
   <AppToast />
 </template>
 
@@ -24,10 +25,12 @@ import MiniAudioPlayer from "@/components/MiniAudioPlayer.vue";
 import ExpandedAudioPlayer from "@/components/ExpandedAudioPlayer.vue";
 import AppNav from "@/components/AppNav.vue";
 import AppToast from "@/components/ui/toast/AppToast.vue";
+import AppUpdatePrompt from "@/components/update/AppUpdatePrompt.vue";
 import { useSessionStore } from "@/store/session-store";
 import { useAudioPlayerStore } from "@/store/audio-player-store";
 import { useOfflineStore } from "@/store/offline-store";
 import { usePreferencesStore } from "@/store/preferences-store";
+import { useAppUpdateStore } from "@/store/app-update-store";
 import { useDpadNavigation } from "@/composables/useDpadNavigation";
 import { usePlatform } from "@/composables/usePlatform";
 import { useBottomNavVisible } from "@/composables/useBottomNav";
@@ -163,6 +166,8 @@ onMounted(async () => {
         router.back();
       }
     });
+    // Not awaited: a slow GitHub check must not delay startup.
+    useAppUpdateStore().init().catch((error) => logger.warn("[App] Update check failed:", error));
   }
 
   if (isAuthenticated.value) {

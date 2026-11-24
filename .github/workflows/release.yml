@@ -3,9 +3,11 @@ name: Release
 # Manual, versioned release. Builds Android, Windows and Linux from the selected
 # commit, then publishes every platform artifact in one GitHub release.
 #
-# The APK remains debug-signed with the committed fixed keystore so it installs
-# over an existing build. Android versionCode and all package versions are
-# derived from the requested semantic version.
+# The APK is a release build signed with the release key, rotated from the
+# legacy committed keystore so it installs over older builds (see
+# scripts/sign-android-apk.sh). The Android versionCode
+# (.github/scripts/android-version.sh) and all package versions are derived
+# from the requested semantic version.
 on:
   workflow_dispatch:
     inputs:
@@ -26,7 +28,6 @@ jobs:
   prepare:
     runs-on: ubuntu-latest
     outputs:
-      code: ${{ steps.version.outputs.code }}
       tag: ${{ steps.version.outputs.tag }}
       version: ${{ steps.version.outputs.version }}
 
@@ -44,10 +45,9 @@ jobs:
             exit 1
           fi
 
-          IFS=. read -r MAJOR MINOR PATCH <<< "$VERSION"
-          VERSION_CODE=$((MAJOR * 10000 + MINOR * 100 + PATCH))
+          # Also checks MINOR and PATCH fit the versionCode scheme (<= 99).
+          .github/scripts/android-version.sh release "$VERSION"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Fail if tag already exists
@@ -89,11 +89,9 @@ jobs:
       - name: Apply Android version
         shell: bash
         run: |
-          # build.gradle reads ANDROID_VERSION_CODE (its versionCode spans two
-          # lines, so rewriting it with sed broke the Gradle file).
-          echo "ANDROID_VERSION_CODE=${{ needs.prepare.outputs.code }}" >> "$GITHUB_ENV"
-          sed -i -E "s/versionName \"[^\"]*\"/versionName \"${{ needs.prepare.outputs.version }}\"/" android/app/build.gradle
-          grep -nE "versionName" android/app/build.gradle
+          # build.gradle reads ANDROID_VERSION_CODE and ANDROID_VERSION_NAME
+          # (rewriting the Gradle file with sed broke it).
+          .github/scripts/android-version.sh release "${{ needs.prepare.outputs.version }}" | tee -a "$GITHUB_ENV"
 
       - name: Install dependencies
         run: npm ci
@@ -108,13 +106,22 @@ jobs:
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleRelease
+
+      - name: Sign APK with the release key
+        env:
+          KEYSTORE_B64: ${{ secrets.VELA_SIGNING_KEYSTORE_B64 }}
+          VELA_SIGNING_PASSWORD: ${{ secrets.VELA_SIGNING_PASSWORD }}
+        run: |
+          export VELA_SIGNING_KEYSTORE="$RUNNER_TEMP/vela-release.p12"
+          echo "$KEYSTORE_B64" | base64 -d > "$VELA_SIGNING_KEYSTORE"
+          scripts/sign-android-apk.sh --require android/app/build/outputs/apk/release/vela.apk
 
       - name: Prepare Android release asset
         shell: bash
         run: |
           mkdir -p release-assets
-          cp android/app/build/outputs/apk/debug/vela.apk \
+          cp android/app/build/outputs/apk/release/vela.apk \
              "release-assets/Vela-${{ needs.prepare.outputs.version }}-android.apk"
 
       - name: Upload Android release asset

@@ -110,9 +110,17 @@
   the plan's "Phase 9 results". Not yet tested on the phone (versionCode 40
   to install), in a car or with a Cast device.
 
+- Phone tests 2026-11-24 (versionCode 40 → 41): Plex music and downloads work.
+  Offline artwork of Plex downloads was never saved (e2a373e): downloads ask
+  images by width only and the Plex photo transcoder answers 400 to one
+  dimension; now a square box with minSize=0. Existing downloads get their
+  artwork back from the Downloads page when online. User confirmed.
+- Watch state checked live on the managed profile (allowed since 2026-11-24);
+  Plex music tracks are scrobbled when stopped after 90 % (2aa07b8).
+
 ## Next steps
-- Install versionCode 40 on the user's phone (on request) and test Plex music,
-  a download, Cast and Android Auto.
+- Still untested on real devices: Cast, Android Auto, BIF previews (the
+  server has no generated previews).
 - Done in ec7ebda: one shared request per Plex item (3 s), native player
   reports playing/paused (timeline said "paused" for Plex and Jellyfin), a
   request silent for 3 s checks its address and moves only if it is dead

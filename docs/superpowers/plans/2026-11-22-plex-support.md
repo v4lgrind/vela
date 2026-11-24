@@ -637,6 +637,11 @@ Plan: `docs/superpowers/plans/2026-11-23-plex-phase-9.md`. Commits ac2efc2 →
   in a car.
 - Plex images without a size are served as the original (the photo
   transcoder answers 400 without one).
+- Watch state checked live on the managed profile (allowed since 2026-11-24):
+  resume at 120 s + Continue Watching, played/unplayed, a movie stopped at 95 %
+  becomes watched. PMS keeps no play count from a music timeline (with or
+  without `type=music`): the Plex music reporter scrobbles a track stopped
+  after 90 % of it. Audio playlists: listed, server order kept, direct files.
 
 ### Phase 10 — Verification & docs
 - Emulator smoke test on both backends (login → browse → play → resume → change

@@ -38,7 +38,7 @@ beforeEach(() => {
     requests.push(url);
     if (url.pathname === '/library/streams/88') return new Response('[00:01.00]Hello');
     const body = routes[url.pathname];
-    return body === undefined ? new Response('', { status: url.pathname === '/:/timeline' ? 200 : 404 }) : new Response(JSON.stringify(body));
+    return body === undefined ? new Response('', { status: url.pathname.startsWith('/:/') ? 200 : 404 }) : new Response(JSON.stringify(body));
   }));
 });
 afterEach(() => vi.unstubAllGlobals());
@@ -95,6 +95,18 @@ describe('Plex music', () => {
   it('lyrics from the lyrics stream, null without one', async () => {
     expect(await music().lyrics('1')).toEqual({ synced: true, lines: [{ startMs: 1000, text: 'Hello' }] });
     expect(await music().lyrics('2')).toBeNull();
+  });
+
+  it('counts a track played to the end (PMS ignores the music timeline for that)', async () => {
+    await music().reporter('1').stop({ positionMs: 9_500, durationMs: 10_000, isPaused: false });
+    const paths = requests.map((u) => u.pathname);
+    expect(paths).toContain('/:/scrobble');
+    expect(Object.fromEntries(requests.find((u) => u.pathname === '/:/scrobble')!.searchParams)).toMatchObject({ key: '1', identifier: 'com.plexapp.plugins.library' });
+  });
+
+  it('does not count a track skipped early', async () => {
+    await music().reporter('1').stop({ positionMs: 3_000, durationMs: 10_000, isPaused: false });
+    expect(requests.map((u) => u.pathname)).not.toContain('/:/scrobble');
   });
 
   it('reports the timeline for a track', async () => {

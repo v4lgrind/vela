@@ -13,6 +13,9 @@ const UNIVERSAL = '/music/:/transcode/universal';
  */
 const CAP_THRESHOLD_BPS = 10_000_000;
 const LYRICS_STREAM = 4;
+/** Share of a track after which it counts as played. */
+const PLAYED_RATIO = 0.9;
+const LIBRARY = 'com.plexapp.plugins.library';
 
 const toTracks = (metadata: PlexMetadata[]) => metadata.map(toMediaItem).filter((item): item is Track => item.kind === 'track');
 
@@ -74,6 +77,19 @@ export function createPlexMusic(client: PlexClient): MusicPort {
       ? client.url(streamRef)
       : universalUrl(trackId, request)),
     lyrics,
-    reporter: (trackId) => playback.reporter(trackPlan, trackId),
+    // PMS keeps no play count from a music timeline (checked live): a track
+    // stopped near its end is scrobbled explicitly, like other Plex clients do.
+    reporter: (trackId) => {
+      const timeline = playback.reporter(trackPlan, trackId);
+      return {
+        ...timeline,
+        stop: async (progress) => {
+          await timeline.stop(progress);
+          if (progress.durationMs && progress.positionMs >= progress.durationMs * PLAYED_RATIO) {
+            await client.send('GET', '/:/scrobble', { key: trackId, identifier: LIBRARY });
+          }
+        },
+      };
+    },
   };
 }

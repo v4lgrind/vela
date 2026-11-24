@@ -12,8 +12,16 @@ export function plexImageUrl(serverUrl: string, token: string, ref: ImageRef, si
   // The photo transcoder answers 400 without a size: the original image then.
   if (!size.width && !size.height) return `${serverUrl}${ref}${ref.includes('?') ? '&' : '?'}X-Plex-Token=${encodeURIComponent(token)}`;
   const params = new URLSearchParams({ url: ref, minSize: '1', upscale: '1', 'X-Plex-Token': token });
-  if (size.width) params.set('width', String(size.width));
-  if (size.height) params.set('height', String(size.height));
+  if (size.width && size.height) {
+    params.set('width', String(size.width));
+    params.set('height', String(size.height));
+  } else {
+    // PMS answers 400 to a single dimension: fit the image in a square box instead.
+    const edge = String(size.width ?? size.height);
+    params.set('width', edge);
+    params.set('height', edge);
+    params.set('minSize', '0');
+  }
   return `${serverUrl}/photo/:/transcode?${params}`;
 }
 

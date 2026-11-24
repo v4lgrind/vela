@@ -123,6 +123,11 @@ describe('Plex → domain: music, libraries, misc', () => {
     expect(url.searchParams.get('X-Plex-Token')).toBe('tok');
   });
 
+  it('fits an image asked by width only into a square box (PMS answers 400 to one dimension)', () => {
+    const url = new URL(plexImageUrl('https://pms.example:32400', 'tok', '/library/metadata/1/thumb/2', { width: 960 }));
+    expect(Object.fromEntries(url.searchParams)).toMatchObject({ width: '960', height: '960', minSize: '0' });
+  });
+
   it('serves the original image when no size is asked (the transcoder needs one)', () => {
     expect(plexImageUrl('https://pms.example:32400', 'tok', '/library/metadata/1/thumb/2')).toBe('https://pms.example:32400/library/metadata/1/thumb/2?X-Plex-Token=tok');
   });

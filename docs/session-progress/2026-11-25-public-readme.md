@@ -26,3 +26,12 @@
 
 ## Next
 - Optional: a native player screenshot from a real device.
+
+## Follow-up: web and macOS dropped as targets
+- Supported targets: Android, Windows, Linux. The app in a plain browser is a dev tool
+  only (npm run dev, e2e, screenshots); `ClientPlatform` `web` → `dev`, identity
+  "Vela Dev". Unused `public/manifest.webmanifest` removed.
+- macOS branches removed (`usePlatform`, `desktop.d.ts`, download store, Electron
+  `darwin`/`activate` handlers).
+- Stale e2e assertion fixed ("Jellyfin Client" → "Vela" heading). vue-tsc, 426 unit
+  tests and 5 e2e tests pass.

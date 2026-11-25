@@ -9,7 +9,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('boots to the login screen', async ({ page }) => {
-  await expect(page.getByText('Jellyfin Client')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Vela' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible();
   await expect(page.locator('#serverUrl')).toBeVisible();
 });

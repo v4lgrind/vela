@@ -126,7 +126,7 @@ import { groupActiveTasks, groupStored, storageByKind, type StoredGroup } from '
 const { t } = useI18n();
 const offlineStore = useOfflineStore();
 const imageUrl = useImageUrl();
-const SMALL = { width: 150, height: 150 };
+const SMALL = { width: 48, height: 48 }; // size-12, CSS px
 const downloadStore = useDownloadStore();
 const { artworkUrl, preload } = useOfflineArtwork();
 

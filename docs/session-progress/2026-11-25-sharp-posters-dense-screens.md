@@ -32,3 +32,22 @@ Vérifié : `vue-tsc` OK, 423 tests OK. Pas de test sur appareil (pas d'émulate
 - Éventuellement : passer les autres pages (recherche 130×195, accueil, détails)
   sur `deviceImageSize` avec des tailles CSS réelles, pour la cohérence et pour
   éviter de surcharger les petits écrans.
+
+## Suite : correctif généralisé (branche `fix/sharp-artwork-everywhere`)
+
+PR #48 fusionnée. Le correctif est maintenant appliqué partout :
+- `useImageUrl()` (`src/composables/useBackend.ts`) passe chaque taille par
+  `deviceImageSize()` : toutes les tailles de l'app sont désormais des **pixels CSS**
+  (taille affichée), converties en pixels physiques selon la densité de l'écran.
+- Tailles remises à la taille réelle affichée : accueil (rails 144×216, cartes 16:9
+  208×117), bibliothèques (400×225), détails (saisons/similaires 144×216, albums 260,
+  épisodes 180×101, héros 960×540, affiche en héros 640×960, pochette carrée 512,
+  casting 110×165), recherche (200×300), personne (112×168 / 200×300),
+  hors-ligne (48), mini-lecteur (48), lecteur audio plein écran (280).
+- Gros gain : sur la page détail d'un film sans backdrop, l'affiche étirée en
+  pleine largeur était demandée en 300×450 → maintenant 640×960 × densité.
+- Test : `src/composables/useBackend.test.ts`. 426 tests OK, `vue-tsc` OK.
+
+Non touché (pas lié à l'écran) : artwork de la notification audio
+(`audioPlayerService`), affiche du lecteur vidéo et du Cast (image originale),
+artwork téléchargé pour le hors-ligne (600 / 960 / 1920 px fixes).

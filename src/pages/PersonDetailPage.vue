@@ -11,7 +11,7 @@
       <div class="pt-3 pb-2 flex gap-5 items-start">
         <div class="shrink-0 w-28 aspect-[2/3] rounded-2xl overflow-hidden bg-surface-raised shadow-lg">
           <LazyImg
-            :src="imageUrl(person?.images.poster, { width: 300 })"
+            :src="imageUrl(person?.images.poster, { width: 112, height: 168 })"
             :alt="person?.title ?? ''"
             kind="person"
             class="w-full h-full object-cover object-top"
@@ -35,7 +35,7 @@
           >
             <div class="relative aspect-[2/3] rounded-xl overflow-hidden bg-surface-raised shadow mb-1.5 group-hover:-translate-y-0.5 transition-transform duration-200">
               <LazyImg
-                :src="imageUrl(item.images.poster, { width: 300 })"
+                :src="imageUrl(item.images.poster, { width: 200, height: 300 })"
                 :alt="item.title"
                 :kind="item.kind"
                 class="w-full h-full object-cover"

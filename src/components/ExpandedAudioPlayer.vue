@@ -165,7 +165,7 @@ const currentTrack = computed(() => audioStore.currentTrack);
 const albumArtUrl = computed(() => {
   const track = currentTrack.value;
   if (!track) return '';
-  return imageUrl(track.artwork, { width: 560, height: 560 });
+  return imageUrl(track.artwork, { width: 280, height: 280 });
 });
 
 // A cover that failed to load (network cut while locked) is fetched again.

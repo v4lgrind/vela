@@ -37,6 +37,18 @@
     <OfflineHome v-if="isOffline" />
 
     <template v-else>
+    <!-- First load: nothing cached yet -->
+    <section v-if="loading" class="mt-section">
+      <Skeleton class="mb-3 h-6 w-56 rounded-md" />
+      <MediaRail>
+        <Skeleton v-for="i in 5" :key="i" class="aspect-video w-44 shrink-0 rounded-xl sm:w-52" />
+      </MediaRail>
+    </section>
+
+    <div v-else-if="error" class="p-10 text-center">
+      <p class="text-error text-lg">{{ error }}</p>
+    </div>
+
     <!-- Continue Watching -->
     <Section v-if="resumeItems.length" :title="t('home.continueWatching')">
       <MediaRail>
@@ -210,36 +222,6 @@
       </Section>
     </template>
 
-    <!-- Libraries -->
-    <Section :title="t('home.myLibraries')">
-
-      <!-- Loading state -->
-      <MediaRail v-if="loading">
-        <Skeleton v-for="i in 6" :key="i" class="aspect-video w-44 shrink-0 rounded-xl sm:w-52" />
-      </MediaRail>
-
-      <!-- Error state -->
-      <div v-else-if="error" class="p-10 text-center">
-        <p class="text-error text-lg">{{ error }}</p>
-      </div>
-
-      <!-- Library row -->
-      <MediaRail v-else>
-        <router-link v-for="item in libraries" :key="item.id"
-          class="shrink-0 w-44 sm:w-52 group active:scale-[0.97] active:opacity-75 transition-all duration-200"
-          :to="{ name: 'libraryItem', params: { id: item.id, name: item.title } }">
-          <div class="relative rounded-xl overflow-hidden bg-surface-raised aspect-video mb-1.5
-                      group-hover:-translate-y-1 group-hover:shadow-xl transition-all duration-200">
-            <LazyImg :src="imageUrl(item.images.poster, LIBRARY_TILE)" :alt="item.title"
-              class="block w-full h-full object-cover" />
-          </div>
-          <div class="px-0.5 text-xs font-semibold text-text-heading truncate
-                      group-hover:text-accent-purple-light transition-colors">
-            {{ item.title }}
-          </div>
-        </router-link>
-      </MediaRail>
-    </Section>
     </template>
   </AppPage>
 </template>
@@ -281,7 +263,6 @@ const router = useRouter();
 // Rendered sizes in CSS px (useImageUrl scales them to the screen density).
 const POSTER: ImageSize = { width: 144, height: 216 }; // w-36 rail card
 const RESUME_IMAGE: ImageSize = { width: 208, height: 117 }; // w-52 16:9 card
-const LIBRARY_TILE: ImageSize = { width: 208, height: 117 };
 const RESUME_LIMIT = 12;
 const UP_NEXT_LIMIT = 20;
 const LATEST_LIMIT = 10;

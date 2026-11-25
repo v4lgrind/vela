@@ -1,6 +1,6 @@
 # 2026-11-25 — Pochettes floues sur écran pliable
 
-Branche : `fix/sharp-library-posters` (pas poussée).
+Branche : `fix/sharp-library-posters` — PR #48.
 
 ## Constat
 

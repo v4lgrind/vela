@@ -21,7 +21,7 @@ import { useSessionStore } from './session-store';
 
 const MAX_CONCURRENT = 3;
 const MAX_SOFTWARE_DECODE_HEIGHT = 1080;
-const isDesktopPlatform = ['linux', 'macos', 'windows'].includes(getClientPlatform());
+const isDesktopPlatform = ['linux', 'windows'].includes(getClientPlatform());
 
 const STORAGE_TYPE: Partial<Record<MediaItem['kind'], DownloadedMedia['type']>> = {
   movie: 'Movie', episode: 'Episode', track: 'Audio', album: 'MusicAlbum',

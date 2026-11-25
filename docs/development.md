@@ -7,7 +7,7 @@ Technical documentation for contributors. Users: see the [README](../README.md).
 - **Frontend:** Vue 3 + TypeScript + Vite
 - **Mobile:** Capacitor v8 (Android)
 - **Desktop:** Electron (Windows and Linux)
-- **Media Playback:** ExoPlayer (Media3) on Android, HLS.js/Chromium on desktop and web
+- **Media Playback:** ExoPlayer (Media3) on Android, HLS.js/Chromium on desktop (Windows, Linux)
 - **State Management:** Pinia with persistence
 - **Servers:** Jellyfin (official SDK) and Plex (Plex Media Server and plex.tv APIs),
   behind Vela's own domain model (see [Architecture](#architecture) below)
@@ -76,6 +76,10 @@ native `MusicLibrary` (Jellyfin or Plex) configured by the app.
 ## Development
 
 ### Web Development
+
+Supported targets are Android, Windows and Linux. Opening the app in a plain
+browser (`npm run dev`) is a development tool only, used for UI work, e2e tests
+and screenshots; it is not a supported way to use Vela.
 
 ```bash
 # Install dependencies

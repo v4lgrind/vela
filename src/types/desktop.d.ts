@@ -22,7 +22,7 @@ declare global {
     downloadMedia(request: DesktopMediaDownloadRequest): Promise<{ size: number }>;
     getMediaUrl(relativePath: string): string;
     readonly isDesktop: true;
-    readonly platform: "darwin" | "linux" | "win32";
+    readonly platform: "linux" | "win32";
     statMedia(relativePath: string): Promise<{ exists: boolean; size: number }>;
     subscribeMediaDownloadProgress(
       operationId: string,

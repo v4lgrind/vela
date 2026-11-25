@@ -1,6 +1,10 @@
 import { Capacitor } from '@capacitor/core';
 
-export type ClientPlatform = 'android' | 'linux' | 'macos' | 'web' | 'windows';
+/**
+ * Supported targets are Android, Windows and Linux. `dev` is the app opened in a
+ * plain browser (npm run dev, e2e tests, screenshots): a development tool only.
+ */
+export type ClientPlatform = 'android' | 'linux' | 'windows' | 'dev';
 
 interface ClientDeviceInfo {
   clientName: string;
@@ -16,37 +20,18 @@ export function getClientPlatform(): ClientPlatform {
   if (isAndroid) return 'android';
   if (desktopPlatform === 'win32') return 'windows';
   if (desktopPlatform === 'linux') return 'linux';
-  if (desktopPlatform === 'darwin') return 'macos';
-  return 'web';
+  return 'dev';
 }
 
+const DEVICE_INFO: Record<ClientPlatform, ClientDeviceInfo> = {
+  android: { clientName: 'Vela Android', deviceIdPrefix: 'jellyfin-android', deviceName: 'Android' },
+  windows: { clientName: 'Vela Desktop', deviceIdPrefix: 'jellyfin-windows', deviceName: 'Windows' },
+  linux: { clientName: 'Vela Desktop', deviceIdPrefix: 'jellyfin-linux', deviceName: 'Linux' },
+  dev: { clientName: 'Vela Dev', deviceIdPrefix: 'jellyfin-dev', deviceName: 'Dev browser' },
+};
+
 export function getClientDeviceInfo(): ClientDeviceInfo {
-  const platform = getClientPlatform();
-
-  if (platform === 'android') {
-    return {
-      clientName: 'Vela Android',
-      deviceIdPrefix: 'jellyfin-android',
-      deviceName: 'Android',
-    };
-  }
-
-  if (isDesktop) {
-    const desktopName = platform === 'macos'
-      ? 'macOS'
-      : `${platform.charAt(0).toUpperCase()}${platform.slice(1)}`;
-    return {
-      clientName: 'Vela Desktop',
-      deviceIdPrefix: `jellyfin-${platform}`,
-      deviceName: desktopName,
-    };
-  }
-
-  return {
-    clientName: 'Vela Web',
-    deviceIdPrefix: 'jellyfin-web',
-    deviceName: 'Web Browser',
-  };
+  return DEVICE_INFO[getClientPlatform()];
 }
 
 export function usePlatform() {
@@ -54,7 +39,6 @@ export function usePlatform() {
     isAndroid,
     isDesktop,
     isNative: isAndroid,
-    isWeb: !isAndroid && !isDesktop,
     platform: getClientPlatform(),
   };
 }

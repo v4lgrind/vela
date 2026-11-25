@@ -199,9 +199,10 @@ function tabCount(kind: string) {
 
 /** Episodes show their still (series poster as fallback); songs use the album cover. */
 function itemImageUrl(item: MediaItem): string {
-  if (item.kind === 'episode') return imageUrl(item.images.thumb ?? item.images.poster, { width: 400, height: 225 });
+  // Grid cells: 3 columns on phones, auto-fill 140px+ wider; ~200 CSS px at most.
+  if (item.kind === 'episode') return imageUrl(item.images.thumb ?? item.images.poster, { width: 200, height: 113 });
   if (isMusic(item)) return imageUrl(item.images.poster, { width: 200, height: 200 });
-  return imageUrl(item.images.poster, { width: 130, height: 195 });
+  return imageUrl(item.images.poster, { width: 200, height: 300 });
 }
 
 function goToItem(item: MediaItem) {

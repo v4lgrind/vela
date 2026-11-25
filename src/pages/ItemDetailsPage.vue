@@ -544,13 +544,15 @@ const route = useRoute();
 const router = useRouter();
 const { t, locale } = useI18n();
 
-const POSTER: ImageSize = { width: 300, height: 450 };
-const SQUARE: ImageSize = { width: 300, height: 300 };
-const EPISODE_STILL: ImageSize = { width: 240, height: 135 };
-const HERO_STILL: ImageSize = { width: 960, height: 540 };
-const COVER: ImageSize = { width: 800, height: 800 };
-const BACKDROP: ImageSize = { width: 1920, height: 1080 };
-const PERSON: ImageSize = { width: 220 };
+// Rendered sizes in CSS px (useImageUrl scales them to the screen density).
+const POSTER: ImageSize = { width: 144, height: 216 }; // w-36 season / similar cards
+const SQUARE: ImageSize = { width: 260, height: 260 }; // album grid, auto-fill 130px+
+const EPISODE_STILL: ImageSize = { width: 180, height: 101 };
+const HERO_STILL: ImageSize = { width: 960, height: 540 }; // full-width hero
+const HERO_POSTER: ImageSize = { width: 640, height: 960 }; // poster stretched over the hero
+const COVER: ImageSize = { width: 512, height: 512 }; // square cover hero, max-h-[70vh]
+const BACKDROP: ImageSize = { width: 960, height: 540 };
+const PERSON: ImageSize = { width: 110, height: 165 };
 
 // Deep links (Android Auto, notifications) open a detail page with nothing behind it: land on Home.
 function goBack() {
@@ -786,7 +788,7 @@ const posterUrl = computed(() => {
     const media = item.value;
     if (!media) return '';
     if (media.kind === 'episode') return artUrl(media.id, media.images.thumb ?? media.images.poster, HERO_STILL);
-    return artUrl(media.id, media.images.poster, isSquareArtwork.value ? COVER : POSTER);
+    return artUrl(media.id, media.images.poster, isSquareArtwork.value ? COVER : HERO_POSTER);
 });
 
 /** Seasons and episodes carry the series backdrop (a season poster upscaled looks pixelated). */

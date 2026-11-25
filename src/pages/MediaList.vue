@@ -278,9 +278,10 @@ const offlineStore = useOfflineStore();
 const downloadStore = useDownloadStore();
 const router = useRouter();
 
-const POSTER: ImageSize = { width: 300, height: 450 };
-const RESUME_IMAGE: ImageSize = { width: 640, height: 360 };
-const LIBRARY_TILE: ImageSize = { width: 800, height: 400 };
+// Rendered sizes in CSS px (useImageUrl scales them to the screen density).
+const POSTER: ImageSize = { width: 144, height: 216 }; // w-36 rail card
+const RESUME_IMAGE: ImageSize = { width: 208, height: 117 }; // w-52 16:9 card
+const LIBRARY_TILE: ImageSize = { width: 208, height: 117 };
 const RESUME_LIMIT = 12;
 const UP_NEXT_LIMIT = 20;
 const LATEST_LIMIT = 10;

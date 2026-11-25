@@ -75,7 +75,7 @@ const ICONS: Record<LibraryKind, typeof Film> = {
 };
 
 function tileImage(library: Library): string {
-  return artworkUrl(library.id, imageUrl(library.images.poster, { width: 800, height: 450 }));
+  return artworkUrl(library.id, imageUrl(library.images.poster, { width: 400, height: 225 }));
 }
 
 async function loadLibraries() {

@@ -267,7 +267,7 @@ import LazyImg from '@/components/LazyImg.vue';
 import { formatMsDuration } from '@/utils/helpers';
 import { trackToAudioTrack } from '@/utils/audioTrack';
 import { playedPercent } from '@/domain';
-import type { LibraryQuery, MediaItem, SortField, Track } from '@/domain';
+import type { ImageSize, LibraryQuery, MediaItem, SortField, Track } from '@/domain';
 import { useBackend, useImageUrl } from '@/composables/useBackend';
 import { useLibrariesStore } from '@/store/libraries-store';
 import { useSessionStore } from '@/store/session-store';
@@ -287,7 +287,6 @@ import { useDownloadStore } from '@/store/download-store';
 import { useMetadataCacheStore } from '@/store/metadata-cache-store';
 import { useOfflineArtwork } from '@/composables/useOfflineArtwork';
 import { shuffleAround } from '@/utils/audioQueue';
-import { deviceImageSize } from '@/utils/imageSize';
 import { downloadedTracks, downloadsInLibrary, localGenres, localLibraryPage } from '@/utils/offlineLibrary';
 
 const { t } = useI18n();
@@ -340,11 +339,11 @@ const SORT_ORDERS = [
   { value: 'asc' as const, label: 'library.ascending', arrow: '↑' },
   { value: 'desc' as const, label: 'library.descending', arrow: '↓' },
 ];
-// Grid cells render up to ~200 CSS px wide (3 columns on phones, auto-fill 150px+ on
-// foldables/tablets); deviceImageSize() turns that into device pixels so posters stay sharp.
-const POSTER = deviceImageSize({ width: 200, height: 300 });
-const SQUARE = deviceImageSize({ width: 200, height: 200 });
-const SONG_THUMB = deviceImageSize({ width: 48, height: 48 });
+// Rendered sizes in CSS px (useImageUrl scales them to the screen density). Grid cells
+// are up to ~200px wide: 3 columns on phones, auto-fill 150px+ on foldables/tablets.
+const POSTER: ImageSize = { width: 200, height: 300 };
+const SQUARE: ImageSize = { width: 200, height: 200 };
+const SONG_THUMB: ImageSize = { width: 48, height: 48 };
 const RANDOM_TRACKS = 300;
 
 type MusicTab = 'albums' | 'artists' | 'songs' | 'playlists';

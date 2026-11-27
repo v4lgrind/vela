@@ -40,10 +40,16 @@
 - APK debug construit localement (versionCode 40) :
   `android/app/build/outputs/apk/debug/vela.apk`.
 
-## Pas encore vérifié (aucun appareil branché pendant la session)
-1. Appui long sur une vignette d'album : le menu s'ouvre, relâcher n'ouvre pas
-   l'album, le défilement reste fluide. **Risque** : Reka annule l'appui long
-   au moindre `pointermove` — à vérifier au doigt.
+- Pixel 10, APK 1.5.2-lot1 (versionCode 1050201, re-signé avec
+  `scripts/sign-android-apk.sh` : le téléphone a la clé de release), installé
+  par-dessus 1.5.2 en gardant les données. Via adb (`input swipe` immobile
+  1,2 s) : appui long sur « (What's The Story) Morning Glory? » → menu « Aller
+  à Oasis / Lancer la radio / Lire ensuite / Ajouter à la file », l'album ne
+  s'ouvre pas ; « Aller à Oasis » ouvre la page de l'artiste.
+
+## Pas encore vérifié
+1. Appui long **au doigt** : Reka annule l'appui long au moindre
+   `pointermove` (adb ne bouge pas) ; défilement de la grille.
 2. Radio : lancer depuis un titre, un album, un artiste ; laisser tourner
    jusqu'à la recharge.
 3. Minuteur natif : fondu audible, pause, volume normal à la reprise ; fin du

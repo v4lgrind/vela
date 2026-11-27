@@ -4,7 +4,8 @@
       <slot />
     </ContextMenuTrigger>
     <ContextMenuPortal>
-      <ContextMenuContent :class="MENU_CONTENT_CLASS">
+      <ContextMenuContent :collision-padding="menuCollisionPadding()"
+        :class="cn(MENU_CONTENT_CLASS, 'max-h-(--reka-context-menu-content-available-height) overflow-y-auto')">
         <ContextMenuItem v-for="action in actions" :key="musicActionKey(action)" :class="MENU_ITEM_CLASS"
           @select="target && run(action, target, track)">
           <component :is="musicActionView(action, t).icon" class="size-4 shrink-0" />
@@ -24,7 +25,9 @@ import { useMusicActions } from '@/composables/useMusicActions';
 import type { Track } from '@/domain';
 import type { MusicTarget } from '@/utils/musicActions';
 
-import { MENU_CONTENT_CLASS, MENU_ITEM_CLASS, musicActionKey, musicActionView } from './musicActionView';
+import { cn } from '@/lib/utils';
+
+import { MENU_CONTENT_CLASS, MENU_ITEM_CLASS, menuCollisionPadding, musicActionKey, musicActionView } from './musicActionView';
 
 // target: undefined leaves the slot as is (e.g. a movie in a mixed grid).
 const props = defineProps<{ target?: MusicTarget; track?: Track }>();

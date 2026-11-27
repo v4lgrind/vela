@@ -6,7 +6,8 @@
       </Button>
     </DropdownMenuTrigger>
     <DropdownMenuPortal>
-      <DropdownMenuContent align="end" :side-offset="4" :class="MENU_CONTENT_CLASS">
+      <DropdownMenuContent align="end" :side-offset="4" :collision-padding="menuCollisionPadding()"
+        :class="cn(MENU_CONTENT_CLASS, 'max-h-(--reka-dropdown-menu-content-available-height) overflow-y-auto')">
         <DropdownMenuItem v-for="action in actions" :key="musicActionKey(action)" :class="MENU_ITEM_CLASS"
           @select="target && run(action, target)">
           <component :is="musicActionView(action, t).icon" class="size-4 shrink-0" />
@@ -28,11 +29,12 @@ import { DropdownMenuContent, DropdownMenuItem, DropdownMenuPortal, DropdownMenu
 import { EllipsisVertical, Moon } from 'lucide-vue-next';
 
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { useMusicActions } from '@/composables/useMusicActions';
 import type { AudioTrack } from '@/store/audio-player-store';
 import { trackTarget } from '@/utils/musicActions';
 
-import { MENU_CONTENT_CLASS, MENU_ITEM_CLASS, musicActionKey, musicActionView } from './musicActionView';
+import { MENU_CONTENT_CLASS, MENU_ITEM_CLASS, menuCollisionPadding, musicActionKey, musicActionView } from './musicActionView';
 
 /** The full-screen player's ⋯: go to the playing track's album / artists, radio, sleep timer. */
 const props = defineProps<{ track: AudioTrack | null }>();

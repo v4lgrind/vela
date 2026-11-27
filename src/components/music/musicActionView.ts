@@ -23,3 +23,19 @@ export function musicActionKey(action: MusicAction): string {
 
 export const MENU_ITEM_CLASS = 'flex items-center gap-2.5 min-h-11 rounded-lg px-3 py-2.5 text-sm text-text-primary outline-none data-highlighted:bg-white/10 cursor-pointer';
 export const MENU_CONTENT_CLASS = 'z-300 min-w-44 max-w-72 rounded-xl border border-border-default bg-surface-raised p-1 shadow-xl';
+
+const MENU_EDGE_PX = 8;
+
+function insetPx(name: string): number {
+  return parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name)) || 0;
+}
+
+/** Keeps menus clear of the status and navigation bars (the WebView draws under them). */
+export function menuCollisionPadding() {
+  return {
+    top: insetPx('--sat') + MENU_EDGE_PX,
+    bottom: insetPx('--sab') + MENU_EDGE_PX,
+    left: MENU_EDGE_PX,
+    right: MENU_EDGE_PX,
+  };
+}

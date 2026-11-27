@@ -7,7 +7,8 @@
     </DropdownMenuTrigger>
     <DropdownMenuPortal>
       <DropdownMenuContent align="end" :side-offset="4"
-        :class="MENU_CONTENT_CLASS">
+        :collision-padding="menuCollisionPadding()"
+        :class="cn(MENU_CONTENT_CLASS, 'max-h-(--reka-dropdown-menu-content-available-height) overflow-y-auto')">
         <template v-if="menuTarget && extraActions.length">
           <DropdownMenuItem v-for="action in extraActions" :key="musicActionKey(action)" :class="MENU_ITEM_CLASS"
             @select="run(action, menuTarget, track)">
@@ -54,7 +55,7 @@ import { useOfflineStore } from '@/store/offline-store';
 import type { Track } from '@/domain';
 import { trackTarget } from '@/utils/musicActions';
 import type { MusicTarget } from '@/utils/musicActions';
-import { MENU_CONTENT_CLASS, MENU_ITEM_CLASS, musicActionKey, musicActionView } from './music/musicActionView';
+import { MENU_CONTENT_CLASS, MENU_ITEM_CLASS, menuCollisionPadding, musicActionKey, musicActionView } from './music/musicActionView';
 
 const { t } = useI18n();
 // track: when given, the menu also downloads it for offline play.

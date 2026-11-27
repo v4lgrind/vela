@@ -38,12 +38,16 @@ export function albumTarget(a: Album): MusicTarget {
   return { kind: 'album', id: a.id, artists: a.artists };
 }
 
+/** More album artists than this is a compilation: no artist entries. */
+const MAX_LINKED_ARTISTS = 3;
+
 function goToActions(target: MusicTarget, currentPageId?: string): MusicAction[] {
   const actions: MusicAction[] = [];
   if (target.kind === 'track' && target.albumId && target.albumId !== currentPageId) {
     actions.push({ type: 'goToAlbum', itemId: target.albumId });
   }
-  for (const artist of target.artists) {
+  const artists = target.artists.length > MAX_LINKED_ARTISTS ? [] : target.artists;
+  for (const artist of artists) {
     if (artist.id && artist.id !== currentPageId) actions.push({ type: 'goToArtist', itemId: artist.id, name: artist.name });
   }
   return actions;

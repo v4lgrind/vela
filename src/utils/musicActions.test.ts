@@ -45,6 +45,18 @@ describe('buildMusicActions', () => {
     expect(buildMusicActions(target, ctx)[0]).toEqual({ type: 'goToArtist', itemId: 'a1', name: 'Daft Punk' });
   });
 
+  it('lists up to three artists', () => {
+    const artists = ['a', 'b', 'c'].map((id) => ({ id, name: id }));
+    const actions = buildMusicActions({ kind: 'album', id: 'al1', artists }, ctx);
+    expect(actions.filter((a) => a.type === 'goToArtist')).toHaveLength(3);
+  });
+
+  it('offers no artist for a compilation (more than three album artists)', () => {
+    const artists = ['a', 'b', 'c', 'd'].map((id) => ({ id, name: id }));
+    const types = buildMusicActions({ kind: 'album', id: 'al1', artists }, ctx).map((a) => a.type);
+    expect(types).toEqual(['radio', 'playNext', 'addToQueue']);
+  });
+
   it("hides radio offline or when the backend can't", () => {
     expect(buildMusicActions(track, { ...ctx, online: false }).map((a) => a.type)).not.toContain('radio');
     expect(buildMusicActions(track, { ...ctx, canRadio: false }).map((a) => a.type)).not.toContain('radio');

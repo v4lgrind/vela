@@ -4,6 +4,9 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.media3.common.AudioAttributes
@@ -21,11 +24,13 @@ import androidx.media3.session.MediaLibraryService.MediaLibrarySession
 import androidx.media3.session.MediaSession
 import androidx.media3.session.SessionCommand
 import androidx.media3.session.SessionError
+import androidx.media3.session.SessionResult
 import com.google.common.collect.ImmutableList
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.MoreExecutors
 import java.util.concurrent.Executors
+import org.json.JSONObject
 
 /**
  * Background music playback. Owns the ExoPlayer playlist and the MediaSession,
@@ -39,6 +44,12 @@ class MusicService : MediaLibraryService() {
     companion object {
         /** Sent to controllers when a queue was started from outside the app (e.g. the car). */
         const val COMMAND_EXTERNAL_QUEUE = "externalQueue"
+        /** From the app: arm (args "mode", "minutes") or cancel ("off") the sleep timer. */
+        const val COMMAND_SET_SLEEP_TIMER = "setSleepTimer"
+        /** To the app: the sleep timer paused the music. */
+        const val COMMAND_SLEEP_TIMER_FIRED = "sleepTimerFired"
+        private const val SLEEP_TICK_MS = 250L
+        private const val MS_PER_MINUTE = 60_000.0
         private const val TAG = "MusicService"
         /** Library shuffle tops the queue up once this many tracks are left after the playing one. */
         private const val LIBRARY_SHUFFLE_REFILL_AT = 5
@@ -53,6 +64,18 @@ class MusicService : MediaLibraryService() {
     // (the app tops up its own library shuffle).
     private var libraryShuffle: String? = null
     private var refilling = false
+
+    // Sleep timer: ticks on the main thread while armed and fades the volume out.
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private var sleepMode: SleepMode? = null
+    private var sleepDeadlineMs = 0L
+    private var sleepBaseVolume = 1f
+    private val sleepTick = object : Runnable {
+        override fun run() {
+            tickSleepTimer()
+            if (sleepMode != null) mainHandler.postDelayed(this, SLEEP_TICK_MS)
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -98,6 +121,52 @@ class MusicService : MediaLibraryService() {
             .build()
     }
 
+    private fun setSleepTimer(player: Player, mode: SleepMode?, minutes: Double) {
+        cancelSleepTimer(player)
+        if (mode == null) return
+        sleepMode = mode
+        sleepDeadlineMs = SystemClock.elapsedRealtime() + (minutes * MS_PER_MINUTE).toLong()
+        sleepBaseVolume = player.volume
+        mainHandler.post(sleepTick)
+    }
+
+    /** Disarms the timer and gives the volume back, even mid-fade. */
+    private fun cancelSleepTimer(player: Player) {
+        if (sleepMode == null) return
+        sleepMode = null
+        mainHandler.removeCallbacks(sleepTick)
+        player.volume = sleepBaseVolume
+        (player as? ExoPlayer)?.pauseAtEndOfMediaItems = false
+    }
+
+    private fun albumIdAt(player: Player, index: Int): String? {
+        if (index !in 0 until player.mediaItemCount) return null
+        val json = player.getMediaItemAt(index).mediaMetadata.extras?.getString(TRACK_EXTRA) ?: return null
+        return runCatching { JSONObject(json).optString("albumId") }.getOrNull()
+    }
+
+    private fun tickSleepTimer() {
+        val player = session?.player as? ExoPlayer ?: return
+        val mode = sleepMode ?: return
+        if (player.mediaItemCount == 0) return cancelSleepTimer(player)
+        val index = player.currentMediaItemIndex
+        // The next track in queue order, ignoring repeat: "end of album" must not loop forever.
+        val lastOfAlbum = isLastOfAlbum(albumIdAt(player, index), albumIdAt(player, index + 1))
+        val remaining = sleepRemainingMs(
+            mode, sleepDeadlineMs, SystemClock.elapsedRealtime(), player.currentPosition, player.duration, lastOfAlbum,
+        )
+        // End of track / album: stop at the boundary instead of starting the next track.
+        player.pauseAtEndOfMediaItems = mode != SleepMode.MINUTES && remaining != null
+        if (remaining == null) return
+        // On AirPlay the local output is muted: no fade, only the pause.
+        if (AirPlayManager.currentDevice() == null) player.volume = sleepVolume(sleepBaseVolume, remaining)
+        if (remaining <= SLEEP_TICK_MS || (mode != SleepMode.MINUTES && !player.playWhenReady && remaining < SLEEP_FADE_MS)) {
+            player.pause()
+            cancelSleepTimer(player)
+            session?.broadcastCustomCommand(SessionCommand(COMMAND_SLEEP_TIMER_FIRED, Bundle.EMPTY), Bundle.EMPTY)
+        }
+    }
+
     /** More random picks before a car-started library shuffle runs out. */
     private fun refillLibraryShuffle(player: Player) {
         val libraryId = libraryShuffle ?: return
@@ -129,6 +198,7 @@ class MusicService : MediaLibraryService() {
     }
 
     override fun onDestroy() {
+        mainHandler.removeCallbacks(sleepTick)
         session?.run {
             AirPlayManager.detach(player as ExoPlayer)
             player.release()
@@ -140,6 +210,35 @@ class MusicService : MediaLibraryService() {
     }
 
     private inner class LibraryCallback : MediaLibrarySession.Callback {
+
+        // Only the app itself may set the sleep timer (not the car or other controllers).
+        override fun onConnect(
+            session: MediaSession,
+            controller: MediaSession.ControllerInfo,
+        ): MediaSession.ConnectionResult {
+            val result = super.onConnect(session, controller)
+            if (controller.packageName != packageName || !result.isAccepted) return result
+            val commands = result.availableSessionCommands.buildUpon()
+                .add(SessionCommand(COMMAND_SET_SLEEP_TIMER, Bundle.EMPTY))
+                .build()
+            return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
+                .setAvailableSessionCommands(commands)
+                .setAvailablePlayerCommands(result.availablePlayerCommands)
+                .build()
+        }
+
+        override fun onCustomCommand(
+            session: MediaSession,
+            controller: MediaSession.ControllerInfo,
+            customCommand: SessionCommand,
+            args: Bundle,
+        ): ListenableFuture<SessionResult> {
+            if (customCommand.customAction != COMMAND_SET_SLEEP_TIMER) {
+                return super.onCustomCommand(session, controller, customCommand, args)
+            }
+            setSleepTimer(session.player, SleepMode.fromJs(args.getString("mode")), args.getDouble("minutes", 0.0))
+            return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+        }
 
         // The app sends ready-to-play items (URI in requestMetadata); the car
         // sends only ids or a voice query, which the library resolves.

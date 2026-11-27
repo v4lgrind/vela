@@ -90,7 +90,10 @@ class NativeAudioPlugin : Plugin() {
                     command: SessionCommand,
                     args: Bundle,
                 ): ListenableFuture<SessionResult> {
-                    if (command.customAction == MusicService.COMMAND_EXTERNAL_QUEUE) notifyListeners("externalQueue", JSObject())
+                    when (command.customAction) {
+                        MusicService.COMMAND_EXTERNAL_QUEUE -> notifyListeners("externalQueue", JSObject())
+                        MusicService.COMMAND_SLEEP_TIMER_FIRED -> notifyListeners("sleepTimerFired", JSObject())
+                    }
                     return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
                 }
             })
@@ -200,6 +203,19 @@ class NativeAudioPlugin : Plugin() {
             // While on AirPlay the local output stays muted; the slider drives the receiver.
             if (AirPlayManager.currentDevice() != null) AirPlayManager.setVolume((volume * 100).toInt())
             else c.volume = volume
+            call.resolve()
+        }
+    }
+
+    /** Arms ("minutes", "endOfTrack", "endOfAlbum") or cancels ("off") the sleep timer in MusicService. */
+    @PluginMethod
+    fun setSleepTimer(call: PluginCall) {
+        val args = Bundle().apply {
+            putString("mode", call.getString("mode") ?: "off")
+            putDouble("minutes", call.data.optDouble("minutes", 0.0))
+        }
+        withController(call) { c ->
+            c.sendCustomCommand(SessionCommand(MusicService.COMMAND_SET_SLEEP_TIMER, Bundle.EMPTY), args)
             call.resolve()
         }
     }

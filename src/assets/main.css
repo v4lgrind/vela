@@ -218,6 +218,25 @@ html.light {
 html.light {
   --audio-player-bg: radial-gradient(circle at top, #dce4f1 0%, var(--color-background) 70%);
 }
+/*
+ * Cover backdrop ("UltraBlur"). Worst cases checked for text-muted contrast:
+ * a white cover stays under ~#373737 (dark, >= 4.5:1), a black one over
+ * ~#e6e6e6 (light, >= 4.5:1).
+ */
+:root {
+  --audio-player-art-filter: blur(60px) saturate(1.6) brightness(0.7);
+  --audio-player-scrim: rgb(0 0 0 / 0.7);
+}
+html.light {
+  --audio-player-art-filter: blur(60px) saturate(1.6) brightness(1.1);
+  --audio-player-scrim: rgb(255 255 255 / 0.9);
+}
+@utility audio-player-art {
+  filter: var(--audio-player-art-filter);
+}
+@utility audio-player-scrim {
+  background: var(--audio-player-scrim);
+}
 @utility audio-player-bg {
   background: var(--audio-player-bg);
 }

@@ -4,6 +4,17 @@
     :style="{ padding: 'var(--sat, env(safe-area-inset-top, 12px)) 16px calc(16px + var(--sab, env(safe-area-inset-bottom, 0px)))', transform: `translateY(${sheetOffset}px)` }"
     @touchstart.passive="onSwipeStart" @touchmove.passive="onSwipeMove" @touchend="onSwipeEnd" @touchcancel="onSwipeEnd">
 
+    <!-- Cover backdrop: fixed inside the swiped sheet (its transform makes it the containing block) -->
+    <div class="pointer-events-none fixed inset-0 -z-10 overflow-hidden" aria-hidden="true">
+      <Transition enter-active-class="transition-opacity duration-400" leave-active-class="transition-opacity duration-400"
+        enter-from-class="opacity-0" leave-to-class="opacity-0">
+        <div v-if="albumArtUrl && !artFailed" :key="albumArtUrl" class="absolute inset-0">
+          <img :src="albumArtUrl" alt="" class="absolute inset-0 size-full scale-125 object-cover audio-player-art" />
+          <div class="absolute inset-0 audio-player-scrim"></div>
+        </div>
+      </Transition>
+    </div>
+
     <!-- Header -->
     <div class="flex items-center justify-between py-2 shrink-0">
       <Button variant="ghost" size="icon" class="size-11 rounded-full text-text-primary hover:bg-white/10" @click="audioStore.isExpanded = false">

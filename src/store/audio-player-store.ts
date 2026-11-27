@@ -19,6 +19,8 @@ export interface AudioTrack {
   streamRef?: string;
   /** Artists that have a page; absent on queues saved before 2026-11-27. */
   artists?: { id: string; name: string }[];
+  /** Loudness leveling gain (dB) measured by the server, when known. */
+  gainDb?: number;
 }
 
 /** What the playback engine reports back; mirrored into the store. */

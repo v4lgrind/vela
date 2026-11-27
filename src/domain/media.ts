@@ -153,6 +153,8 @@ export interface Track extends ItemBase {
   discNumber?: number;
   /** Undefined when the server does not say. */
   hasLyrics?: boolean;
+  /** dB to apply for loudness leveling, as measured by the server; undefined when not measured. */
+  gainDb?: number;
   versions: MediaVersion[];
 }
 

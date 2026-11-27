@@ -20,6 +20,7 @@ export function trackToAudioTrack(track: Track, albumNameFallback = ''): AudioTr
     artwork: track.images.poster,
     streamRef: track.versions[0]?.streamRef,
     artists: linkedArtists(track.artists.length ? track.artists : track.albumArtists),
+    gainDb: track.gainDb,
   };
 }
 

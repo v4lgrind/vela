@@ -259,6 +259,8 @@
     "tracksCount": "{n} titre | {n} titres"
   },
   "settings": {
+    "loudnessLeveling": "Égaliser le volume",
+    "loudnessLevelingHint": "Tous les titres au même volume, selon la mesure du serveur",
     "title": "Réglages",
     "account": "Compte",
     "active": "Actif",

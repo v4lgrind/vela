@@ -86,6 +86,7 @@ class AudioPlayerService implements AudioController {
       this.setupCasting();
       this.setupAirPlay();
       this.setupAndroidAuto();
+      this.setupLoudnessLeveling();
     }
     registerAudioController(this);
     this.restoreFromEngine();
@@ -204,6 +205,15 @@ class AudioPlayerService implements AudioController {
   }
 
   // --- Android Auto: the car browses the library natively and may start a queue ---
+
+  /** MusicService applies each track's gain; it only needs to know whether to. */
+  private setupLoudnessLeveling() {
+    watch(
+      () => this.preferencesStore.loudnessLeveling,
+      (enabled) => NativeAudio.setLoudnessLeveling({ enabled }).catch((e) => logger.error('[AudioPlayer] setLoudnessLeveling failed', e)),
+      { immediate: true },
+    );
+  }
 
   private setupAndroidAuto() {
     // The car can start the music service without the app: it needs its own credentials

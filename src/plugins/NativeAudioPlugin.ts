@@ -46,6 +46,8 @@ export interface NativeAudioPluginInterface {
   setRepeatMode(opts: { mode: RepeatMode }): Promise<void>;
   /** Pause after `minutes`, at the end of the track or of the album, with a 10 s fade; 'off' cancels. */
   setSleepTimer(opts: { mode: SleepMode | 'off'; minutes?: number }): Promise<void>;
+  /** Loudness leveling on/off; MusicService remembers it (car-started playback too). */
+  setLoudnessLeveling(opts: { enabled: boolean }): Promise<void>;
   getState(): Promise<NativeAudioState & { tracks: Record<string, unknown>[] }>;
   /** Server and credentials for browsing the library from Android Auto. */
   /** Android Auto library credentials (see utils/autoLibraryConfig). */

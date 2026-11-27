@@ -48,6 +48,10 @@ class MusicService : MediaLibraryService() {
         const val COMMAND_SET_SLEEP_TIMER = "setSleepTimer"
         /** To the app: the sleep timer paused the music. */
         const val COMMAND_SLEEP_TIMER_FIRED = "sleepTimerFired"
+        /** From the app: loudness leveling on/off (arg "enabled"), kept for car-started playback too. */
+        const val COMMAND_SET_LOUDNESS_LEVELING = "setLoudnessLeveling"
+        private const val PREFS = "music"
+        private const val PREF_LEVELING = "loudnessLeveling"
         private const val SLEEP_TICK_MS = 250L
         private const val MS_PER_MINUTE = 60_000.0
         private const val TAG = "MusicService"
@@ -64,6 +68,11 @@ class MusicService : MediaLibraryService() {
     // (the app tops up its own library shuffle).
     private var libraryShuffle: String? = null
     private var refilling = false
+
+    // Loudness leveling: the playing track's server-measured gain, applied in the sink.
+    private val loudness = LoudnessAudioProcessor()
+    private val levelingEnabled: Boolean
+        get() = getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean(PREF_LEVELING, true)
 
     // Sleep timer: ticks on the main thread while armed and fades the volume out.
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -94,7 +103,7 @@ class MusicService : MediaLibraryService() {
             ): AudioSink = DefaultAudioSink.Builder(context)
                 .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
                 .setAudioProcessorChain(
-                    DefaultAudioSink.DefaultAudioProcessorChain(AirPlayManager.resampler, AirPlayManager.tee)
+                    DefaultAudioSink.DefaultAudioProcessorChain(loudness, AirPlayManager.resampler, AirPlayManager.tee)
                 )
                 .build()
         }.setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
@@ -105,7 +114,10 @@ class MusicService : MediaLibraryService() {
             .build()
         AirPlayManager.attach(player)
         player.addListener(object : Player.Listener {
-            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) = refillLibraryShuffle(player)
+            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                applyLoudness(player)
+                refillLibraryShuffle(player)
+            }
         })
 
         val openApp = PendingIntent.getActivity(
@@ -119,6 +131,20 @@ class MusicService : MediaLibraryService() {
             .setId("music")
             .setSessionActivity(openApp)
             .build()
+    }
+
+    /**
+     * Gain of the track now playing. Set when the transition is reported, so the
+     * first few hundred ms already buffered for it may keep the previous gain.
+     */
+    private fun applyLoudness(player: Player) {
+        val json = player.currentMediaItem?.mediaMetadata?.extras?.getString(TRACK_EXTRA)
+        loudness.factor = if (levelingEnabled) loudnessFactor(gainDbOf(json)) else 1f
+    }
+
+    private fun setLoudnessLeveling(player: Player, enabled: Boolean) {
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(PREF_LEVELING, enabled).apply()
+        applyLoudness(player)
     }
 
     private fun setSleepTimer(player: Player, mode: SleepMode?, minutes: Double) {
@@ -220,6 +246,7 @@ class MusicService : MediaLibraryService() {
             if (controller.packageName != packageName || !result.isAccepted) return result
             val commands = result.availableSessionCommands.buildUpon()
                 .add(SessionCommand(COMMAND_SET_SLEEP_TIMER, Bundle.EMPTY))
+                .add(SessionCommand(COMMAND_SET_LOUDNESS_LEVELING, Bundle.EMPTY))
                 .build()
             return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
                 .setAvailableSessionCommands(commands)
@@ -233,10 +260,12 @@ class MusicService : MediaLibraryService() {
             customCommand: SessionCommand,
             args: Bundle,
         ): ListenableFuture<SessionResult> {
-            if (customCommand.customAction != COMMAND_SET_SLEEP_TIMER) {
-                return super.onCustomCommand(session, controller, customCommand, args)
+            when (customCommand.customAction) {
+                COMMAND_SET_SLEEP_TIMER ->
+                    setSleepTimer(session.player, SleepMode.fromJs(args.getString("mode")), args.getDouble("minutes", 0.0))
+                COMMAND_SET_LOUDNESS_LEVELING -> setLoudnessLeveling(session.player, args.getBoolean("enabled", true))
+                else -> return super.onCustomCommand(session, controller, customCommand, args)
             }
-            setSleepTimer(session.player, SleepMode.fromJs(args.getString("mode")), args.getDouble("minutes", 0.0))
             return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
         }
 

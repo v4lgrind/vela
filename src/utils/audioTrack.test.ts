@@ -47,3 +47,9 @@ describe('withServerDetails', () => {
   });
 });
 
+describe('trackToAudioTrack: loudness', () => {
+  it('carries the gain to the player', () => {
+    expect(trackToAudioTrack({ ...track, gainDb: -6.2 } as Track).gainDb).toBe(-6.2);
+    expect(trackToAudioTrack(track).gainDb).toBeUndefined();
+  });
+});

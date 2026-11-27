@@ -220,6 +220,16 @@ class NativeAudioPlugin : Plugin() {
         }
     }
 
+    /** Loudness leveling on/off in MusicService (remembered there for car-started playback). */
+    @PluginMethod
+    fun setLoudnessLeveling(call: PluginCall) {
+        val args = Bundle().apply { putBoolean("enabled", call.getBoolean("enabled") ?: true) }
+        withController(call) { c ->
+            c.sendCustomCommand(SessionCommand(MusicService.COMMAND_SET_LOUDNESS_LEVELING, Bundle.EMPTY), args)
+            call.resolve()
+        }
+    }
+
     @PluginMethod
     fun stop(call: PluginCall) = withController(call) { c ->
         c.stop()

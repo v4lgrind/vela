@@ -259,6 +259,8 @@
     "tracksCount": "{n} track | {n} tracks"
   },
   "settings": {
+    "loudnessLeveling": "Loudness leveling",
+    "loudnessLevelingHint": "Every track at the same volume, as measured by the server",
     "title": "Settings",
     "account": "Account",
     "active": "Active",

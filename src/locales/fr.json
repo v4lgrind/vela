@@ -98,6 +98,10 @@
     "offlineLocked": "Hors ligne : le filtre reste activé."
   },
   "audio": {
+    "goToAlbum": "Aller à l'album",
+    "goToArtist": "Aller à {name}",
+    "startRadio": "Lancer la radio",
+    "sleepTimer": "Minuteur",
     "radioFailed": "Impossible de lancer la radio",
     "playingNext": "Lecture à suivre",
     "addedToQueue": "Ajouté à la file",

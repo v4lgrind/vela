@@ -1,4 +1,4 @@
-import type { ArtistRef, Track } from '@/domain';
+import type { ArtistRef, MediaItem, Track } from '@/domain';
 import type { AudioTrack } from '@/store/audio-player-store';
 
 const MS_PER_SECOND = 1000;
@@ -21,4 +21,16 @@ export function trackToAudioTrack(track: Track, albumNameFallback = ''): AudioTr
     streamRef: track.versions[0]?.streamRef,
     artists: linkedArtists(track.artists.length ? track.artists : track.albumArtists),
   };
+}
+
+/** A queue saved before tracks carried their cover or artists. */
+export function needsServerDetails(track: AudioTrack): boolean {
+  return !track.artwork || !track.artists;
+}
+
+/** Completes such a track from the server's item; never overwrites what it has. */
+export function withServerDetails(track: AudioTrack, item: MediaItem | undefined): AudioTrack {
+  if (!item) return track;
+  const artists = track.artists ?? (item.kind === 'track' ? linkedArtists(item.artists.length ? item.artists : item.albumArtists) : undefined);
+  return { ...track, artwork: track.artwork ?? item.images.poster, artists };
 }

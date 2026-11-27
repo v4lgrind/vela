@@ -24,7 +24,7 @@ import type { AudioEngine, EngineState, QueueItem } from './audio/types';
 import { autoLibraryConfig } from '@/utils/autoLibraryConfig';
 import { logger } from '@/utils/logger';
 import type { MediaBackend, PlaybackReporter, Track } from '@/domain';
-import { trackToAudioTrack } from '@/utils/audioTrack';
+import { needsServerDetails, trackToAudioTrack, withServerDetails } from '@/utils/audioTrack';
 import { freshTracks, LIBRARY_SHUFFLE_REFILL_AT } from '@/utils/audioQueue';
 import type { MusicTarget } from '@/utils/musicActions';
 import { loadRadio, RADIO_BATCH } from '@/utils/radio';
@@ -85,23 +85,23 @@ class AudioPlayerService implements AudioController {
     }
     registerAudioController(this);
     this.restoreFromEngine();
-    void this.backfillArtwork();
+    void this.backfillQueueDetails();
     this.setupLibraryShuffleRefill();
   }
 
-  /** Queues saved before tracks carried their cover get it from the server once. */
-  private async backfillArtwork() {
+  /** Queues saved before tracks carried their cover / artists get them from the server once. */
+  private async backfillQueueDetails() {
     const store = this.audioStore;
-    const missing = [...new Set([...store.queue, ...store.unshuffledQueue].filter((t) => !t.artwork).map((t) => t.id))];
+    const missing = [...new Set([...store.queue, ...store.unshuffledQueue].filter(needsServerDetails).map((t) => t.id))];
     const backend = this.backend();
     if (!missing.length || !backend || !this.offlineStore.isFullyOnline) return;
     try {
-      const art = new Map((await backend.catalog.items(missing)).map((item) => [item.id, item.images.poster]));
-      const withArt = (track: AudioTrack) => (track.artwork ? track : { ...track, artwork: art.get(track.id) });
-      store.queue = store.queue.map(withArt);
-      store.unshuffledQueue = store.unshuffledQueue.map(withArt);
+      const items = new Map((await backend.catalog.items(missing)).map((item) => [item.id, item]));
+      const complete = (track: AudioTrack) => withServerDetails(track, items.get(track.id));
+      store.queue = store.queue.map(complete);
+      store.unshuffledQueue = store.unshuffledQueue.map(complete);
     } catch (e) {
-      logger.warn('[AudioPlayer] Could not fetch queue artwork', e);
+      logger.warn('[AudioPlayer] Could not complete the saved queue', e);
     }
   }
 

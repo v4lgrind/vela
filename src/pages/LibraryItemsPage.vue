@@ -110,8 +110,9 @@
     <section class="flex-1 relative">
       <!-- Songs: tap plays this page from that song -->
       <ul v-if="showSongList" class="list-none p-0 m-0 flex flex-col">
-        <li v-for="(song, i) in songs" :key="song.id"
-          class="flex items-center gap-3 py-2 px-1 border-b border-border-default cursor-pointer active:opacity-80"
+        <MusicContextMenu v-for="(song, i) in songs" :key="song.id" :target="trackTarget(song)" :track="song">
+        <li
+          class="flex items-center gap-3 py-2 px-1 border-b border-border-default cursor-pointer active:opacity-80 select-none"
           :class="audioStore.currentTrack?.id === song.id && 'bg-accent-purple/10'"
           @click="playSongs(i)">
           <div class="size-12 shrink-0 rounded-md overflow-hidden bg-black/60">
@@ -128,11 +129,13 @@
           <span v-if="song.durationMs" class="text-xs text-text-subtle tabular-nums shrink-0">{{ formatMsDuration(song.durationMs) }}</span>
           <TrackActionsMenu :track="song" @play-next="enqueueSong(song, 'next')" @add-to-queue="enqueueSong(song, 'end')" />
         </li>
+        </MusicContextMenu>
       </ul>
 
       <!-- Grid view -->
       <ul v-else-if="viewMode === 'grid'" class="list-none p-0 m-0 grid grid-cols-3 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(150px,1fr))] sm:gap-4">
-        <li v-for="item in items" :key="item.id" class="group">
+        <MusicContextMenu v-for="item in items" :key="item.id" :target="item.kind === 'album' ? albumTarget(item) : undefined">
+        <li class="group select-none">
           <!-- Poster with overlay -->
           <div class="relative w-full rounded-xl overflow-hidden bg-surface-raised"
             :class="isSquare(item) ? 'aspect-square' : 'aspect-[2/3]'">
@@ -186,11 +189,13 @@
             <div v-if="item.year" class="text-label font-normal text-text-muted">{{ item.year }}</div>
           </div>
         </li>
+        </MusicContextMenu>
       </ul>
 
       <!-- List view -->
       <ul v-else class="list-none p-0 m-0 flex flex-col">
-        <li v-for="item in items" :key="item.id">
+        <MusicContextMenu v-for="item in items" :key="item.id" :target="item.kind === 'album' ? albumTarget(item) : undefined">
+        <li class="select-none">
           <router-link
             :to="itemRoute(item)"
             class="flex items-center gap-3 py-2.5 px-1 border-b border-border-default hover:bg-surface-hover transition-colors active:opacity-80">
@@ -239,6 +244,7 @@
             </div>
           </router-link>
         </li>
+        </MusicContextMenu>
       </ul>
 
       <p v-if="error && !items.length" class="py-12 text-center text-body text-error">{{ error }}</p>
@@ -272,6 +278,8 @@ import { useBackend, useImageUrl } from '@/composables/useBackend';
 import { useLibrariesStore } from '@/store/libraries-store';
 import { useSessionStore } from '@/store/session-store';
 import TrackActionsMenu from '@/components/TrackActionsMenu.vue';
+import MusicContextMenu from '@/components/music/MusicContextMenu.vue';
+import { albumTarget, trackTarget } from '@/utils/musicActions';
 import { useAudioPlayerStore } from '@/store/audio-player-store';
 import { useToast } from '@/composables/useToast';
 import { Button } from '@/components/ui/button';

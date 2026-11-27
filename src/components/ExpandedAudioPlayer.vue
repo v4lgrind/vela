@@ -38,6 +38,7 @@
         <Button variant="ghost" size="icon" class="size-11 rounded-full text-text-primary hover:bg-white/10" :aria-label="t('audio.queue')" @click="showQueue = !showQueue">
           <ListMusic class="size-7" />
         </Button>
+        <NowPlayingMenu :track="currentTrack" @sleep-timer="showSleepTimer = true" />
       </div>
     </div>
 
@@ -149,6 +150,7 @@ import { Slider } from '@/components/ui/slider';
 import { audioPlayerService } from '@/services/audioPlayerService';
 import AirPlayDialog from '@/components/AirPlayDialog.vue';
 import AudioLyrics from '@/components/AudioLyrics.vue';
+import NowPlayingMenu from '@/components/music/NowPlayingMenu.vue';
 import type { Lyrics } from '@/domain';
 import { Airplay, Cast, ChevronDown, GripVertical, ListMusic, MicVocal, SkipBack, SkipForward, Play, Pause, Repeat, Repeat1, Shuffle, Volume2, Volume1, VolumeX, X } from 'lucide-vue-next';
 
@@ -158,6 +160,7 @@ const session = useSessionStore();
 const imageUrl = useImageUrl();
 
 const showQueue = ref(false);
+const showSleepTimer = ref(false);
 const showAirPlay = ref(false);
 
 const currentTrack = computed(() => audioStore.currentTrack);

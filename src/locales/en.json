@@ -98,6 +98,10 @@
     "offlineLocked": "Offline: the filter stays on."
   },
   "audio": {
+    "goToAlbum": "Go to album",
+    "goToArtist": "Go to {name}",
+    "startRadio": "Start radio",
+    "sleepTimer": "Sleep timer",
     "radioFailed": "Could not start the radio",
     "playingNext": "Playing next",
     "addedToQueue": "Added to queue",

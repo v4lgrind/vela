@@ -47,16 +47,18 @@
   à Oasis / Lancer la radio / Lire ensuite / Ajouter à la file », l'album ne
   s'ouvre pas ; « Aller à Oasis » ouvre la page de l'artiste.
 
-## Pas encore vérifié
-1. Appui long **au doigt** : Reka annule l'appui long au moindre
-   `pointermove` (adb ne bouge pas) ; défilement de la grille.
-2. Radio : lancer depuis un titre, un album, un artiste ; laisser tourner
-   jusqu'à la recharge.
-3. Minuteur natif : fondu audible, pause, volume normal à la reprise ; fin du
-   titre écran éteint ; annulation pendant le fondu.
-4. Fond flouté sur une pochette très claire et une très sombre.
-5. Ancienne file (sans artistes) : l'entrée artiste apparaît après redémarrage.
+- Correctif après test : un « album » de 13 artistes (dossier Explo
+  `/music/explo/Daily-Jams`, que Jellyfin prend pour un album « United »)
+  faisait déborder le menu. Plus de 3 artistes = pas d'entrée artiste ; les
+  menus gardent une marge sous les barres système et défilent.
+- **Validé par l'utilisateur sur le Pixel 10** (1.5.2-lot1, code 1050202) :
+  appui long, radio, lecteur, minuteur, fond.
+
+## Note serveur (hors Vela)
+- Explo dépose chaque playlist dans un dossier de `/music` : Jellyfin en fait
+  un faux album qui apparaît sur la page de chaque artiste. À régler côté
+  serveur (sortir `explo` de la bibliothèque Musiques + vraie playlist).
 
 ## Suite
-- Tests appareil ci-dessus, puis PR / merge quand l'utilisateur le demande.
+- PR / merge quand l'utilisateur le demande.
 - Lot 2 (tops), lot 3 (égalisation du volume, Sweet Fades).

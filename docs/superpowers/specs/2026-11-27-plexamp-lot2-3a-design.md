@@ -54,3 +54,28 @@ avec son propre design : c'est le seul gros morceau natif.
 
 ## Hors périmètre
 - Gain d'album (mode « album » de Plexamp), tops par période, Plex gain.
+
+## Lot 3b — Sweet Fades (fondu enchaîné « intelligent »)
+
+**Intention :** un fondu de 6 s entre deux titres, sauf entre deux titres qui
+se suivent sur le même album (là, enchaînement sans blanc comme aujourd'hui).
+
+- **Quand :** fondu si le titre suivant n'est pas le n+1 du même album
+  (`albumId` + `indexNumber` du JSON de la file). Pas de fondu : répétition
+  « un », pas de titre suivant, titre < 18 s, minuteur armé, AirPlay actif,
+  ou titre en cours non « seekable » (flux transcodé à la volée).
+- **Comment (natif, `CrossfadeController`) :** 8 s avant le fondu, un
+  second ExoPlayer « queue » (sans focus audio, sans copie AirPlay) prépare
+  le titre en cours, en pause, à `durée - 6 s`. À `durée - 6 s` : la queue
+  joue et s'éteint en 6 s ; le lecteur principal passe au titre suivant et
+  monte en 6 s. La session média, la notification et l'app suivent le
+  lecteur principal, qui affiche donc le nouveau titre dès le début du fondu
+  (comme Plexamp).
+- **Rampes :** calculées en trames audio dans `LoudnessAudioProcessor`
+  (multiplicateur de fondu en plus du gain d'égalisation), donc calées sur le
+  son et pas sur l'horloge. `player.volume` reste au volume et au minuteur.
+- Saut, pause, arrêt ou changement de file pendant un fondu : la queue
+  s'arrête tout de suite, le lecteur principal revient à plein volume.
+- **Réglage :** Réglages › Musique › « Fondu entre les titres » (activé par
+  défaut), mémorisé par le service comme l'égalisation.
+- Fonctions pures testées : `shouldCrossfade`, `rampGain`.

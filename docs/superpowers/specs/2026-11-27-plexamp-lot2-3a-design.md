@@ -79,3 +79,6 @@ se suivent sur le même album (là, enchaînement sans blanc comme aujourd'hui).
 - **Réglage :** Réglages › Musique › « Fondu entre les titres » (activé par
   défaut), mémorisé par le service comme l'égalisation.
 - Fonctions pures testées : `shouldCrossfade`, `rampGain`.
+
+> **2026-11-27 — retiré.** L'utilisateur a écouté Sweet Fades et ne l'aime
+> pas : le commit a été annulé (revert), plus de fondu ni de réglage.

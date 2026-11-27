@@ -110,3 +110,5 @@ nouvelle série de questions).
   197 titres écoutés (Tops alimentés).
 - L'émulateur `vela_phone` démarre maintenant (≈ 3 min, ≈ 3 Go de RAM) ;
   non connecté au serveur (Quick Connect possible si besoin).
+- **Sweet Fades retiré** à la demande de l'utilisateur (testé, pas aimé) :
+  revert de `3a027c3` ; l'égalisation du volume reste. APK code 1050206.

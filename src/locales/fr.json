@@ -98,6 +98,7 @@
     "offlineLocked": "Hors ligne : le filtre reste activé."
   },
   "audio": {
+    "radioFailed": "Impossible de lancer la radio",
     "playingNext": "Lecture à suivre",
     "addedToQueue": "Ajouté à la file",
     "cover": "Pochette",

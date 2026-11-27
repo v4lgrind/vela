@@ -23,9 +23,11 @@ import { WebAudioEngine } from './audio/webAudioEngine';
 import type { AudioEngine, EngineState, QueueItem } from './audio/types';
 import { autoLibraryConfig } from '@/utils/autoLibraryConfig';
 import { logger } from '@/utils/logger';
-import type { MediaBackend, PlaybackReporter } from '@/domain';
+import type { MediaBackend, PlaybackReporter, Track } from '@/domain';
 import { trackToAudioTrack } from '@/utils/audioTrack';
 import { freshTracks, LIBRARY_SHUFFLE_REFILL_AT } from '@/utils/audioQueue';
+import type { MusicTarget } from '@/utils/musicActions';
+import { loadRadio, RADIO_BATCH } from '@/utils/radio';
 
 const isNative = Capacitor.isNativePlatform();
 const REPORT_INTERVAL_MS = 10_000;
@@ -107,13 +109,43 @@ class AudioPlayerService implements AudioController {
 
   private setupLibraryShuffleRefill() {
     watch(
-      () => [this.audioStore.libraryShuffle, this.audioStore.currentIndex, this.audioStore.queue.length] as const,
-      ([libraryShuffle, index, length]) => {
-        if (libraryShuffle && index >= 0 && length - 1 - index <= LIBRARY_SHUFFLE_REFILL_AT) {
-          this.refillLibraryShuffle(libraryShuffle);
-        }
+      () => [this.audioStore.libraryShuffle, this.audioStore.radioSeed, this.audioStore.currentIndex, this.audioStore.queue.length] as const,
+      ([libraryShuffle, radioSeed, index, length]) => {
+        if (index < 0 || length - 1 - index > LIBRARY_SHUFFLE_REFILL_AT) return;
+        if (libraryShuffle) this.refillLibraryShuffle(libraryShuffle);
+        else if (radioSeed) this.refillRadio(radioSeed);
       },
     );
+  }
+
+  /** Replaces the queue with a radio from a track, album or artist. */
+  async startRadio(target: MusicTarget) {
+    const backend = this.backend();
+    if (!backend) return;
+    try {
+      const seed = target.kind === 'track' ? await backend.catalog.item(target.id) : undefined;
+      const tracks = await loadRadio(backend.music, target, seed?.kind === 'track' ? seed as Track : undefined);
+      this.audioStore.playRadio(target.id, tracks);
+    } catch (e) {
+      logger.warn('[AudioPlayer] Radio failed', e);
+      useToast().showError(i18n.global.t('audio.radioFailed'));
+    }
+  }
+
+  /** More of the radio, mixed from the playing track. */
+  private async refillRadio(seedId: string) {
+    const current = this.audioStore.currentTrack;
+    if (this.refilling || !current) return;
+    this.refilling = true;
+    try {
+      const mix = await this.backend()?.music.radio(current.id, RADIO_BATCH) ?? [];
+      const picks = mix.map((track) => trackToAudioTrack(track));
+      if (this.audioStore.radioSeed === seedId && picks.length) this.audioStore.addToQueue(freshTracks(this.audioStore.queue, picks));
+    } catch (e) {
+      logger.error('[AudioPlayer] Radio refill failed', e);
+    } finally {
+      this.refilling = false;
+    }
   }
 
   private async refillLibraryShuffle(libraryId: string) {
@@ -189,6 +221,7 @@ class AudioPlayerService implements AudioController {
       this.audioStore.shuffle = false;
       // The car's library shuffle is topped up by MusicService itself.
       this.audioStore.libraryShuffle = null;
+      this.audioStore.radioSeed = null;
       this.restoreFromEngine().then(() => {
         this.audioStore.unshuffledQueue = this.audioStore.queue;
       });

@@ -98,6 +98,7 @@
     "offlineLocked": "Offline: the filter stays on."
   },
   "audio": {
+    "radioFailed": "Could not start the radio",
     "playingNext": "Playing next",
     "addedToQueue": "Added to queue",
     "cover": "Cover",

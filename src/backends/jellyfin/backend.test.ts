@@ -125,6 +125,19 @@ describe('Jellyfin backend: user data, music, images', () => {
     expect(requests.map((r) => `${r.method} ${r.path}`)).toEqual(['POST /Sessions/Playing', 'POST /Sessions/Playing/Stopped']);
   });
 
+  it('builds a radio from the Instant Mix of an item', async () => {
+    responses['/Items/t1/InstantMix'] = { body: { Items: [
+      { Id: 'x1', Type: 'Audio', Name: 'One' }, { Id: 'x2', Type: 'Audio', Name: 'Two' }, { Id: 'al', Type: 'MusicAlbum', Name: 'Album' },
+    ] } };
+    const tracks = await backend().music.radio('t1', 100);
+    expect(tracks.map((t) => [t.id, t.kind])).toEqual([['x1', 'track'], ['x2', 'track']]);
+    expect(Object.fromEntries(requests[0].params)).toMatchObject({ userId: 'u1', limit: '100' });
+  });
+
+  it('can build a radio', () => {
+    expect(backend().capabilities.radio).toBe(true);
+  });
+
   it('returns null lyrics on 404', async () => {
     responses['/Audio/t1/Lyrics'] = { status: 404 };
     expect(await backend().music.lyrics('t1')).toBeNull();

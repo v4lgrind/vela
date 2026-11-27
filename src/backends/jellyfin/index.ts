@@ -23,6 +23,7 @@ const CAPABILITIES: Capabilities = {
   serverStreamInfo: true,
   cast: true,
   androidAuto: true,
+  radio: true,
 };
 
 export function createJellyfinBackend(connection: ServerConnection, token: string, identity: ClientIdentity): MediaBackend {

@@ -49,6 +49,8 @@ export interface MusicPort {
   albumTracks(albumId: ItemId): Promise<Track[]>;
   playlistTracks(playlistId: ItemId): Promise<Track[]>;
   randomTracks(libraryId: string, limit: number): Promise<Track[]>;
+  /** Tracks close to a track, album or artist; empty when the server can't (see Capabilities.radio). */
+  radio(seedId: ItemId, limit: number): Promise<Track[]>;
   /** `streamRef`: the track version's file locator, when known (direct file instead of a conversion). */
   streamUrl(trackId: ItemId, request: AudioStreamRequest, streamRef?: string): string;
   lyrics(trackId: ItemId): Promise<Lyrics | null>;

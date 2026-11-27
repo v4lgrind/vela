@@ -73,6 +73,8 @@ export function createPlexMusic(client: PlexClient): MusicPort {
     randomTracks: async (libraryId, limit) => toTracks(await client.metadata(
       `/library/sections/${libraryId}/all`, { type: 10, sort: 'random' }, { offset: 0, limit },
     )),
+    // Sonic radio (Plex analysis) comes later: Capabilities.radio is false.
+    radio: async () => [],
     streamUrl: (trackId, request, streamRef) => (streamRef && isDirectlyPlayable(streamRef, request)
       ? client.url(streamRef)
       : universalUrl(trackId, request)),

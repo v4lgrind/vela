@@ -62,3 +62,39 @@
 ## Suite
 - PR / merge quand l'utilisateur le demande.
 - Lot 2 (tops), lot 3 (égalisation du volume, Sweet Fades).
+
+---
+
+# Même jour — lot 2 (tops), lot 3a (égalisation), lot 3b (Sweet Fades)
+
+Design : `docs/superpowers/specs/2026-11-27-plexamp-lot2-3a-design.md`
+(choix faits par Claude, l'utilisateur ayant demandé de continuer sans
+nouvelle série de questions).
+
+## Changements
+- **Tops** : onglet « Tops » des bibliothèques musicales (masqué hors ligne).
+  `MusicPort.mostPlayed` (Jellyfin `IsPlayed` + `PlayCount`, Plex
+  `viewCount:desc`), `musicCharts()` additionne les écoutes par album et par
+  artiste, `MusicCharts.vue` (10 artistes, 10 albums, 25 titres).
+- **Égalisation du volume** : `Track.gainDb` ← Jellyfin `NormalizationGain`,
+  porté par la file jusqu'au natif ; `LoudnessAudioProcessor` en tête de la
+  chaîne du sink (avant la copie AirPlay), gain borné [-20 dB, +4 dB].
+  Réglages › « Égaliser le volume » (par défaut activé), mémorisé par
+  `MusicService` (SharedPreferences `music`). Limite connue : au changement
+  de titre, les quelques centaines de ms déjà en tampon gardent l'ancien gain.
+- **Sweet Fades** : `CrossfadeController` (second ExoPlayer sans focus audio
+  pour la fin du titre sortant, fondu 6 s, rampes en trames dans le
+  processeur). Pas de fondu entre titres consécutifs d'un album, en
+  répétition « un », avec minuteur, en AirPlay, ou si le titre ne peut pas
+  être « seeké » (transcodage à la volée). Réglages › « Fondu entre les
+  titres » (par défaut activé).
+
+## Vérifié
+- vitest 478 ; tests Kotlin `CrossfadeTest` 6, `LoudnessTest` 6,
+  `SleepTimerTest` 7 ; build web ; APK 1.5.2-lot3 (code 1050204) installé
+  sur le Pixel 10.
+
+## Pas vérifié
+- **Rien n'a été écouté** : fondu, égalisation, onglet Tops sur le vrai serveur.
+- Le serveur calcule-t-il `NormalizationGain` ? (requête impossible : téléphone
+  en veille). Sans cette valeur, l'égalisation ne fait rien.

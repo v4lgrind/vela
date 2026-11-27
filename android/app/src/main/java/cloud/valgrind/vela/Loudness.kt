@@ -14,6 +14,13 @@ const val MAX_GAIN_DB = 4.0
 /** …nor turns a loud one down by more than this. */
 const val MIN_GAIN_DB = -20.0
 private const val DB_PER_DECADE = 20.0
+private const val MS_PER_SECOND = 1000L
+
+/** Gain at [position] of a linear ramp of [total] steps from [from] to [to]; held at [to] after it. */
+fun rampGain(position: Long, total: Long, from: Float, to: Float): Float {
+    if (total <= 0 || position >= total) return to
+    return from + (to - from) * (position.toFloat() / total)
+}
 
 /** Amplitude factor for a server-measured gain; 1 when none is known. */
 fun loudnessFactor(gainDb: Double?): Float {
@@ -45,6 +52,31 @@ class LoudnessAudioProcessor : BaseAudioProcessor() {
     /** Set from the main thread on each track change, read on the audio thread. */
     @Volatile var factor = 1f
 
+    /** A volume ramp counted in audio frames, so it follows the sound, not the clock. */
+    private class Ramp(val from: Float, val to: Float, val durationMs: Long) {
+        var position = 0L // frames, audio thread only
+    }
+    @Volatile private var ramp: Ramp? = null
+
+    /** Fades from [from] to [to] over [durationMs] of audio, starting with the next samples played. */
+    fun startRamp(from: Float, to: Float, durationMs: Long) {
+        ramp = Ramp(from, to, durationMs)
+    }
+
+    fun clearRamp() {
+        ramp = null
+    }
+
+    // A seek or a track change flushes the sink: the ramp starts with the new samples.
+    override fun onFlush() {
+        ramp?.position = 0
+    }
+
+    private fun frameGain(r: Ramp?, framesTotal: Long): Float {
+        if (r == null) return 1f
+        return rampGain(r.position++, framesTotal, r.from, r.to)
+    }
+
     override fun onConfigure(inputAudioFormat: AudioFormat): AudioFormat {
         val encoding = inputAudioFormat.encoding
         if (encoding != C.ENCODING_PCM_16BIT && encoding != C.ENCODING_PCM_FLOAT) {
@@ -57,11 +89,16 @@ class LoudnessAudioProcessor : BaseAudioProcessor() {
         val size = inputBuffer.remaining()
         if (size == 0) return
         val output = replaceOutputBuffer(size)
-        val f = factor
-        if (inputAudioFormat.encoding == C.ENCODING_PCM_FLOAT) {
-            while (inputBuffer.hasRemaining()) output.putFloat(scaleFloat(inputBuffer.getFloat(), f))
-        } else {
-            while (inputBuffer.hasRemaining()) output.putShort(scale16(inputBuffer.getShort(), f))
+        val format = inputAudioFormat
+        val isFloat = format.encoding == C.ENCODING_PCM_FLOAT
+        val r = ramp
+        val framesTotal = r?.let { it.durationMs * format.sampleRate / MS_PER_SECOND } ?: 0L
+        while (inputBuffer.hasRemaining()) {
+            val f = factor * frameGain(r, framesTotal)
+            repeat(format.channelCount) {
+                if (isFloat) output.putFloat(scaleFloat(inputBuffer.getFloat(), f))
+                else output.putShort(scale16(inputBuffer.getShort(), f))
+            }
         }
         output.flip()
     }

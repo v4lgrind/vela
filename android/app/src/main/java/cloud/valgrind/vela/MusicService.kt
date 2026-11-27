@@ -1,7 +1,6 @@
 package cloud.valgrind.vela
 
 import android.app.PendingIntent
-import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
@@ -13,10 +12,7 @@ import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
-import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.audio.AudioSink
-import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.session.LibraryResult
 import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaLibraryService.LibraryParams
@@ -52,6 +48,9 @@ class MusicService : MediaLibraryService() {
         const val COMMAND_SET_LOUDNESS_LEVELING = "setLoudnessLeveling"
         private const val PREFS = "music"
         private const val PREF_LEVELING = "loudnessLeveling"
+        /** From the app: Sweet Fades on/off (arg "enabled"). */
+        const val COMMAND_SET_SWEET_FADES = "setSweetFades"
+        private const val PREF_SWEET_FADES = "sweetFades"
         private const val SLEEP_TICK_MS = 250L
         private const val MS_PER_MINUTE = 60_000.0
         private const val TAG = "MusicService"
@@ -73,6 +72,10 @@ class MusicService : MediaLibraryService() {
     private val loudness = LoudnessAudioProcessor()
     private val levelingEnabled: Boolean
         get() = getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean(PREF_LEVELING, true)
+    // Sweet Fades between tracks of different albums.
+    private var crossfade: CrossfadeController? = null
+    private val sweetFadesEnabled: Boolean
+        get() = getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean(PREF_SWEET_FADES, true)
 
     // Sleep timer: ticks on the main thread while armed and fades the volume out.
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -94,25 +97,17 @@ class MusicService : MediaLibraryService() {
             .build()
         // FFmpeg after MediaCodec, same as the video player, for formats the
         // platform can't decode (ALAC on some devices, etc.).
-        val renderersFactory = object : DefaultRenderersFactory(this) {
-            // AirPlay taps the decoded PCM at the end of the processor chain.
-            override fun buildAudioSink(
-                context: Context,
-                enableFloatOutput: Boolean,
-                enableAudioTrackPlaybackParams: Boolean,
-            ): AudioSink = DefaultAudioSink.Builder(context)
-                .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
-                .setAudioProcessorChain(
-                    DefaultAudioSink.DefaultAudioProcessorChain(loudness, AirPlayManager.resampler, AirPlayManager.tee)
-                )
-                .build()
-        }.setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
+        // AirPlay taps the decoded PCM at the end of the chain, after loudness leveling.
+        val renderersFactory = musicRenderersFactory(this, loudness, AirPlayManager.resampler, AirPlayManager.tee)
         val player = ExoPlayer.Builder(this, renderersFactory)
             .setAudioAttributes(audioAttributes, true)
             .setHandleAudioBecomingNoisy(true)
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
         AirPlayManager.attach(player)
+        crossfade = CrossfadeController(this, player, loudness) {
+            sweetFadesEnabled && sleepMode == null && AirPlayManager.currentDevice() == null
+        }.also { it.start() }
         player.addListener(object : Player.Listener {
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 applyLoudness(player)
@@ -225,6 +220,8 @@ class MusicService : MediaLibraryService() {
 
     override fun onDestroy() {
         mainHandler.removeCallbacks(sleepTick)
+        crossfade?.release()
+        crossfade = null
         session?.run {
             AirPlayManager.detach(player as ExoPlayer)
             player.release()
@@ -247,6 +244,7 @@ class MusicService : MediaLibraryService() {
             val commands = result.availableSessionCommands.buildUpon()
                 .add(SessionCommand(COMMAND_SET_SLEEP_TIMER, Bundle.EMPTY))
                 .add(SessionCommand(COMMAND_SET_LOUDNESS_LEVELING, Bundle.EMPTY))
+                .add(SessionCommand(COMMAND_SET_SWEET_FADES, Bundle.EMPTY))
                 .build()
             return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
                 .setAvailableSessionCommands(commands)
@@ -264,6 +262,8 @@ class MusicService : MediaLibraryService() {
                 COMMAND_SET_SLEEP_TIMER ->
                     setSleepTimer(session.player, SleepMode.fromJs(args.getString("mode")), args.getDouble("minutes", 0.0))
                 COMMAND_SET_LOUDNESS_LEVELING -> setLoudnessLeveling(session.player, args.getBoolean("enabled", true))
+                COMMAND_SET_SWEET_FADES ->
+                    getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(PREF_SWEET_FADES, args.getBoolean("enabled", true)).apply()
                 else -> return super.onCustomCommand(session, controller, customCommand, args)
             }
             return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))

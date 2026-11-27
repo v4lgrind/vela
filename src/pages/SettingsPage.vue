@@ -109,6 +109,14 @@
             </div>
             <Switch v-model="preferencesStore.loudnessLeveling" />
           </label>
+          <label class="flex min-h-12 items-center gap-3 px-4 py-3.5">
+            <Blend class="size-[19px] text-text-muted shrink-0" :stroke-width="1.8" />
+            <div class="flex-1">
+              <div class="text-body text-text-heading">{{ t('settings.sweetFades') }}</div>
+              <p class="text-caption text-text-muted mt-0.5">{{ t('settings.sweetFadesHint') }}</p>
+            </div>
+            <Switch v-model="preferencesStore.sweetFades" />
+          </label>
         </div>
       </section>
 
@@ -155,7 +163,7 @@ import { useRouter } from 'vue-router';
 import { AppPage, ListRow, PageHeader } from '@/components/layout';
 import { Switch } from '@/components/ui/switch';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { ChevronRight, LogOut, Server, Palette, MonitorPlay, Music, Users, AudioLines } from 'lucide-vue-next';
+import { ChevronRight, LogOut, Server, Palette, MonitorPlay, Music, Users, AudioLines, Blend } from 'lucide-vue-next';
 import { usePreferencesStore } from '@/store/preferences-store';
 import { useAppUpdateStore } from '@/store/app-update-store';
 import AppUpdateSettings from '@/components/update/AppUpdateSettings.vue';

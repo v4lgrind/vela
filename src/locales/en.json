@@ -259,6 +259,8 @@
     "tracksCount": "{n} track | {n} tracks"
   },
   "settings": {
+    "sweetFades": "Crossfade between tracks",
+    "sweetFadesHint": "6 s fade, except between consecutive tracks of an album",
     "loudnessLeveling": "Loudness leveling",
     "loudnessLevelingHint": "Every track at the same volume, as measured by the server",
     "title": "Settings",

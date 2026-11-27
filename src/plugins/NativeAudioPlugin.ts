@@ -48,6 +48,8 @@ export interface NativeAudioPluginInterface {
   setSleepTimer(opts: { mode: SleepMode | 'off'; minutes?: number }): Promise<void>;
   /** Loudness leveling on/off; MusicService remembers it (car-started playback too). */
   setLoudnessLeveling(opts: { enabled: boolean }): Promise<void>;
+  /** Sweet Fades on/off; MusicService remembers it. */
+  setSweetFades(opts: { enabled: boolean }): Promise<void>;
   getState(): Promise<NativeAudioState & { tracks: Record<string, unknown>[] }>;
   /** Server and credentials for browsing the library from Android Auto. */
   /** Android Auto library credentials (see utils/autoLibraryConfig). */

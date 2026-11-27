@@ -134,6 +134,15 @@ describe('Jellyfin backend: user data, music, images', () => {
     expect(Object.fromEntries(requests[0].params)).toMatchObject({ userId: 'u1', limit: '100' });
   });
 
+  it('lists the most played tracks of a library', async () => {
+    responses['/Items'] = { body: { Items: [{ Id: 'x1', Type: 'Audio', Name: 'One', UserData: { PlayCount: 7, Played: true } }] } };
+    const tracks = await backend().music.mostPlayed('lib1', 500);
+    expect(tracks.map((t) => [t.id, t.user.playCount])).toEqual([['x1', 7]]);
+    expect(Object.fromEntries(requests[0].params)).toMatchObject({
+      parentId: 'lib1', recursive: 'true', filters: 'IsPlayed', sortBy: 'PlayCount', sortOrder: 'Descending', limit: '500',
+    });
+  });
+
   it('can build a radio', () => {
     expect(backend().capabilities.radio).toBe(true);
   });

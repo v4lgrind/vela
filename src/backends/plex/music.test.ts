@@ -54,6 +54,13 @@ describe('Plex music', () => {
     expect((await music().artistTracks('5')).map((t) => t.id)).toEqual(['1', '2']);
   });
 
+  it('lists the most played tracks of a library', async () => {
+    expect((await music().mostPlayed('10', 500)).map((t) => t.id)).toEqual(['2']);
+    const url = requests[0];
+    expect(url.pathname).toBe('/library/sections/10/all');
+    expect(Object.fromEntries(url.searchParams)).toMatchObject({ type: '10', sort: 'viewCount:desc' });
+  });
+
   it('has no radio yet, without asking the server', async () => {
     expect(await music().radio('1', 100)).toEqual([]);
     expect(requests).toEqual([]);

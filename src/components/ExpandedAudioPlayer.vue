@@ -52,6 +52,10 @@
         <div class="text-xl font-bold text-text-heading truncate">{{ currentTrack?.name || '' }}</div>
         <div class="text-base text-text-muted mt-1">{{ currentTrack?.artist || '' }}</div>
         <div v-if="currentTrack?.albumName" class="text-sm text-text-subtle mt-0.5">{{ currentTrack.albumName }}</div>
+        <button v-if="sleepLeft !== null" class="mt-2 inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-sm font-medium text-accent-purple tabular-nums hover:bg-white/10 cursor-pointer"
+          :aria-label="t('audio.sleep.remaining', { time: formatTime(sleepLeft) })" @click="showSleepTimer = true">
+          <Moon class="size-4" /> {{ formatTime(sleepLeft) }}
+        </button>
       </div>
 
       <!-- Progress -->
@@ -134,6 +138,7 @@
       </div>
     </div>
     <AirPlayDialog v-model:open="showAirPlay" />
+    <SleepTimerSheet v-model:open="showSleepTimer" />
   </div>
 </template>
 
@@ -151,8 +156,11 @@ import { audioPlayerService } from '@/services/audioPlayerService';
 import AirPlayDialog from '@/components/AirPlayDialog.vue';
 import AudioLyrics from '@/components/AudioLyrics.vue';
 import NowPlayingMenu from '@/components/music/NowPlayingMenu.vue';
+import SleepTimerSheet from '@/components/music/SleepTimerSheet.vue';
+import { sleepRemaining } from '@/utils/sleepTimer';
+import { useNow } from '@vueuse/core';
 import type { Lyrics } from '@/domain';
-import { Airplay, Cast, ChevronDown, GripVertical, ListMusic, MicVocal, SkipBack, SkipForward, Play, Pause, Repeat, Repeat1, Shuffle, Volume2, Volume1, VolumeX, X } from 'lucide-vue-next';
+import { Airplay, Cast, ChevronDown, Moon, GripVertical, ListMusic, MicVocal, SkipBack, SkipForward, Play, Pause, Repeat, Repeat1, Shuffle, Volume2, Volume1, VolumeX, X } from 'lucide-vue-next';
 
 const { t } = useI18n();
 const audioStore = useAudioPlayerStore();
@@ -161,6 +169,16 @@ const imageUrl = useImageUrl();
 
 const showQueue = ref(false);
 const showSleepTimer = ref(false);
+const now = useNow({ interval: 1000 });
+/** Seconds before the sleep timer pauses, null when none is set. */
+const sleepLeft = computed(() => {
+  const timer = audioStore.sleepTimer;
+  if (!timer) return null;
+  return sleepRemaining(timer, {
+    now: now.value.getTime(), queue: audioStore.queue, currentIndex: audioStore.currentIndex,
+    currentTime: audioStore.currentTime, duration: audioStore.duration,
+  });
+});
 const showAirPlay = ref(false);
 
 const currentTrack = computed(() => audioStore.currentTrack);

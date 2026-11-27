@@ -98,6 +98,13 @@
     "offlineLocked": "Offline: the filter stays on."
   },
   "audio": {
+    "sleep": {
+      "minutes": "{n} min",
+      "endOfTrack": "End of track",
+      "endOfAlbum": "End of album",
+      "cancel": "Cancel sleep timer",
+      "remaining": "Sleep timer: {time} left"
+    },
     "goToAlbum": "Go to album",
     "goToArtist": "Go to {name}",
     "startRadio": "Start radio",

@@ -28,6 +28,8 @@ import { needsServerDetails, trackToAudioTrack, withServerDetails } from '@/util
 import { freshTracks, LIBRARY_SHUFFLE_REFILL_AT } from '@/utils/audioQueue';
 import type { MusicTarget } from '@/utils/musicActions';
 import { loadRadio, RADIO_BATCH } from '@/utils/radio';
+import { sleepShouldPause } from '@/utils/sleepTimer';
+import type { SleepTimerRequest } from '@/utils/sleepTimer';
 
 const isNative = Capacitor.isNativePlatform();
 const REPORT_INTERVAL_MS = 10_000;
@@ -75,7 +77,9 @@ class AudioPlayerService implements AudioController {
     this.offlineStore = useOfflineStore();
     this.preferencesStore = usePreferencesStore();
 
-    this.localEngine = isNative ? new NativeAudioEngine() : new WebAudioEngine();
+    const nativeEngine = isNative ? new NativeAudioEngine() : null;
+    nativeEngine?.onSleepTimerFired(() => { this.audioStore.sleepTimer = null; });
+    this.localEngine = nativeEngine ?? new WebAudioEngine();
     this.engine = this.localEngine;
     this.bindEngine(this.localEngine);
     if (isNative) {
@@ -288,6 +292,7 @@ class AudioPlayerService implements AudioController {
   next() { this.enqueue(() => this.engine.next()); }
   previous() { this.enqueue(() => this.engine.previous()); }
   setVolume(volume: number) { this.enqueue(() => this.engine.setVolume(volume)); }
+  setSleepTimer(request: SleepTimerRequest | null) { this.enqueue(() => this.engine.setSleepTimer(request)); }
 
   stop() {
     this.enqueue(() => this.engine.stop());
@@ -316,10 +321,20 @@ class AudioPlayerService implements AudioController {
       currentTime: s.position,
       duration: s.duration,
     });
+    this.checkSleepTimer();
     if (s.trackId !== this.reportedTrackId) this.onTrackChanged(s.trackId);
     this.lastPosition = s.position;
     this.audioStore.resumePosition = s.position;
     this.lastDuration = s.duration;
+  }
+
+  /** Cast / web: the engine can't pause on its own, so the timer runs here on its state reports. */
+  private checkSleepTimer() {
+    const store = this.audioStore;
+    if (!store.sleepTimer || this.engine.ownsSleepTimer) return;
+    if (!sleepShouldPause(store.sleepTimer, { now: Date.now(), queue: store.queue, currentIndex: store.currentIndex })) return;
+    store.sleepTimer = null;
+    if (store.isPlaying) store.togglePlayPause();
   }
 
   private onEngineError(message: string, network = false) {

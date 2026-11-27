@@ -1,4 +1,5 @@
 import type { AudioTrack, RepeatMode } from '@/store/audio-player-store';
+import type { SleepTimerRequest } from '@/utils/sleepTimer';
 
 export interface QueueItem {
   track: AudioTrack;
@@ -33,6 +34,10 @@ export interface AudioEngine {
   previous(): void;
   setVolume(volume: number): void;
   stop(): void;
+  /** Engines that can't pause on their own (Cast, web) ignore it: audioPlayerService keeps the timer. */
+  setSleepTimer(request: SleepTimerRequest | null): void;
+  /** True when the engine pauses itself (native: works with the screen off). */
+  readonly ownsSleepTimer: boolean;
   onState(handler: (s: EngineState) => void): void;
   /** `network`: the server could not be reached (offline), as opposed to a bad file. */
   onError(handler: (message: string, network?: boolean) => void): void;

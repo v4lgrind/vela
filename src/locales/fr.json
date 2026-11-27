@@ -98,6 +98,13 @@
     "offlineLocked": "Hors ligne : le filtre reste activé."
   },
   "audio": {
+    "sleep": {
+      "minutes": "{n} min",
+      "endOfTrack": "Fin du titre",
+      "endOfAlbum": "Fin de l'album",
+      "cancel": "Annuler le minuteur",
+      "remaining": "Minuteur : encore {time}"
+    },
     "goToAlbum": "Aller à l'album",
     "goToArtist": "Aller à {name}",
     "startRadio": "Lancer la radio",

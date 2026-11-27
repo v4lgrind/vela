@@ -15,42 +15,19 @@
       </Transition>
     </div>
 
-    <!-- Header -->
-    <div class="flex items-center justify-between py-2 shrink-0">
-      <Button variant="ghost" size="icon" class="size-11 rounded-full text-text-primary hover:bg-white/10" @click="audioStore.isExpanded = false">
+    <!-- Header: close, what plays where, more -->
+    <div class="flex items-center gap-2 py-2 shrink-0">
+      <Button variant="ghost" size="icon" class="size-11 shrink-0 rounded-full text-text-primary hover:bg-white/10" :aria-label="t('common.close')" @click="audioStore.isExpanded = false">
         <ChevronDown class="size-7" />
       </Button>
-      <span v-if="audioStore.castDevice" class="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-accent-purple truncate">
-        <Cast class="size-4 shrink-0" /> {{ audioStore.castDevice }}
+      <span v-if="audioStore.castDevice" class="flex min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap text-xs font-semibold uppercase tracking-wide text-accent-purple">
+        <Cast class="size-4 shrink-0" /> <span class="truncate">{{ audioStore.castDevice }}</span>
       </span>
-      <span v-else-if="audioStore.airplayDevice" class="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-accent-purple truncate">
-        <Airplay class="size-4 shrink-0" /> {{ audioStore.airplayDevice }}
+      <span v-else-if="audioStore.airplayDevice" class="flex min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap text-xs font-semibold uppercase tracking-wide text-accent-purple">
+        <Airplay class="size-4 shrink-0" /> <span class="truncate">{{ audioStore.airplayDevice }}</span>
       </span>
-      <span v-else class="text-xs font-semibold uppercase tracking-wide text-text-muted">{{ t('audio.nowPlaying') }}</span>
-      <div class="flex items-center gap-2">
-        <Button v-if="audioStore.airplaySupported && !audioStore.castDevice" variant="ghost" size="icon" title="AirPlay"
-          class="size-11 rounded-full hover:bg-white/10"
-          :class="audioStore.airplayDevice ? 'text-accent-purple' : 'text-text-primary'"
-          @click="showAirPlay = true">
-          <Airplay class="size-6" />
-        </Button>
-        <Button v-if="(audioStore.castAvailable || audioStore.castDevice) && !audioStore.airplayDevice" variant="ghost" size="icon" title="Cast"
-          class="size-11 rounded-full hover:bg-white/10"
-          :class="audioStore.castDevice ? 'text-accent-purple' : 'text-text-primary'"
-          @click="audioPlayerService.openCastDialog()">
-          <Cast class="size-6" />
-        </Button>
-        <Button v-if="lyrics" variant="ghost" size="icon" :aria-label="t('audio.lyrics')"
-          class="size-11 rounded-full hover:bg-white/10"
-          :class="showLyrics && !showQueue ? 'text-accent-purple' : 'text-text-primary'"
-          @click="toggleLyrics">
-          <MicVocal class="size-6" />
-        </Button>
-        <Button variant="ghost" size="icon" class="size-11 rounded-full text-text-primary hover:bg-white/10" :aria-label="t('audio.queue')" @click="showQueue = !showQueue">
-          <ListMusic class="size-7" />
-        </Button>
-        <NowPlayingMenu :track="currentTrack" @sleep-timer="showSleepTimer = true" />
-      </div>
+      <span v-else class="min-w-0 flex-1 truncate whitespace-nowrap text-center text-xs font-semibold uppercase tracking-wide text-text-muted">{{ t('audio.nowPlaying') }}</span>
+      <NowPlayingMenu :track="currentTrack" @sleep-timer="showSleepTimer = true" />
     </div>
 
     <!-- Main Player -->
@@ -147,6 +124,31 @@
           </Button>
         </div>
       </div>
+    </div>
+    <!-- Bottom bar: lyrics, output, queue (always three slots, so nothing moves between tracks) -->
+    <div class="flex shrink-0 items-center justify-around pt-3">
+      <Button variant="ghost" size="icon" :aria-label="t('audio.lyrics')" :disabled="!lyrics"
+        class="size-11 rounded-full hover:bg-white/10 disabled:opacity-30"
+        :class="showLyrics && lyrics && !showQueue ? 'text-accent-purple' : 'text-text-primary'"
+        @click="toggleLyrics">
+        <MicVocal class="size-6" />
+      </Button>
+      <Button v-if="audioStore.airplaySupported && !audioStore.castDevice" variant="ghost" size="icon" title="AirPlay"
+        class="size-11 rounded-full hover:bg-white/10"
+        :class="audioStore.airplayDevice ? 'text-accent-purple' : 'text-text-primary'"
+        @click="showAirPlay = true">
+        <Airplay class="size-6" />
+      </Button>
+      <Button v-if="(audioStore.castAvailable || audioStore.castDevice) && !audioStore.airplayDevice" variant="ghost" size="icon" title="Cast"
+        class="size-11 rounded-full hover:bg-white/10"
+        :class="audioStore.castDevice ? 'text-accent-purple' : 'text-text-primary'"
+        @click="audioPlayerService.openCastDialog()">
+        <Cast class="size-6" />
+      </Button>
+      <Button variant="ghost" size="icon" class="size-11 rounded-full hover:bg-white/10" :aria-label="t('audio.queue')"
+        :class="showQueue ? 'text-accent-purple' : 'text-text-primary'" @click="showQueue = !showQueue">
+        <ListMusic class="size-6" />
+      </Button>
     </div>
     <AirPlayDialog v-model:open="showAirPlay" />
     <SleepTimerSheet v-model:open="showSleepTimer" />

@@ -230,16 +230,6 @@ class NativeAudioPlugin : Plugin() {
         }
     }
 
-    /** Sweet Fades on/off in MusicService. */
-    @PluginMethod
-    fun setSweetFades(call: PluginCall) {
-        val args = Bundle().apply { putBoolean("enabled", call.getBoolean("enabled") ?: true) }
-        withController(call) { c ->
-            c.sendCustomCommand(SessionCommand(MusicService.COMMAND_SET_SWEET_FADES, Bundle.EMPTY), args)
-            call.resolve()
-        }
-    }
-
     @PluginMethod
     fun stop(call: PluginCall) = withController(call) { c ->
         c.stop()

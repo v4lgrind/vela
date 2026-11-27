@@ -259,8 +259,6 @@
     "tracksCount": "{n} titre | {n} titres"
   },
   "settings": {
-    "sweetFades": "Fondu entre les titres",
-    "sweetFadesHint": "Fondu de 6 s, sauf entre deux titres qui se suivent sur un album",
     "loudnessLeveling": "Égaliser le volume",
     "loudnessLevelingHint": "Tous les titres au même volume, selon la mesure du serveur",
     "title": "Réglages",

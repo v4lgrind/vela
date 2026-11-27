@@ -12,7 +12,6 @@ export const usePreferencesStore = defineStore('preferences', {
     libraryViewMode: 'grid' as 'grid' | 'list',
     musicMaxBitrate: 0 as number, // 0 = original quality; otherwise max bps for music streams (transcoded above it)
     loudnessLeveling: true as boolean, // music plays at the server-measured gain (on-device playback)
-    sweetFades: true as boolean, // 6 s crossfade between tracks, except consecutive tracks of an album
   }),
   persist: true,
 });

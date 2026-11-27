@@ -213,11 +213,6 @@ class AudioPlayerService implements AudioController {
       (enabled) => NativeAudio.setLoudnessLeveling({ enabled }).catch((e) => logger.error('[AudioPlayer] setLoudnessLeveling failed', e)),
       { immediate: true },
     );
-    watch(
-      () => this.preferencesStore.sweetFades,
-      (enabled) => NativeAudio.setSweetFades({ enabled }).catch((e) => logger.error('[AudioPlayer] setSweetFades failed', e)),
-      { immediate: true },
-    );
   }
 
   private setupAndroidAuto() {

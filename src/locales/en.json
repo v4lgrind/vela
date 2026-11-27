@@ -55,6 +55,13 @@
     "seeAllDownloads": "See all in the library"
   },
   "library": {
+    "charts": {
+      "artists": "Top artists",
+      "albums": "Top albums",
+      "tracks": "Top tracks",
+      "empty": "Nothing played yet",
+      "plays": "{n} play | {n} plays"
+    },
     "title": "Libraries",
     "alphaIndex": "Jump to letter",
     "unwatched": "Unwatched",
@@ -91,6 +98,7 @@
       "artists": "Artists",
       "songs": "Songs",
       "playlists": "Playlists",
+      "tops": "Top",
       "shuffleAll": "Shuffle all",
       "shuffleFailed": "Could not start shuffle"
     },

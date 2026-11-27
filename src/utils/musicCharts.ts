@@ -1,7 +1,7 @@
 import type { ArtistRef, ImageRef, Track } from '@/domain';
 
 export interface ChartArtist { id: string; name: string; plays: number }
-export interface ChartAlbum { id: string; title: string; artist: string; plays: number; cover?: ImageRef }
+export interface ChartAlbum { id: string; title: string; artist: string; artists: ArtistRef[]; plays: number; cover?: ImageRef }
 export interface MusicCharts { artists: ChartArtist[]; albums: ChartAlbum[]; tracks: Track[] }
 
 const TOP_ARTISTS = 10;
@@ -34,7 +34,8 @@ export function musicCharts(tracks: Track[]): MusicCharts {
     const artist = mainArtist(track);
     if (track.albumId) {
       tally(albums, track.albumId, plays, () => ({
-        id: track.albumId!, title: track.albumTitle ?? '', artist: track.albumArtist ?? artist?.name ?? '', plays: 0, cover: track.images.poster,
+        id: track.albumId!, title: track.albumTitle ?? '', artist: track.albumArtist ?? artist?.name ?? '',
+        artists: track.albumArtists, plays: 0, cover: track.images.poster,
       }));
     }
     if (artist?.id) tally(artists, artist.id, plays, () => ({ id: artist.id!, name: artist.name, plays: 0 }));

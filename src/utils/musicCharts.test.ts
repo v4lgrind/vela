@@ -29,8 +29,8 @@ describe('musicCharts', () => {
 
   it('adds up the plays of an album', () => {
     expect(musicCharts(tracks).albums).toEqual([
-      { id: 'al1', title: 'Discovery', artist: 'Daft Punk', plays: 12, cover: 'cover-al1' },
-      { id: 'al2', title: 'Absolution', artist: 'Muse', plays: 7, cover: 'cover-al2' },
+      { id: 'al1', title: 'Discovery', artist: 'Daft Punk', artists: [{ id: 'a1', name: 'Daft Punk' }], plays: 12, cover: 'cover-al1' },
+      { id: 'al2', title: 'Absolution', artist: 'Muse', artists: [{ id: 'a2', name: 'Muse' }], plays: 7, cover: 'cover-al2' },
     ]);
   });
 

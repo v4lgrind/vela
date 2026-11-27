@@ -55,6 +55,13 @@
     "seeAllDownloads": "Tout voir dans la bibliothèque"
   },
   "library": {
+    "charts": {
+      "artists": "Top artistes",
+      "albums": "Top albums",
+      "tracks": "Top titres",
+      "empty": "Rien d'écouté pour l'instant",
+      "plays": "{n} écoute | {n} écoutes"
+    },
     "title": "Bibliothèques",
     "alphaIndex": "Aller à la lettre",
     "unwatched": "Non vus",
@@ -91,6 +98,7 @@
       "artists": "Artistes",
       "songs": "Titres",
       "playlists": "Playlists",
+      "tops": "Tops",
       "shuffleAll": "Lecture aléatoire",
       "shuffleFailed": "Impossible de lancer la lecture aléatoire"
     },

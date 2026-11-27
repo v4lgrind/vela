@@ -98,3 +98,15 @@ nouvelle série de questions).
 - **Rien n'a été écouté** : fondu, égalisation, onglet Tops sur le vrai serveur.
 - Le serveur calcule-t-il `NormalizationGain` ? (requête impossible : téléphone
   en veille). Sans cette valeur, l'égalisation ne fait rien.
+
+## Même soir — en-tête du lecteur, playlists, émulateur
+- Lecteur plein écran : en-tête réduit à ˅ / « Lecture en cours » (une ligne)
+  / ⋯ ; paroles, AirPlay, Cast et file passent dans une barre en bas.
+  Vérifié par capture sur le Pixel 10 (code 1050205).
+- Playlists : elles existent (Daily-Jams, Weekly Discovery, créées par
+  Explo) et l'onglet Musiques › Playlists les liste ; l'utilisateur ne veut
+  rien changer.
+- Serveur : Jellyfin 12.4.0 ; `NormalizationGain` sur 276/300 titres ;
+  197 titres écoutés (Tops alimentés).
+- L'émulateur `vela_phone` démarre maintenant (≈ 3 min, ≈ 3 Go de RAM) ;
+  non connecté au serveur (Quick Connect possible si besoin).

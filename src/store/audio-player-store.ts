@@ -16,6 +16,8 @@ export interface AudioTrack {
   artwork?: string;
   /** File locator for a direct stream (MediaVersion.streamRef); absent on older queues. */
   streamRef?: string;
+  /** Artists that have a page; absent on queues saved before 2026-11-27. */
+  artists?: { id: string; name: string }[];
 }
 
 /** What the playback engine reports back; mirrored into the store. */

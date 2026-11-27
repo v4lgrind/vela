@@ -18,4 +18,14 @@ describe('trackToAudioTrack', () => {
   it('has no locator for servers that do not give one', () => {
     expect(trackToAudioTrack({ ...track, versions: [] } as Track).streamRef).toBeUndefined();
   });
+
+  it('keeps the track artists that have an id', () => {
+    const t = { ...track, artists: [{ id: 'a1', name: 'Daft Punk' }, { name: 'Sans id' }] } as Track;
+    expect(trackToAudioTrack(t).artists).toEqual([{ id: 'a1', name: 'Daft Punk' }]);
+  });
+
+  it('falls back to the album artists', () => {
+    const t = { ...track, artists: [], albumArtists: [{ id: 'a2', name: 'X' }] } as unknown as Track;
+    expect(trackToAudioTrack(t).artists).toEqual([{ id: 'a2', name: 'X' }]);
+  });
 });

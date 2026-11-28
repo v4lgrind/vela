@@ -15,6 +15,9 @@ export interface EngineState {
   ended: boolean;
   position: number;
   duration: number;
+  /** Track left on the last item transition and its position then (native engine). */
+  previousTrackId?: string;
+  previousPosition?: number;
 }
 
 /** A playback engine owning the queue: native ExoPlayer service or web <audio>. */

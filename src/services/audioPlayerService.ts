@@ -14,6 +14,7 @@ import { usePreferencesStore } from '../store/preferences-store';
 import { downloadService } from './downloadService';
 import { offlineDatabase } from './offlineDatabase';
 import { NativeAudioEngine } from './audio/nativeAudioEngine';
+import { positionLeftAt } from './audio/position';
 import { CastAudioEngine } from './audio/castAudioEngine';
 import { CastAudio } from '@/plugins/CastAudioPlugin';
 import { NativeAudio } from '@/plugins/NativeAudioPlugin';
@@ -332,7 +333,10 @@ class AudioPlayerService implements AudioController {
       duration: s.duration,
     });
     this.checkSleepTimer();
-    if (s.trackId !== this.reportedTrackId) this.onTrackChanged(s.trackId);
+    if (s.trackId !== this.reportedTrackId) {
+      this.lastPosition = positionLeftAt(this.reportedTrackId, this.lastPosition, s);
+      this.onTrackChanged(s.trackId);
+    }
     this.lastPosition = s.position;
     this.audioStore.resumePosition = s.position;
     this.lastDuration = s.duration;

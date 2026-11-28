@@ -12,6 +12,8 @@ export function toEngineState(s: NativeAudioState): EngineState {
     ended: s.ended,
     position: s.positionMs / 1000,
     duration: s.durationMs / 1000,
+    previousTrackId: s.previousTrackId,
+    previousPosition: s.previousPositionMs / 1000,
   };
 }
 

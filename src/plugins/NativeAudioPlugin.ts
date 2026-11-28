@@ -22,6 +22,9 @@ export interface NativeAudioState {
   ended: boolean;
   positionMs: number;
   durationMs: number;
+  /** Track left on the last item transition, and where it was left. */
+  previousTrackId: string;
+  previousPositionMs: number;
 }
 
 export interface NativeAudioPluginInterface {

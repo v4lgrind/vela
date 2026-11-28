@@ -34,7 +34,13 @@ private const val TICK_MS = 1000L
 /**
  * JS bridge to [MusicService]. Commands go to the service's player through a
  * MediaController; player state comes back as `stateChange` events (on every
- * player event, plus once a second while playing for the position).
+ * player event, plus once a second while playing and the app is on screen).
+ *
+ * Hidden, the WebView is throttled then frozen: a tick a second piled up and
+ * was replayed all at once on return (UI fast-forwarding through the hour,
+ * black screen). So while hidden only real changes (track, play/pause) are
+ * sent, each carrying where the previous track was left, and one fresh state
+ * on return.
  */
 @CapacitorPlugin(name = "NativeAudio")
 class NativeAudioPlugin : Plugin() {
@@ -43,6 +49,12 @@ class NativeAudioPlugin : Plugin() {
     private var controller: MediaController? = null
     private var connecting = false
     private val pending = mutableListOf<(MediaController) -> Unit>()
+    private var visible = true
+    // Track left on the last item transition, and the position it was left at.
+    private var previousTrackId = ""
+    private var previousPositionMs = 0L
+    // What the last event said, to skip the hidden ones that change nothing (buffering, loading).
+    private var lastEmitted = ""
 
     private val ticker = object : Runnable {
         override fun run() {
@@ -51,11 +63,27 @@ class NativeAudioPlugin : Plugin() {
         }
     }
 
+    private fun scheduleTick(player: Player) {
+        mainHandler.removeCallbacks(ticker)
+        if (visible && player.isPlaying) mainHandler.postDelayed(ticker, TICK_MS)
+    }
+
     private val playerListener = object : Player.Listener {
+        override fun onPositionDiscontinuity(
+            oldPosition: Player.PositionInfo,
+            newPosition: Player.PositionInfo,
+            reason: Int,
+        ) {
+            val left = oldPosition.mediaItem?.mediaId ?: return
+            if (left == newPosition.mediaItem?.mediaId) return
+            previousTrackId = left
+            previousPositionMs = oldPosition.positionMs
+        }
+
+        // Called after the individual callbacks above.
         override fun onEvents(player: Player, events: Player.Events) {
-            controller?.let { emitState(it) }
-            mainHandler.removeCallbacks(ticker)
-            if (player.isPlaying) mainHandler.postDelayed(ticker, TICK_MS)
+            controller?.let { if (visible || summaryOf(it) != lastEmitted) emitState(it) }
+            scheduleTick(player)
         }
 
         override fun onPlayerError(error: PlaybackException) {
@@ -63,6 +91,19 @@ class NativeAudioPlugin : Plugin() {
             notifyListeners("error", JSObject()
                 .put("message", error.message ?: error.errorCodeName)
                 .put("code", error.errorCodeName))
+        }
+    }
+
+    override fun handleOnStop() {
+        visible = false
+        mainHandler.removeCallbacks(ticker)
+    }
+
+    override fun handleOnStart() {
+        visible = true
+        controller?.let {
+            emitState(it)
+            scheduleTick(it)
         }
     }
 
@@ -108,7 +149,7 @@ class NativeAudioPlugin : Plugin() {
             }
             controller = c
             c.addListener(playerListener)
-            if (c.isPlaying) mainHandler.postDelayed(ticker, TICK_MS)
+            scheduleTick(c)
             pending.toList().forEach { it(c) }
             pending.clear()
         }, ContextCompat.getMainExecutor(context))
@@ -321,8 +362,12 @@ class NativeAudioPlugin : Plugin() {
     }
 
     private fun emitState(c: MediaController) {
+        lastEmitted = summaryOf(c)
         notifyListeners("stateChange", stateOf(c))
     }
+
+    private fun summaryOf(c: MediaController) =
+        "${c.currentMediaItemIndex}|${c.currentMediaItem?.mediaId}|${c.playWhenReady}|${c.playbackState == Player.STATE_ENDED}"
 
     private fun stateOf(c: MediaController): JSObject {
         val duration = c.duration
@@ -333,6 +378,8 @@ class NativeAudioPlugin : Plugin() {
             .put("ended", c.playbackState == Player.STATE_ENDED)
             .put("positionMs", c.currentPosition)
             .put("durationMs", if (duration == C.TIME_UNSET) 0L else duration)
+            .put("previousTrackId", previousTrackId)
+            .put("previousPositionMs", previousPositionMs)
     }
 
     private fun toMediaItems(tracks: JSArray): List<MediaItem> =

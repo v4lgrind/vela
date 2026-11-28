@@ -49,7 +49,8 @@
       <!-- Grid -->
       <ul v-else class="list-none px-gutter py-4 md:px-gutter-wide m-0 grid grid-cols-3 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(140px,1fr))] sm:gap-4"
         style="padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px))">
-        <li v-for="item in filteredResults" :key="item.id" class="cursor-pointer" @click="goToItem(item)">
+        <MusicContextMenu v-for="item in filteredResults" :key="item.id" :target="musicTarget(item)" :track="item.kind === 'track' ? item : undefined">
+        <li class="cursor-pointer select-none" @click="goToItem(item)">
           <!-- Poster -->
           <div class="relative w-full overflow-hidden bg-surface shadow-lg active:opacity-80 transition-opacity"
             :class="posterShape(item)">
@@ -103,6 +104,7 @@
               class="text-[10.5px] text-text-muted mt-0.5">{{ item.year }}</p>
           </div>
         </li>
+        </MusicContextMenu>
       </ul>
     </div>
   </div>
@@ -124,6 +126,9 @@ import { useDownloadStore } from '@/store/download-store';
 import { useToast } from '@/composables/useToast';
 import { useAudioPlayerStore } from '@/store/audio-player-store';
 import { trackToAudioTrack } from '@/utils/audioTrack';
+import MusicContextMenu from '@/components/music/MusicContextMenu.vue';
+import { albumTarget, trackTarget } from '@/utils/musicActions';
+import type { MusicTarget } from '@/utils/musicActions';
 
 const route = useRoute();
 const offlineStore = useOfflineStore();
@@ -173,6 +178,13 @@ const tabs = [
 
 function isMusic(item: MediaItem) {
   return MUSIC_KINDS.has(item.kind);
+}
+
+/** Tracks and albums get the long-press music menu. */
+function musicTarget(item: MediaItem): MusicTarget | undefined {
+  if (item.kind === 'track') return trackTarget(item);
+  if (item.kind === 'album') return albumTarget(item);
+  return undefined;
 }
 
 function posterShape(item: MediaItem) {

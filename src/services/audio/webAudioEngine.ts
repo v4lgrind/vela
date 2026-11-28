@@ -85,6 +85,9 @@ export class WebAudioEngine implements AudioEngine {
     }
   }
 
+  readonly ownsSleepTimer = false;
+  setSleepTimer() { /* kept by audioPlayerService */ }
+
   onState(handler: (s: EngineState) => void) { this.stateHandler = handler; }
   onError(handler: (message: string) => void) { this.errorHandler = handler; }
   async restore() { return null; }

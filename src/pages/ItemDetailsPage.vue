@@ -119,7 +119,7 @@
                                 class="flex items-center justify-center size-[50px] rounded-2xl bg-surface border border-border-default text-text-heading active:scale-95 transition cursor-pointer">
                                 <Shuffle class="size-5" />
                             </button>
-                            <TrackActionsMenu v-if="isMusicCollection"
+                            <TrackActionsMenu v-if="isMusicCollection" :target="item.kind === 'album' ? albumTarget(item) : undefined"
                                 trigger-class="size-[50px] rounded-2xl bg-surface border border-border-default text-text-heading"
                                 @play-next="queueAlbum('next')" @add-to-queue="queueAlbum('end')" />
 
@@ -375,8 +375,9 @@
                 <Section v-if="(item.kind === 'album' || item.kind === 'playlist') && audioTracks.length"
                     :title="t('detail.tracks')">
                     <div class="flex flex-col gap-0.5">
-                        <div v-for="(track, i) in audioTracks" :key="track.id"
-                            class="grid grid-cols-[36px_1fr_56px_36px] gap-3 items-center rounded-lg pl-3 pr-1 py-2.5 cursor-pointer transition-all duration-150 hover:bg-surface-raised"
+                        <MusicContextMenu v-for="(track, i) in audioTracks" :key="track.id" :target="trackTarget(track)" :track="track">
+                        <div
+                            class="grid grid-cols-[36px_1fr_56px_36px] gap-3 items-center rounded-lg pl-3 pr-1 py-2.5 cursor-pointer transition-all duration-150 hover:bg-surface-raised select-none"
                             :class="audioPlayerStore.currentTrack?.id === track.id ? 'bg-accent-purple/10 text-accent-purple-light' : ''"
                             @click="playTrack(i)">
                             <div class="text-center text-text-subtle font-medium text-sm tabular-nums">{{ item.kind === 'playlist' ? i + 1 : track.trackNumber || '·' }}</div>
@@ -394,6 +395,7 @@
                             </div>
                             <TrackActionsMenu :track="track" @play-next="queueTrack(track, 'next')" @add-to-queue="queueTrack(track, 'end')" />
                         </div>
+                        </MusicContextMenu>
                     </div>
                 </Section>
 
@@ -416,7 +418,8 @@
                 <!-- Artist albums -->
                 <Section v-if="artistAlbums.length" :title="t('library.music.albums')">
                     <ul class="list-none p-0 m-0 grid grid-cols-[repeat(auto-fill,minmax(130px,1fr))] gap-4">
-                        <li v-for="album in artistAlbums" :key="album.id" class="cursor-pointer active:opacity-75" @click="goToItem(album.id)">
+                        <MusicContextMenu v-for="album in artistAlbums" :key="album.id" :target="albumTarget(album)">
+                        <li class="cursor-pointer active:opacity-75 select-none" @click="goToItem(album.id)">
                             <div class="aspect-square rounded-xl overflow-hidden bg-black/60 shadow-lg">
                                 <LazyImg :src="artUrl(album.id, album.images.poster, SQUARE)" :alt="album.title" kind="album"
                                     class="w-full h-full object-cover" />
@@ -424,6 +427,7 @@
                             <div class="mt-1.5 text-xs font-medium text-text-heading truncate">{{ album.title }}</div>
                             <div v-if="album.year" class="text-[10.5px] text-text-muted">{{ album.year }}</div>
                         </li>
+                        </MusicContextMenu>
                     </ul>
                 </Section>
 
@@ -529,6 +533,8 @@ import { useToast } from '@/composables/useToast';
 import { logger } from '@/utils/logger';
 import TranscodeDownloadDialog from '@/components/TranscodeDownloadDialog.vue';
 import TrackActionsMenu from '@/components/TrackActionsMenu.vue';
+import MusicContextMenu from '@/components/music/MusicContextMenu.vue';
+import { albumTarget, trackTarget } from '@/utils/musicActions';
 import { trackToAudioTrack } from '@/utils/audioTrack';
 import { hdrLabel, metaParts, nextEpisodeOf, resolutionLabel } from '@/utils/detailMeta';
 import type { TranscodeOptions } from '@/store/download-store';

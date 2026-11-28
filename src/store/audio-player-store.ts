@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import { indexAfterMove, moveItem, shuffleAround } from '@/utils/audioQueue';
+import type { SleepMode, SleepTimer, SleepTimerRequest } from '@/utils/sleepTimer';
 
 export type RepeatMode = 'off' | 'all' | 'one';
 const NEXT_REPEAT_MODE: Record<RepeatMode, RepeatMode> = { off: 'all', all: 'one', one: 'off' };
@@ -16,6 +17,10 @@ export interface AudioTrack {
   artwork?: string;
   /** File locator for a direct stream (MediaVersion.streamRef); absent on older queues. */
   streamRef?: string;
+  /** Artists that have a page; absent on queues saved before 2026-11-27. */
+  artists?: { id: string; name: string }[];
+  /** Loudness leveling gain (dB) measured by the server, when known. */
+  gainDb?: number;
 }
 
 /** What the playback engine reports back; mirrored into the store. */
@@ -45,9 +50,17 @@ export interface AudioController {
   previous(): void;
   setVolume(volume: number): void;
   stop(): void;
+  setSleepTimer(request: SleepTimerRequest | null): void;
 }
 
 let controller: AudioController | null = null;
+
+const MS_PER_MINUTE = 60_000;
+
+/** State kept across restarts. */
+export const PERSISTED_AUDIO_STATE = [
+  'queue', 'currentIndex', 'volume', 'repeatMode', 'shuffle', 'unshuffledQueue', 'libraryShuffle', 'radioSeed', 'resumePosition',
+] as const;
 
 export function registerAudioController(c: AudioController) {
   controller = c;
@@ -68,6 +81,10 @@ interface AudioPlayerState {
   unshuffledQueue: AudioTrack[];
   /** Music library whose random picks are playing, topped up as they run out */
   libraryShuffle: string | null;
+  /** Armed sleep timer; deliberately not persisted (a restart cancels it) */
+  sleepTimer: SleepTimer | null;
+  /** Item a radio was started from, topped up from the playing track as it runs out */
+  radioSeed: string | null;
   /** Last known position, persisted so the queue resumes after a restart */
   resumePosition: number;
   /** A Google Cast device is reachable */
@@ -94,15 +111,15 @@ export const useAudioPlayerStore = defineStore('audio-player', {
     shuffle: false,
     unshuffledQueue: [],
     libraryShuffle: null,
+    radioSeed: null,
+    sleepTimer: null,
     resumePosition: 0,
     castAvailable: false,
     castDevice: null,
     airplaySupported: false,
     airplayDevice: null,
   }),
-  persist: {
-    pick: ['queue', 'currentIndex', 'volume', 'repeatMode', 'shuffle', 'unshuffledQueue', 'libraryShuffle', 'resumePosition'],
-  },
+  persist: { pick: [...PERSISTED_AUDIO_STATE] },
   getters: {
     currentTrack: (state): AudioTrack | null => {
       if (state.currentIndex < 0 || state.currentIndex >= state.queue.length) return null;
@@ -122,6 +139,7 @@ export const useAudioPlayerStore = defineStore('audio-player', {
     playAlbum(tracks: AudioTrack[], startIndex = 0) {
       this.unshuffledQueue = tracks;
       this.libraryShuffle = null;
+      this.radioSeed = null;
       this.queue = this.shuffle ? shuffleAround(tracks, startIndex) : tracks;
       this.currentIndex = this.shuffle ? 0 : startIndex;
       this.currentTime = 0;
@@ -138,6 +156,14 @@ export const useAudioPlayerStore = defineStore('audio-player', {
     playLibraryShuffle(libraryId: string, tracks: AudioTrack[]) {
       this.playAlbum(tracks, 0);
       this.libraryShuffle = libraryId;
+    },
+    /** A radio plays in its own order, whatever the shuffle setting. */
+    playRadio(seedId: string, tracks: AudioTrack[]) {
+      const shuffle = this.shuffle;
+      this.shuffle = false;
+      this.playAlbum(tracks, 0);
+      this.shuffle = shuffle;
+      this.radioSeed = seedId;
     },
     toggleShuffle() {
       const current = this.currentTrack;
@@ -242,9 +268,23 @@ export const useAudioPlayerStore = defineStore('audio-player', {
       this.queue = [];
       this.unshuffledQueue = [];
       this.libraryShuffle = null;
+      this.radioSeed = null;
+      this.sleepTimer = null;
       this.currentIndex = -1;
       this.resumePosition = 0;
       controller?.stop();
+    },
+    setSleepTimer(mode: SleepMode, minutes?: number) {
+      this.sleepTimer = {
+        mode,
+        endsAt: mode === 'minutes' && minutes ? Date.now() + minutes * MS_PER_MINUTE : undefined,
+        armedIndex: this.currentIndex,
+      };
+      controller?.setSleepTimer({ mode, minutes });
+    },
+    cancelSleepTimer() {
+      this.sleepTimer = null;
+      controller?.setSleepTimer(null);
     },
     /** Mirror the engine's state; never calls back into the controller. */
     applySnapshot(s: PlayerSnapshot) {

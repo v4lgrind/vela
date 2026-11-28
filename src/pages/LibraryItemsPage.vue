@@ -17,8 +17,10 @@
       </TabsList>
     </Tabs>
 
+    <MusicCharts v-if="showCharts" :library-id="libraryId" class="flex-1" />
+
     <!-- Quick toggle, active filters summary, view mode, sort & filter sheet -->
-    <section class="mb-4 flex items-center gap-2">
+    <section v-if="!showCharts" class="mb-4 flex items-center gap-2">
       <Toggle variant="outline" class="shrink-0 gap-1.5" :model-value="localMode" :disabled="isOffline"
         @update:model-value="toggleDownloaded">
         <WifiOff v-if="isOffline" /><DownloadIcon v-else /> {{ t('library.downloaded') }}
@@ -107,11 +109,12 @@
       </DrawerContent>
     </Drawer>
 
-    <section class="flex-1 relative">
+    <section v-if="!showCharts" class="flex-1 relative">
       <!-- Songs: tap plays this page from that song -->
       <ul v-if="showSongList" class="list-none p-0 m-0 flex flex-col">
-        <li v-for="(song, i) in songs" :key="song.id"
-          class="flex items-center gap-3 py-2 px-1 border-b border-border-default cursor-pointer active:opacity-80"
+        <MusicContextMenu v-for="(song, i) in songs" :key="song.id" :target="trackTarget(song)" :track="song">
+        <li
+          class="flex items-center gap-3 py-2 px-1 border-b border-border-default cursor-pointer active:opacity-80 select-none"
           :class="audioStore.currentTrack?.id === song.id && 'bg-accent-purple/10'"
           @click="playSongs(i)">
           <div class="size-12 shrink-0 rounded-md overflow-hidden bg-black/60">
@@ -128,11 +131,13 @@
           <span v-if="song.durationMs" class="text-xs text-text-subtle tabular-nums shrink-0">{{ formatMsDuration(song.durationMs) }}</span>
           <TrackActionsMenu :track="song" @play-next="enqueueSong(song, 'next')" @add-to-queue="enqueueSong(song, 'end')" />
         </li>
+        </MusicContextMenu>
       </ul>
 
       <!-- Grid view -->
       <ul v-else-if="viewMode === 'grid'" class="list-none p-0 m-0 grid grid-cols-3 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(150px,1fr))] sm:gap-4">
-        <li v-for="item in items" :key="item.id" class="group">
+        <MusicContextMenu v-for="item in items" :key="item.id" :target="item.kind === 'album' ? albumTarget(item) : undefined">
+        <li class="group select-none">
           <!-- Poster with overlay -->
           <div class="relative w-full rounded-xl overflow-hidden bg-surface-raised"
             :class="isSquare(item) ? 'aspect-square' : 'aspect-[2/3]'">
@@ -186,11 +191,13 @@
             <div v-if="item.year" class="text-label font-normal text-text-muted">{{ item.year }}</div>
           </div>
         </li>
+        </MusicContextMenu>
       </ul>
 
       <!-- List view -->
       <ul v-else class="list-none p-0 m-0 flex flex-col">
-        <li v-for="item in items" :key="item.id">
+        <MusicContextMenu v-for="item in items" :key="item.id" :target="item.kind === 'album' ? albumTarget(item) : undefined">
+        <li class="select-none">
           <router-link
             :to="itemRoute(item)"
             class="flex items-center gap-3 py-2.5 px-1 border-b border-border-default hover:bg-surface-hover transition-colors active:opacity-80">
@@ -239,6 +246,7 @@
             </div>
           </router-link>
         </li>
+        </MusicContextMenu>
       </ul>
 
       <p v-if="error && !items.length" class="py-12 text-center text-body text-error">{{ error }}</p>
@@ -272,6 +280,9 @@ import { useBackend, useImageUrl } from '@/composables/useBackend';
 import { useLibrariesStore } from '@/store/libraries-store';
 import { useSessionStore } from '@/store/session-store';
 import TrackActionsMenu from '@/components/TrackActionsMenu.vue';
+import MusicContextMenu from '@/components/music/MusicContextMenu.vue';
+import MusicCharts from '@/components/music/MusicCharts.vue';
+import { albumTarget, trackTarget } from '@/utils/musicActions';
 import { useAudioPlayerStore } from '@/store/audio-player-store';
 import { useToast } from '@/composables/useToast';
 import { Button } from '@/components/ui/button';
@@ -346,13 +357,16 @@ const SQUARE: ImageSize = { width: 200, height: 200 };
 const SONG_THUMB: ImageSize = { width: 48, height: 48 };
 const RANDOM_TRACKS = 300;
 
-type MusicTab = 'albums' | 'artists' | 'songs' | 'playlists';
+type MusicTab = 'albums' | 'artists' | 'songs' | 'playlists' | 'tops';
 const MUSIC_TABS: { value: MusicTab; label: string }[] = [
   { value: 'albums', label: 'library.music.albums' },
   { value: 'artists', label: 'library.music.artists' },
   { value: 'songs', label: 'library.music.songs' },
   { value: 'playlists', label: 'library.music.playlists' },
+  { value: 'tops', label: 'library.music.tops' },
 ];
+/** Tabs that need the server: hidden offline / with "Téléchargés" on. */
+const SERVER_ONLY_TABS = new Set<MusicTab>(['playlists', 'tops']);
 const musicTab = ref<MusicTab>('albums');
 const currentLibrary = computed(() =>
   librariesStore.libraries.find((l) => l.id === libraryId.value) ?? { id: libraryId.value, kind: 'other' as const });
@@ -365,7 +379,7 @@ const downloadedOnly = ref(false);
 const isOffline = computed(() => !offlineStore.isFullyOnline);
 const localMode = computed(() => downloadedOnly.value || isOffline.value);
 // Playlists are never downloaded as a whole: nothing to list with the filter on.
-const visibleMusicTabs = computed(() => MUSIC_TABS.filter((tab) => !localMode.value || tab.value !== 'playlists'));
+const visibleMusicTabs = computed(() => MUSIC_TABS.filter((tab) => !localMode.value || !SERVER_ONLY_TABS.has(tab.value)));
 let localSeed = 1;
 
 function libraryDownloads() {
@@ -373,7 +387,7 @@ function libraryDownloads() {
 }
 
 function leavePlaylistsTab() {
-  if (localMode.value && musicTab.value === 'playlists') musicTab.value = 'albums';
+  if (localMode.value && SERVER_ONLY_TABS.has(musicTab.value)) musicTab.value = 'albums';
 }
 
 function toggleDownloaded() {
@@ -384,6 +398,8 @@ function toggleDownloaded() {
   onFilterChange();
 }
 const showSongList = computed(() => isMusicLibrary.value && musicTab.value === 'songs');
+/** The Tops tab shows its own charts instead of the paged list and its filters. */
+const showCharts = computed(() => isMusicLibrary.value && musicTab.value === 'tops');
 
 function selectMusicTab(tab: MusicTab) {
   musicTab.value = tab;
@@ -523,7 +539,7 @@ function toggleViewMode() {
 // A-Z sidebar
 const alphabet = ['#', ...Array.from({ length: 26 }, (_, i) => String.fromCharCode(65 + i))];
 // Short lists don't need an index; keep it while a letter is applied so it can be changed or cleared.
-const showIndex = computed(() =>
+const showIndex = computed(() => !showCharts.value &&
   sortBy.value === 'title' && (items.value.length >= 30 || hasMore.value || nameStartsWith.value !== ''));
 
 function jumpToLetter(letter: string) {
@@ -537,6 +553,7 @@ function jumpToLetter(letter: string) {
 
 const countLabel = computed(() => {
   if (loading.value && !items.value.length) return undefined;
+  if (showCharts.value) return undefined;
   const key = isMusicLibrary.value ? `library.count.${musicTab.value}` : 'library.count.items';
   return t(key, total.value);
 });
@@ -555,11 +572,11 @@ function formatRuntime(ms: number): string {
   return formatDuration(Math.round(ms / 60_000) * 60);
 }
 
-const VIEW_BY_TAB: Record<MusicTab, LibraryQuery['view']> = { albums: 'albums', artists: 'artists', songs: 'tracks', playlists: 'playlists' };
+const VIEW_BY_TAB: Record<Exclude<MusicTab, 'tops'>, LibraryQuery['view']> = { albums: 'albums', artists: 'artists', songs: 'tracks', playlists: 'playlists' };
 
 function libraryQuery(offset: number): LibraryQuery {
   return {
-    view: isMusicLibrary.value ? VIEW_BY_TAB[musicTab.value] : 'items',
+    view: isMusicLibrary.value && musicTab.value !== 'tops' ? VIEW_BY_TAB[musicTab.value] : 'items',
     sort: { by: sortBy.value, order: sortOrder.value },
     filter: {
       unplayed: unplayedOnly.value && !isMusicLibrary.value,
@@ -575,6 +592,7 @@ function libraryQuery(offset: number): LibraryQuery {
 /** First page for the current tab / filters; replaces what was listed. */
 async function loadPage() {
   saveLibraryState();
+  if (showCharts.value) return;
   localSeed = Date.now();
   const id = libraryId.value;
   const request = ++pageRequest;
@@ -595,6 +613,7 @@ async function loadPage() {
 }
 
 async function loadMore() {
+  if (showCharts.value) return;
   if (loading.value || loadingMore.value || !hasMore.value) return;
   const request = pageRequest;
   loadingMore.value = true;

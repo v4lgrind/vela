@@ -37,3 +37,9 @@ export function freshTracks<T extends { id: string }>(queue: T[], candidates: T[
   const fresh = candidates.filter((t) => !queued.has(t.id));
   return fresh.length ? fresh : candidates;
 }
+
+/** A radio queue: the seed track first, then the mix without it. */
+export function radioQueue<T extends { id: string }>(seed: T | null, mix: T[]): T[] {
+  if (!seed) return mix;
+  return [seed, ...mix.filter((t) => t.id !== seed.id)];
+}

@@ -1,7 +1,11 @@
-import type { Track } from '@/domain';
+import type { ArtistRef, MediaItem, Track } from '@/domain';
 import type { AudioTrack } from '@/store/audio-player-store';
 
 const MS_PER_SECOND = 1000;
+
+function linkedArtists(refs: ArtistRef[]): { id: string; name: string }[] {
+  return refs.flatMap((artist) => (artist.id ? [{ id: artist.id, name: artist.name }] : []));
+}
 
 /** Maps a domain track to the player's track shape. */
 export function trackToAudioTrack(track: Track, albumNameFallback = ''): AudioTrack {
@@ -15,5 +19,19 @@ export function trackToAudioTrack(track: Track, albumNameFallback = ''): AudioTr
     indexNumber: track.trackNumber || 0,
     artwork: track.images.poster,
     streamRef: track.versions[0]?.streamRef,
+    artists: linkedArtists(track.artists.length ? track.artists : track.albumArtists),
+    gainDb: track.gainDb,
   };
+}
+
+/** A queue saved before tracks carried their cover or artists. */
+export function needsServerDetails(track: AudioTrack): boolean {
+  return !track.artwork || !track.artists;
+}
+
+/** Completes such a track from the server's item; never overwrites what it has. */
+export function withServerDetails(track: AudioTrack, item: MediaItem | undefined): AudioTrack {
+  if (!item) return track;
+  const artists = track.artists ?? (item.kind === 'track' ? linkedArtists(item.artists.length ? item.artists : item.albumArtists) : undefined);
+  return { ...track, artwork: track.artwork ?? item.images.poster, artists };
 }

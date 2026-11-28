@@ -14,6 +14,7 @@ import { usePreferencesStore } from '../store/preferences-store';
 import { downloadService } from './downloadService';
 import { offlineDatabase } from './offlineDatabase';
 import { NativeAudioEngine } from './audio/nativeAudioEngine';
+import { positionLeftAt } from './audio/position';
 import { CastAudioEngine } from './audio/castAudioEngine';
 import { CastAudio } from '@/plugins/CastAudioPlugin';
 import { NativeAudio } from '@/plugins/NativeAudioPlugin';
@@ -23,9 +24,13 @@ import { WebAudioEngine } from './audio/webAudioEngine';
 import type { AudioEngine, EngineState, QueueItem } from './audio/types';
 import { autoLibraryConfig } from '@/utils/autoLibraryConfig';
 import { logger } from '@/utils/logger';
-import type { MediaBackend, PlaybackReporter } from '@/domain';
-import { trackToAudioTrack } from '@/utils/audioTrack';
+import type { MediaBackend, PlaybackReporter, Track } from '@/domain';
+import { needsServerDetails, trackToAudioTrack, withServerDetails } from '@/utils/audioTrack';
 import { freshTracks, LIBRARY_SHUFFLE_REFILL_AT } from '@/utils/audioQueue';
+import type { MusicTarget } from '@/utils/musicActions';
+import { loadRadio, RADIO_BATCH } from '@/utils/radio';
+import { sleepShouldPause } from '@/utils/sleepTimer';
+import type { SleepTimerRequest } from '@/utils/sleepTimer';
 
 const isNative = Capacitor.isNativePlatform();
 const REPORT_INTERVAL_MS = 10_000;
@@ -73,33 +78,36 @@ class AudioPlayerService implements AudioController {
     this.offlineStore = useOfflineStore();
     this.preferencesStore = usePreferencesStore();
 
-    this.localEngine = isNative ? new NativeAudioEngine() : new WebAudioEngine();
+    const nativeEngine = isNative ? new NativeAudioEngine() : null;
+    nativeEngine?.onSleepTimerFired(() => { this.audioStore.sleepTimer = null; });
+    this.localEngine = nativeEngine ?? new WebAudioEngine();
     this.engine = this.localEngine;
     this.bindEngine(this.localEngine);
     if (isNative) {
       this.setupCasting();
       this.setupAirPlay();
       this.setupAndroidAuto();
+      this.setupLoudnessLeveling();
     }
     registerAudioController(this);
     this.restoreFromEngine();
-    void this.backfillArtwork();
+    void this.backfillQueueDetails();
     this.setupLibraryShuffleRefill();
   }
 
-  /** Queues saved before tracks carried their cover get it from the server once. */
-  private async backfillArtwork() {
+  /** Queues saved before tracks carried their cover / artists get them from the server once. */
+  private async backfillQueueDetails() {
     const store = this.audioStore;
-    const missing = [...new Set([...store.queue, ...store.unshuffledQueue].filter((t) => !t.artwork).map((t) => t.id))];
+    const missing = [...new Set([...store.queue, ...store.unshuffledQueue].filter(needsServerDetails).map((t) => t.id))];
     const backend = this.backend();
     if (!missing.length || !backend || !this.offlineStore.isFullyOnline) return;
     try {
-      const art = new Map((await backend.catalog.items(missing)).map((item) => [item.id, item.images.poster]));
-      const withArt = (track: AudioTrack) => (track.artwork ? track : { ...track, artwork: art.get(track.id) });
-      store.queue = store.queue.map(withArt);
-      store.unshuffledQueue = store.unshuffledQueue.map(withArt);
+      const items = new Map((await backend.catalog.items(missing)).map((item) => [item.id, item]));
+      const complete = (track: AudioTrack) => withServerDetails(track, items.get(track.id));
+      store.queue = store.queue.map(complete);
+      store.unshuffledQueue = store.unshuffledQueue.map(complete);
     } catch (e) {
-      logger.warn('[AudioPlayer] Could not fetch queue artwork', e);
+      logger.warn('[AudioPlayer] Could not complete the saved queue', e);
     }
   }
 
@@ -107,13 +115,43 @@ class AudioPlayerService implements AudioController {
 
   private setupLibraryShuffleRefill() {
     watch(
-      () => [this.audioStore.libraryShuffle, this.audioStore.currentIndex, this.audioStore.queue.length] as const,
-      ([libraryShuffle, index, length]) => {
-        if (libraryShuffle && index >= 0 && length - 1 - index <= LIBRARY_SHUFFLE_REFILL_AT) {
-          this.refillLibraryShuffle(libraryShuffle);
-        }
+      () => [this.audioStore.libraryShuffle, this.audioStore.radioSeed, this.audioStore.currentIndex, this.audioStore.queue.length] as const,
+      ([libraryShuffle, radioSeed, index, length]) => {
+        if (index < 0 || length - 1 - index > LIBRARY_SHUFFLE_REFILL_AT) return;
+        if (libraryShuffle) this.refillLibraryShuffle(libraryShuffle);
+        else if (radioSeed) this.refillRadio(radioSeed);
       },
     );
+  }
+
+  /** Replaces the queue with a radio from a track, album or artist. */
+  async startRadio(target: MusicTarget) {
+    const backend = this.backend();
+    if (!backend) return;
+    try {
+      const seed = target.kind === 'track' ? await backend.catalog.item(target.id) : undefined;
+      const tracks = await loadRadio(backend.music, target, seed?.kind === 'track' ? seed as Track : undefined);
+      this.audioStore.playRadio(target.id, tracks);
+    } catch (e) {
+      logger.warn('[AudioPlayer] Radio failed', e);
+      useToast().showError(i18n.global.t('audio.radioFailed'));
+    }
+  }
+
+  /** More of the radio, mixed from the playing track. */
+  private async refillRadio(seedId: string) {
+    const current = this.audioStore.currentTrack;
+    if (this.refilling || !current) return;
+    this.refilling = true;
+    try {
+      const mix = await this.backend()?.music.radio(current.id, RADIO_BATCH) ?? [];
+      const picks = mix.map((track) => trackToAudioTrack(track));
+      if (this.audioStore.radioSeed === seedId && picks.length) this.audioStore.addToQueue(freshTracks(this.audioStore.queue, picks));
+    } catch (e) {
+      logger.error('[AudioPlayer] Radio refill failed', e);
+    } finally {
+      this.refilling = false;
+    }
   }
 
   private async refillLibraryShuffle(libraryId: string) {
@@ -169,6 +207,15 @@ class AudioPlayerService implements AudioController {
 
   // --- Android Auto: the car browses the library natively and may start a queue ---
 
+  /** MusicService applies each track's gain; it only needs to know whether to. */
+  private setupLoudnessLeveling() {
+    watch(
+      () => this.preferencesStore.loudnessLeveling,
+      (enabled) => NativeAudio.setLoudnessLeveling({ enabled }).catch((e) => logger.error('[AudioPlayer] setLoudnessLeveling failed', e)),
+      { immediate: true },
+    );
+  }
+
   private setupAndroidAuto() {
     // The car can start the music service without the app: it needs its own credentials
     // (Jellyfin or Plex), cleared when signed out.
@@ -189,6 +236,7 @@ class AudioPlayerService implements AudioController {
       this.audioStore.shuffle = false;
       // The car's library shuffle is topped up by MusicService itself.
       this.audioStore.libraryShuffle = null;
+      this.audioStore.radioSeed = null;
       this.restoreFromEngine().then(() => {
         this.audioStore.unshuffledQueue = this.audioStore.queue;
       });
@@ -255,6 +303,7 @@ class AudioPlayerService implements AudioController {
   next() { this.enqueue(() => this.engine.next()); }
   previous() { this.enqueue(() => this.engine.previous()); }
   setVolume(volume: number) { this.enqueue(() => this.engine.setVolume(volume)); }
+  setSleepTimer(request: SleepTimerRequest | null) { this.enqueue(() => this.engine.setSleepTimer(request)); }
 
   stop() {
     this.enqueue(() => this.engine.stop());
@@ -283,10 +332,23 @@ class AudioPlayerService implements AudioController {
       currentTime: s.position,
       duration: s.duration,
     });
-    if (s.trackId !== this.reportedTrackId) this.onTrackChanged(s.trackId);
+    this.checkSleepTimer();
+    if (s.trackId !== this.reportedTrackId) {
+      this.lastPosition = positionLeftAt(this.reportedTrackId, this.lastPosition, s);
+      this.onTrackChanged(s.trackId);
+    }
     this.lastPosition = s.position;
     this.audioStore.resumePosition = s.position;
     this.lastDuration = s.duration;
+  }
+
+  /** Cast / web: the engine can't pause on its own, so the timer runs here on its state reports. */
+  private checkSleepTimer() {
+    const store = this.audioStore;
+    if (!store.sleepTimer || this.engine.ownsSleepTimer) return;
+    if (!sleepShouldPause(store.sleepTimer, { now: Date.now(), queue: store.queue, currentIndex: store.currentIndex })) return;
+    store.sleepTimer = null;
+    if (store.isPlaying) store.togglePlayPause();
   }
 
   private onEngineError(message: string, network = false) {

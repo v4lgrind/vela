@@ -63,6 +63,13 @@ export function createJellyfinMusic(client: JellyfinClient): MusicPort {
     randomTracks: (libraryId, limit) => list<Track>({
       parentId: libraryId, recursive: true, includeItemTypes: ['Audio'], sortBy: ['Random'], limit,
     }),
+    mostPlayed: (libraryId, limit) => list<Track>({
+      parentId: libraryId, recursive: true, includeItemTypes: ['Audio'], filters: ['IsPlayed'],
+      sortBy: ['PlayCount'], sortOrder: ['Descending'], limit,
+    }),
+    // Instant Mix: genre-based picks, Jellyfin has no sonic analysis.
+    radio: async (seedId, limit) => (await client.get<{ Items?: BaseItemDto[] }>(`/Items/${seedId}/InstantMix`, { userId, limit }))
+      .Items?.map(toMediaItem).filter((item): item is Track => item.kind === 'track') ?? [],
     streamUrl,
     lyrics,
     reporter: (trackId) => createReporter(client, {

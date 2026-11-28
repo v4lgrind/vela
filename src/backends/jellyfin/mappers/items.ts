@@ -141,6 +141,7 @@ const BUILDERS: Partial<Record<ItemKind, Builder>> = {
     trackNumber: opt(dto.IndexNumber),
     discNumber: opt(dto.ParentIndexNumber),
     hasLyrics: opt(dto.HasLyrics),
+    gainDb: opt(dto.NormalizationGain),
     versions: toMediaVersions(dto),
   }),
   playlist: (dto, base) => ({ ...base, kind: 'playlist', mediaType: playlistMediaType(dto.MediaType), itemCount: opt(dto.ChildCount) }),

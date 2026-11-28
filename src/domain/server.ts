@@ -15,6 +15,8 @@ export interface Capabilities {
   serverStreamInfo: boolean;
   cast: boolean;
   androidAuto: boolean;
+  /** MusicPort.radio returns tracks. */
+  radio: boolean;
 }
 
 export interface ServerUser {

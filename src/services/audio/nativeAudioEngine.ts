@@ -1,6 +1,7 @@
 import { NativeAudio, type NativeAudioState, type NativeAudioTrack } from '@/plugins/NativeAudioPlugin';
 import type { AudioTrack, RepeatMode } from '@/store/audio-player-store';
 import { logger } from '@/utils/logger';
+import type { SleepTimerRequest } from '@/utils/sleepTimer';
 import type { AudioEngine, EngineState, QueueItem } from './types';
 
 export function toEngineState(s: NativeAudioState): EngineState {
@@ -11,6 +12,8 @@ export function toEngineState(s: NativeAudioState): EngineState {
     ended: s.ended,
     position: s.positionMs / 1000,
     duration: s.durationMs / 1000,
+    previousTrackId: s.previousTrackId,
+    previousPosition: s.previousPositionMs / 1000,
   };
 }
 
@@ -65,6 +68,16 @@ export class NativeAudioEngine implements AudioEngine {
   previous() { run('previous', NativeAudio.previous()); }
   setVolume(volume: number) { run('setVolume', NativeAudio.setVolume({ volume })); }
   stop() { run('stop', NativeAudio.stop()); }
+
+  readonly ownsSleepTimer = true;
+  setSleepTimer(request: SleepTimerRequest | null) {
+    run('setSleepTimer', NativeAudio.setSleepTimer({ mode: request?.mode ?? 'off', minutes: request?.minutes }));
+  }
+
+  /** The service paused on its sleep timer. */
+  onSleepTimerFired(handler: () => void) {
+    NativeAudio.addListener('sleepTimerFired', handler);
+  }
 
   onState(handler: (s: EngineState) => void) {
     NativeAudio.addListener('stateChange', (s) => handler(toEngineState(s)));

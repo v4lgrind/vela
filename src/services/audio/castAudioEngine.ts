@@ -72,6 +72,9 @@ export class CastAudioEngine implements AudioEngine {
     run('stop', CastAudio.stop());
   }
 
+  readonly ownsSleepTimer = false;
+  setSleepTimer() { /* kept by audioPlayerService */ }
+
   onState(handler: (s: EngineState) => void) {
     CastAudio.addListener('stateChange', (raw) => {
       this.last = toEngineState(raw);

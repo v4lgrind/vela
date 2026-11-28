@@ -4,41 +4,30 @@
     :style="{ padding: 'var(--sat, env(safe-area-inset-top, 12px)) 16px calc(16px + var(--sab, env(safe-area-inset-bottom, 0px)))', transform: `translateY(${sheetOffset}px)` }"
     @touchstart.passive="onSwipeStart" @touchmove.passive="onSwipeMove" @touchend="onSwipeEnd" @touchcancel="onSwipeEnd">
 
-    <!-- Header -->
-    <div class="flex items-center justify-between py-2 shrink-0">
-      <Button variant="ghost" size="icon" class="size-11 rounded-full text-text-primary hover:bg-white/10" @click="audioStore.isExpanded = false">
+    <!-- Cover backdrop: fixed inside the swiped sheet (its transform makes it the containing block) -->
+    <div class="pointer-events-none fixed inset-0 -z-10 overflow-hidden" aria-hidden="true">
+      <Transition enter-active-class="transition-opacity duration-400" leave-active-class="transition-opacity duration-400"
+        enter-from-class="opacity-0" leave-to-class="opacity-0">
+        <div v-if="albumArtUrl && !artFailed" :key="albumArtUrl" class="absolute inset-0">
+          <img :src="albumArtUrl" alt="" class="absolute inset-0 size-full scale-125 object-cover audio-player-art" />
+          <div class="absolute inset-0 audio-player-scrim"></div>
+        </div>
+      </Transition>
+    </div>
+
+    <!-- Header: close, what plays where, more -->
+    <div class="flex items-center gap-2 py-2 shrink-0">
+      <Button variant="ghost" size="icon" class="size-11 shrink-0 rounded-full text-text-primary hover:bg-white/10" :aria-label="t('common.close')" @click="audioStore.isExpanded = false">
         <ChevronDown class="size-7" />
       </Button>
-      <span v-if="audioStore.castDevice" class="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-accent-purple truncate">
-        <Cast class="size-4 shrink-0" /> {{ audioStore.castDevice }}
+      <span v-if="audioStore.castDevice" class="flex min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap text-xs font-semibold uppercase tracking-wide text-accent-purple">
+        <Cast class="size-4 shrink-0" /> <span class="truncate">{{ audioStore.castDevice }}</span>
       </span>
-      <span v-else-if="audioStore.airplayDevice" class="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-accent-purple truncate">
-        <Airplay class="size-4 shrink-0" /> {{ audioStore.airplayDevice }}
+      <span v-else-if="audioStore.airplayDevice" class="flex min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap text-xs font-semibold uppercase tracking-wide text-accent-purple">
+        <Airplay class="size-4 shrink-0" /> <span class="truncate">{{ audioStore.airplayDevice }}</span>
       </span>
-      <span v-else class="text-xs font-semibold uppercase tracking-wide text-text-muted">{{ t('audio.nowPlaying') }}</span>
-      <div class="flex items-center gap-2">
-        <Button v-if="audioStore.airplaySupported && !audioStore.castDevice" variant="ghost" size="icon" title="AirPlay"
-          class="size-11 rounded-full hover:bg-white/10"
-          :class="audioStore.airplayDevice ? 'text-accent-purple' : 'text-text-primary'"
-          @click="showAirPlay = true">
-          <Airplay class="size-6" />
-        </Button>
-        <Button v-if="(audioStore.castAvailable || audioStore.castDevice) && !audioStore.airplayDevice" variant="ghost" size="icon" title="Cast"
-          class="size-11 rounded-full hover:bg-white/10"
-          :class="audioStore.castDevice ? 'text-accent-purple' : 'text-text-primary'"
-          @click="audioPlayerService.openCastDialog()">
-          <Cast class="size-6" />
-        </Button>
-        <Button v-if="lyrics" variant="ghost" size="icon" :aria-label="t('audio.lyrics')"
-          class="size-11 rounded-full hover:bg-white/10"
-          :class="showLyrics && !showQueue ? 'text-accent-purple' : 'text-text-primary'"
-          @click="toggleLyrics">
-          <MicVocal class="size-6" />
-        </Button>
-        <Button variant="ghost" size="icon" class="size-11 rounded-full text-text-primary hover:bg-white/10" :aria-label="t('audio.queue')" @click="showQueue = !showQueue">
-          <ListMusic class="size-7" />
-        </Button>
-      </div>
+      <span v-else class="min-w-0 flex-1 truncate whitespace-nowrap text-center text-xs font-semibold uppercase tracking-wide text-text-muted">{{ t('audio.nowPlaying') }}</span>
+      <NowPlayingMenu :track="currentTrack" @sleep-timer="showSleepTimer = true" />
     </div>
 
     <!-- Main Player -->
@@ -51,6 +40,10 @@
         <div class="text-xl font-bold text-text-heading truncate">{{ currentTrack?.name || '' }}</div>
         <div class="text-base text-text-muted mt-1">{{ currentTrack?.artist || '' }}</div>
         <div v-if="currentTrack?.albumName" class="text-sm text-text-subtle mt-0.5">{{ currentTrack.albumName }}</div>
+        <button v-if="sleepLeft !== null" class="mt-2 inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-sm font-medium text-accent-purple tabular-nums hover:bg-white/10 cursor-pointer"
+          :aria-label="t('audio.sleep.remaining', { time: formatTime(sleepLeft) })" @click="showSleepTimer = true">
+          <Moon class="size-4" /> {{ formatTime(sleepLeft) }}
+        </button>
       </div>
 
       <!-- Progress -->
@@ -132,7 +125,33 @@
         </div>
       </div>
     </div>
+    <!-- Bottom bar: lyrics, output, queue (always three slots, so nothing moves between tracks) -->
+    <div class="flex shrink-0 items-center justify-around pt-3">
+      <Button variant="ghost" size="icon" :aria-label="t('audio.lyrics')" :disabled="!lyrics"
+        class="size-11 rounded-full hover:bg-white/10 disabled:opacity-30"
+        :class="showLyrics && lyrics && !showQueue ? 'text-accent-purple' : 'text-text-primary'"
+        @click="toggleLyrics">
+        <MicVocal class="size-6" />
+      </Button>
+      <Button v-if="audioStore.airplaySupported && !audioStore.castDevice" variant="ghost" size="icon" title="AirPlay"
+        class="size-11 rounded-full hover:bg-white/10"
+        :class="audioStore.airplayDevice ? 'text-accent-purple' : 'text-text-primary'"
+        @click="showAirPlay = true">
+        <Airplay class="size-6" />
+      </Button>
+      <Button v-if="(audioStore.castAvailable || audioStore.castDevice) && !audioStore.airplayDevice" variant="ghost" size="icon" title="Cast"
+        class="size-11 rounded-full hover:bg-white/10"
+        :class="audioStore.castDevice ? 'text-accent-purple' : 'text-text-primary'"
+        @click="audioPlayerService.openCastDialog()">
+        <Cast class="size-6" />
+      </Button>
+      <Button variant="ghost" size="icon" class="size-11 rounded-full hover:bg-white/10" :aria-label="t('audio.queue')"
+        :class="showQueue ? 'text-accent-purple' : 'text-text-primary'" @click="showQueue = !showQueue">
+        <ListMusic class="size-6" />
+      </Button>
+    </div>
     <AirPlayDialog v-model:open="showAirPlay" />
+    <SleepTimerSheet v-model:open="showSleepTimer" />
   </div>
 </template>
 
@@ -149,8 +168,12 @@ import { Slider } from '@/components/ui/slider';
 import { audioPlayerService } from '@/services/audioPlayerService';
 import AirPlayDialog from '@/components/AirPlayDialog.vue';
 import AudioLyrics from '@/components/AudioLyrics.vue';
+import NowPlayingMenu from '@/components/music/NowPlayingMenu.vue';
+import SleepTimerSheet from '@/components/music/SleepTimerSheet.vue';
+import { sleepRemaining } from '@/utils/sleepTimer';
+import { useNow } from '@vueuse/core';
 import type { Lyrics } from '@/domain';
-import { Airplay, Cast, ChevronDown, GripVertical, ListMusic, MicVocal, SkipBack, SkipForward, Play, Pause, Repeat, Repeat1, Shuffle, Volume2, Volume1, VolumeX, X } from 'lucide-vue-next';
+import { Airplay, Cast, ChevronDown, Moon, GripVertical, ListMusic, MicVocal, SkipBack, SkipForward, Play, Pause, Repeat, Repeat1, Shuffle, Volume2, Volume1, VolumeX, X } from 'lucide-vue-next';
 
 const { t } = useI18n();
 const audioStore = useAudioPlayerStore();
@@ -158,6 +181,17 @@ const session = useSessionStore();
 const imageUrl = useImageUrl();
 
 const showQueue = ref(false);
+const showSleepTimer = ref(false);
+const now = useNow({ interval: 1000 });
+/** Seconds before the sleep timer pauses, null when none is set. */
+const sleepLeft = computed(() => {
+  const timer = audioStore.sleepTimer;
+  if (!timer) return null;
+  return sleepRemaining(timer, {
+    now: now.value.getTime(), queue: audioStore.queue, currentIndex: audioStore.currentIndex,
+    currentTime: audioStore.currentTime, duration: audioStore.duration,
+  });
+});
 const showAirPlay = ref(false);
 
 const currentTrack = computed(() => audioStore.currentTrack);

@@ -55,6 +55,13 @@
     "seeAllDownloads": "See all in the library"
   },
   "library": {
+    "charts": {
+      "artists": "Top artists",
+      "albums": "Top albums",
+      "tracks": "Top tracks",
+      "empty": "Nothing played yet",
+      "plays": "{n} play | {n} plays"
+    },
     "title": "Libraries",
     "alphaIndex": "Jump to letter",
     "unwatched": "Unwatched",
@@ -91,6 +98,7 @@
       "artists": "Artists",
       "songs": "Songs",
       "playlists": "Playlists",
+      "tops": "Top",
       "shuffleAll": "Shuffle all",
       "shuffleFailed": "Could not start shuffle"
     },
@@ -98,6 +106,18 @@
     "offlineLocked": "Offline: the filter stays on."
   },
   "audio": {
+    "sleep": {
+      "minutes": "{n} min",
+      "endOfTrack": "End of track",
+      "endOfAlbum": "End of album",
+      "cancel": "Cancel sleep timer",
+      "remaining": "Sleep timer: {time} left"
+    },
+    "goToAlbum": "Go to album",
+    "goToArtist": "Go to {name}",
+    "startRadio": "Start radio",
+    "sleepTimer": "Sleep timer",
+    "radioFailed": "Could not start the radio",
     "playingNext": "Playing next",
     "addedToQueue": "Added to queue",
     "cover": "Cover",
@@ -239,6 +259,8 @@
     "tracksCount": "{n} track | {n} tracks"
   },
   "settings": {
+    "loudnessLeveling": "Loudness leveling",
+    "loudnessLevelingHint": "Every track at the same volume, as measured by the server",
     "title": "Settings",
     "account": "Account",
     "active": "Active",

@@ -55,6 +55,13 @@
     "seeAllDownloads": "Tout voir dans la bibliothèque"
   },
   "library": {
+    "charts": {
+      "artists": "Top artistes",
+      "albums": "Top albums",
+      "tracks": "Top titres",
+      "empty": "Rien d'écouté pour l'instant",
+      "plays": "{n} écoute | {n} écoutes"
+    },
     "title": "Bibliothèques",
     "alphaIndex": "Aller à la lettre",
     "unwatched": "Non vus",
@@ -91,6 +98,7 @@
       "artists": "Artistes",
       "songs": "Titres",
       "playlists": "Playlists",
+      "tops": "Tops",
       "shuffleAll": "Lecture aléatoire",
       "shuffleFailed": "Impossible de lancer la lecture aléatoire"
     },
@@ -98,6 +106,18 @@
     "offlineLocked": "Hors ligne : le filtre reste activé."
   },
   "audio": {
+    "sleep": {
+      "minutes": "{n} min",
+      "endOfTrack": "Fin du titre",
+      "endOfAlbum": "Fin de l'album",
+      "cancel": "Annuler le minuteur",
+      "remaining": "Minuteur : encore {time}"
+    },
+    "goToAlbum": "Aller à l'album",
+    "goToArtist": "Aller à {name}",
+    "startRadio": "Lancer la radio",
+    "sleepTimer": "Minuteur",
+    "radioFailed": "Impossible de lancer la radio",
     "playingNext": "Lecture à suivre",
     "addedToQueue": "Ajouté à la file",
     "cover": "Pochette",
@@ -239,6 +259,8 @@
     "tracksCount": "{n} titre | {n} titres"
   },
   "settings": {
+    "loudnessLeveling": "Égaliser le volume",
+    "loudnessLevelingHint": "Tous les titres au même volume, selon la mesure du serveur",
     "title": "Réglages",
     "account": "Compte",
     "active": "Actif",

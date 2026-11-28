@@ -107,6 +107,11 @@ describe('Jellyfin → domain: music', () => {
     expect(track.images.poster).toBe('a1/Primary/x');
   });
 
+  it('keeps the loudness gain the server measured', () => {
+    expect((toMediaItem({ Id: 't1', Type: 'Audio', NormalizationGain: -7.5 }) as Track).gainDb).toBe(-7.5);
+    expect((toMediaItem({ Id: 't2', Type: 'Audio', NormalizationGain: null }) as Track).gainDb).toBeUndefined();
+  });
+
   it('maps unknown types to other', () => {
     expect(toMediaItem({ Id: 'f', Type: 'Folder', Name: 'x' }).kind).toBe('other');
   });
